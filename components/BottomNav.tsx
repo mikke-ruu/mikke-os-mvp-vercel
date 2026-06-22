@@ -1,12 +1,12 @@
 "use client";
 
-import { BarChart3, Home, NotebookTabs, Settings, UserRound } from "lucide-react";
+import { BarChart3, Home, Settings, Store, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
   { href: "/home", label: "ホーム", icon: Home },
-  { href: "/marketnote", label: "記録", icon: NotebookTabs },
+  { href: "/marketnote", label: "出店", icon: Store },
   { href: "/story", label: "Story", icon: UserRound },
   { href: "/desk", label: "DESK", icon: BarChart3 },
   { href: "/settings", label: "設定", icon: Settings }

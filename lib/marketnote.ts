@@ -52,6 +52,8 @@ export async function createMarketEvent(
     area: string;
     genre: string;
     publicNote: string;
+    privateNote?: string;
+    status?: "planned" | "preparing";
   }
 ) {
   const { data, error } = await supabase
@@ -64,10 +66,11 @@ export async function createMarketEvent(
       venue_name: input.venueName || null,
       area: input.area || null,
       genre: input.genre || null,
-      status: "planned",
+      status: input.status ?? "planned",
       visibility: "public",
       display_on_story: true,
-      public_note: input.publicNote || null
+      public_note: input.publicNote || null,
+      private_note: input.privateNote || null
     })
     .select("*")
     .single();

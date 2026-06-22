@@ -2,15 +2,26 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, Circle, Flag } from "lucide-react";
+import {
+  Banknote,
+  Camera,
+  Check,
+  Circle,
+  Clock,
+  CreditCard,
+  MapPin,
+  Minus,
+  MoreHorizontal,
+  Plus,
+  QrCode,
+  WalletCards
+} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
-import { StatCard } from "@/components/StatCard";
 import { formatDate, formatYen } from "@/lib/format";
 import {
   addCheckItem,
   addFinancialRecord,
-  completeMarketEvent,
   getMarketEventBundle,
   saveReflection,
   toggleCheckItem
@@ -41,7 +52,7 @@ function MarketDetailContent() {
   const totals = useMemo(() => {
     const revenue = finances.filter((row) => row.record_type === "revenue").reduce((sum, row) => sum + Number(row.amount), 0);
     const expense = finances.filter((row) => row.record_type === "expense").reduce((sum, row) => sum + Number(row.amount), 0);
-    return { revenue, expense, profit: revenue - expense };
+    return { revenue, expense };
   }, [finances]);
 
   if (!event) {
@@ -53,21 +64,8 @@ function MarketDetailContent() {
   }
 
   return (
-    <AppShell title={event.title} subtitle={`${formatDate(event.event_date)} / ${event.venue_name ?? "会場未設定"}`}>
-      <section className="rounded-2xl border border-[#e8e1da] bg-white p-4 shadow-sm">
-        <p className="text-xs font-bold text-[#d9643a]">出店情報</p>
-        <h2 className="mt-2 text-2xl font-bold">{event.title}</h2>
-        <p className="mt-2 text-sm leading-6 text-[#79716b]">
-          {[event.venue_name, event.area, event.genre].filter(Boolean).join(" / ") || "詳細未設定"}
-        </p>
-        <p className="mt-3 inline-flex rounded-full bg-[#fff0e9] px-3 py-1 text-xs font-bold text-[#8f3d22]">{event.status}</p>
-      </section>
-
-      <section className="mt-4 grid grid-cols-3 gap-3">
-        <StatCard label="売上" value={formatYen(totals.revenue)} tone="orange" />
-        <StatCard label="経費" value={formatYen(totals.expense)} tone="navy" />
-        <StatCard label="利益" value={formatYen(totals.profit)} tone="green" />
-      </section>
+    <AppShell title="出店詳細" subtitle={event.title}>
+      <BasicInfo event={event} />
 
       <CheckSection
         checks={checks}
@@ -81,10 +79,28 @@ function MarketDetailContent() {
         }}
       />
 
-      <FinanceSection
+      <PaymentSection event={event} checks={checks} />
+
+      <MoneySection
+        title="経費"
+        total={totals.expense}
+        recordType="expense"
         eventId={event.id}
-        finances={finances}
         eventDate={event.event_date}
+        records={finances.filter((row) => row.record_type === "expense")}
+        onAdd={async (input) => {
+          await addFinancialRecord(profile, input);
+          await load();
+        }}
+      />
+
+      <MoneySection
+        title="売上"
+        total={totals.revenue}
+        recordType="revenue"
+        eventId={event.id}
+        eventDate={event.event_date}
+        records={finances.filter((row) => row.record_type === "revenue")}
         onAdd={async (input) => {
           await addFinancialRecord(profile, input);
           await load();
@@ -97,23 +113,32 @@ function MarketDetailContent() {
         onSave={async (input) => {
           await saveReflection(profile, input);
           await load();
-          setMessage("振り返りを保存しました。");
+          setMessage("Diary / 振り返りを保存しました。");
         }}
       />
 
-      {message ? <p className="mt-4 rounded-2xl bg-[#fff0e9] px-4 py-3 text-sm text-[#8f3d22]">{message}</p> : null}
-
-      <button
-        onClick={async () => {
-          const updated = await completeMarketEvent(profile, event);
-          setEvent(updated);
-          setMessage("出店完了としてStoryに反映しました。");
-        }}
-        className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#d9643a] px-4 py-3 font-bold text-white"
-      >
-        <Flag size={20} /> 出店完了にする
-      </button>
+      {message ? <p className="mt-4 rounded-2xl bg-[#fff0e9] px-4 py-3 text-sm font-semibold text-[#8f3d22]">{message}</p> : null}
     </AppShell>
+  );
+}
+
+function BasicInfo({ event }: { event: MarketEvent }) {
+  return (
+    <section className="rounded-2xl border border-[#eceae5] bg-white p-4 shadow-sm">
+      <StatusBadge status={event.status} />
+      <h2 className="mt-3 text-2xl font-black tracking-normal text-[#1f1b18]">{event.title}</h2>
+      <div className="mt-3 grid gap-2 text-sm font-semibold text-[#4a423c]">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-[#9a9089]" />
+          <span>{formatDate(event.event_date)} / 時間未設定</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <MapPin size={16} className="text-[#9a9089]" />
+          <span>{[event.venue_name, event.area].filter(Boolean).join("（") || "会場未設定"}</span>
+        </div>
+      </div>
+      {event.public_note ? <p className="mt-3 rounded-xl bg-[#fcfbf9] p-3 text-sm leading-6 text-[#4a423c]">{event.public_note}</p> : null}
+    </section>
   );
 }
 
@@ -127,6 +152,7 @@ function CheckSection({
   onToggle: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
 }) {
   const [title, setTitle] = useState("");
+  const done = checks.filter((check) => check.is_done).length;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -136,42 +162,81 @@ function CheckSection({
   }
 
   return (
-    <section className="mt-5 rounded-2xl border border-[#e8e1da] bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-bold">準備チェック</h2>
-      <div className="mt-3 space-y-2">
+    <section className="mt-4 rounded-2xl border border-[#eceae5] bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-lg font-extrabold">チェック</h2>
+        <span className="text-xs font-bold text-[#9a9089]">{checks.length}件中 {done}件完了</span>
+      </div>
+      <div>
         {checks.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onToggle(item, !item.is_done)}
-            className="flex w-full items-center gap-3 rounded-xl bg-[#fbfaf8] px-3 py-3 text-left"
-          >
-            {item.is_done ? <CheckCircle2 className="text-[#4f8a61]" size={22} /> : <Circle className="text-[#c8bdb4]" size={22} />}
-            <span className={item.is_done ? "text-[#79716b] line-through" : "font-semibold"}>{item.title}</span>
+          <button key={item.id} onClick={() => onToggle(item, !item.is_done)} className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-[#f2efea] py-3 text-left last:border-b-0">
+            <span className={`grid h-6 w-6 place-items-center rounded-full ${item.is_done ? "bg-[#2e8b57] text-white" : "bg-white text-[#d6cec5] ring-1 ring-[#d6cec5]"}`}>
+              {item.is_done ? <Check size={14} /> : item.title.includes("提出") || item.title.includes("確認") ? <Minus size={14} className="text-[#e8612c]" /> : <Circle size={14} />}
+            </span>
+            <span className={`text-sm font-bold ${item.is_done ? "text-[#6b635c]" : "text-[#1f1b18]"}`}>{item.title}</span>
+            {item.due_date ? <span className="text-xs font-extrabold text-[#e8612c]">期限 {shortDate(item.due_date)}</span> : null}
           </button>
         ))}
       </div>
       <form onSubmit={submit} className="mt-3 flex gap-2">
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="例: 釣り銭を準備"
-          className="min-w-0 flex-1 rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3"
-        />
-        <button className="rounded-xl bg-[#25211f] px-4 py-3 font-bold text-white">追加</button>
+        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="追加チェック項目" className="min-w-0 flex-1 rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3 text-sm" />
+        <button className="rounded-xl border border-[#f0c4ae] px-4 py-3 font-extrabold text-[#e8612c]"><Plus size={18} /></button>
       </form>
     </section>
   );
 }
 
-function FinanceSection({
+function PaymentSection({ checks }: { event: MarketEvent; checks: MarketCheckItem[] }) {
+  const paymentCheck = checks.find((check) => check.title.includes("支払い"));
+  const paid = paymentCheck?.is_done ?? false;
+  const methods = [
+    { label: "現金", icon: Banknote, amount: 0 },
+    { label: "QR", icon: QrCode, amount: 0 },
+    { label: "カード", icon: CreditCard, amount: 0 },
+    { label: "ポイント", icon: WalletCards, amount: 0 },
+    { label: "その他", icon: MoreHorizontal, amount: 0 }
+  ];
+
+  return (
+    <section className="mt-4 rounded-2xl border border-[#eceae5] bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-lg font-extrabold">支払い情報</h2>
+        <span className={`rounded-md border px-2 py-1 text-xs font-extrabold ${paid ? "border-[#cfe6d2] bg-[#e6f1e7] text-[#2e7d46]" : "border-[#f2cfc6] bg-[#fcebe7] text-[#d94a2f]"}`}>
+          {paid ? "支払い済み" : "未払い"}
+        </span>
+      </div>
+      <div className="grid grid-cols-5 gap-2">
+        {methods.map((method) => {
+          const Icon = method.icon;
+          return (
+            <div key={method.label} className="rounded-xl border border-[#eceae5] p-2 text-center">
+              <Icon size={18} className="mx-auto text-[#6b635c]" />
+              <span className="mt-1 block text-[10px] font-bold text-[#6b635c]">{method.label}</span>
+              <span className="mt-1 block text-xs font-extrabold text-[#a39a92]">{formatYen(method.amount)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3 text-xs font-semibold leading-5 text-[#9a9089]">支払い方法は複数併用できます。支払い状況はチェック欄の「支払い済み」で管理します。</p>
+    </section>
+  );
+}
+
+function MoneySection({
+  title,
+  total,
+  recordType,
   eventId,
-  finances,
   eventDate,
+  records,
   onAdd
 }: {
+  title: "経費" | "売上";
+  total: number;
+  recordType: "revenue" | "expense";
   eventId: string;
-  finances: MarketFinancialRecord[];
   eventDate: string;
+  records: MarketFinancialRecord[];
   onAdd: (input: {
     marketEventId: string;
     recordType: "revenue" | "expense";
@@ -182,64 +247,37 @@ function FinanceSection({
     memo: string;
   }) => Promise<void>;
 }) {
-  const [recordType, setRecordType] = useState<"revenue" | "expense">("revenue");
-  const [title, setTitle] = useState("");
+  const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("");
-  const [memo, setMemo] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const numericAmount = Number(amount);
-    if (!title.trim() || !numericAmount) return;
-    await onAdd({
-      marketEventId: eventId,
-      recordType,
-      title: title.trim(),
-      amount: numericAmount,
-      occurredAt: eventDate,
-      category,
-      memo
-    });
-    setTitle("");
+    if (!name.trim() || !numericAmount) return;
+    await onAdd({ marketEventId: eventId, recordType, title: name.trim(), amount: numericAmount, occurredAt: eventDate, category: title, memo: "" });
+    setName("");
     setAmount("");
-    setCategory("");
-    setMemo("");
   }
 
   return (
-    <section className="mt-5 rounded-2xl border border-[#e8e1da] bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-bold">売上・経費</h2>
-      <form onSubmit={submit} className="mt-3 space-y-3">
-        <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#fbfaf8] p-1">
-          {(["revenue", "expense"] as const).map((type) => (
-            <button
-              type="button"
-              key={type}
-              onClick={() => setRecordType(type)}
-              className={`rounded-lg px-3 py-2 text-sm font-bold ${recordType === type ? "bg-white text-[#d9643a] shadow-sm" : "text-[#79716b]"}`}
-            >
-              {type === "revenue" ? "売上" : "経費"}
-            </button>
-          ))}
-        </div>
-        <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="内容" className="w-full rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3" />
-        <input value={amount} onChange={(event) => setAmount(event.target.value)} type="number" inputMode="numeric" placeholder="金額" className="w-full rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3" />
-        <input value={category} onChange={(event) => setCategory(event.target.value)} placeholder="カテゴリ" className="w-full rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3" />
-        <textarea value={memo} onChange={(event) => setMemo(event.target.value)} rows={3} placeholder="メモ" className="w-full rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3" />
-        <button className="w-full rounded-xl bg-[#25211f] px-4 py-3 font-bold text-white">記録する</button>
-      </form>
-      <div className="mt-4 space-y-2">
-        {finances.map((row) => (
-          <div key={row.id} className="flex items-center justify-between rounded-xl bg-[#fbfaf8] px-3 py-3">
-            <div>
-              <p className="font-bold">{row.title}</p>
-              <p className="text-xs text-[#79716b]">{row.record_type === "revenue" ? "売上" : "経費"}</p>
-            </div>
-            <p className={row.record_type === "revenue" ? "font-bold text-[#d9643a]" : "font-bold text-[#243447]"}>{formatYen(row.amount)}</p>
+    <section className="mt-4 rounded-2xl border border-[#eceae5] bg-white p-4 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-lg font-extrabold">{title}</h2>
+        <span className="text-xs font-bold text-[#6b635c]">合計 {formatYen(total)}</span>
+      </div>
+      <div>
+        {records.map((row) => (
+          <div key={row.id} className="flex items-center justify-between border-b border-[#f2efea] py-3 last:border-b-0">
+            <span className="text-sm font-bold">{row.title}</span>
+            <span className="text-sm font-extrabold">{formatYen(row.amount)}</span>
           </div>
         ))}
       </div>
+      <form onSubmit={submit} className="mt-3 grid grid-cols-[1fr_92px_auto] gap-2">
+        <input value={name} onChange={(event) => setName(event.target.value)} placeholder={`${title}名`} className="min-w-0 rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3 text-sm" />
+        <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="numeric" placeholder="金額" className="min-w-0 rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3 text-sm" />
+        <button className="rounded-xl border border-[#f0c4ae] px-3 py-3 text-[#e8612c]"><Plus size={18} /></button>
+      </form>
     </section>
   );
 }
@@ -277,17 +315,36 @@ function ReflectionSection({
   }
 
   return (
-    <section className="mt-5 rounded-2xl border border-[#e8e1da] bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-bold">振り返り</h2>
+    <section className="mt-4 rounded-2xl border border-[#eceae5] bg-white p-4 shadow-sm">
+      <h2 className="text-lg font-extrabold">Diary / 振り返り</h2>
       <form onSubmit={submit} className="mt-3 space-y-3">
-        <textarea value={publicSummary} onChange={(event) => setPublicSummary(event.target.value)} rows={3} placeholder="Storyに出してよい振り返り" className="w-full rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3" />
-        <textarea value={goodPoints} onChange={(event) => setGoodPoints(event.target.value)} rows={3} placeholder="よかったこと" className="w-full rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3" />
-        <textarea value={nextActions} onChange={(event) => setNextActions(event.target.value)} rows={3} placeholder="次にやること" className="w-full rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3" />
-        <textarea value={privateNote} onChange={(event) => setPrivateNote(event.target.value)} rows={3} placeholder="非公開メモ" className="w-full rounded-xl border border-[#e8e1da] bg-[#fbfaf8] px-3 py-3" />
-        <button className="w-full rounded-xl bg-[#25211f] px-4 py-3 font-bold text-white">保存する</button>
+        <textarea value={publicSummary} onChange={(event) => setPublicSummary(event.target.value)} rows={3} placeholder="天気、客足、よく売れたものなど" className="w-full rounded-xl border border-[#e8e1da] bg-[#fcfbf9] px-3 py-3 text-sm leading-6" />
+        <textarea value={goodPoints} onChange={(event) => setGoodPoints(event.target.value)} rows={2} placeholder="よかったこと" className="w-full rounded-xl border border-[#e8e1da] bg-[#fcfbf9] px-3 py-3 text-sm leading-6" />
+        <textarea value={nextActions} onChange={(event) => setNextActions(event.target.value)} rows={2} placeholder="次に試すこと" className="w-full rounded-xl border border-[#e8e1da] bg-[#fcfbf9] px-3 py-3 text-sm leading-6" />
+        <textarea value={privateNote} onChange={(event) => setPrivateNote(event.target.value)} rows={2} placeholder="非公開メモ" className="w-full rounded-xl border border-[#e8e1da] bg-[#fcfbf9] px-3 py-3 text-sm leading-6" />
+        <div className="grid grid-cols-4 gap-2">
+          <div className="aspect-square rounded-xl bg-[#e8dcc9]" />
+          <div className="aspect-square rounded-xl bg-[#dcc9b6]" />
+          <div className="aspect-square rounded-xl bg-[#e9cfa8]" />
+          <button type="button" className="grid aspect-square place-items-center rounded-xl border border-dashed border-[#d6cec5] text-[#a39a92]">
+            <span className="grid place-items-center gap-1 text-[10px] font-bold"><Camera size={20} />写真を追加</span>
+          </button>
+        </div>
+        <button className="w-full rounded-xl bg-[#e8612c] px-4 py-3 font-extrabold text-white">保存する</button>
       </form>
     </section>
   );
+}
+
+function StatusBadge({ status }: { status: MarketEvent["status"] }) {
+  const label = status === "completed" ? "終了" : status === "preparing" ? "確定" : status === "cancelled" ? "中止" : "検討中";
+  const tone = status === "preparing" ? "border-[#cfe6d2] bg-[#e6f1e7] text-[#2e7d46]" : status === "planned" ? "border-[#d3e1f2] bg-[#eaf1fa] text-[#3a6fb0]" : "border-[#e4ddd4] bg-[#f1eeea] text-[#8a817a]";
+  return <span className={`inline-flex rounded-md border px-3 py-1 text-xs font-extrabold ${tone}`}>{label}</span>;
+}
+
+function shortDate(value: string) {
+  const date = new Date(`${value}T00:00:00`);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 export default function MarketDetailPage() {
