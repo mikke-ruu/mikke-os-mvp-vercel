@@ -170,6 +170,7 @@ export async function addFinancialRecord(
     occurredAt: string;
     category: string;
     memo: string;
+    paymentStatus?: "unpaid" | "paid" | "not_required";
   }
 ) {
   const { data, error } = await supabase
@@ -183,7 +184,7 @@ export async function addFinancialRecord(
       amount: input.amount,
       occurred_at: input.occurredAt,
       category: input.category || null,
-      payment_status: "paid",
+      payment_status: input.paymentStatus ?? "paid",
       memo: input.memo || null
     })
     .select("*")
@@ -204,7 +205,7 @@ export async function addFinancialRecord(
     hasFinancialValue: true,
     amount: record.amount,
     transactionType: record.record_type,
-    paymentStatus: "paid"
+    paymentStatus: input.paymentStatus ?? "paid"
   });
 
   return record;

@@ -86,7 +86,7 @@ function HomeContent() {
   }, [summaries]);
 
   const monthCells = useMemo(() => buildMonthCells(visibleMonth), [visibleMonth]);
-  const selectedSummary = eventsByDate[selectedDate]?.[0] ?? summaries.find((summary) => summary.event.status !== "completed") ?? summaries[0] ?? null;
+  const selectedSummary = eventsByDate[selectedDate]?.[0] ?? null;
   const dueSoon = useMemo(() => getDueSoon(summaries).slice(0, 3), [summaries]);
   const nextEvents = useMemo(() => {
     const today = toDateKey(new Date());
@@ -167,9 +167,7 @@ function HomeContent() {
             <UpcomingEventCard summary={selectedSummary} />
           )
         ) : (
-          <div className="mt-4 rounded-2xl border border-[#eee9e4] bg-white p-5 text-sm font-semibold text-[#8a817a] shadow-[0_4px_16px_rgba(45,33,22,0.04)]">
-            この日に表示できる予定はありません。
-          </div>
+          <EmptyDateCard selectedDate={selectedDate} />
         )}
 
         {selectedSummary?.event.status === "completed" ? null : (
@@ -207,6 +205,22 @@ function HomeContent() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+function EmptyDateCard({ selectedDate }: { selectedDate: string }) {
+  return (
+    <section className="mt-4 rounded-2xl border border-[#eee9e4] bg-white p-5 shadow-[0_4px_16px_rgba(45,33,22,0.04)]">
+      <p className="text-lg font-semibold tracking-normal text-[#1f1b18]">{dateWithWeekdayLabel(selectedDate)}</p>
+      <p className="mt-2 text-sm font-bold text-[#8a817a]">この日の予定はありません</p>
+      <Link
+        href={`/marketnote/new?startDate=${selectedDate}`}
+        className="mt-4 inline-flex items-center gap-2 rounded-full border border-[#f3d0be] bg-white px-4 py-2 text-sm font-extrabold text-[#f46a14]"
+      >
+        <Plus size={16} strokeWidth={1.8} />
+        この日に予定を追加
+      </Link>
+    </section>
   );
 }
 
@@ -457,6 +471,11 @@ function shortDate(value: string) {
 
 function weekdayLabel(value: string) {
   return ["日", "月", "火", "水", "木", "金", "土"][parseDate(value).getDay()];
+}
+
+function dateWithWeekdayLabel(value: string) {
+  const date = parseDate(value);
+  return `${date.getMonth() + 1}/${date.getDate()}（${weekdayLabel(value)}）`;
 }
 
 function statusLabel(status: MarketEvent["status"]) {
