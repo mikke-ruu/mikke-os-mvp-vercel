@@ -2,45 +2,65 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Bell, CalendarDays, Check, ChevronRight, Circle, Clock, MapPin, Minus, Plus } from "lucide-react";
+import {
+  Bell,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Circle,
+  Edit3,
+  Plus
+} from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
-import { EmptyState } from "@/components/EmptyState";
-import { formatDate } from "@/lib/format";
-import { listCheckItems, listFinancialRecords, listMarketEvents } from "@/lib/marketnote";
-import type { MarketCheckItem, MarketEvent, MarketFinancialRecord } from "@/types/database";
+import { formatDate, formatYen } from "@/lib/format";
+import { listCheckItems, listFinancialRecords, listMarketEvents, listReflections } from "@/lib/marketnote";
+import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
-type StatusFilter = "all" | "confirmed" | "unpaid" | "considering" | "completed";
+const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
 
-const filterLabels: { value: StatusFilter; label: string }[] = [
-  { value: "all", label: "すべて" },
-  { value: "confirmed", label: "出店確定" },
-  { value: "unpaid", label: "未払い" },
-  { value: "considering", label: "検討中" },
-  { value: "completed", label: "終了" }
-];
+type PaymentState = "paid" | "unpaid" | "not_required";
+type EventSummary = {
+  event: MarketEvent;
+  checks: MarketCheckItem[];
+  finances: MarketFinancialRecord[];
+  reflection: MarketReflection | null;
+};
 
 function HomeContent() {
   const { profile } = useAuth();
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [checksByEvent, setChecksByEvent] = useState<Record<string, MarketCheckItem[]>>({});
   const [finances, setFinances] = useState<MarketFinancialRecord[]>([]);
-  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [reflections, setReflections] = useState<MarketReflection[]>([]);
+  const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
+  const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
 
   useEffect(() => {
     let active = true;
 
     async function load() {
       const nextEvents = await listMarketEvents(profile.id);
-      const [nextFinances, checkPairs] = await Promise.all([
+      const [nextFinances, nextReflections, checkPairs] = await Promise.all([
         listFinancialRecords(profile.id),
+        listReflections(profile.id),
         Promise.all(nextEvents.map(async (event) => [event.id, await listCheckItems(profile.id, event.id)] as const))
       ]);
 
       if (!active) return;
       setEvents(nextEvents);
       setFinances(nextFinances);
-      setChecksByEvent(Object.fromEntries(checkPairs));
+      setReflections(nextReflections);
+
+      const nextChecks = Object.fromEntries(checkPairs);
+      setChecksByEvent(nextChecks);
+
+      const firstEvent = [...nextEvents].sort((a, b) => a.event_date.localeCompare(b.event_date))[0];
+      if (firstEvent) {
+        const eventDate = parseDate(firstEvent.event_date);
+        setVisibleMonth(startOfMonth(eventDate));
+        setSelectedDate(firstEvent.event_date);
+      }
     }
 
     load();
@@ -49,224 +69,413 @@ function HomeContent() {
     };
   }, [profile.id]);
 
-  const upcomingEvents = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return [...events]
-      .filter((event) => event.status !== "completed" && event.status !== "cancelled" && event.event_date >= today)
-      .sort((a, b) => a.event_date.localeCompare(b.event_date));
-  }, [events]);
+  const summaries = useMemo<EventSummary[]>(() => {
+    return events.map((event) => ({
+      event,
+      checks: checksByEvent[event.id] ?? [],
+      finances: finances.filter((row) => row.market_event_id === event.id),
+      reflection: reflections.find((row) => row.market_event_id === event.id) ?? null
+    }));
+  }, [checksByEvent, events, finances, reflections]);
 
-  const nextEvent = upcomingEvents[0] ?? [...events].sort((a, b) => b.event_date.localeCompare(a.event_date))[0];
+  const eventsByDate = useMemo(() => {
+    return summaries.reduce<Record<string, EventSummary[]>>((acc, summary) => {
+      acc[summary.event.event_date] = [...(acc[summary.event.event_date] ?? []), summary];
+      return acc;
+    }, {});
+  }, [summaries]);
 
-  const dueSoonChecks = useMemo(() => {
-    return Object.entries(checksByEvent)
-      .flatMap(([eventId, checks]) => {
-        const event = events.find((row) => row.id === eventId);
-        return checks
-          .filter((check) => !check.is_done)
-          .map((check) => ({ check, event }))
-          .filter((row): row is { check: MarketCheckItem; event: MarketEvent } => Boolean(row.event));
-      })
-      .sort((a, b) => (a.check.due_date ?? a.event.event_date).localeCompare(b.check.due_date ?? b.event.event_date))
-      .slice(0, 4);
-  }, [checksByEvent, events]);
+  const monthCells = useMemo(() => buildMonthCells(visibleMonth), [visibleMonth]);
+  const selectedSummary = eventsByDate[selectedDate]?.[0] ?? summaries.find((summary) => summary.event.status !== "completed") ?? summaries[0] ?? null;
+  const dueSoon = useMemo(() => getDueSoon(summaries).slice(0, 3), [summaries]);
+  const nextEvents = useMemo(() => {
+    const today = toDateKey(new Date());
+    return summaries
+      .filter((summary) => summary.event.event_date >= today && summary.event.status !== "completed" && summary.event.status !== "cancelled")
+      .sort((a, b) => a.event.event_date.localeCompare(b.event.event_date))
+      .slice(0, 3);
+  }, [summaries]);
 
-  const filteredEvents = useMemo(() => {
-    return upcomingEvents.filter((event) => {
-      const checks = checksByEvent[event.id] ?? [];
-      const payment = getPaymentState(event, checks, finances);
-      if (filter === "all") return true;
-      if (filter === "confirmed") return event.status === "preparing" || event.status === "planned";
-      if (filter === "unpaid") return payment === "unpaid";
-      if (filter === "considering") return event.status === "planned";
-      return event.status === "completed";
-    });
-  }, [checksByEvent, filter, finances, upcomingEvents]);
+  function moveMonth(diff: number) {
+    setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + diff, 1));
+  }
+
+  function selectToday() {
+    const today = new Date();
+    setVisibleMonth(startOfMonth(today));
+    setSelectedDate(toDateKey(today));
+  }
 
   return (
-    <AppShell title="MarketNote" subtitle="出店予定・準備・振り返り">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="text-sm font-extrabold text-[#e8612c]">MarketNote</p>
-          <h2 className="mt-1 text-2xl font-black tracking-normal text-[#1f1b18]">出店管理</h2>
-        </div>
-        <button className="rounded-full border border-[#e8e1da] bg-white p-3 text-[#4a423c]" aria-label="通知">
-          <Bell size={20} />
-        </button>
-      </div>
-
-      {nextEvent ? (
-        <section>
-          <SectionHeader title="次の出店" href="/marketnote" />
-          <NextEventCard event={nextEvent} checks={checksByEvent[nextEvent.id] ?? []} finances={finances} />
-        </section>
-      ) : (
-        <EmptyState title="出店予定はまだありません" body="まずはイベント名と開催日だけ登録して、準備チェックを作りましょう。" />
-      )}
-
-      <section className="mt-5">
-        <SectionHeader title="期限が近いチェック" />
-        <div className="rounded-2xl border border-[#eceae5] bg-white px-4 py-2 shadow-sm">
-          {dueSoonChecks.length > 0 ? (
-            dueSoonChecks.map(({ check, event }) => <CheckRow key={check.id} check={check} event={event} />)
-          ) : (
-            <p className="py-4 text-sm font-semibold text-[#8a817a]">期限が近い未完了チェックはありません。</p>
-          )}
-        </div>
-      </section>
-
-      <section className="mt-5">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-extrabold text-[#1f1b18]">出店カード一覧</h2>
-          <Link href="/marketnote/new" className="inline-flex items-center gap-1 text-sm font-extrabold text-[#e8612c]">
-            <Plus size={16} /> 追加
-          </Link>
-        </div>
-        <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
-          {filterLabels.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => setFilter(item.value)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold ${
-                filter === item.value ? "border-[#e8612c] bg-[#e8612c] text-white" : "border-[#e4ddd4] bg-white text-[#8a817a]"
-              }`}
-            >
-              {item.label}
+    <AppShell title="MarketNote" hideHeader>
+      <div className="-mx-1 pb-1">
+        <header className="mb-5 pt-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="font-serif text-4xl italic leading-none text-[#f46a14]">M</span>
+              <span className="font-serif text-3xl tracking-normal text-[#1f1b18]">MarketNote</span>
+            </div>
+            <button className="relative rounded-full p-2 text-[#1f1b18]" aria-label="通知">
+              <Bell size={26} strokeWidth={1.8} />
+              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#f46a14]" />
             </button>
-          ))}
-        </div>
-        <div className="grid gap-3">
-          {filteredEvents.map((event) => (
-            <EventCard key={event.id} event={event} checks={checksByEvent[event.id] ?? []} finances={finances} />
-          ))}
-        </div>
-      </section>
+          </div>
 
-      <Link href="/marketnote/new" className="mt-5 flex items-center justify-center gap-2 rounded-2xl border border-[#e8612c] bg-white px-4 py-4 font-extrabold text-[#e8612c]">
-        <Plus size={20} /> 出店予定を追加
-      </Link>
+          <div className="mt-6 grid grid-cols-[48px_1fr_48px_auto] items-center gap-3">
+            <button className="grid h-10 place-items-center rounded-full text-[#5f5a55]" onClick={() => moveMonth(-1)} aria-label="前の月">
+              <ChevronLeft size={26} />
+            </button>
+            <h1 className="text-center text-3xl font-semibold tracking-normal text-[#1f1b18]">{visibleMonth.getFullYear()}年{visibleMonth.getMonth() + 1}月</h1>
+            <button className="grid h-10 place-items-center rounded-full text-[#5f5a55]" onClick={() => moveMonth(1)} aria-label="次の月">
+              <ChevronRight size={26} />
+            </button>
+            <button onClick={selectToday} className="rounded-full border border-[#ded9d4] bg-white px-4 py-2 text-sm font-bold text-[#5f5a55] shadow-sm">
+              今日
+            </button>
+          </div>
+        </header>
+
+        <section>
+          <div className="grid grid-cols-7 pb-2 text-center text-sm font-bold text-[#1f1b18]">
+            {weekDays.map((day) => <span key={day}>{day}</span>)}
+          </div>
+          <div className="overflow-hidden rounded-xl border border-[#eee9e4] bg-white">
+            <div className="grid grid-cols-7">
+              {monthCells.map((date) => {
+                const key = toDateKey(date);
+                const dayEvents = eventsByDate[key] ?? [];
+                const summary = dayEvents[0];
+                return (
+                  <CalendarCell
+                    key={key}
+                    date={date}
+                    currentMonth={date.getMonth() === visibleMonth.getMonth()}
+                    selected={key === selectedDate}
+                    summary={summary}
+                    onSelect={() => setSelectedDate(key)}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {selectedSummary ? (
+          selectedSummary.event.status === "completed" ? (
+            <CompletedEventCard summary={selectedSummary} />
+          ) : (
+            <UpcomingEventCard summary={selectedSummary} />
+          )
+        ) : (
+          <div className="mt-4 rounded-2xl border border-[#eee9e4] bg-white p-5 text-sm font-semibold text-[#8a817a] shadow-[0_4px_16px_rgba(45,33,22,0.04)]">
+            この日に表示できる予定はありません。
+          </div>
+        )}
+
+        {selectedSummary?.event.status === "completed" ? null : (
+          <section className="mt-5 grid grid-cols-2 gap-4">
+            <div>
+              <h2 className="mb-3 text-sm font-extrabold text-[#1f1b18]">やること（期限順）</h2>
+              <div className="space-y-3">
+                {dueSoon.length > 0 ? dueSoon.map(({ check, summary }) => (
+                  <Link key={check.id} href={`/marketnote/${summary.event.id}`} className="grid grid-cols-[18px_1fr_auto] items-center gap-2 text-xs">
+                    <Circle size={15} className="text-[#9a9089]" />
+                    <span className="truncate font-semibold text-[#3b3530]">{check.title}</span>
+                    <span className="font-bold text-[#f46a14]">{shortDate(check.due_date ?? summary.event.event_date)}</span>
+                  </Link>
+                )) : <p className="text-xs font-semibold text-[#9a9089]">未完了タスクはありません。</p>}
+              </div>
+            </div>
+            <div>
+              <h2 className="mb-3 text-sm font-extrabold text-[#1f1b18]">次回イベント</h2>
+              <div className="space-y-2">
+                {nextEvents.length > 0 ? nextEvents.map((summary) => {
+                  const done = summary.checks.filter((check) => check.is_done).length;
+                  return (
+                    <Link key={summary.event.id} href={`/marketnote/${summary.event.id}`} className="grid grid-cols-[34px_1fr] gap-2 text-xs">
+                      <span className="font-bold text-[#3b3530]">{shortDate(summary.event.event_date)}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-[#1f1b18]">{summary.event.title}</span>
+                        <span className="mt-0.5 block truncate text-[#7b736d]">{statusLabel(summary.event.status)} / {paymentLabel(getPaymentState(summary))} / {done}/{summary.checks.length}</span>
+                      </span>
+                    </Link>
+                  );
+                }) : <p className="text-xs font-semibold text-[#9a9089]">次回イベントは未登録です。</p>}
+              </div>
+            </div>
+          </section>
+        )}
+      </div>
     </AppShell>
   );
 }
 
-function SectionHeader({ title, href }: { title: string; href?: string }) {
+function CalendarCell({
+  date,
+  currentMonth,
+  selected,
+  summary,
+  onSelect
+}: {
+  date: Date;
+  currentMonth: boolean;
+  selected: boolean;
+  summary?: EventSummary;
+  onSelect: () => void;
+}) {
+  const isCompleted = summary?.event.status === "completed";
+  const totals = summary ? getTotals(summary.finances) : { revenue: 0, expense: 0, profit: 0 };
+  const done = summary?.checks.filter((check) => check.is_done).length ?? 0;
+  const payment = summary ? getPaymentState(summary) : "not_required";
+
   return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="text-lg font-extrabold text-[#1f1b18]">{title}</h2>
-      {href ? (
-        <Link href={href} className="inline-flex items-center gap-1 text-xs font-bold text-[#9a9089]">
-          すべて見る <ChevronRight size={14} />
-        </Link>
-      ) : null}
-    </div>
+    <button
+      type="button"
+      onClick={onSelect}
+      className={`min-h-[82px] border-b border-r border-[#eee9e4] p-2 text-left transition last:border-r-0 ${
+        selected ? "bg-[#fffaf7] ring-1 ring-inset ring-[#f46a14]" : "bg-white"
+      } ${currentMonth ? "text-[#1f1b18]" : "text-[#aaa39d]"}`}
+    >
+      <div className="flex h-full flex-col">
+        <span className={`text-sm font-semibold leading-none ${selected && !isCompleted ? "ml-auto grid h-6 w-6 place-items-center rounded-full bg-[#f46a14] text-white" : ""}`}>
+          {date.getDate()}
+        </span>
+
+        {summary ? (
+          isCompleted ? (
+            <div className="mt-auto space-y-1">
+              {totals.revenue || totals.expense ? (
+                <>
+                  <PhotoThumb className="h-7 w-full rounded-md" tone="green" />
+                  <p className="truncate whitespace-nowrap text-[10px] font-extrabold leading-none text-[#15823b]">{formatYen(totals.profit)}</p>
+                </>
+              ) : (
+                <>
+                  <p className="truncate text-[10px] font-bold text-[#77706a]">終了</p>
+                  <p className="truncate text-[10px] font-bold text-[#aaa39d]">未記録</p>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="mt-auto space-y-1.5">
+              <p className="truncate text-[10px] font-semibold leading-tight text-[#2f2a26]">{summary.event.title}</p>
+              <div className="flex items-center justify-between gap-1">
+                <PaymentChip payment={payment} short />
+                <span className="whitespace-nowrap text-[10px] font-semibold text-[#3c3732]">{done}/{summary.checks.length}</span>
+              </div>
+            </div>
+          )
+        ) : null}
+      </div>
+    </button>
   );
 }
 
-function NextEventCard({ event, checks, finances }: { event: MarketEvent; checks: MarketCheckItem[]; finances: MarketFinancialRecord[] }) {
-  const done = checks.filter((check) => check.is_done).length;
-  const percent = checks.length ? Math.round((done / checks.length) * 100) : 0;
+function UpcomingEventCard({ summary }: { summary: EventSummary }) {
+  const done = summary.checks.filter((check) => check.is_done).length;
+  const progress = summary.checks.length ? Math.round((done / summary.checks.length) * 100) : 0;
+  const payment = getPaymentState(summary);
 
   return (
-    <Link href={`/marketnote/${event.id}`} className="block rounded-2xl border border-[#f2cdbd] bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap gap-2">
-        <StatusBadge event={event} />
-        <PaymentBadge payment={getPaymentState(event, checks, finances)} />
-      </div>
-      <h3 className="text-2xl font-black tracking-normal text-[#1f1b18]">{event.title}</h3>
-      <div className="mt-3 grid gap-2 text-sm font-semibold text-[#4a423c]">
-        <MetaRow icon={<CalendarDays size={16} />} text={formatDate(event.event_date)} />
-        <MetaRow icon={<Clock size={16} />} text="時間未設定" />
-        <MetaRow icon={<MapPin size={16} />} text={[event.venue_name, event.area].filter(Boolean).join("（") || "会場未設定"} />
-      </div>
-      <div className="mt-4 border-t border-[#f2efea] pt-4">
-        <div className="mb-2 flex items-center justify-between text-xs font-bold">
-          <span className="text-[#6b635c]">
-            チェック <strong className="text-[#e8612c]">{done}</strong> / {checks.length} 完了
-          </span>
-          <span className="inline-flex items-center gap-1 text-[#9a9089]">
-            タップで詳細へ <ChevronRight size={13} />
-          </span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-[#eee7df]">
-          <div className="h-full rounded-full bg-[#e8612c]" style={{ width: `${percent}%` }} />
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function EventCard({ event, checks, finances }: { event: MarketEvent; checks: MarketCheckItem[]; finances: MarketFinancialRecord[] }) {
-  const date = new Date(`${event.event_date}T00:00:00`);
-  const remaining = checks.filter((check) => !check.is_done).length;
-
-  return (
-    <Link href={`/marketnote/${event.id}`} className="grid grid-cols-[54px_1fr_auto] items-center gap-3 rounded-2xl border border-[#eceae5] bg-white p-3 shadow-sm">
-      <div className="grid h-14 w-14 place-items-center rounded-2xl border border-[#f6ddd0] bg-[#fceee7] text-[#c24e1e]">
-        <span className="text-[10px] font-extrabold">{date.getMonth() + 1}月</span>
-        <span className="-mt-2 text-2xl font-black">{date.getDate()}</span>
+    <Link href={`/marketnote/${summary.event.id}`} className="mt-4 grid grid-cols-[68px_1fr] gap-4 rounded-2xl border border-[#eee9e4] bg-white p-4 shadow-[0_4px_16px_rgba(45,33,22,0.045)]">
+      <div className="border-r border-[#eee9e4] pr-3 text-center">
+        <p className="text-2xl font-semibold text-[#1f1b18]">{shortDate(summary.event.event_date)}</p>
+        <p className="mt-1 text-xs font-bold text-[#1f1b18]">{weekdayLabel(summary.event.event_date)}</p>
       </div>
       <div className="min-w-0">
-        <h3 className="truncate text-[15px] font-black text-[#1f1b18]">{event.title}</h3>
-        <p className="mt-1 truncate text-xs font-semibold text-[#9a9089]">{formatDate(event.event_date)} | {event.venue_name ?? "会場未設定"}</p>
-        <p className={`mt-1 text-xs font-extrabold ${remaining ? "text-[#e8612c]" : "text-[#9a9089]"}`}>未完了チェック {remaining}件</p>
-      </div>
-      <div className="flex flex-col items-end gap-1">
-        <StatusBadge event={event} compact />
-        <PaymentBadge payment={getPaymentState(event, checks, finances)} compact />
-        <ChevronRight size={16} className="text-[#c2b9b0]" />
+        <div className="flex items-center justify-between gap-2">
+          <StatusChip status={summary.event.status} withChevron />
+          <Edit3 size={16} className="shrink-0 text-[#7b736d]" />
+        </div>
+        <h2 className="mt-3 truncate text-lg font-bold tracking-normal text-[#1f1b18]">{summary.event.title}</h2>
+        <p className="mt-2 truncate text-xs font-semibold text-[#5f5a55]">{formatDate(summary.event.event_date)} / 時間未設定</p>
+        <p className="mt-1 truncate text-xs font-semibold text-[#5f5a55]">{[summary.event.venue_name, summary.event.area].filter(Boolean).join(" / ") || "会場未設定"}</p>
+        <div className="mt-3 flex items-center justify-between text-xs">
+          <span className="font-semibold text-[#3b3530]">支払い：<PaymentChip payment={payment} /></span>
+          <span className="font-semibold text-[#3b3530]">タスク {done}/{summary.checks.length}</span>
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#eee8e2]">
+          <div className="h-full rounded-full bg-[#f46a14]" style={{ width: `${progress}%` }} />
+        </div>
       </div>
     </Link>
   );
 }
 
-function CheckRow({ check, event }: { check: MarketCheckItem; event: MarketEvent }) {
+function CompletedEventCard({ summary }: { summary: EventSummary }) {
+  const totals = getTotals(summary.finances);
+  const reflection = summary.reflection?.public_summary || summary.reflection?.good_points || "振り返りはまだ未記録です。";
+
   return (
-    <Link href={`/marketnote/${event.id}`} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 border-b border-[#f2efea] py-3 last:border-b-0">
-      <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e8612c] text-white">
-        <Minus size={14} />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-sm font-bold text-[#1f1b18]">{check.title}</span>
-        <span className="block truncate text-xs font-semibold text-[#9a9089]">{event.title}</span>
-      </span>
-      <span className="text-xs font-extrabold text-[#e8612c]">{check.due_date ? `期限 ${shortDate(check.due_date)}` : `期限 ${shortDate(event.event_date)}`}</span>
-    </Link>
+    <section className="mt-4 rounded-[22px] border border-[#eee9e4] bg-white p-4 shadow-[0_5px_18px_rgba(45,33,22,0.045)]">
+      <div className="mx-auto mb-3 h-1 w-9 rounded-full bg-[#d8d3cf]" />
+      <div className="mb-3 flex items-center gap-3">
+        <div className="flex items-center gap-3">
+          <p className="text-3xl font-semibold tracking-normal text-[#1f1b18]">{shortDate(summary.event.event_date)}</p>
+          <span className="rounded-full bg-[#f3f0ed] px-3 py-1 text-xs font-bold text-[#5f5a55]">終了</span>
+        </div>
+      </div>
+      <h2 className="text-xl font-bold tracking-normal text-[#1f1b18]">{summary.event.title}</h2>
+
+      <div className="mt-4 grid grid-cols-[1fr_1px_1fr_1px_1fr_auto] items-center rounded-2xl border border-[#eee9e4] bg-white p-2.5">
+        <MoneyCell label="売上" value={totals.revenue} />
+        <span className="h-10 bg-[#eee9e4]" />
+        <MoneyCell label="経費" value={totals.expense} muted />
+        <span className="h-10 bg-[#eee9e4]" />
+        <MoneyCell label="利益" value={totals.profit} profit />
+        <Edit3 size={18} className="ml-2 text-[#5f5a55]" />
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-extrabold text-[#1f1b18]">振り返り</h3>
+          <div className="flex items-center gap-3 text-[#5f5a55]">
+            <ChevronDown size={18} />
+            <Edit3 size={17} />
+          </div>
+        </div>
+        <p className="mt-2 truncate text-sm font-semibold leading-6 text-[#2f2a26]">{reflection}</p>
+      </div>
+
+      <div className="mt-4">
+        <h3 className="text-base font-extrabold text-[#1f1b18]">写真</h3>
+        <div className="mt-3 grid grid-cols-[1fr_1fr_96px] gap-2.5">
+          <PhotoThumb className="h-20 rounded-xl" tone="green" />
+          <PhotoThumb className="h-20 rounded-xl" tone="warm" />
+          <button className="grid h-20 place-items-center rounded-xl border border-[#f3d0be] bg-white text-[#f46a14]" aria-label="写真を追加">
+            <Plus size={28} strokeWidth={1.7} />
+          </button>
+        </div>
+        <p className="mt-2 text-right text-xs font-semibold text-[#1f1b18]">2/5 枚</p>
+      </div>
+
+      <div className="mt-4 border-t border-[#f0ebe6] pt-3">
+        <Link href={`/marketnote/${summary.event.id}`} className="inline-flex items-center gap-2 text-sm font-extrabold text-[#f46a14]">
+          詳細を見る <ChevronRight size={17} />
+        </Link>
+      </div>
+    </section>
   );
 }
 
-function MetaRow({ icon, text }: { icon: React.ReactNode; text: string }) {
+function MoneyCell({ label, value, muted = false, profit = false }: { label: string; value: number; muted?: boolean; profit?: boolean }) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[#9a9089]">{icon}</span>
-      <span className="min-w-0 truncate">{text}</span>
+    <div className="text-center">
+      <p className="text-xs font-bold text-[#1f1b18]">{label}</p>
+      <p className={`mt-1 text-base font-semibold ${profit ? "text-[#16833b]" : muted ? "text-[#6f6862]" : "text-[#1f1b18]"}`}>{formatYen(value)}</p>
     </div>
   );
 }
 
-function StatusBadge({ event, compact = false }: { event: MarketEvent; compact?: boolean }) {
-  const label = event.status === "completed" ? "終了" : event.status === "preparing" ? "出店確定" : event.status === "cancelled" ? "中止" : "検討中";
-  const tone = event.status === "completed" ? "bg-[#f1eeea] text-[#8a817a] border-[#e4ddd4]" : event.status === "planned" ? "bg-[#eaf1fa] text-[#3a6fb0] border-[#d3e1f2]" : "bg-[#e6f1e7] text-[#2e7d46] border-[#cfe6d2]";
-  return <span className={`inline-flex rounded-md border font-extrabold ${compact ? "px-2 py-1 text-[10px]" : "px-3 py-1 text-xs"} ${tone}`}>{label}</span>;
+function StatusChip({ status, withChevron = false }: { status: MarketEvent["status"]; withChevron?: boolean }) {
+  const label = statusLabel(status);
+  const tone = status === "preparing"
+    ? "bg-[#fff0e7] text-[#f46a14]"
+    : status === "planned"
+      ? "bg-[#f1eeea] text-[#6f6862]"
+      : status === "completed"
+        ? "bg-[#f1eeea] text-[#6f6862]"
+        : "bg-[#f1eeea] text-[#6f6862]";
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${tone}`}>
+      {label}{withChevron ? <ChevronDown size={14} /> : null}
+    </span>
+  );
 }
 
-function PaymentBadge({ payment, compact = false }: { payment: "paid" | "unpaid" | "not_required"; compact?: boolean }) {
-  const label = payment === "paid" ? "支払済" : payment === "not_required" ? "未登録" : "未払い";
-  const tone = payment === "paid" ? "bg-[#e6f1e7] text-[#2e7d46] border-[#cfe6d2]" : payment === "not_required" ? "bg-[#f1eeea] text-[#8a817a] border-[#e4ddd4]" : "bg-[#fcebe7] text-[#d94a2f] border-[#f2cfc6]";
-  return <span className={`inline-flex rounded-md border font-extrabold ${compact ? "px-2 py-1 text-[10px]" : "px-3 py-1 text-xs"} ${tone}`}>{label}</span>;
+function PaymentChip({ payment, short = false }: { payment: PaymentState; short?: boolean }) {
+  const tone = payment === "paid"
+    ? "border-[#8fd3a7] bg-[#eefaf1] text-[#16833b]"
+    : payment === "unpaid"
+      ? "border-[#f4b28d] bg-[#fff1e8] text-[#f46a14]"
+      : "border-[#ded9d4] bg-[#f5f3f1] text-[#6f6862]";
+
+  return (
+    <span className={`inline-flex whitespace-nowrap rounded-full border px-1.5 py-0.5 text-[10px] font-bold leading-none ${tone}`}>
+      {short ? shortPaymentLabel(payment) : paymentLabel(payment)}
+    </span>
+  );
 }
 
-function getPaymentState(event: MarketEvent, checks: MarketCheckItem[], finances: MarketFinancialRecord[]): "paid" | "unpaid" | "not_required" {
-  const paymentCheck = checks.find((check) => check.title.includes("支払い"));
+function PhotoThumb({ className, tone }: { className: string; tone: "green" | "warm" }) {
+  const background = tone === "green"
+    ? "linear-gradient(160deg, rgba(255,255,255,.12), rgba(255,255,255,0) 35%), radial-gradient(circle at 28% 62%, #6b8f69 0 11%, transparent 12%), radial-gradient(circle at 62% 56%, #e7d8b6 0 9%, transparent 10%), linear-gradient(180deg, #b9d6c1 0 45%, #6f9b76 46% 100%)"
+    : "linear-gradient(160deg, rgba(255,255,255,.18), rgba(255,255,255,0) 36%), radial-gradient(circle at 30% 62%, #8a6449 0 10%, transparent 11%), radial-gradient(circle at 66% 50%, #f2d6af 0 12%, transparent 13%), linear-gradient(180deg, #e6c69f 0 42%, #b9875f 43% 100%)";
+
+  return <div className={`${className} border border-white/70 bg-cover bg-center shadow-[inset_0_0_0_1px_rgba(255,255,255,0.35)]`} style={{ backgroundImage: background }} />;
+}
+
+function getPaymentState(summary: EventSummary): PaymentState {
+  const paymentCheck = summary.checks.find((check) => check.title.includes("支払い"));
   if (paymentCheck) return paymentCheck.is_done ? "paid" : "unpaid";
-  const eventPayments = finances.filter((row) => row.market_event_id === event.id && row.record_type === "expense" && row.title.includes("出店"));
+  const eventPayments = summary.finances.filter((row) => row.record_type === "expense" && row.title.includes("出店"));
   if (eventPayments.length === 0) return "not_required";
   return eventPayments.every((row) => row.payment_status === "paid") ? "paid" : "unpaid";
 }
 
+function getTotals(finances: MarketFinancialRecord[]) {
+  const revenue = finances.filter((row) => row.record_type === "revenue").reduce((sum, row) => sum + Number(row.amount), 0);
+  const expense = finances.filter((row) => row.record_type === "expense").reduce((sum, row) => sum + Number(row.amount), 0);
+  return { revenue, expense, profit: revenue - expense };
+}
+
+function getDueSoon(summaries: EventSummary[]) {
+  return summaries
+    .flatMap((summary) => summary.checks
+      .filter((check) => !check.is_done)
+      .map((check) => ({ check, summary })))
+    .sort((a, b) => (a.check.due_date ?? a.summary.event.event_date).localeCompare(b.check.due_date ?? b.summary.event.event_date));
+}
+
+function buildMonthCells(month: Date) {
+  const start = startOfMonth(month);
+  const first = new Date(start);
+  first.setDate(start.getDate() - start.getDay());
+  return Array.from({ length: 42 }, (_, index) => new Date(first.getFullYear(), first.getMonth(), first.getDate() + index));
+}
+
+function startOfMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function parseDate(value: string) {
+  return new Date(`${value}T00:00:00`);
+}
+
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function shortDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
+  const date = parseDate(value);
   return `${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function weekdayLabel(value: string) {
+  return ["日", "月", "火", "水", "木", "金", "土"][parseDate(value).getDay()];
+}
+
+function statusLabel(status: MarketEvent["status"]) {
+  if (status === "completed") return "終了";
+  if (status === "preparing") return "出店確定";
+  if (status === "cancelled") return "中止";
+  return "検討中";
+}
+
+function paymentLabel(payment: PaymentState) {
+  if (payment === "paid") return "支払済";
+  if (payment === "unpaid") return "未払い";
+  return "不要";
+}
+
+function shortPaymentLabel(payment: PaymentState) {
+  if (payment === "paid") return "支払済";
+  if (payment === "unpaid") return "未払い";
+  return "不要";
 }
 
 export default function HomePage() {

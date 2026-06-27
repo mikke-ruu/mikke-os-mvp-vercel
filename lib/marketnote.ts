@@ -222,6 +222,16 @@ export async function getReflection(profileId: string, marketEventId: string) {
   return data as MarketReflection | null;
 }
 
+export async function listReflections(profileId: string) {
+  const { data, error } = await supabase
+    .from("market_reflections")
+    .select("*")
+    .eq("profile_id", profileId);
+
+  if (error) throw error;
+  return (data ?? []) as MarketReflection[];
+}
+
 export async function saveReflection(
   profile: Profile,
   input: {
