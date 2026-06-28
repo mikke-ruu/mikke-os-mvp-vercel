@@ -100,7 +100,8 @@ function HomeContent() {
   }, [summaries]);
 
   const monthCells = useMemo(() => buildMonthCells(visibleMonth), [visibleMonth]);
-  const selectedSummary = eventsByDate[selectedDate]?.[0] ?? null;
+  const selectedSummaries = eventsByDate[selectedDate] ?? [];
+  const selectedDateHasActiveEvent = selectedSummaries.some((summary) => summary.event.status !== "completed");
   const dueSoon = useMemo(() => getDueSoon(summaries).slice(0, 3), [summaries]);
   const nextEvents = useMemo(() => {
     const today = toDateKey(new Date());
@@ -171,6 +172,7 @@ function HomeContent() {
                     currentMonth={date.getMonth() === visibleMonth.getMonth()}
                     selected={key === selectedDate}
                     summary={summary}
+                    extraCount={Math.max(dayEvents.length - 1, 0)}
                     onSelect={() => setSelectedDate(key)}
                   />
                 );
@@ -179,24 +181,29 @@ function HomeContent() {
           </div>
         </section>
 
-        {selectedSummary ? (
+        {selectedSummaries.length > 0 ? (
           <>
-            {selectedSummary.event.status === "completed" ? (
-              <CompletedEventCard summary={selectedSummary} />
-            ) : (
-              <UpcomingEventCard
-                summary={selectedSummary}
-                onOpen={() => router.push(`/marketnote/${selectedSummary.event.id}`)}
-                onStatusChange={(status) => changeEventStatus(selectedSummary.event, status)}
-              />
-            )}
+            <div className="space-y-3">
+              {selectedSummaries.map((summary) => (
+                summary.event.status === "completed" ? (
+                  <CompletedEventCard key={summary.event.id} summary={summary} />
+                ) : (
+                  <UpcomingEventCard
+                    key={summary.event.id}
+                    summary={summary}
+                    onOpen={() => router.push(`/marketnote/${summary.event.id}`)}
+                    onStatusChange={(status) => changeEventStatus(summary.event, status)}
+                  />
+                )
+              ))}
+            </div>
             <AddAnotherEventLink selectedDate={selectedDate} />
           </>
         ) : (
           <EmptyDateCard selectedDate={selectedDate} />
         )}
 
-        {selectedSummary?.event.status === "completed" ? null : (
+        {selectedSummaries.length > 0 && !selectedDateHasActiveEvent ? null : (
           <section className="mt-5 grid grid-cols-2 gap-4">
             <div>
               <h2 className="mb-3 text-sm font-extrabold text-[#1f1b18]">やること（期限順）</h2>
@@ -267,12 +274,14 @@ function CalendarCell({
   currentMonth,
   selected,
   summary,
+  extraCount,
   onSelect
 }: {
   date: Date;
   currentMonth: boolean;
   selected: boolean;
   summary?: EventSummary;
+  extraCount: number;
   onSelect: () => void;
 }) {
   const isCompleted = summary?.event.status === "completed";
@@ -284,7 +293,7 @@ function CalendarCell({
     <button
       type="button"
       onClick={onSelect}
-      className={`min-h-[82px] border-b border-r border-[#eee9e4] p-2 text-left transition last:border-r-0 ${
+      className={`relative min-h-[82px] border-b border-r border-[#eee9e4] p-2 text-left transition last:border-r-0 ${
         selected ? "bg-[#fffaf7] ring-1 ring-inset ring-[#f46a14]" : "bg-white"
       } ${currentMonth ? "text-[#1f1b18]" : "text-[#aaa39d]"}`}
     >
@@ -318,8 +327,19 @@ function CalendarCell({
             </div>
           )
         ) : null}
+        <ExtraEventCount count={extraCount} />
       </div>
     </button>
+  );
+}
+
+function ExtraEventCount({ count }: { count: number }) {
+  if (count <= 0) return null;
+
+  return (
+    <span className="absolute bottom-1.5 right-1.5 rounded-full bg-[#f3eee9] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-[#f46a14]">
+      +{count}
+    </span>
   );
 }
 
