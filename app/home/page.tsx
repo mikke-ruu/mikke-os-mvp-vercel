@@ -293,14 +293,19 @@ function CalendarCell({
     <button
       type="button"
       onClick={onSelect}
-      className={`relative min-h-[82px] border-b border-r border-[#eee9e4] p-2 text-left transition last:border-r-0 ${
+      className={`min-h-[82px] border-b border-r border-[#eee9e4] p-2 text-left transition last:border-r-0 ${
         selected ? "bg-[#fffaf7] ring-1 ring-inset ring-[#f46a14]" : "bg-white"
       } ${currentMonth ? "text-[#1f1b18]" : "text-[#aaa39d]"}`}
     >
       <div className="flex h-full flex-col">
-        <span className={`text-sm font-semibold leading-none ${selected && !isCompleted ? "ml-auto grid h-6 w-6 place-items-center rounded-full bg-[#f46a14] text-white" : ""}`}>
-          {date.getDate()}
-        </span>
+        <div className="flex min-h-6 items-center gap-1.5">
+          <span className={`grid h-6 w-6 place-items-center text-sm font-semibold leading-none ${
+            selected ? "rounded-full bg-[#f46a14] text-white" : ""
+          }`}>
+            {date.getDate()}
+          </span>
+          <ExtraEventCount count={extraCount} />
+        </div>
 
         {summary ? (
           isCompleted ? (
@@ -327,7 +332,6 @@ function CalendarCell({
             </div>
           )
         ) : null}
-        <ExtraEventCount count={extraCount} />
       </div>
     </button>
   );
@@ -337,7 +341,7 @@ function ExtraEventCount({ count }: { count: number }) {
   if (count <= 0) return null;
 
   return (
-    <span className="absolute bottom-1.5 right-1.5 rounded-full bg-[#f3eee9] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-[#f46a14]">
+    <span className="rounded-full bg-[#f3eee9] px-1.5 py-0.5 text-[10px] font-extrabold leading-none text-[#f46a14]">
       +{count}
     </span>
   );
