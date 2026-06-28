@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   ChevronDown,
@@ -14,7 +15,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { formatDate, formatYen } from "@/lib/format";
-import { listCheckItems, listFinancialRecords, listMarketEvents, listReflections } from "@/lib/marketnote";
+import { listCheckItems, listFinancialRecords, listMarketEvents, listReflections, updateMarketEventStatus } from "@/lib/marketnote";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
 const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
@@ -27,7 +28,14 @@ type EventSummary = {
   reflection: MarketReflection | null;
 };
 
+const statusMenuOptions: Array<{ label: string; value: MarketEvent["status"] }> = [
+  { label: "検討中", value: "planned" },
+  { label: "出店確定", value: "preparing" },
+  { label: "終了", value: "completed" }
+];
+
 function HomeContent() {
+  const router = useRouter();
   const { profile } = useAuth();
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [checksByEvent, setChecksByEvent] = useState<Record<string, MarketCheckItem[]>>({});
@@ -106,6 +114,11 @@ function HomeContent() {
     setSelectedDate(toDateKey(today));
   }
 
+  async function changeEventStatus(event: MarketEvent, status: MarketEvent["status"]) {
+    const updated = await updateMarketEventStatus(profile, event, status);
+    setEvents((current) => current.map((item) => item.id === updated.id ? updated : item));
+  }
+
   return (
     <AppShell title="MarketNote" hideHeader>
       <div className="-mx-1 pb-1">
@@ -161,11 +174,18 @@ function HomeContent() {
         </section>
 
         {selectedSummary ? (
-          selectedSummary.event.status === "completed" ? (
-            <CompletedEventCard summary={selectedSummary} />
-          ) : (
-            <UpcomingEventCard summary={selectedSummary} />
-          )
+          <>
+            {selectedSummary.event.status === "completed" ? (
+              <CompletedEventCard summary={selectedSummary} />
+            ) : (
+              <UpcomingEventCard
+                summary={selectedSummary}
+                onOpen={() => router.push(`/marketnote/${selectedSummary.event.id}`)}
+                onStatusChange={(status) => changeEventStatus(selectedSummary.event, status)}
+              />
+            )}
+            <AddAnotherEventLink selectedDate={selectedDate} />
+          </>
         ) : (
           <EmptyDateCard selectedDate={selectedDate} />
         )}
@@ -221,6 +241,18 @@ function EmptyDateCard({ selectedDate }: { selectedDate: string }) {
         この日に予定を追加
       </Link>
     </section>
+  );
+}
+
+function AddAnotherEventLink({ selectedDate }: { selectedDate: string }) {
+  return (
+    <Link
+      href={`/marketnote/new?startDate=${selectedDate}`}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-extrabold text-[#f46a14]"
+    >
+      <Plus size={14} strokeWidth={1.8} />
+      この日に別の予定を追加
+    </Link>
   );
 }
 
@@ -285,21 +317,96 @@ function CalendarCell({
   );
 }
 
-function UpcomingEventCard({ summary }: { summary: EventSummary }) {
+function UpcomingEventCard({
+  summary,
+  onOpen,
+  onStatusChange
+}: {
+  summary: EventSummary;
+  onOpen: () => void;
+  onStatusChange: (status: MarketEvent["status"]) => Promise<void>;
+}) {
   const done = summary.checks.filter((check) => check.is_done).length;
   const progress = summary.checks.length ? Math.round((done / summary.checks.length) * 100) : 0;
   const payment = getPaymentState(summary);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
+
+  async function chooseStatus(status: MarketEvent["status"]) {
+    if (status === summary.event.status || changingStatus) {
+      setStatusMenuOpen(false);
+      return;
+    }
+
+    setChangingStatus(true);
+    try {
+      await onStatusChange(status);
+      setStatusMenuOpen(false);
+    } finally {
+      setChangingStatus(false);
+    }
+  }
 
   return (
-    <Link href={`/marketnote/${summary.event.id}`} className="mt-4 grid grid-cols-[68px_1fr] gap-4 rounded-2xl border border-[#eee9e4] bg-white p-4 shadow-[0_4px_16px_rgba(45,33,22,0.045)]">
+    <section
+      role="link"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") onOpen();
+      }}
+      className="mt-4 grid cursor-pointer grid-cols-[68px_1fr] gap-4 rounded-2xl border border-[#eee9e4] bg-white p-4 shadow-[0_4px_16px_rgba(45,33,22,0.045)]"
+    >
       <div className="border-r border-[#eee9e4] pr-3 text-center">
         <p className="text-2xl font-semibold text-[#1f1b18]">{shortDate(summary.event.event_date)}</p>
         <p className="mt-1 text-xs font-bold text-[#1f1b18]">{weekdayLabel(summary.event.event_date)}</p>
       </div>
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <StatusChip status={summary.event.status} withChevron />
-          <Edit3 size={16} className="shrink-0 text-[#7b736d]" />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setStatusMenuOpen((current) => !current);
+              }}
+              className="rounded-full"
+              aria-label="ステータスを変更"
+              aria-expanded={statusMenuOpen}
+            >
+              <StatusChip status={summary.event.status} withChevron />
+            </button>
+            {statusMenuOpen ? (
+              <div
+                className="absolute left-0 top-8 z-20 w-32 overflow-hidden rounded-xl border border-[#e8dfd8] bg-white py-1 shadow-[0_8px_22px_rgba(45,33,22,0.12)]"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+              >
+                {statusMenuOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={changingStatus}
+                    onClick={() => chooseStatus(option.value)}
+                    className="block w-full px-3 py-2 text-left text-xs font-extrabold text-[#3b3530] hover:bg-[#fff7f2] disabled:opacity-50"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <Link
+            href={`/marketnote/${summary.event.id}`}
+            onClick={(event) => event.stopPropagation()}
+            className="shrink-0 text-[#7b736d]"
+            aria-label="詳細を開く"
+          >
+            <Edit3 size={16} />
+          </Link>
         </div>
         <h2 className="mt-3 truncate text-lg font-bold tracking-normal text-[#1f1b18]">{summary.event.title}</h2>
         <p className="mt-2 truncate text-xs font-semibold text-[#5f5a55]">{formatDate(summary.event.event_date)} / 時間未設定</p>
@@ -312,7 +419,7 @@ function UpcomingEventCard({ summary }: { summary: EventSummary }) {
           <div className="h-full rounded-full bg-[#f46a14]" style={{ width: `${progress}%` }} />
         </div>
       </div>
-    </Link>
+    </section>
   );
 }
 

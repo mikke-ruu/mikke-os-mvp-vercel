@@ -309,6 +309,23 @@ export async function completeMarketEvent(profile: Profile, event: MarketEvent) 
   return updated;
 }
 
+export async function updateMarketEventStatus(
+  profile: Profile,
+  event: MarketEvent,
+  status: MarketEvent["status"]
+) {
+  const { data, error } = await supabase
+    .from("market_events")
+    .update({ status })
+    .eq("id", event.id)
+    .eq("profile_id", profile.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as MarketEvent;
+}
+
 export async function listActivityLogs(profileId: string, storyOnly = false) {
   let query = supabase
     .from("activity_logs")
