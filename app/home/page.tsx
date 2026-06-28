@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
-import { formatDate, formatYen } from "@/lib/format";
+import { formatDate, formatMonthDay, formatYen } from "@/lib/format";
 import { listCheckItems, listFinancialRecords, listMarketEvents, listReflections, updateMarketEventStatus } from "@/lib/marketnote";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
@@ -26,6 +26,12 @@ type EventSummary = {
   checks: MarketCheckItem[];
   finances: MarketFinancialRecord[];
   reflection: MarketReflection | null;
+};
+
+type EventMeta = {
+  endDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
 };
 
 const statusMenuOptions: Array<{ label: string; value: MarketEvent["status"] }> = [
@@ -329,6 +335,7 @@ function UpcomingEventCard({
   const done = summary.checks.filter((check) => check.is_done).length;
   const progress = summary.checks.length ? Math.round((done / summary.checks.length) * 100) : 0;
   const payment = getPaymentState(summary);
+  const eventMeta = parseEventMeta(summary.event);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
 
@@ -409,7 +416,7 @@ function UpcomingEventCard({
           </Link>
         </div>
         <h2 className="mt-3 truncate text-lg font-bold tracking-normal text-[#1f1b18]">{summary.event.title}</h2>
-        <p className="mt-2 truncate text-xs font-semibold text-[#5f5a55]">{formatDate(summary.event.event_date)} / 時間未設定</p>
+        <p className="mt-2 truncate text-xs font-semibold text-[#5f5a55]">{eventDateRangeLabel(summary.event, eventMeta)} / {eventTimeLabel(eventMeta)}</p>
         <p className="mt-1 truncate text-xs font-semibold text-[#5f5a55]">{[summary.event.venue_name, summary.event.area].filter(Boolean).join(" / ") || "会場未設定"}</p>
         <div className="mt-3 flex items-center justify-between text-xs">
           <span className="font-semibold text-[#3b3530]">支払い：<PaymentChip payment={payment} /></span>
@@ -549,11 +556,43 @@ function getDueSoon(summaries: EventSummary[]) {
     .sort((a, b) => (a.check.due_date ?? a.summary.event.event_date).localeCompare(b.check.due_date ?? b.summary.event.event_date));
 }
 
+function parseEventMeta(event: MarketEvent): EventMeta {
+  const note = event.private_note ?? "";
+  return {
+    endDate: matchNoteValue(note, "end_date"),
+    startTime: matchNoteValue(note, "開始時間"),
+    endTime: matchNoteValue(note, "終了時間")
+  };
+}
+
+function matchNoteValue(note: string, label: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matched = note.match(new RegExp(`(?:^|\\n)${escaped}:\\s*([^\\n]+)`));
+  return matched?.[1]?.trim() || null;
+}
+
+function eventDateRangeLabel(event: MarketEvent, meta: EventMeta) {
+  const endDate = meta.endDate && meta.endDate !== event.event_date ? meta.endDate : null;
+  if (!endDate) return formatDate(event.event_date);
+  return `${formatDate(event.event_date)} - ${formatMonthDay(endDate)}`;
+}
+
+function eventTimeLabel(meta: EventMeta) {
+  if (meta.startTime && meta.endTime) return `${meta.startTime} - ${meta.endTime}`;
+  if (meta.startTime) return `${meta.startTime}開始`;
+  if (meta.endTime) return `${meta.endTime}終了`;
+  return "時間未設定";
+}
+
 function buildMonthCells(month: Date) {
   const start = startOfMonth(month);
+  const end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
   const first = new Date(start);
   first.setDate(start.getDate() - start.getDay());
-  return Array.from({ length: 42 }, (_, index) => new Date(first.getFullYear(), first.getMonth(), first.getDate() + index));
+  const last = new Date(end);
+  last.setDate(end.getDate() + (6 - end.getDay()));
+  const dayCount = Math.round((last.getTime() - first.getTime()) / 86400000) + 1;
+  return Array.from({ length: dayCount }, (_, index) => new Date(first.getFullYear(), first.getMonth(), first.getDate() + index));
 }
 
 function startOfMonth(date: Date) {

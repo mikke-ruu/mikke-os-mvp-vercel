@@ -527,7 +527,7 @@ function SelectBox({
     ? "border-[#68bd7d] bg-[#f1fbf3] text-[#16833b]"
     : tone === "orange"
       ? "border-[#ffb996] bg-[#fff6f1] text-[#ff5a1f]"
-      : "border-[#e7e1dc] bg-white text-[#3b3530]";
+      : "border-[#cbc4bd] bg-[#f7f5f2] text-[#5f5a55]";
 
   return (
     <label className="relative block">
