@@ -89,8 +89,7 @@ function MarketDetailContent() {
   const [nextActions, setNextActions] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [basicOpen, setBasicOpen] = useState(false);
-  const [venueOpen, setVenueOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   async function load() {
     const bundle = await getMarketEventBundle(profile.id, params.id);
@@ -184,7 +183,7 @@ function MarketDetailContent() {
         publicSummary: goodPoints,
         privateNote: "",
         goodPoints,
-        nextActions
+        nextActions: ""
       });
 
       await load();
@@ -234,23 +233,25 @@ function MarketDetailContent() {
           done={done}
           total={checks.length}
           progress={progress}
+          checks={checks.slice(0, 3)}
+          onStatusChange={setStatus}
+          onToggleCheck={async (item, nextValue) => {
+            await toggleCheckItem(profile, item, nextValue);
+            await load();
+          }}
+          onShowAllChecks={() => setEditOpen(true)}
         />
 
         <div className="mt-3 space-y-3">
-          <CollapsibleCard title="基本情報" icon={<ClipboardList size={16} strokeWidth={1.8} />} open={basicOpen} onToggle={() => setBasicOpen((current) => !current)}>
-            <Field label="イベント名">
-              <TextInput value={title} onChange={setTitle} />
-            </Field>
+          <CollapsibleCard title="各項目編集" icon={<ClipboardList size={16} strokeWidth={1.8} />} open={editOpen} onToggle={() => setEditOpen((current) => !current)}>
+            <SectionLabel>基本情報</SectionLabel>
+            <Field label="イベント名"><TextInput value={title} onChange={setTitle} /></Field>
             <div className="grid grid-cols-2 gap-2.5">
-              <Field label={multiDay ? "開始日" : "開催日"}>
-                <TextInput value={eventDate} onChange={(value) => {
-                  setEventDate(value);
-                  if (!multiDay) setEndDate(value);
-                }} type="date" icon={<CalendarDays size={15} />} />
-              </Field>
-              <Field label="ステータス">
-                <SelectBox value={status} onChange={(value) => setStatus(value as MarketEvent["status"])} options={statusOptions} tone={statusTone(status)} />
-              </Field>
+              <Field label={multiDay ? "開始日" : "開催日"}><TextInput value={eventDate} onChange={(value) => {
+                setEventDate(value);
+                if (!multiDay) setEndDate(value);
+              }} type="date" icon={<CalendarDays size={15} />} /></Field>
+              <Field label="ステータス"><SelectBox value={status} onChange={(value) => setStatus(value as MarketEvent["status"])} options={statusOptions} tone={statusTone(status)} /></Field>
             </div>
             <button type="button" onClick={() => setMultiDay((current) => !current)} className="inline-flex items-center gap-2 text-xs font-bold text-[#6f6862]">
               <span className={`grid h-4 w-4 place-items-center rounded border ${multiDay ? "border-[#ff5a1f] bg-[#ff5a1f] text-white" : "border-[#d8d2cc] bg-white text-transparent"}`}>
@@ -258,26 +259,19 @@ function MarketDetailContent() {
               </span>
               複数日イベント
             </button>
-            {multiDay ? (
-              <Field label="終了日">
-                <TextInput value={endDate} onChange={setEndDate} type="date" icon={<CalendarDays size={15} />} />
-              </Field>
-            ) : null}
+            {multiDay ? <Field label="終了日"><TextInput value={endDate} onChange={setEndDate} type="date" icon={<CalendarDays size={15} />} /></Field> : null}
             <div className="grid grid-cols-2 gap-2.5">
               <Field label="開始時間"><TextInput value={startTime} onChange={setStartTime} type="time" /></Field>
               <Field label="終了時間"><TextInput value={endTime} onChange={setEndTime} type="time" /></Field>
               <Field label="集合時間"><TextInput value={meetTime} onChange={setMeetTime} type="time" /></Field>
               <Field label="撤収時間"><TextInput value={packUpTime} onChange={setPackUpTime} type="time" /></Field>
             </div>
-          </CollapsibleCard>
 
-          <CollapsibleCard title="会場情報" icon={<MapPin size={16} strokeWidth={1.8} />} open={venueOpen} onToggle={() => setVenueOpen((current) => !current)}>
+            <SectionLabel>会場情報</SectionLabel>
             <Field label="会場名"><TextInput value={venueName} onChange={setVenueName} placeholder="例）東京ビッグサイト 西1・2ホール" /></Field>
             <Field label="住所"><TextInput value={address} onChange={setAddress} placeholder="例）東京都江東区有明3-11-1" /></Field>
-            <span className="block text-right text-xs font-extrabold text-[#16833b]">地図を見る ↗</span>
-          </CollapsibleCard>
 
-          <FormCard title="支払い情報" icon={<WalletCards size={16} strokeWidth={1.8} />}>
+            <SectionLabel>支払い情報</SectionLabel>
             <div className="grid grid-cols-[1fr_1fr_0.95fr] gap-2">
               <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentTone(paymentStatus)} />
               <SelectBox value={paymentMethod} onChange={(value) => setPaymentMethod(value as PaymentMethod)} options={paymentMethods.map((method) => ({ label: method, value: method }))} tone="gray" />
@@ -287,15 +281,8 @@ function MarketDetailContent() {
               <Plus size={14} strokeWidth={1.7} />
               支払い追加
             </div>
-          </FormCard>
 
-          <FormCard title="チェック項目" icon={<ClipboardList size={16} strokeWidth={1.8} />}>
-            <div className="flex items-center gap-3">
-              <span className="text-xs font-extrabold text-[#3b3530]">タスク {done}/{checks.length}</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#eee8e2]">
-                <div className="h-full rounded-full bg-[#ff5a1f]" style={{ width: `${progress}%` }} />
-              </div>
-            </div>
+            <SectionLabel>チェック項目</SectionLabel>
             <div className="grid gap-2 sm:grid-cols-2">
               {checks.map((item) => (
                 <button
@@ -320,7 +307,7 @@ function MarketDetailContent() {
                 <Plus size={17} />
               </button>
             </div>
-          </FormCard>
+          </CollapsibleCard>
 
           <FormCard title="メモ" icon={<FileText size={16} strokeWidth={1.8} />}>
             <textarea value={memo} onChange={(inputEvent) => setMemo(inputEvent.target.value)} rows={2} className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 text-[#1f1b18] outline-none focus:border-[#ff5a1f]" />
@@ -329,10 +316,7 @@ function MarketDetailContent() {
           <FinanceMemo totals={totals} />
 
           <FormCard title="振り返り" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
-            <div className="grid gap-3">
-              <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={3} placeholder="よかったこと" className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 outline-none focus:border-[#ff5a1f]" />
-              <textarea value={nextActions} onChange={(inputEvent) => setNextActions(inputEvent.target.value)} rows={3} placeholder="次回改善" className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 outline-none focus:border-[#ff5a1f]" />
-            </div>
+            <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={4} placeholder="今日の反応、気づいたこと、次回やることなど" className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 outline-none focus:border-[#ff5a1f]" />
           </FormCard>
 
           <FormCard title="写真" icon={<ImageIcon size={16} strokeWidth={1.8} />}>
@@ -373,7 +357,11 @@ function SummaryCard({
   paymentStatus,
   done,
   total,
-  progress
+  progress,
+  checks,
+  onStatusChange,
+  onToggleCheck,
+  onShowAllChecks
 }: {
   event: MarketEvent;
   title: string;
@@ -388,10 +376,37 @@ function SummaryCard({
   done: number;
   total: number;
   progress: number;
+  checks: MarketCheckItem[];
+  onStatusChange: (status: MarketEvent["status"]) => void;
+  onToggleCheck: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
+  onShowAllChecks: () => void;
 }) {
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+
   return (
     <section className="rounded-[18px] border border-[#e7e1dc] bg-white p-4 shadow-[0_4px_14px_rgba(45,33,22,0.04)]">
-      <StatusChip status={status} />
+      <div className="relative w-fit">
+        <button type="button" onClick={() => setStatusMenuOpen((current) => !current)} aria-expanded={statusMenuOpen}>
+          <StatusChip status={status} withChevron />
+        </button>
+        {statusMenuOpen ? (
+          <div className="absolute left-0 top-8 z-20 w-32 overflow-hidden rounded-xl border border-[#e8dfd8] bg-white py-1 shadow-[0_8px_22px_rgba(45,33,22,0.12)]">
+            {statusOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onStatusChange(option.value);
+                  setStatusMenuOpen(false);
+                }}
+                className="block w-full px-3 py-2 text-left text-xs font-extrabold text-[#3b3530] hover:bg-[#fff7f2]"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
       <h2 className="mt-3 truncate text-xl font-extrabold tracking-normal text-[#1f1b18]">{title}</h2>
       <div className="mt-3 grid gap-1.5 text-sm font-semibold text-[#4a423c]">
         <span className="flex min-w-0 items-center gap-2"><Clock3 size={16} className="text-[#8a817a]" />{dateRangeLabel(eventDate, endDate)} / {timeLabel(startTime, endTime)}</span>
@@ -404,6 +419,28 @@ function SummaryCard({
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#eee8e2]">
         <div className="h-full rounded-full bg-[#ff5a1f]" style={{ width: `${progress}%` }} />
       </div>
+      {checks.length > 0 ? (
+        <div className="mt-3 grid gap-1.5">
+          {checks.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => onToggleCheck(item, !item.is_done)}
+              className="grid grid-cols-[20px_1fr] items-center gap-2 text-left"
+            >
+              <span className={`grid h-5 w-5 place-items-center rounded-full border ${item.is_done ? "border-[#5fb878] bg-[#eaf8ee] text-[#16833b]" : "border-[#d8d2cc] text-transparent"}`}>
+                <Check size={12} strokeWidth={2} />
+              </span>
+              <span className="truncate text-xs font-bold text-[#3b3530]">{item.title}</span>
+            </button>
+          ))}
+          {total > checks.length ? (
+            <button type="button" onClick={onShowAllChecks} className="w-fit text-xs font-extrabold text-[#ff5a1f]">
+              すべて見る
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -442,6 +479,10 @@ function FormCard({ title, icon, children }: { title: string; icon?: React.React
       <div className="mt-3 space-y-2.5">{children}</div>
     </section>
   );
+}
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return <p className="pt-1 text-xs font-extrabold text-[#8a817a]">{children}</p>;
 }
 
 function CollapsibleCard({
@@ -535,8 +576,12 @@ function MoneyInput({ value, onChange }: { value: string; onChange: (value: stri
   );
 }
 
-function StatusChip({ status }: { status: MarketEvent["status"] }) {
-  return <span className={`inline-flex rounded-full px-3 py-1 text-xs font-extrabold ${statusChipClass(status)}`}>{statusLabel(status)}</span>;
+function StatusChip({ status, withChevron = false }: { status: MarketEvent["status"]; withChevron?: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-extrabold ${statusChipClass(status)}`}>
+      {statusLabel(status)}{withChevron ? <ChevronDown size={13} /> : null}
+    </span>
+  );
 }
 
 function PaymentChip({ status }: { status: PaymentStatus }) {

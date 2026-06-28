@@ -101,3 +101,12 @@ Target route: `/marketnote/[id]`
 - Any section that shows a collapse arrow must actually open and close.
 - Do not show edit icons that do not perform an action.
 - Reflection inputs should be one column on mobile so longer text remains easy to read and edit.
+
+## 2026-06-28 summary-first layout notes
+
+- The detail screen should make the summary card the primary surface.
+- Status changes and quick check completion should be available directly inside the summary card.
+- Basic information, venue information, payment information, and detailed check editing should be grouped into one collapsed `各項目編集` card.
+- Memo, finance memo, reflection, and photos are record areas below the edit card.
+- Reflection is one freeform field with placeholder guidance such as `今日の反応、気づいたこと、次回やることなど`.
+- Finance details should not be edited in a popup on the detail screen. The detail screen shows totals and links to a future finance page for detailed revenue / expense entry.
