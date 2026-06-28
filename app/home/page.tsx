@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
+import { MikkeAppSwitcher } from "@/components/MikkeAppSwitcher";
 import { formatDate, formatMonthDay, formatYen } from "@/lib/format";
 import { listCheckItems, listFinancialRecords, listMarketEvents, listReflections, updateMarketEventStatus } from "@/lib/marketnote";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
@@ -132,6 +133,7 @@ function HomeContent() {
         <header className="mb-5 pt-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
+              <MikkeAppSwitcher />
               <span className="font-serif text-4xl italic leading-none text-[#f46a14]">M</span>
               <span className="font-serif text-3xl tracking-normal text-[#1f1b18]">MarketNote</span>
             </div>

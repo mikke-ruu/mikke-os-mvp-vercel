@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronDown, Clock3, Edit3, Filter, MapPin, Plus } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
+import { MikkeAppSwitcher } from "@/components/MikkeAppSwitcher";
 import { formatDate } from "@/lib/format";
 import { listCheckItems, listMarketEvents } from "@/lib/marketnote";
 import type { MarketCheckItem, MarketEvent } from "@/types/database";
@@ -60,8 +61,9 @@ function MarketNoteContent() {
     <AppShell title="MarketNote" hideHeader>
       <div className="-mx-1 pb-2">
         <header className="mb-5 pt-2">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-semibold tracking-normal text-[#1f1b18]">一覧</h1>
+          <div className="grid grid-cols-[40px_1fr_40px] items-center">
+            <MikkeAppSwitcher />
+            <h1 className="text-center text-3xl font-semibold tracking-normal text-[#1f1b18]">一覧</h1>
             <button className="grid h-11 w-11 place-items-center rounded-full text-[#f46a14]" aria-label="フィルター">
               <Filter size={25} strokeWidth={1.7} />
             </button>

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
+import { MikkeAppSwitcher } from "@/components/MikkeAppSwitcher";
 import { formatMonthDay, formatYen } from "@/lib/format";
 import {
   addFinancialRecord,
@@ -190,8 +191,9 @@ function MarketFinanceContent() {
     <AppShell title="MarketNote" hideHeader>
       <div className="-mx-1 pb-2">
         <header className="mb-4 pt-2">
-          <div className="flex items-center justify-between">
-            <h1 className="text-[28px] font-semibold tracking-normal text-[#1f1b18]">収支</h1>
+          <div className="grid grid-cols-[40px_1fr_40px] items-center">
+            <MikkeAppSwitcher />
+            <h1 className="text-center text-[28px] font-semibold tracking-normal text-[#1f1b18]">収支</h1>
             <span className="h-10 w-10" aria-hidden="true" />
           </div>
 
