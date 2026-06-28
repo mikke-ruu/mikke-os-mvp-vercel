@@ -313,7 +313,7 @@ function MarketDetailContent() {
             </div>
           </CollapsibleCard>
 
-          <FinanceMemo totals={totals} />
+          <FinanceMemo eventId={event.id} totals={totals} />
 
           <FormCard title="振り返り" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
             <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={4} placeholder="今日の反応、気づいたこと、次回やることなど" className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 outline-none focus:border-[#ff5a1f]" />
@@ -447,7 +447,7 @@ function SummaryCard({
   );
 }
 
-function FinanceMemo({ totals }: { totals: { revenue: number; expense: number; profit: number } }) {
+function FinanceMemo({ eventId, totals }: { eventId: string; totals: { revenue: number; expense: number; profit: number } }) {
   return (
     <FormCard title="収支メモ" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
       <div className="grid grid-cols-[1fr_1px_1fr_1px_1fr] items-center">
@@ -457,7 +457,7 @@ function FinanceMemo({ totals }: { totals: { revenue: number; expense: number; p
         <span className="h-9 bg-[#eee9e4]" />
         <MoneyCell label="利益" value={totals.profit} profit />
       </div>
-      <div className="text-right text-xs font-extrabold text-[#16833b]">収支を詳しく見る →</div>
+      <Link href={`/marketnote/finance?eventId=${eventId}`} className="block text-right text-xs font-extrabold text-[#16833b]">収支を詳しく見る →</Link>
     </FormCard>
   );
 }

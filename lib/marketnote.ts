@@ -244,6 +244,49 @@ export async function addFinancialRecord(
   return record;
 }
 
+export async function updateFinancialRecord(
+  profile: Profile,
+  recordId: string,
+  input: {
+    recordType: "revenue" | "expense";
+    title: string;
+    amount: number;
+    occurredAt: string;
+    category: string;
+    memo: string;
+    paymentStatus?: "unpaid" | "paid" | "not_required";
+  }
+) {
+  const { data, error } = await supabase
+    .from("market_financial_records")
+    .update({
+      record_type: input.recordType,
+      title: input.title,
+      amount: input.amount,
+      occurred_at: input.occurredAt,
+      category: input.category || null,
+      memo: input.memo || null,
+      payment_status: input.paymentStatus ?? "paid"
+    })
+    .eq("id", recordId)
+    .eq("profile_id", profile.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as MarketFinancialRecord;
+}
+
+export async function deleteFinancialRecord(profile: Profile, recordId: string) {
+  const { error } = await supabase
+    .from("market_financial_records")
+    .delete()
+    .eq("id", recordId)
+    .eq("profile_id", profile.id);
+
+  if (error) throw error;
+}
+
 export async function saveEventPaymentRecord(
   profile: Profile,
   input: {

@@ -8,7 +8,7 @@ const items = [
   { href: "/home", label: "ホーム", icon: Home },
   { href: "/marketnote", label: "一覧", icon: List },
   { href: "/marketnote/new", label: "追加", icon: Plus, primary: true },
-  { href: "/desk", label: "収支", icon: ReceiptText },
+  { href: "/marketnote/finance", label: "収支", icon: ReceiptText },
   { href: "/settings", label: "設定", icon: Settings }
 ];
 
@@ -23,7 +23,7 @@ export function BottomNav() {
           const active = item.primary
             ? pathname === item.href
             : item.href === "/marketnote"
-              ? pathname === "/marketnote" || (pathname.startsWith("/marketnote/") && pathname !== "/marketnote/new")
+              ? pathname === "/marketnote"
               : pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
