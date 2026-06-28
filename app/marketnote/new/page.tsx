@@ -8,10 +8,12 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ClipboardList,
   Clock3,
   FileText,
   MapPin,
   Plus,
+  WalletCards,
   X
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
@@ -21,6 +23,7 @@ import type { MarketEvent } from "@/types/database";
 
 type EntryStatus = "planned" | "applied" | "preparing";
 type PaymentStatus = "unpaid" | "paid" | "not_required";
+type PaymentMethod = "現金" | "QR" | "カード" | "ポイント" | "その他";
 
 const statusOptions: Array<{ label: string; value: EntryStatus }> = [
   { label: "検討中", value: "planned" },
@@ -34,7 +37,7 @@ const paymentStatusOptions: Array<{ label: string; value: PaymentStatus }> = [
   { label: "不要", value: "not_required" }
 ];
 
-const paymentMethods = ["現金", "QR", "カード", "ポイント", "その他"] as const;
+const paymentMethods: PaymentMethod[] = ["現金", "QR", "カード", "ポイント", "その他"];
 
 const commonCheckItems = [
   "出店料を支払う",
@@ -59,7 +62,7 @@ function NewMarketEventContent() {
   const [venueName, setVenueName] = useState("");
   const [address, setAddress] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
-  const [paymentMethod, setPaymentMethod] = useState<(typeof paymentMethods)[number]>("QR");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("現金");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [selectedChecks, setSelectedChecks] = useState<string[]>(commonCheckItems.slice(0, 3));
@@ -172,35 +175,30 @@ function NewMarketEventContent() {
   }
 
   return (
-    <AppShell title="出店予定を追加" hideHeader>
-      <form onSubmit={submit} className="pb-6">
-        <header className="mb-5 flex items-center justify-between pt-2">
+    <AppShell title="出店予定を追加" hideHeader hideBottomNav>
+      <form onSubmit={submit} className="pb-5">
+        <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button
             type="button"
             onClick={() => router.back()}
-            className="grid h-10 w-10 place-items-center rounded-full border border-[#eee9e4] bg-white text-[#5f5a55] shadow-[0_4px_12px_rgba(45,33,22,0.035)]"
+            className="grid h-9 w-9 place-items-center rounded-full text-[#1f1b18]"
             aria-label="戻る"
           >
-            <ArrowLeft size={20} strokeWidth={1.7} />
+            <ArrowLeft size={22} strokeWidth={1.7} />
           </button>
-          <h1 className="text-xl font-semibold tracking-normal text-[#1f1b18]">出店予定を追加</h1>
-          <Link
-            href="/marketnote"
-            className="grid h-10 w-10 place-items-center rounded-full border border-[#f3d0be] bg-white text-[#f46a14] shadow-[0_4px_12px_rgba(45,33,22,0.035)]"
-            aria-label="閉じる"
-          >
+          <h1 className="text-center text-xl font-semibold tracking-normal text-[#1f1b18]">出店予定を追加</h1>
+          <Link href="/marketnote" className="grid h-9 w-9 place-items-center rounded-full text-[#5f5a55]" aria-label="閉じる">
             <X size={20} strokeWidth={1.7} />
           </Link>
         </header>
 
-        <div className="space-y-4">
-          <FormCard title="基本情報">
-            <Field label="イベント名" required>
-              <TextInput value={title} onChange={setTitle} placeholder="Mikke bazar vol.12" required />
-            </Field>
-
-            {multiDay ? (
-              <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-3">
+          <FormCard title="基本情報" icon={<ClipboardList size={16} strokeWidth={1.8} />}>
+            <div className="grid grid-cols-[1fr_0.86fr] gap-3">
+              <Field label="イベント名" required compact>
+                <TextInput value={title} onChange={setTitle} placeholder="例）ハンドメイドフェス 2025" required />
+              </Field>
+              {multiDay ? (
                 <Field label="開始日" required compact>
                   <TextInput
                     value={startDate}
@@ -210,27 +208,33 @@ function NewMarketEventContent() {
                     }}
                     type="date"
                     required
-                    icon={<CalendarDays size={17} />}
+                    icon={<CalendarDays size={15} />}
                   />
                 </Field>
+              ) : (
+                <Field label="開催日" required compact>
+                  <TextInput
+                    value={startDate}
+                    onChange={(value) => {
+                      setStartDate(value);
+                      setEndDate(value);
+                    }}
+                    type="date"
+                    required
+                    icon={<CalendarDays size={15} />}
+                  />
+                </Field>
+              )}
+            </div>
+
+            {multiDay ? (
+              <div className="grid grid-cols-[1fr_0.86fr] gap-3">
+                <span />
                 <Field label="終了日" required compact>
-                  <TextInput value={endDate} onChange={setEndDate} type="date" required icon={<CalendarDays size={17} />} />
+                  <TextInput value={endDate} onChange={setEndDate} type="date" required icon={<CalendarDays size={15} />} />
                 </Field>
               </div>
-            ) : (
-              <Field label="開催日" required>
-                <TextInput
-                  value={startDate}
-                  onChange={(value) => {
-                    setStartDate(value);
-                    setEndDate(value);
-                  }}
-                  type="date"
-                  required
-                  icon={<CalendarDays size={17} />}
-                />
-              </Field>
-            )}
+            ) : null}
 
             <button
               type="button"
@@ -241,25 +245,25 @@ function NewMarketEventContent() {
                   return next;
                 });
               }}
-              className="inline-flex items-center gap-2 text-xs font-bold text-[#5f5a55]"
+              className="inline-flex items-center gap-2 text-xs font-bold text-[#6f6862]"
             >
-              <span className={`grid h-4 w-4 place-items-center rounded border ${multiDay ? "border-[#f46a14] bg-[#f46a14] text-white" : "border-[#d8d2cc] bg-white text-transparent"}`}>
+              <span className={`grid h-4 w-4 place-items-center rounded border ${multiDay ? "border-[#ff5a1f] bg-[#ff5a1f] text-white" : "border-[#d8d2cc] bg-white text-transparent"}`}>
                 <Check size={11} strokeWidth={2} />
               </span>
               複数日イベント
             </button>
-
-            <Field label="ステータス">
-              <Segmented
-                options={statusOptions}
-                value={status}
-                onChange={setStatus}
-                getTone={(value) => value === "preparing" ? "orange" : value === "applied" ? "green" : "gray"}
-              />
-            </Field>
           </FormCard>
 
-          <AccordionCard title="日時詳細" icon={<Clock3 size={18} />} open={timeOpen} onToggle={() => setTimeOpen((value) => !value)}>
+          <FormCard title="ステータス" icon={<Check size={16} strokeWidth={1.8} />}>
+            <Segmented
+              options={statusOptions}
+              value={status}
+              onChange={setStatus}
+              getTone={(value) => value === "preparing" ? "orange" : value === "applied" ? "green" : "gray"}
+            />
+          </FormCard>
+
+          <AccordionCard title="日時（任意）" icon={<Clock3 size={16} />} open={timeOpen} onToggle={() => setTimeOpen((value) => !value)}>
             <div className="grid grid-cols-2 gap-3">
               <Field label="開始時間" compact>
                 <TextInput value={startTime} onChange={setStartTime} type="time" />
@@ -276,74 +280,43 @@ function NewMarketEventContent() {
             </div>
           </AccordionCard>
 
-          <AccordionCard title="会場情報" icon={<MapPin size={18} />} open={venueOpen} onToggle={() => setVenueOpen((value) => !value)}>
-            <Field label="会場名">
-              <TextInput value={venueName} onChange={setVenueName} placeholder="MILKROAD CAFE" />
-            </Field>
-            <Field label="住所">
-              <TextInput value={address} onChange={setAddress} placeholder="東京都墨田区..." />
-            </Field>
+          <AccordionCard title="会場情報（任意）" icon={<MapPin size={16} />} open={venueOpen} onToggle={() => setVenueOpen((value) => !value)}>
+            <div className="space-y-2.5">
+              <Field label="会場名" compact>
+                <TextInput value={venueName} onChange={setVenueName} placeholder="例）東京ビッグサイト 西1・2ホール" />
+              </Field>
+              <Field label="住所" compact>
+                <TextInput value={address} onChange={setAddress} placeholder="例）東京都江東区有明3-11-1" />
+              </Field>
+            </div>
           </AccordionCard>
 
-          <FormCard title="支払い情報">
-            <Field label="状況">
-              <Segmented
-                options={paymentStatusOptions}
-                value={paymentStatus}
-                onChange={setPaymentStatus}
-                getTone={(value) => value === "paid" ? "green" : value === "unpaid" ? "orange" : "gray"}
-              />
-            </Field>
-            <Field label="方法">
-              <div className="grid grid-cols-5 gap-1.5">
-                {paymentMethods.map((method) => (
-                  <button
-                    key={method}
-                    type="button"
-                    onClick={() => setPaymentMethod(method)}
-                    className={`min-h-10 rounded-xl border px-1 text-xs font-bold transition ${
-                      paymentMethod === method
-                        ? "border-[#f46a14] bg-[#fff2e8] text-[#f46a14]"
-                        : "border-[#eee9e4] bg-white text-[#6f6862]"
-                    }`}
-                  >
-                    {method}
-                  </button>
-                ))}
-              </div>
-            </Field>
-            <Field label="金額">
-              <div className="grid grid-cols-[44px_1fr] overflow-hidden rounded-xl border border-[#eee9e4] bg-white">
-                <span className="grid place-items-center border-r border-[#eee9e4] text-sm font-bold text-[#9a9089]">¥</span>
-                <input
-                  value={paymentAmount}
-                  onChange={(event) => setPaymentAmount(event.target.value)}
-                  inputMode="numeric"
-                  placeholder="0"
-                  className="min-h-11 min-w-0 bg-white px-3 text-right text-sm font-bold text-[#1f1b18] outline-none"
-                />
-              </div>
-            </Field>
+          <FormCard title="支払い情報" icon={<WalletCards size={16} />}>
+            <div className="grid grid-cols-[1fr_1fr_0.95fr] gap-2">
+              <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentStatus === "paid" ? "green" : paymentStatus === "unpaid" ? "orange" : "gray"} />
+              <SelectBox value={paymentMethod} onChange={(value) => setPaymentMethod(value as PaymentMethod)} options={paymentMethods.map((method) => ({ label: method, value: method }))} tone="gray" />
+              <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
+            </div>
             <button
               type="button"
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-[#f3d0be] bg-white px-4 py-3 text-sm font-extrabold text-[#f46a14]"
+              className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#ffb996] bg-white px-3 py-2.5 text-sm font-extrabold text-[#ff5a1f]"
             >
-              <Plus size={16} strokeWidth={1.8} />
+              <Plus size={15} strokeWidth={1.8} />
               支払い追加
             </button>
           </FormCard>
 
-          <FormCard title="メモ" icon={<FileText size={18} />}>
+          <FormCard title="メモ" icon={<FileText size={16} />}>
             <textarea
               value={memo}
               onChange={(event) => setMemo(event.target.value)}
-              rows={5}
-              placeholder="出店条件、搬入メモ、主催者からの連絡など"
-              className="w-full resize-none rounded-2xl border border-[#eee9e4] bg-white px-4 py-3 text-sm leading-6 text-[#1f1b18] outline-none transition placeholder:text-[#b4aaa2] focus:border-[#f46a14]"
+              rows={4}
+              placeholder="電源使用予定、搬入時間、主催者からの連絡など"
+              className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 text-[#1f1b18] outline-none transition placeholder:text-[#b4aaa2] focus:border-[#ff5a1f]"
             />
           </FormCard>
 
-          <AccordionCard title="チェック項目" open={checksOpen} onToggle={() => setChecksOpen((value) => !value)}>
+          <AccordionCard title="チェック項目（任意）" icon={<ClipboardList size={16} />} open={checksOpen} onToggle={() => setChecksOpen((value) => !value)}>
             <div className="flex flex-wrap gap-2">
               {commonCheckItems.map((item) => {
                 const active = selectedChecks.includes(item);
@@ -352,13 +325,13 @@ function NewMarketEventContent() {
                     key={item}
                     type="button"
                     onClick={() => toggleCheck(item)}
-                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold ${
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-bold ${
                       active
-                        ? "border-[#f3d0be] bg-[#fff2e8] text-[#f46a14]"
-                        : "border-[#eee9e4] bg-white text-[#6f6862]"
+                        ? "border-[#ffb996] bg-[#fff4ef] text-[#ff5a1f]"
+                        : "border-[#e7e1dc] bg-white text-[#6f6862]"
                     }`}
                   >
-                    {active ? <Check size={13} strokeWidth={1.8} /> : null}
+                    {active ? <Check size={12} strokeWidth={1.8} /> : null}
                     {item}
                   </button>
                 );
@@ -373,28 +346,28 @@ function NewMarketEventContent() {
                   setSelectedChecks((current) => Array.from(new Set([...current, customCheck.trim()])));
                   setCustomCheck("");
                 }}
-                className="grid h-11 w-11 place-items-center rounded-xl border border-[#f3d0be] bg-white text-[#f46a14]"
+                className="grid h-10 w-10 place-items-center rounded-xl border border-[#ffb996] bg-white text-[#ff5a1f]"
                 aria-label="項目追加"
               >
-                <Plus size={18} />
+                <Plus size={17} />
               </button>
             </div>
           </AccordionCard>
 
-          {error ? <p className="rounded-2xl bg-[#fff0e9] px-4 py-3 text-sm font-bold text-[#8f3d22]">{error}</p> : null}
+          {error ? <p className="rounded-xl bg-[#fff0e9] px-4 py-3 text-sm font-bold text-[#8f3d22]">{error}</p> : null}
 
-          <div className="space-y-3 pt-1">
+          <div className="space-y-2.5 pt-0.5">
             <p className="text-center text-xs font-bold text-[#8a817a]">イベント名と開催日だけでも保存できます</p>
             <button
               type="submit"
               disabled={!canSave}
-              className="w-full rounded-2xl bg-[#f46a14] px-4 py-4 text-base font-extrabold text-white shadow-[0_8px_18px_rgba(244,106,20,0.18)] disabled:opacity-50"
+              className="w-full rounded-xl bg-[#ff5a1f] px-4 py-3.5 text-base font-extrabold text-white shadow-[0_8px_18px_rgba(255,90,31,0.16)] disabled:opacity-50"
             >
               {saving ? "保存中..." : "出店予定を保存"}
             </button>
             <Link
               href="/marketnote"
-              className="block w-full rounded-2xl border border-[#f3d0be] bg-white px-4 py-3 text-center text-sm font-extrabold text-[#f46a14]"
+              className="block w-full rounded-xl border border-[#ff8a5c] bg-white px-4 py-3 text-center text-sm font-extrabold text-[#ff5a1f]"
             >
               閉じる
             </Link>
@@ -407,9 +380,9 @@ function NewMarketEventContent() {
 
 function FormCard({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <section className="rounded-[22px] border border-[#eee9e4] bg-white p-4 shadow-[0_5px_16px_rgba(45,33,22,0.04)]">
+    <section className="rounded-[18px] border border-[#e7e1dc] bg-white p-3.5 shadow-[0_4px_14px_rgba(45,33,22,0.035)]">
       <SectionHeading title={title} icon={icon} />
-      <div className="mt-4 space-y-3">{children}</div>
+      <div className="mt-3 space-y-2.5">{children}</div>
     </section>
   );
 }
@@ -428,12 +401,12 @@ function AccordionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[22px] border border-[#eee9e4] bg-white shadow-[0_5px_16px_rgba(45,33,22,0.04)]">
-      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between gap-3 p-4 text-left">
+    <section className="rounded-[18px] border border-[#e7e1dc] bg-white shadow-[0_4px_14px_rgba(45,33,22,0.035)]">
+      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between gap-3 p-3.5 text-left">
         <SectionHeading title={title} icon={icon} />
-        <ChevronDown size={19} className={`shrink-0 text-[#8a817a] transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={17} className={`shrink-0 text-[#5f5a55] transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open ? <div className="border-t border-[#f3eee9] px-4 pb-4 pt-3">{children}</div> : null}
+      {open ? <div className="border-t border-[#f3eee9] px-3.5 pb-3.5 pt-3">{children}</div> : null}
     </section>
   );
 }
@@ -441,10 +414,10 @@ function AccordionCard({
 function SectionHeading({ title, icon }: { title: string; icon?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="grid h-8 w-8 place-items-center rounded-full bg-[#fff2e8] text-[#f46a14]">
-        {icon ?? <span className="h-2 w-2 rounded-full bg-[#f46a14]" />}
+      <span className="grid h-6 w-6 place-items-center rounded-full text-[#ff5a1f]">
+        {icon ?? <span className="h-2 w-2 rounded-full bg-[#ff5a1f]" />}
       </span>
-      <h2 className="text-base font-extrabold text-[#1f1b18]">{title}</h2>
+      <h2 className="text-sm font-extrabold text-[#1f1b18]">{title}</h2>
     </div>
   );
 }
@@ -461,9 +434,9 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className={compact ? "block" : "grid gap-2"}>
-      <span className="text-xs font-extrabold text-[#4c433d]">
-        {label}{required ? <span className="text-[#f46a14]">*</span> : null}
+    <label className={compact ? "block" : "grid gap-1.5"}>
+      <span className="text-xs font-extrabold text-[#3b3530]">
+        {label}{required ? <span className="ml-0.5 text-[#ff5a1f]">*</span> : null}
       </span>
       {children}
     </label>
@@ -493,9 +466,9 @@ function TextInput({
         type={type}
         required={required}
         placeholder={placeholder}
-        className="min-h-11 w-full rounded-xl border border-[#eee9e4] bg-white px-3 py-3 pr-10 text-sm font-semibold text-[#1f1b18] outline-none transition placeholder:text-[#b4aaa2] focus:border-[#f46a14]"
+        className="h-10 w-full rounded-xl border border-[#e7e1dc] bg-white px-3 pr-9 text-sm font-semibold text-[#1f1b18] outline-none transition placeholder:text-[#b4aaa2] focus:border-[#ff5a1f]"
       />
-      {icon ? <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#8a817a]">{icon}</span> : null}
+      {icon ? <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[#5f5a55]">{icon}</span> : null}
     </div>
   );
 }
@@ -512,29 +485,79 @@ function Segmented<T extends string>({
   getTone: (value: T) => "orange" | "green" | "gray";
 }) {
   return (
-    <div className="grid grid-cols-3 gap-1.5">
+    <div className="grid grid-cols-3 gap-2">
       {options.map((option) => {
         const active = option.value === value;
         const tone = getTone(option.value);
         const activeClass = tone === "green"
-          ? "border-[#9ed8ae] bg-[#eefaf1] text-[#16833b]"
+          ? "border-[#68bd7d] bg-[#f1fbf3] text-[#16833b]"
           : tone === "orange"
-            ? "border-[#f3d0be] bg-[#fff2e8] text-[#f46a14]"
-            : "border-[#ded9d4] bg-[#f5f3f1] text-[#5f5a55]";
+            ? "border-[#ff5a1f] bg-[#fff6f1] text-[#ff5a1f]"
+            : "border-[#d8d2cc] bg-white text-[#4b443e]";
 
         return (
           <button
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`min-h-10 rounded-xl border px-1.5 text-xs font-extrabold transition ${
-              active ? activeClass : "border-[#eee9e4] bg-white text-[#6f6862]"
+            className={`h-9 rounded-full border px-2 text-xs font-extrabold transition ${
+              active ? activeClass : "border-[#d8d2cc] bg-white text-[#5f5a55]"
             }`}
           >
             {option.label}
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function SelectBox({
+  value,
+  options,
+  onChange,
+  tone
+}: {
+  value: string;
+  options: Array<{ label: string; value: string }>;
+  onChange: (value: string) => void;
+  tone: "orange" | "green" | "gray";
+}) {
+  const toneClass = tone === "green"
+    ? "border-[#68bd7d] bg-[#f1fbf3] text-[#16833b]"
+    : tone === "orange"
+      ? "border-[#ffb996] bg-[#fff6f1] text-[#ff5a1f]"
+      : "border-[#e7e1dc] bg-white text-[#3b3530]";
+
+  return (
+    <label className="relative block">
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`h-9 w-full appearance-none rounded-xl border px-3 pr-7 text-xs font-extrabold outline-none ${toneClass}`}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-current" />
+    </label>
+  );
+}
+
+function MoneyInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="grid h-9 grid-cols-[24px_1fr] overflow-hidden rounded-xl border border-[#e7e1dc] bg-white">
+      <span className="grid place-items-center text-xs font-bold text-[#5f5a55]">¥</span>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
+        type="text"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        placeholder="0"
+        className="min-w-0 bg-white pr-2 text-right text-sm font-extrabold text-[#1f1b18] outline-none"
+      />
     </div>
   );
 }

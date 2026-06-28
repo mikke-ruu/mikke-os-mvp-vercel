@@ -36,3 +36,12 @@ display_on_story = true
 ## DESK
 
 DESK is not accounting software. It only shows rough activity revenue, expenses, and profit.
+
+## Numeric Inputs
+
+For numeric fields across Mikke OS, prefer mobile numeric keyboards.
+
+- Use `inputMode="numeric"` for integers such as amounts, quantity, people count, photo count, and number-centered booth fields.
+- Use `pattern="[0-9]*"` when decimals are not needed.
+- Use `inputMode="decimal"` only when decimals may be valid.
+- Prefer `type="text"` with `inputMode` when `type="number"` would add browser spinners or unstable mobile styling.

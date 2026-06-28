@@ -10,11 +10,13 @@ export function AppShell({
   title,
   subtitle,
   hideHeader = false,
+  hideBottomNav = false,
   children
 }: {
   title: string;
   subtitle?: string;
   hideHeader?: boolean;
+  hideBottomNav?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -47,8 +49,8 @@ export function AppShell({
           </div>
         </header>
       )}
-      <div className="mx-auto max-w-md px-4 py-4">{children}</div>
-      <BottomNav />
+      <div className={`mx-auto max-w-md px-4 py-4 ${hideBottomNav ? "" : "pb-24"}`}>{children}</div>
+      {hideBottomNav ? null : <BottomNav />}
     </main>
   );
 }
