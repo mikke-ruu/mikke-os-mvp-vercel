@@ -110,3 +110,12 @@ Target route: `/marketnote/[id]`
 - Memo, finance memo, reflection, and photos are record areas below the edit card.
 - Reflection is one freeform field with placeholder guidance such as `今日の反応、気づいたこと、次回やることなど`.
 - Finance details should not be edited in a popup on the detail screen. The detail screen shows totals and links to a future finance page for detailed revenue / expense entry.
+
+## 2026-06-28 summary card detail rules
+
+- Status changes are centralized in the summary card badge.
+- `各項目編集` must not include a separate status field.
+- The summary card shows start time, end time, meet time, pack-up time, payment status, payment method, amount, and all check items.
+- All check items are visible in the summary card and can be toggled there. Do not use `すべて見る` in the MVP.
+- `各項目編集` edits the same underlying data shown in the summary: basic information, venue, time fields, payment method, payment amount, and check item details.
+- The screen order is `サマリーカード → メモ → 各項目編集 → 収支メモ → 振り返り → 写真`.

@@ -226,33 +226,37 @@ function MarketDetailContent() {
           endDate={normalizedEndDate}
           startTime={startTime}
           endTime={endTime}
+          meetTime={meetTime}
+          packUpTime={packUpTime}
           venueName={venueName}
           address={address}
           status={status}
           paymentStatus={paymentStatus}
+          paymentMethod={paymentMethod}
+          paymentAmount={paymentAmount}
           done={done}
           total={checks.length}
           progress={progress}
-          checks={checks.slice(0, 3)}
+          checks={checks}
           onStatusChange={setStatus}
           onToggleCheck={async (item, nextValue) => {
             await toggleCheckItem(profile, item, nextValue);
             await load();
           }}
-          onShowAllChecks={() => setEditOpen(true)}
         />
 
         <div className="mt-3 space-y-3">
+          <FormCard title="メモ" icon={<FileText size={16} strokeWidth={1.8} />}>
+            <textarea value={memo} onChange={(inputEvent) => setMemo(inputEvent.target.value)} rows={2} className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 text-[#1f1b18] outline-none focus:border-[#ff5a1f]" />
+          </FormCard>
+
           <CollapsibleCard title="各項目編集" icon={<ClipboardList size={16} strokeWidth={1.8} />} open={editOpen} onToggle={() => setEditOpen((current) => !current)}>
             <SectionLabel>基本情報</SectionLabel>
             <Field label="イベント名"><TextInput value={title} onChange={setTitle} /></Field>
-            <div className="grid grid-cols-2 gap-2.5">
-              <Field label={multiDay ? "開始日" : "開催日"}><TextInput value={eventDate} onChange={(value) => {
-                setEventDate(value);
-                if (!multiDay) setEndDate(value);
-              }} type="date" icon={<CalendarDays size={15} />} /></Field>
-              <Field label="ステータス"><SelectBox value={status} onChange={(value) => setStatus(value as MarketEvent["status"])} options={statusOptions} tone={statusTone(status)} /></Field>
-            </div>
+            <Field label={multiDay ? "開始日" : "開催日"}><TextInput value={eventDate} onChange={(value) => {
+              setEventDate(value);
+              if (!multiDay) setEndDate(value);
+            }} type="date" icon={<CalendarDays size={15} />} /></Field>
             <button type="button" onClick={() => setMultiDay((current) => !current)} className="inline-flex items-center gap-2 text-xs font-bold text-[#6f6862]">
               <span className={`grid h-4 w-4 place-items-center rounded border ${multiDay ? "border-[#ff5a1f] bg-[#ff5a1f] text-white" : "border-[#d8d2cc] bg-white text-transparent"}`}>
                 <Check size={11} strokeWidth={2} />
@@ -309,10 +313,6 @@ function MarketDetailContent() {
             </div>
           </CollapsibleCard>
 
-          <FormCard title="メモ" icon={<FileText size={16} strokeWidth={1.8} />}>
-            <textarea value={memo} onChange={(inputEvent) => setMemo(inputEvent.target.value)} rows={2} className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 text-[#1f1b18] outline-none focus:border-[#ff5a1f]" />
-          </FormCard>
-
           <FinanceMemo totals={totals} />
 
           <FormCard title="振り返り" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
@@ -351,17 +351,20 @@ function SummaryCard({
   endDate,
   startTime,
   endTime,
+  meetTime,
+  packUpTime,
   venueName,
   address,
   status,
   paymentStatus,
+  paymentMethod,
+  paymentAmount,
   done,
   total,
   progress,
   checks,
   onStatusChange,
-  onToggleCheck,
-  onShowAllChecks
+  onToggleCheck
 }: {
   event: MarketEvent;
   title: string;
@@ -369,17 +372,20 @@ function SummaryCard({
   endDate: string;
   startTime: string;
   endTime: string;
+  meetTime: string;
+  packUpTime: string;
   venueName: string;
   address: string;
   status: MarketEvent["status"];
   paymentStatus: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  paymentAmount: string;
   done: number;
   total: number;
   progress: number;
   checks: MarketCheckItem[];
   onStatusChange: (status: MarketEvent["status"]) => void;
   onToggleCheck: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
-  onShowAllChecks: () => void;
 }) {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
 
@@ -410,10 +416,11 @@ function SummaryCard({
       <h2 className="mt-3 truncate text-xl font-extrabold tracking-normal text-[#1f1b18]">{title}</h2>
       <div className="mt-3 grid gap-1.5 text-sm font-semibold text-[#4a423c]">
         <span className="flex min-w-0 items-center gap-2"><Clock3 size={16} className="text-[#8a817a]" />{dateRangeLabel(eventDate, endDate)} / {timeLabel(startTime, endTime)}</span>
+        <span className="flex min-w-0 items-center gap-2"><Clock3 size={16} className="text-[#8a817a]" />集合 {meetTime || "未設定"} / 撤収 {packUpTime || "未設定"}</span>
         <span className="flex min-w-0 items-center gap-2"><MapPin size={16} className="text-[#8a817a]" />{[venueName, address].filter(Boolean).join(" / ") || "会場未設定"}</span>
       </div>
       <div className="mt-3 flex items-center justify-between text-xs font-bold text-[#3b3530]">
-        <span>支払い：<PaymentChip status={paymentStatus} /></span>
+        <span className="min-w-0 truncate">支払い：<PaymentChip status={paymentStatus} /> <span className="ml-1 text-[#6f6862]">{paymentMethod} / {formatYen(Number(paymentAmount || 0))}</span></span>
         <span>タスク {done}/{total}</span>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#eee8e2]">
@@ -434,11 +441,6 @@ function SummaryCard({
               <span className="truncate text-xs font-bold text-[#3b3530]">{item.title}</span>
             </button>
           ))}
-          {total > checks.length ? (
-            <button type="button" onClick={onShowAllChecks} className="w-fit text-xs font-extrabold text-[#ff5a1f]">
-              すべて見る
-            </button>
-          ) : null}
         </div>
       ) : null}
     </section>
