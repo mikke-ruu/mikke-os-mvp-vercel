@@ -1,5 +1,11 @@
 # MarketNote Implementation Spec 03
 
+## 2026-06-28 refinement notes
+
+- Status colors are shared rules: planned / considering uses a light neutral gray, applied uses green, confirmed / preparing uses orange. The selected planned state must stay gray, not orange or green.
+- Payment add is visually disabled in this MVP. Multiple payment rows will be implemented later together with detail, list, and finance handling so users do not see an active-looking control that does nothing.
+- Check templates are planned for the settings page. The settings page should manage check templates, frequently used items, ordering, and hidden items, then reflect those choices in the add event page and detail page.
+
 ## 出店予定追加ページ仕様
 
 対象: アオイ / Codex 実装用

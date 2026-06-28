@@ -297,13 +297,13 @@ function NewMarketEventContent() {
               <SelectBox value={paymentMethod} onChange={(value) => setPaymentMethod(value as PaymentMethod)} options={paymentMethods.map((method) => ({ label: method, value: method }))} tone="gray" />
               <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
             </div>
-            <button
-              type="button"
-              className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[#ffb996] bg-white px-3 py-2.5 text-sm font-extrabold text-[#ff5a1f]"
+            <div
+              className="mt-2.5 flex w-full select-none items-center justify-center gap-2 rounded-xl border border-dashed border-[#eadfd7] bg-[#fbfaf8] px-3 py-2 text-xs font-bold text-[#b8aaa0]"
+              aria-hidden="true"
             >
-              <Plus size={15} strokeWidth={1.8} />
+              <Plus size={14} strokeWidth={1.7} />
               支払い追加
-            </button>
+            </div>
           </FormCard>
 
           <FormCard title="メモ" icon={<FileText size={16} />}>
@@ -493,7 +493,7 @@ function Segmented<T extends string>({
           ? "border-[#68bd7d] bg-[#f1fbf3] text-[#16833b]"
           : tone === "orange"
             ? "border-[#ff5a1f] bg-[#fff6f1] text-[#ff5a1f]"
-            : "border-[#d8d2cc] bg-white text-[#4b443e]";
+            : "border-[#cbc4bd] bg-[#f7f5f2] text-[#4b443e]";
 
         return (
           <button
