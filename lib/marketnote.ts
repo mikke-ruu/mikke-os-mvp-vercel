@@ -95,6 +95,39 @@ export async function createMarketEvent(
   return event;
 }
 
+export async function updateMarketEventDetails(
+  profile: Profile,
+  eventId: string,
+  input: {
+    title: string;
+    eventDate: string;
+    venueName: string;
+    area: string;
+    status: MarketEvent["status"];
+    publicNote: string;
+    privateNote: string;
+  }
+) {
+  const { data, error } = await supabase
+    .from("market_events")
+    .update({
+      title: input.title,
+      event_date: input.eventDate,
+      venue_name: input.venueName || null,
+      area: input.area || null,
+      status: input.status,
+      public_note: input.publicNote || null,
+      private_note: input.privateNote || null
+    })
+    .eq("id", eventId)
+    .eq("profile_id", profile.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as MarketEvent;
+}
+
 export async function listCheckItems(profileId: string, marketEventId: string) {
   const { data, error } = await supabase
     .from("market_check_items")
@@ -209,6 +242,52 @@ export async function addFinancialRecord(
   });
 
   return record;
+}
+
+export async function saveEventPaymentRecord(
+  profile: Profile,
+  input: {
+    marketEventId: string;
+    eventDate: string;
+    amount: number;
+    method: string;
+    paymentStatus: "unpaid" | "paid" | "not_required";
+  }
+) {
+  const existing = (await listFinancialRecords(profile.id, input.marketEventId))
+    .find((row) => row.record_type === "expense" && (row.title.includes("出店") || row.title.includes("蜃ｺ蠎") || row.category === "出店料"));
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from("market_financial_records")
+      .update({
+        amount: input.amount,
+        occurred_at: input.eventDate,
+        category: "出店料",
+        payment_status: input.paymentStatus,
+        memo: input.method || null
+      })
+      .eq("id", existing.id)
+      .eq("profile_id", profile.id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+    return data as MarketFinancialRecord;
+  }
+
+  if (input.amount <= 0 && input.paymentStatus === "not_required") return null;
+
+  return addFinancialRecord(profile, {
+    marketEventId: input.marketEventId,
+    recordType: "expense",
+    title: "出店料",
+    amount: input.amount,
+    occurredAt: input.eventDate,
+    category: "出店料",
+    memo: input.method,
+    paymentStatus: input.paymentStatus
+  });
 }
 
 export async function getReflection(profileId: string, marketEventId: string) {
