@@ -93,3 +93,11 @@ Target route: `/marketnote/[id]`
 - Add first-class event statuses such as `considering / applied / confirmed / finished / canceled`.
 - Add settings-managed check templates with due-date rules.
 - Add real photo storage and multi-payment rows.
+
+## 2026-06-28 refinement notes
+
+- The detail screen is confirmation-first, not a large input form.
+- Basic information and venue information should start collapsed, or otherwise use compact confirmation-style rows.
+- Any section that shows a collapse arrow must actually open and close.
+- Do not show edit icons that do not perform an action.
+- Reflection inputs should be one column on mobile so longer text remains easy to read and edit.

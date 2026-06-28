@@ -15,7 +15,6 @@ import {
   FileText,
   Image as ImageIcon,
   MapPin,
-  Pencil,
   Plus,
   ReceiptText,
   WalletCards,
@@ -90,6 +89,8 @@ function MarketDetailContent() {
   const [nextActions, setNextActions] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
+  const [basicOpen, setBasicOpen] = useState(false);
+  const [venueOpen, setVenueOpen] = useState(false);
 
   async function load() {
     const bundle = await getMarketEventBundle(profile.id, params.id);
@@ -216,9 +217,7 @@ function MarketDetailContent() {
             <ArrowLeft size={22} strokeWidth={1.7} />
           </button>
           <h1 className="text-center text-xl font-semibold tracking-normal text-[#1f1b18]">出店詳細</h1>
-          <button type="submit" disabled={!canSave} className="grid h-9 w-9 place-items-center rounded-full text-[#5f5a55] disabled:opacity-40" aria-label="保存">
-            <Pencil size={19} strokeWidth={1.7} />
-          </button>
+          <span />
         </header>
 
         <SummaryCard
@@ -238,7 +237,7 @@ function MarketDetailContent() {
         />
 
         <div className="mt-3 space-y-3">
-          <FormCard title="基本情報" icon={<ClipboardList size={16} strokeWidth={1.8} />}>
+          <CollapsibleCard title="基本情報" icon={<ClipboardList size={16} strokeWidth={1.8} />} open={basicOpen} onToggle={() => setBasicOpen((current) => !current)}>
             <Field label="イベント名">
               <TextInput value={title} onChange={setTitle} />
             </Field>
@@ -270,13 +269,13 @@ function MarketDetailContent() {
               <Field label="集合時間"><TextInput value={meetTime} onChange={setMeetTime} type="time" /></Field>
               <Field label="撤収時間"><TextInput value={packUpTime} onChange={setPackUpTime} type="time" /></Field>
             </div>
-          </FormCard>
+          </CollapsibleCard>
 
-          <FormCard title="会場情報" icon={<MapPin size={16} strokeWidth={1.8} />}>
+          <CollapsibleCard title="会場情報" icon={<MapPin size={16} strokeWidth={1.8} />} open={venueOpen} onToggle={() => setVenueOpen((current) => !current)}>
             <Field label="会場名"><TextInput value={venueName} onChange={setVenueName} placeholder="例）東京ビッグサイト 西1・2ホール" /></Field>
             <Field label="住所"><TextInput value={address} onChange={setAddress} placeholder="例）東京都江東区有明3-11-1" /></Field>
             <span className="block text-right text-xs font-extrabold text-[#16833b]">地図を見る ↗</span>
-          </FormCard>
+          </CollapsibleCard>
 
           <FormCard title="支払い情報" icon={<WalletCards size={16} strokeWidth={1.8} />}>
             <div className="grid grid-cols-[1fr_1fr_0.95fr] gap-2">
@@ -324,13 +323,13 @@ function MarketDetailContent() {
           </FormCard>
 
           <FormCard title="メモ" icon={<FileText size={16} strokeWidth={1.8} />}>
-            <textarea value={memo} onChange={(inputEvent) => setMemo(inputEvent.target.value)} rows={3} className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 text-[#1f1b18] outline-none focus:border-[#ff5a1f]" />
+            <textarea value={memo} onChange={(inputEvent) => setMemo(inputEvent.target.value)} rows={2} className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 text-[#1f1b18] outline-none focus:border-[#ff5a1f]" />
           </FormCard>
 
           <FinanceMemo totals={totals} />
 
           <FormCard title="振り返り" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3">
               <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={3} placeholder="よかったこと" className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 outline-none focus:border-[#ff5a1f]" />
               <textarea value={nextActions} onChange={(inputEvent) => setNextActions(inputEvent.target.value)} rows={3} placeholder="次回改善" className="w-full resize-none rounded-xl border border-[#e7e1dc] bg-white px-3 py-2.5 text-sm leading-6 outline-none focus:border-[#ff5a1f]" />
             </div>
@@ -439,9 +438,33 @@ function FormCard({ title, icon, children }: { title: string; icon?: React.React
       <div className="flex items-center gap-2">
         <span className="grid h-6 w-6 place-items-center rounded-full text-[#ff5a1f]">{icon}</span>
         <h2 className="text-sm font-extrabold text-[#1f1b18]">{title}</h2>
-        <ChevronDown size={16} className="ml-auto text-[#5f5a55]" />
       </div>
       <div className="mt-3 space-y-2.5">{children}</div>
+    </section>
+  );
+}
+
+function CollapsibleCard({
+  title,
+  icon,
+  open,
+  onToggle,
+  children
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-[18px] border border-[#e7e1dc] bg-white shadow-[0_4px_14px_rgba(45,33,22,0.035)]">
+      <button type="button" onClick={onToggle} className="flex w-full items-center gap-2 p-3.5 text-left">
+        <span className="grid h-6 w-6 place-items-center rounded-full text-[#ff5a1f]">{icon}</span>
+        <h2 className="text-sm font-extrabold text-[#1f1b18]">{title}</h2>
+        <ChevronDown size={16} className={`ml-auto text-[#5f5a55] transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? <div className="space-y-2.5 border-t border-[#f3eee9] px-3.5 pb-3.5 pt-3">{children}</div> : null}
     </section>
   );
 }
