@@ -8,7 +8,6 @@ import {
   ChevronRight,
   CircleX,
   Clock3,
-  Filter,
   MapPin,
   Plus,
   ReceiptText
@@ -193,9 +192,7 @@ function MarketFinanceContent() {
         <header className="mb-4 pt-2">
           <div className="flex items-center justify-between">
             <h1 className="text-[28px] font-semibold tracking-normal text-[#1f1b18]">収支</h1>
-            <button className="grid h-10 w-10 place-items-center rounded-full text-[#f46a14]" aria-label="フィルター">
-              <Filter size={24} strokeWidth={1.7} />
-            </button>
+            <span className="h-10 w-10" aria-hidden="true" />
           </div>
 
           <div className="mt-5 grid grid-cols-[44px_1fr_44px] items-center gap-3">
@@ -378,14 +375,15 @@ function FinanceDraftSection({
       <div className="space-y-1.5">
         {drafts.map((draft) => (
           <div key={draft.id} className="grid grid-cols-[1fr_96px_24px] items-center gap-1.5 rounded-lg border border-[#e7e1dc] bg-white px-2 py-1.5">
-            <div className="min-w-0">
+            <div className="relative min-w-0">
               <input
                 value={draft.title}
                 list={`${recordType}-category-options`}
                 onChange={(inputEvent) => onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value })}
                 placeholder={recordType === "revenue" ? "物販" : "出店料"}
-                className="h-7 w-full min-w-0 bg-transparent text-xs font-bold text-[#1f1b18] outline-none placeholder:text-[#b4aaa2]"
+                className="h-7 w-full min-w-0 bg-transparent pr-5 text-xs font-bold text-[#1f1b18] outline-none placeholder:text-[#b4aaa2]"
               />
+              <ChevronDown size={13} className="pointer-events-none absolute right-0 top-2 text-[#f46a14]" />
               {isPaymentLinkedDraft(draft) ? (
                 <span className="mt-0.5 inline-flex rounded-full bg-[#f5f3f1] px-2 py-0.5 text-[10px] font-bold leading-none text-[#8a817a]">支払い情報から反映</span>
               ) : null}

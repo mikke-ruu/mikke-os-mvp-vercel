@@ -281,6 +281,7 @@ function MarketDetailContent() {
               <SelectBox value={paymentMethod} onChange={(value) => setPaymentMethod(value as PaymentMethod)} options={paymentMethods.map((method) => ({ label: method, value: method }))} tone="gray" />
               <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
             </div>
+            <p className="text-[11px] font-bold leading-5 text-[#8a817a]">支払い情報の変更は、下部の「変更を保存」で収支に反映されます。</p>
             <div className="mt-2.5 flex w-full select-none items-center justify-center gap-2 rounded-xl border border-dashed border-[#eadfd7] bg-[#fbfaf8] px-3 py-2 text-xs font-bold text-[#b8aaa0]" aria-hidden="true">
               <Plus size={14} strokeWidth={1.7} />
               支払い追加
