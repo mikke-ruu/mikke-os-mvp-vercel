@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
+import { getActiveCheckTitles, loadCheckTemplate } from "@/lib/check-templates";
 import { addCheckItem, addFinancialRecord, createMarketEvent, toggleCheckItem } from "@/lib/marketnote";
 import type { MarketEvent } from "@/types/database";
 
@@ -39,14 +40,6 @@ const paymentStatusOptions: Array<{ label: string; value: PaymentStatus }> = [
 
 const paymentMethods: PaymentMethod[] = ["現金", "QR", "カード", "ポイント", "その他"];
 
-const commonCheckItems = [
-  "出店料を支払う",
-  "ブース位置を確認",
-  "持ち物を準備",
-  "搬入時間を確認",
-  "告知文を投稿"
-];
-
 function NewMarketEventContent() {
   const router = useRouter();
   const { profile } = useAuth();
@@ -65,7 +58,8 @@ function NewMarketEventContent() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("現金");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [memo, setMemo] = useState("");
-  const [selectedChecks, setSelectedChecks] = useState<string[]>(commonCheckItems.slice(0, 3));
+  const [templateChecks, setTemplateChecks] = useState<string[]>([]);
+  const [selectedChecks, setSelectedChecks] = useState<string[]>([]);
   const [customCheck, setCustomCheck] = useState("");
   const [timeOpen, setTimeOpen] = useState(false);
   const [venueOpen, setVenueOpen] = useState(false);
@@ -79,6 +73,10 @@ function NewMarketEventContent() {
       setStartDate(initialStartDate);
       setEndDate(initialStartDate);
     }
+
+    const activeTemplateChecks = getActiveCheckTitles(loadCheckTemplate());
+    setTemplateChecks(activeTemplateChecks);
+    setSelectedChecks(activeTemplateChecks);
   }, []);
 
   const normalizedEndDate = multiDay ? (endDate || startDate) : startDate;
@@ -318,7 +316,7 @@ function NewMarketEventContent() {
 
           <AccordionCard title="チェック項目（任意）" icon={<ClipboardList size={16} />} open={checksOpen} onToggle={() => setChecksOpen((value) => !value)}>
             <div className="flex flex-wrap gap-2">
-              {commonCheckItems.map((item) => {
+              {templateChecks.map((item) => {
                 const active = selectedChecks.includes(item);
                 return (
                   <button

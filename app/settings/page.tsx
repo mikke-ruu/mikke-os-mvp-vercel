@@ -59,6 +59,7 @@ function SettingsContent() {
               icon={<ClipboardCheck size={19} strokeWidth={1.7} />}
               title="チェックテンプレート"
               description="出店準備・当日確認などのセットを管理"
+              href="/settings/check-templates"
             />
             <SettingsRow
               icon={<Tag size={19} strokeWidth={1.7} />}
@@ -151,15 +152,29 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="mb-2 px-1 text-sm font-extrabold text-[#1f1b18]">{children}</h2>;
 }
 
-function SettingsRow({ icon, title, description }: { icon: React.ReactNode; title: string; description: string }) {
-  return (
-    <div className="grid grid-cols-[34px_1fr_18px] items-center gap-2 border-b border-[#f1ece7] px-3 py-3 last:border-b-0">
+function SettingsRow({ icon, title, description, href }: { icon: React.ReactNode; title: string; description: string; href?: string }) {
+  const content = (
+    <>
       <span className="grid h-8 w-8 place-items-center rounded-full text-[#3b3530]">{icon}</span>
       <span className="min-w-0">
         <span className="block text-sm font-extrabold text-[#1f1b18]">{title}</span>
         <span className="mt-0.5 block truncate text-xs font-semibold text-[#8a817a]">{description}</span>
       </span>
       <ChevronRight size={17} strokeWidth={1.7} className="text-[#8a817a]" />
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className="grid grid-cols-[34px_1fr_18px] items-center gap-2 border-b border-[#f1ece7] px-3 py-3 last:border-b-0">
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-[34px_1fr_18px] items-center gap-2 border-b border-[#f1ece7] px-3 py-3 last:border-b-0">
+      {content}
     </div>
   );
 }
