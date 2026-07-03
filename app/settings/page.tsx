@@ -65,6 +65,7 @@ function SettingsContent() {
               icon={<Tag size={19} strokeWidth={1.7} />}
               title="収支カテゴリ"
               description={`売上 ${revenueCategories.slice(0, 3).join("・")} / 経費 ${expenseCategories.slice(0, 3).join("・")}`}
+              href="/settings/finance-categories"
             />
             <SettingsRow
               icon={<WalletCards size={19} strokeWidth={1.7} />}

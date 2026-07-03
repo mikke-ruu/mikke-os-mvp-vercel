@@ -15,6 +15,7 @@ import {
 import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { MikkeAppSwitcher } from "@/components/MikkeAppSwitcher";
+import { defaultFinanceCategorySettings, getFinanceCategoryNames, loadFinanceCategorySettings } from "@/lib/finance-categories";
 import { formatMonthDay, formatYen } from "@/lib/format";
 import {
   addFinancialRecord,
@@ -45,13 +46,11 @@ type EventFinanceRow = {
   profit: number;
 };
 
-const revenueCategories = ["物販", "ワークショップ", "セッション", "オーダー", "予約金", "その他"];
-const expenseCategories = ["出店料", "交通費", "お昼代", "仕入れ代", "駐車場代", "什器レンタル", "梱包材", "送料", "その他"];
-
 function MarketFinanceContent() {
   const { profile } = useAuth();
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [records, setRecords] = useState<MarketFinancialRecord[]>([]);
+  const [categorySettings, setCategorySettings] = useState(defaultFinanceCategorySettings);
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, FinanceDraft[]>>({});
@@ -82,8 +81,12 @@ function MarketFinanceContent() {
   }
 
   useEffect(() => {
+    setCategorySettings(loadFinanceCategorySettings());
     load();
   }, [profile.id]);
+
+  const revenueCategories = useMemo(() => getFinanceCategoryNames(categorySettings, "revenue"), [categorySettings]);
+  const expenseCategories = useMemo(() => getFinanceCategoryNames(categorySettings, "expense"), [categorySettings]);
 
   const rows = useMemo<EventFinanceRow[]>(() => {
     return events
@@ -253,6 +256,7 @@ function MarketFinanceContent() {
                       recordType="revenue"
                       event={row.event}
                       drafts={eventDrafts.filter((draft) => draft.recordType === "revenue")}
+                      categoryOptions={revenueCategories}
                       onAdd={() => addDraft(row.event, "revenue")}
                       onChange={(draftId, patch) => updateDraft(row.event.id, draftId, patch)}
                       onRemove={(draft) => removeDraft(row.event.id, draft)}
@@ -263,6 +267,7 @@ function MarketFinanceContent() {
                       recordType="expense"
                       event={row.event}
                       drafts={eventDrafts.filter((draft) => draft.recordType === "expense")}
+                      categoryOptions={expenseCategories}
                       onAdd={() => addDraft(row.event, "expense")}
                       onChange={(draftId, patch) => updateDraft(row.event.id, draftId, patch)}
                       onRemove={(draft) => removeDraft(row.event.id, draft)}
@@ -355,6 +360,7 @@ function FinanceDraftSection({
   recordType,
   event,
   drafts,
+  categoryOptions,
   onAdd,
   onChange,
   onRemove
@@ -364,6 +370,7 @@ function FinanceDraftSection({
   recordType: "revenue" | "expense";
   event: MarketEvent;
   drafts: FinanceDraft[];
+  categoryOptions: string[];
   onAdd: () => void;
   onChange: (draftId: string, patch: Partial<FinanceDraft>) => void;
   onRemove: (draft: FinanceDraft) => void;
@@ -403,7 +410,7 @@ function FinanceDraftSection({
         ) : null}
       </div>
       <datalist id={`${recordType}-category-options`}>
-        {(recordType === "revenue" ? revenueCategories : expenseCategories).map((category) => (
+        {categoryOptions.map((category) => (
           <option key={category} value={category} />
         ))}
       </datalist>
