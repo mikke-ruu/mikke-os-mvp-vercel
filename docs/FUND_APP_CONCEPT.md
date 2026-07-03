@@ -394,3 +394,24 @@ Stripe決済の扱い
 ```
 
 特に投資型にならないよう、言葉と仕様に注意します。Fundは、応援購入・予約販売・支援ページ作成アプリとして設計します。
+## 2026-07-04 Initial User Need Signal
+
+Fund is no longer only an internal concept. On 2026-07-04, the concept was shared with a person who wants to gather support, pledges, or pre-orders for individual projects, and they responded that they would like to try it.
+
+The strongest signal was not for a large crowdfunding platform, but for a smaller personal project page that belongs to the creator's own activity.
+
+Likely needs:
+
+- They do not need a large public crowdfunding platform yet.
+- They want to gather support through their own activity page.
+- They want to show a goal amount and return plans.
+- They want the page to work like a lightweight LP.
+- They want supporter information to connect to future customer management.
+- They want the support history to remain in Story / DESK / Contacts after the campaign.
+
+Implementation impact:
+
+- MarketNote MVP remains the top priority.
+- When Order is rebuilt, its LP, application, customer, amount, and status structures should be designed so Fund can branch from them.
+- Fund should be considered as a small Order-derived MVP after the core Order model is clarified.
+- The first monitor candidate should be interviewed before implementation scope is fixed.
