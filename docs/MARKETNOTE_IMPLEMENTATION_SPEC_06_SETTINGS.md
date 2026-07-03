@@ -156,7 +156,7 @@ components/MikkeAppSwitcher.tsx
 - Mikke OS内のアプリを切り替える。
 - 現在開いているアプリを分かるようにする。
 - 連携済み / 未連携を表示する。
-- 将来のItem Studio / Order / Event / Studio / Connectに拡張できるようにする。
+- 将来のItem Studio / Order / Fund / Session / Academy / Event / Connectに拡張できるようにする。
 
 MVP表示:
 

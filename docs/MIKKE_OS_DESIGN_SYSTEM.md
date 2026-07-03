@@ -1,7 +1,7 @@
 # Mikke OS Design System
 
 MarketNote D案を基準にした、Mikke OS共通デザインルールの初版です。
-STORY / DESK / Item Studio / Order / Event などの各アプリが、別々のツールではなく同じOS内のアプリに見えることを目的にします。
+STORY / DESK / Item Studio / Order / Fund / Session / Academy / Event などの各アプリが、別々のツールではなく同じOS内のアプリに見えることを目的にします。
 
 ## 1. デザイン思想
 
@@ -367,6 +367,6 @@ MarketNoteで固まったルールを基準にします。
 
 - `CalendarCell`
 - `PhotoPicker`
-- MarketNote / STORY / DESK / Item Studio / Order / Event のアプリ別サマリーカード。
+- MarketNote / STORY / DESK / Item Studio / Order / Fund / Session / Academy / Event のアプリ別サマリーカード。
 
 共通化は急ぎすぎない。少なくとも2画面以上で同じ形が出てから抽出します。共通コンポーネントは、余白、角丸、色、focus、disabled、押せる/押せない状態の違いを吸収します。

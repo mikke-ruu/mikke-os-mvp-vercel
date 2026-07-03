@@ -268,7 +268,7 @@ SNS 任意
 取得元 = Fund
 ```
 
-DESK Contactsでは、Fund支援者だけでなく、Order購入者、Studio予約者、Event参加者なども横断的に管理できるようにします。
+DESK Contactsでは、Fund支援者だけでなく、Order購入者、Session予約者、Event参加者なども横断的に管理できるようにします。
 
 ## 11. DESK収支との連携
 
