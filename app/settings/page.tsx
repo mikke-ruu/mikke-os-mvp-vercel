@@ -77,7 +77,8 @@ function SettingsContent() {
             <SettingsRow
               icon={<BellRing size={19} strokeWidth={1.7} />}
               title="通知 / リマインダー"
-              description="期限や未入力をお知らせ"
+              description="ホームのやること表示・期限管理に反映"
+              href="/settings/reminders"
             />
           </div>
         </section>
