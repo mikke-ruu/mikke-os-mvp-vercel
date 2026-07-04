@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, EyeOff, Plus, RotateCcw, Save, Star, Tag, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, EyeOff, Plus, RotateCcw, Save, Star, Tag } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";
 import {
@@ -13,11 +13,22 @@ import {
 } from "@/lib/finance-categories";
 import type { FinanceCategory, FinanceCategorySettings, FinanceCategoryType } from "@/lib/finance-categories";
 
+const renameWarning = [
+  "このカテゴリはすでに収支データで使用されています。",
+  "",
+  "カテゴリ名を変更すると、過去にこのカテゴリで登録した収支データの表示名も変更されます。",
+  "",
+  "意味が変わる場合は、名前を変更せず、新しいカテゴリを追加してください。",
+  "",
+  "変更してもよろしいですか？"
+].join("\n");
+
 function FinanceCategoriesContent() {
   const [settings, setSettings] = useState<FinanceCategorySettings>(defaultFinanceCategorySettings);
   const [activeType, setActiveType] = useState<FinanceCategoryType>("revenue");
   const [newName, setNewName] = useState("");
   const [message, setMessage] = useState("");
+  const [confirmedRenameIds, setConfirmedRenameIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
     setSettings(loadFinanceCategorySettings());
@@ -38,6 +49,41 @@ function FinanceCategoriesContent() {
       ...current,
       items: current.items.map((item) => item.id === id ? { ...item, ...patch } : item)
     }));
+    setMessage("");
+  }
+
+  function renameItem(item: FinanceCategory, nextName: string) {
+    if (nextName !== item.name && !confirmedRenameIds.has(item.id)) {
+      const ok = window.confirm(renameWarning);
+      if (!ok) return;
+      setConfirmedRenameIds((current) => new Set(current).add(item.id));
+    }
+
+    updateItem(item.id, { name: nextName });
+  }
+
+  function moveItem(id: string, direction: "up" | "down") {
+    setSettings((current) => {
+      const ordered = [...current.items]
+        .filter((item) => item.type === activeType && item.isActive)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+      const index = ordered.findIndex((item) => item.id === id);
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+
+      if (index < 0 || targetIndex < 0 || targetIndex >= ordered.length) return current;
+
+      const currentItem = ordered[index];
+      const targetItem = ordered[targetIndex];
+
+      return {
+        ...current,
+        items: current.items.map((item) => {
+          if (item.id === currentItem.id) return { ...item, sortOrder: targetItem.sortOrder };
+          if (item.id === targetItem.id) return { ...item, sortOrder: currentItem.sortOrder };
+          return item;
+        })
+      };
+    });
     setMessage("");
   }
 
@@ -75,6 +121,7 @@ function FinanceCategoriesContent() {
 
   function resetCategories() {
     setSettings(defaultFinanceCategorySettings);
+    setConfirmedRenameIds(new Set());
     setMessage("初期カテゴリに戻しました。保存すると収支ページに反映されます。");
   }
 
@@ -95,7 +142,7 @@ function FinanceCategoriesContent() {
         </header>
 
         <p className="mb-3 rounded-2xl border border-[#eee9e4] bg-white px-4 py-3 text-xs font-bold leading-5 text-[#6f6862] shadow-[0_3px_12px_rgba(45,33,22,0.035)]">
-          収支ページで使う売上カテゴリと経費カテゴリを管理します。よく使うカテゴリは候補の先頭に表示されます。
+          収支ページで使う売上カテゴリと経費カテゴリを管理します。よく使うカテゴリは目印として表示し、候補の順番は矢印で並び替えます。
         </p>
 
         <div className="mb-3 grid grid-cols-2 gap-2 rounded-2xl border border-[#eee9e4] bg-white p-1.5 shadow-[0_3px_12px_rgba(45,33,22,0.035)]">
@@ -118,8 +165,17 @@ function FinanceCategoriesContent() {
           </div>
 
           <div className="space-y-2.5 p-3.5">
-            {activeItems.map((item) => (
-              <CategoryRow key={item.id} item={item} onChange={updateItem} onHide={hideItem} />
+            {activeItems.map((item, index) => (
+              <CategoryRow
+                key={item.id}
+                item={item}
+                canMoveUp={index > 0}
+                canMoveDown={index < activeItems.length - 1}
+                onRename={renameItem}
+                onChange={updateItem}
+                onHide={hideItem}
+                onMove={moveItem}
+              />
             ))}
 
             <div className="grid grid-cols-[1fr_40px] gap-2 rounded-xl border border-dashed border-[#f3d0be] bg-[#fffdfb] p-2">
@@ -151,10 +207,12 @@ function FinanceCategoriesContent() {
         ) : null}
 
         <section className="mt-3 rounded-2xl border border-[#eee9e4] bg-white p-3.5 shadow-[0_3px_12px_rgba(45,33,22,0.035)]">
-          <h2 className="text-sm font-extrabold text-[#1f1b18]">収支ページへの反映</h2>
-          <p className="mt-2 text-xs font-bold leading-5 text-[#6f6862]">
-            保存したカテゴリは、収支ページの売上内訳・経費内訳の候補に反映されます。DB保存とカテゴリ別集計は後続で整理します。
-          </p>
+          <h2 className="text-sm font-extrabold text-[#1f1b18]">運用メモ</h2>
+          <div className="mt-2 space-y-1.5 text-xs font-bold leading-5 text-[#6f6862]">
+            <p>カテゴリは完全削除せず、使わなくなったものは非表示にします。</p>
+            <p>カテゴリ名を変えるときは、意味が変わらないか確認してください。意味が変わる場合は新しいカテゴリを追加します。</p>
+            <p>保存した並び順は、収支ページのカテゴリ候補にも反映されます。</p>
+          </div>
         </section>
 
         {message ? <p className="mt-3 rounded-xl bg-[#fff0e9] px-4 py-3 text-sm font-bold text-[#8f3d22]">{message}</p> : null}
@@ -188,31 +246,57 @@ function CategoryTab({ label, active, onClick }: { label: string; active: boolea
 
 function CategoryRow({
   item,
+  canMoveUp,
+  canMoveDown,
+  onRename,
   onChange,
-  onHide
+  onHide,
+  onMove
 }: {
   item: FinanceCategory;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onRename: (item: FinanceCategory, nextName: string) => void;
   onChange: (id: string, patch: Partial<FinanceCategory>) => void;
   onHide: (id: string) => void;
+  onMove: (id: string, direction: "up" | "down") => void;
 }) {
   return (
     <div className="rounded-xl border border-[#eee9e4] bg-white px-2.5 py-2 shadow-[0_2px_8px_rgba(45,33,22,0.025)]">
-      <div className="grid grid-cols-[1fr_34px_32px] items-center gap-2">
+      <div className="grid grid-cols-[1fr_30px_30px_32px_30px] items-center gap-1.5">
         <input
           value={item.name}
-          onChange={(event) => onChange(item.id, { name: event.target.value })}
+          onChange={(event) => onRename(item, event.target.value)}
           className="min-w-0 bg-transparent text-sm font-extrabold text-[#1f1b18] outline-none"
         />
+        <button
+          type="button"
+          onClick={() => onMove(item.id, "up")}
+          disabled={!canMoveUp}
+          className="grid h-8 w-8 place-items-center rounded-full text-[#8a817a] disabled:text-[#ddd5cf]"
+          aria-label="上へ"
+        >
+          <ArrowUp size={15} strokeWidth={1.7} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onMove(item.id, "down")}
+          disabled={!canMoveDown}
+          className="grid h-8 w-8 place-items-center rounded-full text-[#8a817a] disabled:text-[#ddd5cf]"
+          aria-label="下へ"
+        >
+          <ArrowDown size={15} strokeWidth={1.7} />
+        </button>
         <button
           type="button"
           onClick={() => onChange(item.id, { isFavorite: !item.isFavorite })}
           className={`grid h-8 w-8 place-items-center rounded-full ${item.isFavorite ? "bg-[#fff6f1] text-[#ff5a1f]" : "text-[#b8aaa0]"}`}
           aria-label="よく使う"
         >
-          <Star size={16} strokeWidth={1.7} fill={item.isFavorite ? "currentColor" : "none"} />
+          <Star size={15} strokeWidth={1.7} fill={item.isFavorite ? "currentColor" : "none"} />
         </button>
         <button type="button" onClick={() => onHide(item.id)} className="grid h-8 w-8 place-items-center rounded-full text-[#8a817a]" aria-label="非表示">
-          {item.isDefault ? <EyeOff size={16} strokeWidth={1.7} /> : <Trash2 size={16} strokeWidth={1.7} />}
+          <EyeOff size={15} strokeWidth={1.7} />
         </button>
       </div>
       <p className="mt-1 text-[11px] font-bold text-[#b8aaa0]">{item.isFavorite ? "よく使うカテゴリ" : "通常カテゴリ"}</p>

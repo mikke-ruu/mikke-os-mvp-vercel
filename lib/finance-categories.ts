@@ -65,7 +65,7 @@ export function saveFinanceCategorySettings(settings: FinanceCategorySettings) {
 export function getFinanceCategories(settings: FinanceCategorySettings, type: FinanceCategoryType) {
   return [...settings.items]
     .filter((item) => item.type === type && item.isActive && item.name.trim())
-    .sort((a, b) => Number(b.isFavorite) - Number(a.isFavorite) || a.sortOrder - b.sortOrder);
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export function getFinanceCategoryNames(settings: FinanceCategorySettings, type: FinanceCategoryType) {
