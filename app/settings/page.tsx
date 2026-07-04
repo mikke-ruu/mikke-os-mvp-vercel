@@ -26,7 +26,7 @@ import { supabase } from "@/lib/supabase/client";
 
 const revenueCategories = ["物販", "ワークショップ", "セッション", "オーダー", "予約金", "その他"];
 const expenseCategories = ["出店料", "交通費", "お昼代", "仕入れ代", "駐車場代", "什器レンタル", "梱包材", "送料", "その他"];
-const paymentMethods = ["現金", "QR", "カード", "ポイント", "その他"];
+const paymentMethods = ["現金", "QR", "カード", "ポイント", "振込", "その他"];
 
 function SettingsContent() {
   const router = useRouter();
@@ -71,6 +71,7 @@ function SettingsContent() {
               icon={<WalletCards size={19} strokeWidth={1.7} />}
               title="支払い方法"
               description={paymentMethods.join("・")}
+              href="/settings/payment-methods"
             />
             <CalendarSettingsRow open={calendarOpen} value={calendarMode} onToggle={() => setCalendarOpen((current) => !current)} onChange={setCalendarMode} />
             <SettingsRow

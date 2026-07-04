@@ -20,11 +20,12 @@ import { AppShell } from "@/components/AppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { getActiveCheckTitles, loadCheckTemplate } from "@/lib/check-templates";
 import { addCheckItem, addFinancialRecord, createMarketEvent, toggleCheckItem } from "@/lib/marketnote";
+import { defaultPaymentMethodSettings, getPaymentMethodNames, loadPaymentMethodSettings } from "@/lib/payment-methods";
 import type { MarketEvent } from "@/types/database";
 
 type EntryStatus = "planned" | "applied" | "preparing";
 type PaymentStatus = "unpaid" | "paid" | "not_required";
-type PaymentMethod = "現金" | "QR" | "カード" | "ポイント" | "その他";
+type PaymentMethod = string;
 
 const statusOptions: Array<{ label: string; value: EntryStatus }> = [
   { label: "検討中", value: "planned" },
@@ -38,7 +39,7 @@ const paymentStatusOptions: Array<{ label: string; value: PaymentStatus }> = [
   { label: "不要", value: "not_required" }
 ];
 
-const paymentMethods: PaymentMethod[] = ["現金", "QR", "カード", "ポイント", "その他"];
+const defaultPaymentMethodNames = getPaymentMethodNames(defaultPaymentMethodSettings);
 
 function NewMarketEventContent() {
   const router = useRouter();
@@ -56,6 +57,7 @@ function NewMarketEventContent() {
   const [address, setAddress] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("現金");
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>(defaultPaymentMethodNames);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [templateChecks, setTemplateChecks] = useState<string[]>([]);
@@ -77,6 +79,7 @@ function NewMarketEventContent() {
     const activeTemplateChecks = getActiveCheckTitles(loadCheckTemplate());
     setTemplateChecks(activeTemplateChecks);
     setSelectedChecks(activeTemplateChecks);
+    setPaymentMethodOptions(getPaymentMethodNames(loadPaymentMethodSettings()));
   }, []);
 
   const normalizedEndDate = multiDay ? (endDate || startDate) : startDate;
@@ -292,7 +295,7 @@ function NewMarketEventContent() {
           <FormCard title="支払い情報" icon={<WalletCards size={16} />}>
             <div className="grid grid-cols-[1fr_1fr_0.95fr] gap-2">
               <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentStatus === "paid" ? "green" : paymentStatus === "unpaid" ? "orange" : "gray"} />
-              <SelectBox value={paymentMethod} onChange={(value) => setPaymentMethod(value as PaymentMethod)} options={paymentMethods.map((method) => ({ label: method, value: method }))} tone="gray" />
+              <SelectBox value={paymentMethod} onChange={setPaymentMethod} options={getPaymentMethodOptions(paymentMethodOptions, paymentMethod)} tone="gray" />
               <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
             </div>
             <div
@@ -570,6 +573,11 @@ function paymentLabel(status: PaymentStatus) {
   if (status === "paid") return "支払済";
   if (status === "unpaid") return "未払い";
   return "不要";
+}
+
+function getPaymentMethodOptions(options: string[], selected: string) {
+  const values = Array.from(new Set([...options, selected].filter(Boolean)));
+  return values.map((method) => ({ label: method, value: method }));
 }
 
 export default function NewMarketEventPage() {

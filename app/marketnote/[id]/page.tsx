@@ -31,10 +31,11 @@ import {
   toggleCheckItem,
   updateMarketEventDetails
 } from "@/lib/marketnote";
+import { defaultPaymentMethodSettings, getPaymentMethodNames, loadPaymentMethodSettings } from "@/lib/payment-methods";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
 type PaymentStatus = "unpaid" | "paid" | "not_required";
-type PaymentMethod = "現金" | "QR" | "カード" | "ポイント" | "その他";
+type PaymentMethod = string;
 
 type EventMeta = {
   endDate: string;
@@ -59,7 +60,7 @@ const paymentStatusOptions: Array<{ label: string; value: PaymentStatus }> = [
   { label: "不要", value: "not_required" }
 ];
 
-const paymentMethods: PaymentMethod[] = ["現金", "QR", "カード", "ポイント", "その他"];
+const defaultPaymentMethodNames = getPaymentMethodNames(defaultPaymentMethodSettings);
 
 function MarketDetailContent() {
   const params = useParams<{ id: string }>();
@@ -82,6 +83,7 @@ function MarketDetailContent() {
   const [address, setAddress] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("not_required");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("現金");
+  const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>(defaultPaymentMethodNames);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [customCheck, setCustomCheck] = useState("");
@@ -129,6 +131,7 @@ function MarketDetailContent() {
   }
 
   useEffect(() => {
+    setPaymentMethodOptions(getPaymentMethodNames(loadPaymentMethodSettings()));
     load();
   }, [params.id, profile.id]);
 
@@ -278,7 +281,7 @@ function MarketDetailContent() {
             <SectionLabel>支払い情報</SectionLabel>
             <div className="grid grid-cols-[1fr_1fr_0.95fr] gap-2">
               <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentTone(paymentStatus)} />
-              <SelectBox value={paymentMethod} onChange={(value) => setPaymentMethod(value as PaymentMethod)} options={paymentMethods.map((method) => ({ label: method, value: method }))} tone="gray" />
+              <SelectBox value={paymentMethod} onChange={setPaymentMethod} options={getPaymentMethodOptions(paymentMethodOptions, paymentMethod)} tone="gray" />
               <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
             </div>
             <p className="text-[11px] font-bold leading-5 text-[#8a817a]">支払い情報の変更は、下部の「変更を保存」で収支に反映されます。</p>
@@ -661,8 +664,7 @@ function getEventPayment(checks: MarketCheckItem[], finances: MarketFinancialRec
 }
 
 function normalizePaymentMethod(value: string | null | undefined): PaymentMethod {
-  if (value === "QR" || value === "カード" || value === "ポイント" || value === "その他") return value;
-  return "現金";
+  return value?.trim() || "現金";
 }
 
 function getTotals(finances: MarketFinancialRecord[]) {
@@ -719,6 +721,11 @@ function paymentChipClass(status: PaymentStatus) {
   if (status === "paid") return "bg-[#eaf8ee] text-[#16833b]";
   if (status === "unpaid") return "bg-[#fff0e7] text-[#ff5a1f]";
   return "bg-[#f3f0ed] text-[#6f6862]";
+}
+
+function getPaymentMethodOptions(options: string[], selected: string) {
+  const values = Array.from(new Set([...options, selected].filter(Boolean)));
+  return values.map((method) => ({ label: method, value: method }));
 }
 
 export default function MarketDetailPage() {
