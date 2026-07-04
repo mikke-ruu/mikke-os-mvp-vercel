@@ -121,8 +121,8 @@ function MarketFinanceContent() {
     }));
   }
 
-  function addDraft(event: MarketEvent, recordType: "revenue" | "expense") {
-    const title = recordType === "revenue" ? "物販" : "交通費";
+  function addDraft(event: MarketEvent, recordType: "revenue" | "expense", defaultCategory: string) {
+    const title = defaultCategory || (recordType === "revenue" ? "売上" : "経費");
     setDrafts((current) => ({
       ...current,
       [event.id]: [
@@ -257,7 +257,7 @@ function MarketFinanceContent() {
                       event={row.event}
                       drafts={eventDrafts.filter((draft) => draft.recordType === "revenue")}
                       categoryOptions={revenueCategories}
-                      onAdd={() => addDraft(row.event, "revenue")}
+                      onAdd={() => addDraft(row.event, "revenue", revenueCategories[0] ?? "売上")}
                       onChange={(draftId, patch) => updateDraft(row.event.id, draftId, patch)}
                       onRemove={(draft) => removeDraft(row.event.id, draft)}
                     />
@@ -268,7 +268,7 @@ function MarketFinanceContent() {
                       event={row.event}
                       drafts={eventDrafts.filter((draft) => draft.recordType === "expense")}
                       categoryOptions={expenseCategories}
-                      onAdd={() => addDraft(row.event, "expense")}
+                      onAdd={() => addDraft(row.event, "expense", expenseCategories[0] ?? "経費")}
                       onChange={(draftId, patch) => updateDraft(row.event.id, draftId, patch)}
                       onRemove={(draft) => removeDraft(row.event.id, draft)}
                     />
@@ -385,14 +385,17 @@ function FinanceDraftSection({
         {drafts.map((draft) => (
           <div key={draft.id} className="grid grid-cols-[1fr_96px_24px] items-center gap-1.5 rounded-lg border border-[#e7e1dc] bg-white px-2 py-1.5">
             <div className="relative min-w-0">
-              <input
+              <select
                 value={draft.title}
-                list={`${recordType}-category-options`}
                 onChange={(inputEvent) => onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value })}
-                placeholder={recordType === "revenue" ? "物販" : "出店料"}
-                className="h-7 w-full min-w-0 bg-transparent pr-5 text-xs font-bold text-[#1f1b18] outline-none placeholder:text-[#b4aaa2]"
-              />
-              <ChevronDown size={13} className="pointer-events-none absolute right-0 top-2 text-[#f46a14]" />
+                className="h-8 w-full min-w-0 appearance-none rounded-lg bg-[#fbfaf8] px-2 pr-7 text-xs font-bold text-[#1f1b18] outline-none"
+              >
+                {draft.title && !categoryOptions.includes(draft.title) ? <option value={draft.title} hidden>{draft.title}</option> : null}
+                {categoryOptions.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+              <ChevronDown size={13} className="pointer-events-none absolute right-2 top-2.5 text-[#f46a14]" />
               {isPaymentLinkedDraft(draft) ? (
                 <span className="mt-0.5 inline-flex rounded-full bg-[#f5f3f1] px-2 py-0.5 text-[10px] font-bold leading-none text-[#8a817a]">支払い情報から反映</span>
               ) : null}
@@ -409,11 +412,6 @@ function FinanceDraftSection({
           </p>
         ) : null}
       </div>
-      <datalist id={`${recordType}-category-options`}>
-        {categoryOptions.map((category) => (
-          <option key={category} value={category} />
-        ))}
-      </datalist>
       <button type="button" onClick={onAdd} className="mt-1.5 inline-flex items-center gap-1 rounded-full px-1 py-1 text-xs font-extrabold text-[#ff5a1f]">
         <Plus size={15} strokeWidth={1.8} />
         {actionLabel}
