@@ -568,7 +568,7 @@ function ParticipantsView({ state, updateState, helpers }: ScreenProps & { helpe
                   </div>
                   <p className="tw-body mt-3">{participant.cautions}</p>
                   <p className="tw-helper mt-2">{participant.lastMemo || participant.memo}</p>
-                  <p className="tw-helper mt-1 font-bold text-[#07152f]">{participant.nextMemo}</p>
+                  <p className="tw-helper mt-1 font-bold text-[var(--mikke-primary)]">{participant.nextMemo}</p>
                 </article>
               );
             })}
@@ -652,7 +652,7 @@ function WorkersView({ state, updateState }: ScreenProps) {
                   type="button"
                   onClick={() => toggleDay(day)}
                   className={`min-h-11 rounded-xl border px-2 py-2 text-[length:var(--font-helper)] font-bold ${
-                    form.availableDays.includes(day) ? "border-[#07152f] bg-[#07152f] text-white" : "border-[#e7ebf2] bg-white text-[#5d6678]"
+                    form.availableDays.includes(day) ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-[var(--mikke-surface)]" : "border-[var(--mikke-line)] bg-[var(--mikke-surface)] text-[var(--mikke-muted)]"
                   }`}
                 >
                   {day}
@@ -897,7 +897,7 @@ function WorkerPortalView({ state, updateState, helpers }: ScreenProps & { helpe
           {workerSessions.map((session) => {
             const clocked = state.clockedInSessionIds.includes(session.id);
             return (
-              <article key={session.id} className={`tw-card-soft p-3 ${session.id === firstSession.id ? "border-[#f46a14] bg-[#fff6f1]" : ""}`}>
+              <article key={session.id} className={`tw-card-soft p-3 ${session.id === firstSession.id ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : ""}`}>
                 <p className="tw-card-title">{formatSessionTime(session.startsAt)}</p>
                 <p className="tw-helper mt-1">{helpers.clientName(session.clientId)} / {session.className}</p>
                 <p className="tw-helper mt-1">担当: {helpers.workerName(session.workerId) || "未割当"} / {statusLabel(session.status)}</p>
@@ -921,7 +921,7 @@ function WorkerPortalView({ state, updateState, helpers }: ScreenProps & { helpe
       </Panel>
 
       <Panel title="レッスン実施" lead="学校の名簿から生徒を選ぶと、その子のカルテと次のテーマが出ます。">
-        <div className="mb-4 grid gap-3 rounded-2xl border border-[#e7ebf2] bg-[#f8fafc] p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+        <div className="mb-4 grid gap-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
           <div>
             <p className="tw-card-title">{helpers.clientName(firstSession.clientId)} / {firstSession.className}</p>
             <p className="tw-helper mt-1">{formatSessionTime(firstSession.startsAt)} / {firstSession.durationMinutes}分 / {statusLabel(firstSession.status)}</p>
@@ -947,10 +947,10 @@ function WorkerPortalView({ state, updateState, helpers }: ScreenProps & { helpe
                   key={participant.id}
                   onClick={() => setSelectedParticipantId(participant.id)}
                   className={`rounded-2xl border px-3 py-3 text-left ${
-                    selectedParticipantId === participant.id ? "border-[#f46a14] bg-[#fff6f1]" : "border-[#e7ebf2] bg-white"
+                    selectedParticipantId === participant.id ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-[var(--mikke-surface)]"
                   }`}
                 >
-                  <span className="block text-[length:var(--font-body)] font-extrabold text-[#07152f]">{participant.name}</span>
+                  <span className="block text-[length:var(--font-body)] font-extrabold text-[var(--mikke-primary)]">{participant.name}</span>
                   <span className="tw-helper block">{participant.level} / 次: {helpers.guide(participant.currentGuideItemId)?.number ?? "-"}番</span>
                 </button>
               ))}
@@ -960,7 +960,7 @@ function WorkerPortalView({ state, updateState, helpers }: ScreenProps & { helpe
             <ParticipantChart participant={selectedParticipant} helpers={helpers} />
             <div className="tw-card p-4">
               <div className="flex items-start gap-3">
-                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#fff6f1] text-[#f46a14]">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]">
                   <BookOpenCheck size={19} />
                 </span>
                 <div>
@@ -1198,11 +1198,11 @@ function ClientPortalView({ state, updateState, helpers }: ScreenProps & { helpe
                 {state.sessions.filter((session) => session.clientId === client.id).map((session) => (
                   <div key={session.id} className="tw-card-soft p-3">
                     <p className="tw-card-title">{formatSessionTime(session.startsAt)} / {session.className}</p>
-                    <p className="tw-helper mt-1 break-all text-[#2e7d46]">{session.zoomUrl}</p>
+                    <p className="tw-helper mt-1 break-all text-[var(--mikke-success)]">{session.zoomUrl}</p>
                     <div className="mt-3 grid gap-2">
                       {state.attendanceEntries.filter((entry) => entry.sessionId === session.id).map((entry) => (
-                        <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#e7ebf2] px-3 py-2">
-                          <p className="text-[length:var(--font-body)] font-bold text-[#07152f]">{helpers.participantName(entry.participantId)}</p>
+                        <div key={entry.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2">
+                          <p className="text-[length:var(--font-body)] font-bold text-[var(--mikke-primary)]">{helpers.participantName(entry.participantId)}</p>
                           <div className="flex gap-1">
                             {(["present", "absent", "late"] as AttendanceStatus[]).map((status) => (
                               <button key={status} type="button" onClick={() => setAttendance(entry, status)} className={entry.status === status ? "tw-primary-button min-h-8 px-3" : "tw-secondary-button min-h-8 px-3"}>
@@ -1226,7 +1226,7 @@ function ClientPortalView({ state, updateState, helpers }: ScreenProps & { helpe
             {state.clients.map((client) => (
               <div key={client.id} className="tw-card-soft p-3">
                 <div className="flex items-center gap-2">
-                  <Languages size={17} className="text-[#f46a14]" />
+                  <Languages size={17} className="text-[var(--mikke-primary)]" />
                   <p className="tw-card-title">{languageLabel(client.preferredLanguage)}</p>
                 </div>
                 <p className="tw-helper mt-1">{client.name} の学校画面・連絡文はこの言語で表示する想定です。</p>
@@ -1256,9 +1256,9 @@ function FeatureSettingsPanel() {
       <p className="tw-section-title">業態別に切り替える機能</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         {features.map(([label, enabled]) => (
-          <div key={String(label)} className="flex items-center gap-2 rounded-xl border border-[#e7ebf2] bg-white px-3 py-2">
-            <CheckCircle2 size={16} className={enabled ? "text-[#f46a14]" : "text-[#9aa3b2]"} />
-            <span className="text-[length:var(--font-helper)] font-bold text-[#07152f]">{label}</span>
+          <div key={String(label)} className="flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2">
+            <CheckCircle2 size={16} className={enabled ? "text-[var(--mikke-success)]" : "text-[var(--mikke-muted-light)]"} />
+            <span className="text-[length:var(--font-helper)] font-bold text-[var(--mikke-primary)]">{label}</span>
           </div>
         ))}
       </div>
@@ -1273,7 +1273,7 @@ function ParticipantChart({ participant, helpers }: { participant: TeamWorksPart
   return (
     <article className="tw-card-soft p-3">
       <div className="flex items-start gap-3">
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f4f7fb] text-[#07152f]">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]">
           <UserRound size={19} />
         </span>
         <div>
@@ -1373,15 +1373,15 @@ function GuideCard({ guide, compact = false }: { guide: TeamWorksGuideItem; comp
           <p className="tw-card-title">{guide.number}. {guide.title}</p>
           <p className="tw-helper mt-1">対象: {guide.targetLevel} / 他業種: {guide.genericUse}</p>
         </div>
-        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fff6f1] text-[#f46a14]">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]">
           <BookOpenCheck size={18} />
         </span>
       </div>
-      <div className="mt-3 rounded-2xl border border-[#e7ebf2] bg-[#f8fafc] p-3">
+      <div className="mt-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="tw-form-label">資料</p>
-            <p className="text-[length:var(--font-body)] font-extrabold text-[#07152f]">{materialTitle}</p>
+            <p className="text-[length:var(--font-body)] font-extrabold text-[var(--mikke-primary)]">{materialTitle}</p>
             <p className="tw-helper mt-1">{materialTypeLabel(guide.materialType)} / {guide.materialNote || "Google Docs、PDF、Word、Excelなどを登録できます。"}</p>
           </div>
           <a href={materialUrl} target="_blank" rel="noreferrer" className="tw-secondary-button shrink-0">
@@ -1416,7 +1416,7 @@ function SessionCard({ session, helpers, compact = false }: { session: TeamWorks
       <div className="flex flex-col gap-2.5">
         <div className="grid gap-3 sm:grid-cols-[96px_minmax(0,1fr)_auto] sm:items-start">
           <div>
-            <p className="text-[20px] font-extrabold leading-tight text-[#07152f]">{formatSessionTime(session.startsAt).replace(" ", "\n")}</p>
+            <p className="text-[20px] font-extrabold leading-tight text-[var(--mikke-primary)]">{formatSessionTime(session.startsAt).replace(" ", "\n")}</p>
             <p className="tw-helper mt-1">{session.durationMinutes}分</p>
           </div>
           <div className="min-w-0">
@@ -1430,7 +1430,7 @@ function SessionCard({ session, helpers, compact = false }: { session: TeamWorks
             <StatusChip status={session.status} />
           </div>
         </div>
-        {!compact ? <p className="tw-helper break-all font-bold text-[#2e7d46]">{session.zoomUrl}</p> : null}
+        {!compact ? <p className="tw-helper break-all font-bold text-[var(--mikke-success)]">{session.zoomUrl}</p> : null}
         <div className="grid grid-cols-2 gap-2">
           <a href={session.zoomUrl} className="tw-secondary-button">
             <Video size={17} />
@@ -1472,7 +1472,7 @@ type MetricProps = { label: string; value: string; helper?: string; tone?: Metri
 
 function Metric({ label, value, helper, tone = "orange" }: MetricProps) {
   const classes = {
-    orange: "border-[var(--mikke-primary-border)] bg-white",
+    orange: "border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)]",
     warn: "border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)]",
     green: "border-[var(--mikke-line)] bg-[var(--mikke-success-soft)]",
     navy: "border-[var(--mikke-line)] bg-[var(--mikke-primary-soft)]"
@@ -1561,9 +1561,9 @@ function LinkButton({ href, label }: { href: string; label: string }) {
 
 function MetaLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl bg-white px-3 py-2">
+    <div className="min-w-0 rounded-xl bg-[var(--mikke-surface)] px-3 py-2">
       <p className="tw-helper truncate font-bold">{label}</p>
-      <p className="mt-1 truncate text-[length:var(--font-body)] font-bold text-[#07152f]">{value}</p>
+      <p className="mt-1 truncate text-[length:var(--font-body)] font-bold text-[var(--mikke-primary)]">{value}</p>
     </div>
   );
 }
@@ -1596,9 +1596,9 @@ function StatusChip({ status, label }: { status: string; label?: string }) {
 
 function FlowStep({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-[#e7ebf2] bg-white px-3 py-2">
-      <ClipboardCheck size={16} className="text-[#f46a14]" />
-      <p className="text-[length:var(--font-body)] font-bold text-[#07152f]">{label}</p>
+    <div className="flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2">
+      <ClipboardCheck size={16} className="text-[var(--mikke-primary)]" />
+      <p className="text-[length:var(--font-body)] font-bold text-[var(--mikke-primary)]">{label}</p>
     </div>
   );
 }
@@ -1613,7 +1613,7 @@ function CollapsibleSection({ title, lead, children }: { title: string; lead?: s
           <span className="tw-section-title block">{title}</span>
           {lead ? <span className="tw-helper mt-1 block">{lead}</span> : null}
         </span>
-        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#f4f7fb] text-[#07152f]">
+        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]">
           <Icon size={18} />
         </span>
       </button>
