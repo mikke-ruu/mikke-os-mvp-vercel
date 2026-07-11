@@ -20,7 +20,10 @@ import {
   UserRound,
   Video
 } from "lucide-react";
+import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
+import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import {
   createTeamWorksId,
   formatSessionTime,
@@ -157,10 +160,10 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
 
   return (
     <MikkeAppShell appName="Team Works" title={config.title} subtitle={config.description} currentApp={{ label: "Team", href: "/apps/team-works" }}>
-      <div className="tw-app" data-text-scale={textScale}>
-        <div className="tw-workspace">
+      <div className="tw-app min-w-0" data-text-scale={textScale}>
+        <div className="tw-workspace min-w-0">
           <DesktopSidebar view={effectiveView} mode={mode} setMode={setMode} />
-          <main className="tw-main tw-page-stack">
+          <main className="tw-main tw-page-stack min-w-0">
         <section className="tw-compact-header">
           <p className="tw-helper font-bold uppercase tracking-[0.14em] text-[var(--mikke-accent)]">Team Works</p>
           <div className="mt-2 flex items-center gap-3">
@@ -174,24 +177,24 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
           </div>
         </section>
 
-        <div className="lg:hidden">
+        <div className="min-w-0 lg:hidden">
           <ModeSwitcher mode={mode} setMode={setMode} />
         </div>
 
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
           {metrics.map((metric) => (
             <Metric key={metric.label} {...metric} />
           ))}
         </section>
 
         <nav className="tw-tabs lg:hidden">
-          <div className="flex gap-1">
+          <div className="grid min-w-0 grid-cols-5 gap-1">
             {visibleNav.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex-1 rounded-full px-3 py-2 text-center text-[length:var(--font-nav)] font-bold ${
-                  item.view === effectiveView ? "tw-tab-active bg-[#07152f] text-white" : "text-[#5d6678] hover:bg-[#f4f7fb]"
+                className={`min-w-0 truncate rounded-full px-2 py-2 text-center text-[length:var(--font-nav)] font-bold ${
+                  item.view === effectiveView ? "tw-tab-active bg-[var(--mikke-primary)] text-[var(--mikke-surface)]" : "text-[var(--mikke-text-muted)] hover:bg-[var(--mikke-surface-soft)]"
                 }`}
               >
                 {item.label}
@@ -285,19 +288,19 @@ function ModeSwitcher({ mode, setMode, compact = false }: { mode: ViewMode; setM
   ];
 
   return (
-    <section className={compact ? "" : "tw-card p-3"}>
+    <section className={compact ? "min-w-0" : "tw-card min-w-0 p-3"}>
       {!compact ? <p className="tw-form-label">表示モード</p> : null}
-      <div className={compact ? "grid gap-2" : "grid grid-cols-3 gap-2"}>
+      <div className={compact ? "grid min-w-0 gap-2" : "grid min-w-0 grid-cols-3 gap-2"}>
         {modes.map((item) => (
           <button
             key={item.value}
             type="button"
             onClick={() => setMode(item.value)}
-            className={`rounded-2xl border px-3 py-2 text-left ${
-              mode === item.value ? "border-[#f46a14] bg-[#fff6f1] text-[#f46a14]" : "border-[#e7ebf2] bg-white text-[#07152f]"
+            className={`min-w-0 rounded-2xl border px-2 py-2 text-left ${
+              mode === item.value ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]" : "border-[var(--mikke-line)] bg-[var(--mikke-surface)] text-[var(--mikke-text)]"
             }`}
           >
-            <span className="block text-[length:var(--font-body)] font-extrabold">{item.label}</span>
+            <span className="block truncate text-[length:var(--font-body)] font-extrabold">{item.label}</span>
             {!compact ? <span className="tw-helper block">{item.helper}</span> : null}
           </button>
         ))}
@@ -1453,16 +1456,12 @@ function DataList({
   return (
     <div className="grid gap-3">
       {items.map((item) => (
-        <article key={item.id} className="tw-card p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="tw-card-title">{item.title}</p>
-              <p className="tw-helper mt-1">{item.meta}</p>
-              <p className="tw-body mt-2">{item.detail}</p>
-            </div>
-            <StatusChip status="assigned" label={item.status} />
-          </div>
-        </article>
+        <MikkeListRow
+          key={item.id}
+          title={item.title}
+          helper={`${item.meta}${item.detail ? ` / ${item.detail}` : ""}`}
+          right={<StatusChip status="assigned" label={item.status} />}
+        />
       ))}
     </div>
   );
@@ -1473,15 +1472,15 @@ type MetricProps = { label: string; value: string; helper?: string; tone?: Metri
 
 function Metric({ label, value, helper, tone = "orange" }: MetricProps) {
   const classes = {
-    orange: "border-[#ffd8c4] bg-white",
-    warn: "border-[#ffd8c4] bg-[#fff6f1]",
-    green: "border-[#d6dde5] bg-[#f4f7fb]",
-    navy: "border-[#d6dde5] bg-[#f4f7fb]"
+    orange: "border-[var(--mikke-primary-border)] bg-white",
+    warn: "border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)]",
+    green: "border-[var(--mikke-line)] bg-[var(--mikke-success-soft)]",
+    navy: "border-[var(--mikke-line)] bg-[var(--mikke-primary-soft)]"
   };
   return (
     <div className={`tw-card tw-summary-card border p-4 ${classes[tone]}`}>
-      <p className={tone === "warn" ? "tw-helper font-bold text-[#f46a14]" : "tw-helper font-bold text-[#07152f]"}>{label}</p>
-      <p className="mt-1 text-[22px] font-extrabold tracking-normal text-[#07152f] md:text-[24px]">{value}</p>
+      <p className={tone === "warn" ? "tw-helper font-bold text-[var(--mikke-accent)]" : "tw-helper font-bold text-[var(--mikke-primary)]"}>{label}</p>
+      <p className="mt-1 text-[22px] font-extrabold tracking-normal text-[var(--mikke-primary)] md:text-[24px]">{value}</p>
       {helper ? <p className="tw-helper mt-1">{helper}</p> : null}
     </div>
   );
@@ -1557,12 +1556,7 @@ function ActionButton({ label, onClick, icon }: { label: string; onClick: () => 
 }
 
 function LinkButton({ href, label }: { href: string; label: string }) {
-  return (
-    <Link href={href} className="mb-2 flex min-h-11 items-center justify-between rounded-xl border border-[#e7ebf2] bg-white px-3 py-2 text-[length:var(--font-body)] font-bold text-[#07152f]">
-      {label}
-      <ArrowRight size={16} />
-    </Link>
-  );
+  return <MikkeListRow href={href} title={label} right={<ArrowRight className="shrink-0 text-[var(--mikke-muted-light)]" size={16} />} />;
 }
 
 function MetaLine({ label, value }: { label: string; value: string }) {
@@ -1575,24 +1569,29 @@ function MetaLine({ label, value }: { label: string; value: string }) {
 }
 
 function SummaryLine({ label, value, tone = "gray" }: { label: string; value: string; tone?: "gray" | "orange" | "green" }) {
-  const toneClass = tone === "orange" ? "border-[#ffd8c4] bg-[#fff6f1]" : tone === "green" ? "border-[#d6dde5] bg-[#f4f7fb]" : "border-[#e7ebf2] bg-[#f8fafc]";
+  const toneClass =
+    tone === "orange"
+      ? "border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)]"
+      : tone === "green"
+        ? "border-[var(--mikke-line)] bg-[var(--mikke-success-soft)]"
+        : "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]";
   return (
     <div className={`rounded-xl border px-3 py-2 ${toneClass}`}>
-      <p className={tone === "orange" ? "tw-helper font-bold text-[#f46a14]" : "tw-helper font-bold text-[#07152f]"}>{label}</p>
-      <p className="mt-1 text-[length:var(--font-body)] font-extrabold text-[#07152f]">{value}</p>
+      <p className={tone === "orange" ? "tw-helper font-bold text-[var(--mikke-accent)]" : "tw-helper font-bold text-[var(--mikke-primary)]"}>{label}</p>
+      <p className="mt-1 text-[length:var(--font-body)] font-extrabold text-[var(--mikke-primary)]">{value}</p>
     </div>
   );
 }
 
 function Empty({ text }: { text: string }) {
-  return <div className="tw-card-soft border-dashed p-5 text-[length:var(--font-body)] font-bold text-[#6f6862]">{text}</div>;
+  return <MikkeEmptyState title={text} />;
 }
 
 function StatusChip({ status, label }: { status: string; label?: string }) {
   const greenStatuses = ["assigned", "completed", "reviewed", "present", "active", "available"];
   const orangeStatuses = ["unassigned", "submitted", "late", "trial", "limited", "needs_revision"];
   const tone = greenStatuses.includes(status) ? "green" : orangeStatuses.includes(status) ? "orange" : "gray";
-  return <span className={`tw-status-chip tw-status-${tone}`}>{label ?? statusLabel(status as never)}</span>;
+  return <MikkeStatusBadge tone={tone === "green" ? "success" : tone === "orange" ? "primary" : "muted"}>{label ?? statusLabel(status as never)}</MikkeStatusBadge>;
 }
 
 function FlowStep({ label }: { label: string }) {

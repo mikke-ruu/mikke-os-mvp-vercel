@@ -24,11 +24,11 @@ export function MikkeListRow({ title, label, helper, href, icon: Icon, right }: 
         <span className="mt-1 block truncate text-sm font-bold">{title}</span>
         {helper ? <span className="mt-0.5 block truncate text-xs font-semibold text-[var(--mikke-muted)]">{helper}</span> : null}
       </span>
-      {right ?? (href ? <ChevronRight className="ml-auto shrink-0 text-[var(--mikke-muted-light)]" size={16} /> : null)}
+      {right ? <span className="shrink-0">{right}</span> : href ? <ChevronRight className="ml-auto shrink-0 text-[var(--mikke-muted-light)]" size={16} /> : null}
     </>
   );
 
-  const className = "flex items-center justify-between gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-3";
+  const className = "flex w-full min-w-0 items-center justify-between gap-3 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-3";
 
   if (href) {
     return (
