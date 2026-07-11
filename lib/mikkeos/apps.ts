@@ -49,7 +49,7 @@ export const mikkeApps: MikkeAppDefinition[] = [
     key: "academy",
     name: "Academy",
     shortName: "Academy",
-    role: "講座、教材、受講者、認定講師、キット注文を管理する入口。",
+    role: "講座、教材、受講、認定講師、キット注文を管理する入口。",
     status: "planned",
     activityExamples: ["講座を作成", "受講申込を受付", "認定を完了", "更新を記録"],
     storyOutputs: ["講座実績", "認定実績", "講師プロフィール"],
@@ -71,12 +71,34 @@ export const mikkeApps: MikkeAppDefinition[] = [
     key: "community",
     name: "Community",
     shortName: "Community",
-    role: "掲示板、お知らせ、会員、限定投稿を管理する独立アプリ。",
+    role: "掲示板、お知らせ、会員、投稿、会費を管理する独立アプリ。",
     status: "planned",
     activityExamples: ["コミュニティを作成", "お知らせを投稿", "メンバー参加", "月会費を記録"],
     storyOutputs: ["運営コミュニティ", "投稿実績", "主催実績"],
     deskOutputs: ["月会費売上", "メンバー数", "継続率"],
     accent: "slate"
+  },
+  {
+    key: "team_works",
+    name: "Team Works",
+    shortName: "Team",
+    role: "学校・授業・パートナー・請求・報酬をチーム運営として管理する入口。",
+    status: "active",
+    activityExamples: ["授業を完了", "学校へ請求", "入金を確認", "パートナー報酬を記録"],
+    storyOutputs: ["匿名化した活動実績", "運営実績", "チーム実績"],
+    deskOutputs: ["学校請求", "学校入金", "パートナー報酬"],
+    accent: "navy"
+  },
+  {
+    key: "fund",
+    name: "Fund",
+    shortName: "Fund",
+    role: "応援購入、予約販売、支援ページをOrder派生として管理する将来アプリ。",
+    status: "planned",
+    activityExamples: ["支援ページを作成", "応援購入を受付", "支援金を記録", "リターン提供を管理"],
+    storyOutputs: ["プロジェクト実績", "支援募集ページ", "活動報告"],
+    deskOutputs: ["支援金", "リターン原価", "プロジェクト収支"],
+    accent: "violet"
   }
 ];
 
@@ -88,4 +110,3 @@ export const appByKey = mikkeApps.reduce<Record<AppKey, MikkeAppDefinition>>((ac
 export function getAppDefinition(key: AppKey) {
   return appByKey[key];
 }
-

@@ -221,7 +221,9 @@ export const appActionPresets: Record<AppKey, ActivityActionPreset[]> = {
       sourceLabel: "月会費",
       deskGroup: "コミュニティ売上"
     }
-  ]
+  ],
+  team_works: [],
+  fund: []
 };
 
 export function createActivityFromPreset(preset: ActivityActionPreset): UnifiedActivityLog {

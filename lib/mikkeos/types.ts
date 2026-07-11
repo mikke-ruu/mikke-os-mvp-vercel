@@ -5,7 +5,9 @@ export type AppKey =
   | "item_studio"
   | "academy"
   | "session"
-  | "community";
+  | "community"
+  | "team_works"
+  | "fund";
 
 export type AmountType = "income" | "expense" | "none";
 export type Visibility = "public" | "private";
@@ -58,7 +60,7 @@ export type MikkeAppDefinition = {
   activityExamples: string[];
   storyOutputs: string[];
   deskOutputs: string[];
-  accent: "terracotta" | "green" | "navy" | "gold" | "rose" | "blue" | "slate";
+  accent: "terracotta" | "green" | "navy" | "gold" | "rose" | "blue" | "slate" | "violet";
 };
 
 export type ActivityActionPreset = {

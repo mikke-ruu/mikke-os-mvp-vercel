@@ -160,7 +160,8 @@ export function AppMiniPage({ appKey }: { appKey: AppKey }) {
         <button
           type="button"
           onClick={addActivity}
-          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white shadow-sm"
+          disabled={!selectedPreset}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus size={18} />
           {text.addButton}
