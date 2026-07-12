@@ -1,0 +1,184 @@
+"use client";
+
+import { Suspense, use, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { getListedInstructor, getPublicCourse } from "@/lib/academy/lp";
+import type { AcademyCourse, AcademyInstructor } from "@/types/database";
+
+function formatLabel(f: string) {
+  return f === "in_person" ? "対面" : f === "online" ? "オンライン" : f;
+}
+
+// MUSUBIサイト風: 余白多め・中央揃え・上品なセクション見出し
+function Section({ title, body }: { title: string; body: string | null }) {
+  if (!body) return null;
+  return (
+    <section className="border-t border-[var(--mikke-line)] px-5 py-8 md:px-12 md:py-12">
+      <div className="mx-auto max-w-2xl">
+        <h2 className="text-center text-sm font-bold tracking-[0.2em] text-[var(--mikke-accent-strong)] md:text-base">{title}</h2>
+        <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text)] md:text-[15px] md:leading-8">{body}</p>
+      </div>
+    </section>
+  );
+}
+
+function ApplyButton({ href }: { href: string }) {
+  return (
+    <Link
+      href={href}
+      className="mx-auto block w-full max-w-xs rounded-full bg-[var(--mikke-accent)] py-3.5 text-center text-sm font-bold tracking-wider text-white transition hover:opacity-90"
+    >
+      この講座に申し込む
+    </Link>
+  );
+}
+
+function PublicLpInner({ courseId }: { courseId: string }) {
+  const searchParams = useSearchParams();
+  const instructorId = searchParams.get("k");
+  const [course, setCourse] = useState<AcademyCourse | null>(null);
+  const [instructor, setInstructor] = useState<AcademyInstructor | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const c = await getPublicCourse(courseId);
+      setCourse(c);
+      if (c && instructorId) setInstructor(await getListedInstructor(instructorId).catch(() => null));
+      setLoading(false);
+    }
+    load();
+  }, [courseId, instructorId]);
+
+  if (loading) return <p className="py-20 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (!course || !course.is_published) {
+    return <p className="py-20 text-center text-sm text-[var(--mikke-muted)]">この講座は公開されていません。</p>;
+  }
+
+  const applyHref = instructorId ? `/academy/apply/${course.id}?k=${instructorId}` : `/academy/apply/${course.id}`;
+
+  return (
+    <div className="mx-auto md:max-w-4xl md:px-6 md:py-10">
+      <div className="overflow-hidden bg-white md:rounded-3xl md:shadow-sm">
+        {course.main_image_url ? (
+          <img src={course.main_image_url} alt="" className="h-56 w-full object-cover md:h-[26rem]" />
+        ) : (
+          <div className="h-24 bg-[var(--mikke-accent-soft)] md:h-40" />
+        )}
+
+        {/* ファーストビュー */}
+        <div className="px-5 py-8 text-center md:px-12 md:py-12">
+          <p className="text-xs font-bold uppercase tracking-[0.35em] text-[var(--mikke-accent-strong)]">{course.code}</p>
+          <h1 className="mt-3 text-2xl font-bold leading-9 tracking-wide text-[var(--mikke-text)] md:text-4xl md:leading-[3.2rem]">
+            {course.name}
+          </h1>
+          {course.subtitle ? (
+            <p className="mt-2 text-sm tracking-wider text-[var(--mikke-muted)] md:text-base">{course.subtitle}</p>
+          ) : null}
+
+          <div className="mx-auto mt-7 flex max-w-xl flex-col divide-y divide-[var(--mikke-line)] rounded-2xl bg-[var(--mikke-surface-soft)] text-sm text-[var(--mikke-text)] md:flex-row md:divide-x md:divide-y-0">
+            <div className="flex-1 px-4 py-3 md:py-4">
+              <p className="text-[11px] tracking-widest text-[var(--mikke-accent-strong)]">受講料</p>
+              <p className="mt-1 font-bold">{course.price.toLocaleString()}円</p>
+            </div>
+            {course.duration_text ? (
+              <div className="flex-1 px-4 py-3 md:py-4">
+                <p className="text-[11px] tracking-widest text-[var(--mikke-accent-strong)]">所要時間</p>
+                <p className="mt-1 font-bold">{course.duration_text}</p>
+              </div>
+            ) : null}
+            {course.formats.length ? (
+              <div className="flex-1 px-4 py-3 md:py-4">
+                <p className="text-[11px] tracking-widest text-[var(--mikke-accent-strong)]">受講形式</p>
+                <p className="mt-1 font-bold">{course.formats.map(formatLabel).join(" / ")}</p>
+              </div>
+            ) : null}
+          </div>
+
+          {instructor ? (
+            <div className="mx-auto mt-6 max-w-xl rounded-2xl border border-[var(--mikke-line)] p-4 text-left md:p-5">
+              <p className="text-xs font-bold tracking-widest text-[var(--mikke-accent-strong)]">開催講師</p>
+              <p className="mt-1 text-sm font-bold text-[var(--mikke-text)] md:text-base">{instructor.business_name || "認定講師"}</p>
+              {instructor.area ? (
+                <p className="text-xs text-[var(--mikke-muted)]">
+                  {instructor.area}
+                  {instructor.online_available ? " ・ オンライン対応" : ""}
+                </p>
+              ) : null}
+              {instructor.message ? (
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text)]">{instructor.message}</p>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="mt-8">
+            <ApplyButton href={applyHref} />
+          </div>
+        </div>
+
+        <Section title="講座について" body={course.description} />
+        <Section title="受講後にできること" body={course.can_do_after} />
+        <Section title="認定条件" body={course.certification_conditions} />
+        <Section title="キット内容" body={course.kit_contents} />
+        <Section title="教材内容" body={course.material_contents} />
+
+        {course.lp_blocks?.length ? (
+          <section className="border-t border-[var(--mikke-line)] px-5 py-8 md:px-12 md:py-12">
+            <div className="mx-auto max-w-2xl space-y-5">
+              {course.lp_blocks.map((b, i) =>
+                b.type === "heading" ? (
+                  <h2 key={i} className="pt-2 text-center text-lg font-bold tracking-wide text-[var(--mikke-text)] md:text-xl">
+                    {b.text}
+                  </h2>
+                ) : b.type === "text" ? (
+                  <p key={i} className="whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text)] md:text-[15px] md:leading-8">
+                    {b.text}
+                  </p>
+                ) : b.url ? (
+                  <figure key={i}>
+                    <img src={b.url} alt={b.caption ?? ""} className="w-full rounded-xl" />
+                    {b.caption ? (
+                      <figcaption className="mt-1 text-center text-xs text-[var(--mikke-muted)]">{b.caption}</figcaption>
+                    ) : null}
+                  </figure>
+                ) : null
+              )}
+            </div>
+          </section>
+        ) : null}
+
+        {course.faq.length ? (
+          <section className="border-t border-[var(--mikke-line)] px-5 py-8 md:px-12 md:py-12">
+            <div className="mx-auto max-w-2xl">
+              <h2 className="text-center text-sm font-bold tracking-[0.2em] text-[var(--mikke-accent-strong)] md:text-base">よくあるご質問</h2>
+              <dl className="mt-5 space-y-4">
+                {course.faq.map((f, i) => (
+                  <div key={i} className="rounded-2xl bg-[var(--mikke-surface-soft)] p-4 md:p-5">
+                    <dt className="text-sm font-bold text-[var(--mikke-text)]">Q. {f.q}</dt>
+                    <dd className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text)]">{f.a}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </section>
+        ) : null}
+
+        <div className="border-t border-[var(--mikke-line)] px-5 py-10 md:px-12">
+          <ApplyButton href={applyHref} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function PublicCoursePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  return (
+    <main className="min-h-screen bg-[var(--mikke-surface-soft)]">
+      <Suspense fallback={<p className="py-20 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>}>
+        <PublicLpInner courseId={id} />
+      </Suspense>
+    </main>
+  );
+}

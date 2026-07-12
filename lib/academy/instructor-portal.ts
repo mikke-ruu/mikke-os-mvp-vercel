@@ -1,0 +1,75 @@
+import { supabase } from "@/lib/supabase/client";
+import type { AcademyApplication, AcademyCourse, AcademyInstructor, AcademyMaterial } from "@/types/database";
+
+// 講師側: 自分が担当講師になっている申込（RLSで担当分だけ読める）
+export async function listMyApplications(instructorIds: string[]) {
+  if (instructorIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("academy_applications")
+    .select("*")
+    .in("instructor_id", instructorIds)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as AcademyApplication[];
+}
+
+// 講師側: 取得講座の情報（RLSで講師は自分の講座を読める）
+export async function getCoursesByIds(courseIds: string[]) {
+  if (courseIds.length === 0) return [];
+  const { data, error } = await supabase.from("academy_courses").select("*").in("id", courseIds);
+  if (error) throw error;
+  return (data ?? []) as AcademyCourse[];
+}
+
+// 講師側: 自分の講師レコード（複数講座を持てる）
+export async function getMyInstructorRecords(userId: string) {
+  const { data, error } = await supabase
+    .from("academy_instructors")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as AcademyInstructor[];
+}
+
+// 講師側: 自分が取得した講座の公開教材だけ（RLSで講座外・非活動はDBが弾く）
+export async function listMaterialsForInstructor(courseIds: string[]) {
+  if (courseIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("academy_materials")
+    .select("*")
+    .in("course_id", courseIds)
+    .eq("is_published", true)
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as AcademyMaterial[];
+}
+
+// 講師が編集できるのは営業列のみ。本部管理列を送っても §8 トリガが OLD 値に戻す。
+export type InstructorProfileEdit = {
+  business_name: string | null;
+  area: string | null;
+  online_available: boolean;
+  instagram_url: string | null;
+  self_intro: string | null;
+  message: string | null;
+  available_note: string | null;
+  accepts_applications: boolean;
+  is_listed: boolean;
+  display_on_story: boolean;
+};
+
+export async function updateMyInstructorProfile(instructor: AcademyInstructor, patch: Partial<InstructorProfileEdit>) {
+  const { data, error } = await supabase
+    .from("academy_instructors")
+    .update(patch)
+    .eq("id", instructor.id)
+    .eq("user_id", instructor.user_id as string)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as AcademyInstructor;
+}
