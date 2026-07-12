@@ -11,12 +11,15 @@ export function AppShell({
   subtitle,
   hideHeader = false,
   hideBottomNav = false,
+  maxWidth = "max-w-md",
   children
 }: {
   title: string;
   subtitle?: string;
   hideHeader?: boolean;
   hideBottomNav?: boolean;
+  /** コンテンツ幅。既定はスマホ幅（既存アプリ互換）。Academy管理画面は max-w-5xl 等を渡す */
+  maxWidth?: string;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -31,7 +34,7 @@ export function AppShell({
     <main className="safe-bottom min-h-screen bg-[#fbfaf8]">
       {hideHeader ? null : (
         <header className="sticky top-0 z-20 border-b border-[#e8e1da] bg-[#fbfaf8]/95 px-4 py-4 backdrop-blur">
-          <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+          <div className={`mx-auto flex ${maxWidth} items-center justify-between gap-3`}>
             <div>
               <p className="text-xs font-bold text-[#d9643a]">Mikke OS</p>
               <h1 className="text-xl font-bold tracking-normal text-[#25211f]">{title}</h1>
@@ -49,7 +52,7 @@ export function AppShell({
           </div>
         </header>
       )}
-      <div className={`mx-auto max-w-md px-4 py-4 ${hideBottomNav ? "" : "pb-24"}`}>{children}</div>
+      <div className={`mx-auto ${maxWidth} px-4 py-4 ${hideBottomNav ? "" : "pb-24"}`}>{children}</div>
       {hideBottomNav ? null : <BottomNav />}
     </main>
   );

@@ -7,7 +7,7 @@ export default function RootPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/home");
+    router.replace("/os");
   }, [router]);
 
   return null;

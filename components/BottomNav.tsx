@@ -1,15 +1,15 @@
 "use client";
 
-import { Home, List, Plus, ReceiptText, Settings } from "lucide-react";
+import { Activity, AppWindow, BookOpenText, LayoutDashboard, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const items = [
-  { href: "/home", label: "ホーム", icon: Home },
-  { href: "/marketnote", label: "一覧", icon: List },
-  { href: "/marketnote/new", label: "追加", icon: Plus, primary: true },
-  { href: "/marketnote/finance", label: "収支", icon: ReceiptText },
-  { href: "/settings", label: "設定", icon: Settings }
+  { href: "/os", label: "OS", icon: LayoutDashboard },
+  { href: "/log", label: "Log", icon: Activity },
+  { href: "/story", label: "Story", icon: BookOpenText },
+  { href: "/desk", label: "DESK", icon: ListChecks },
+  { href: "/apps", label: "Apps", icon: AppWindow }
 ];
 
 export function BottomNav() {
@@ -20,30 +20,19 @@ export function BottomNav() {
       <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = item.primary
-            ? pathname === item.href
-            : item.href === "/marketnote"
-              ? pathname === "/marketnote"
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}
               href={item.href}
-              className="flex min-h-14 items-center justify-center rounded-xl px-2 py-2"
+              className="flex min-h-14 flex-col items-center justify-center rounded-xl px-1 py-2 text-[11px] font-bold"
               aria-label={item.label}
               title={item.label}
             >
-              <span
-                className={
-                  item.primary
-                    ? "grid h-[52px] w-[52px] -translate-y-4 place-items-center rounded-full bg-[#f46a14] text-white shadow-[0_6px_14px_rgba(232,97,44,0.18)]"
-                    : active
-                      ? "text-[#f46a14]"
-                      : "text-[#5f5a55]"
-                }
-              >
-                <Icon size={item.primary ? 28 : 25} strokeWidth={item.primary ? 1.7 : 1.55} />
+              <span className={active ? "text-[#f46a14]" : "text-[#5f5a55]"}>
+                <Icon size={22} strokeWidth={1.8} />
               </span>
+              <span className={active ? "mt-1 text-[#f46a14]" : "mt-1 text-[#5f5a55]"}>{item.label}</span>
             </Link>
           );
         })}
@@ -51,3 +40,4 @@ export function BottomNav() {
     </nav>
   );
 }
+
