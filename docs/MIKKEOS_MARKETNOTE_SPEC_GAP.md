@@ -119,3 +119,53 @@ This document is intentionally not an implementation plan. Suggested priority qu
 3. Should reminder execution remain out of scope until a real notification channel is selected?
 4. Should photo support wait for the broader Event/Mikkeruu photo and album decisions?
 5. Should status/date column gaps remain `private_note` MVP behavior until a DB phase is explicitly opened?
+
+## Fable Decision（2026-07-12 優先順位確定）
+
+上記5問への回答:
+
+```text
+1. YES。文字化けと「押せそうで押せないUI」の解消を最初に行う（Wave 1）。
+2. ホームカレンダーがP2-bの主役（Wave 2）。ただし現行データモデルのまま
+   （private_note方式維持・DB変更なし）。
+3. YES。リマインダー実処理はスコープ外。設定の保存のみ維持。
+4. YES。写真はEvent/Mikkeruuの写真・Storage方針が決まるまで見送り
+   （Mikkeruuでbase64→Storage移行とegress超過の実績があるため、
+   写真は場当たりで実装しない）。
+5. YES。DB列追加はしない。ただしSPEC_03の「applied選択がplannedで保存される」
+   問題は、UIがユーザーに嘘をつく状態なので、end_dateと同じ
+   private_note方式で実ステータスを保持し表示する（Wave 1で修正）。
+```
+
+### P2-b実装ウェーブ（この順で実装。各Wave完了ごとにコミット＋セルフチェック）
+
+```text
+Wave 1（品質パス・小〜中）:
+  - 文字化けコピーの全復旧（ユーザーに見える文言全て）
+  - フィルタアイコン: 機能がないので「押せそうな見た目」を解除（SPEC_02準拠）
+  - applied状態のprivate_note保持・表示（上記5）
+  - 収支カテゴリの自由入力対応（SPEC_05・小）
+
+Wave 2（主役機能・SPEC_01ホームカレンダー）:
+  - 月グリッド・日付セルのイベント表示・選択日カード
+  - 選択日からの追加導線（既存 /marketnote/new?startDate= を活用）
+  - 開催前/終了後の表示切替
+  - ホーム下部サポート欄: 期限つきチェック / 次のイベント / 未記録の終了イベント
+  - チェックテンプレの期日ルールを実イベントのチェック項目へ適用
+    （SPEC_03の残り・サポート欄の前提）
+
+Wave 3（仕上げ・Wave 2完了後に着手判断）:
+  - 終了イベントのフィルタ/カード表現（SPEC_02）
+  - カレンダー表示設定の実消費（SPEC_01/06）
+  - 支払いステータスのfinance連動強化（SPEC_02）
+  - 詳細ページへのテンプレ適用（SPEC_07）
+
+P2-bスコープ外（明示）:
+  リマインダー実処理 / 写真 / DB列追加 / CSV・ロック・履歴 /
+  PWA実インストール / Story・DESK実接続ロジック / プロフィール表示 /
+  振り返りgood/next分割（現状の1欄で可）
+  ※設定画面の見た目統一は課題B（OS中心画面統一）側で実施（二重作業禁止）
+
+P2完成の定義: Wave 1 + Wave 2 完了 = 「人に見せて使ってもらえるMarketNote」。
+Wave 3はP3（Event）着手前に状況を見て判断。
+```

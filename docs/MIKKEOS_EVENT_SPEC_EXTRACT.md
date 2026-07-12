@@ -188,3 +188,31 @@ These are design candidates only; do not implement during BP-2-a.
 ## Waiting State
 
 This BP-2-a output is ready for priority review. BP-2-b implementation should wait for explicit instruction after P2-b priority decisions.
+
+## Fable Sign-off（2026-07-12 承認・修正2点付き）
+
+この仕様抽出をBP-2-bの正典として承認する。ただし以下2点を修正して実装すること。
+
+```text
+修正1: My Page（/event/my/[applicationId]）は第1パスから外し、
+       Event MVP第2パスへ送る。
+  理由: 申込者向けページは「推測可能なURLで個人情報が見える」リスクの
+  設計判断が必要（申込IDは推測不能なトークンにする等）。第1パスでは
+  確定連絡は主催者が手動で行う運用とし、confirmed_memo は
+  管理側の申込詳細に保持だけしておく。
+
+修正2: 第1パスの画面は以下の7枚に確定。
+  公開側: /event（一覧）/ /event/[id]（詳細LP）/
+          /event/[id]/apply（申込）/ apply/complete（完了）
+  管理側: /apps/event（ダッシュボード・MikkeAppShell）/
+          /event/admin/new と /event/admin/[id]（作成・編集は1ページ形式）/
+          /event/admin/[id]/applications（申込一覧・ステータス管理・
+          申込詳細と確定後メモを含む）
+
+その他はこのdocsの通り:
+  - 状態遷移3種（Event / Application / Payment）は記載通り採用。
+  - Activity Logマッピング候補は記載通り（申込者情報・金額はStory禁止・
+    強制private）。実装はBP-2-bでも行わず、adapter接続フェーズで別途。
+  - 保存はlocalStorage（activity-client-storeと同じ方式）。
+  - Mikkeruu-codexには一切触れない。
+```
