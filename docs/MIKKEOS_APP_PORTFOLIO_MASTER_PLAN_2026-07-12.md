@@ -360,3 +360,9 @@ Mikkeruu-codexのActivity Log接続 → 別フェーズで検討
 Fundの手数料・料金プラン         → ヒアリング後
 Communityの詳細設計              → Academy会員モデル確定後
 ```
+
+## 8. Event後続フェーズ（2026-07-13追記）
+
+Event MVP第1パス（BP-2-b）完了後の計画として、イベントポータルとMarketNote自動連携を
+`docs/MIKKEOS_EVENT_PORTAL_AND_MARKETNOTE_LINK_PLAN.md` に記録済み（設計のみ・実装未着手）。
+Phase E1（Supabase移行）〜E5（MarketNote自動登録）の5段階。着手は別途指示を受けてから。

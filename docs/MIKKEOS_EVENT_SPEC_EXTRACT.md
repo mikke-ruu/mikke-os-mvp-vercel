@@ -189,6 +189,13 @@ These are design candidates only; do not implement during BP-2-a.
 
 This BP-2-a output is ready for priority review. BP-2-b implementation should wait for explicit instruction after P2-b priority decisions.
 
+## 2026-07-13 追記: 後続フェーズ計画あり
+
+BP-2-b（第1パス）完了後の後続フェーズとして、イベントポータルとMarketNote自動連携の計画を
+`docs/MIKKEOS_EVENT_PORTAL_AND_MARKETNOTE_LINK_PLAN.md` に記録した（設計のみ・実装未着手）。
+My Page（本docsの修正1で見送った機能）も、この後続フェーズのPhase E3（申込とアカウントの
+紐づけ）と合わせて再検討する候補になる。
+
 ## Fable Sign-off（2026-07-12 承認・修正2点付き）
 
 この仕様抽出をBP-2-bの正典として承認する。ただし以下2点を修正して実装すること。

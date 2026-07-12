@@ -4,6 +4,31 @@
 
 mikkeOSのUI方針は、以下のdocsを参照します。
 
+## 2026-07-13 追加（後続フェーズ計画）
+
+### `docs/MIKKEOS_EVENT_PORTAL_AND_MARKETNOTE_LINK_PLAN.md`
+
+EVENTモジュールの後続フェーズ計画（設計のみ・実装未着手）。ユーザー依頼を受けて作成。
+
+- Phase E1: EVENTのSupabase移行（events / event_applicationsテーブル・RLS）
+- Phase E2: 都道府県・地域フィールド、公開用主催者ナンバー
+  （`profiles.member_number` 再利用が第一候補）
+- Phase E3: 申込とmikkeOSアカウントの紐づけ
+- Phase E4: イベントポータル（地域・都道府県・主催者ナンバー・開催日で絞り込み）
+- Phase E5: MarketNote自動連携（申込confirmed時に出店予定を自動作成）
+
+着手はPhase E1から。既存のPhase4 adapter/RLS方針
+（`MIKKEOS_PHASE4_SUPABASE_ADAPTER_PLAN.md` 等）を踏襲する。
+
+## 2026-07-13 追加（続報）
+
+BP-3（Item Studio）・BP-4（Session）も完了。実行ラインは Fund・Community の着手条件待ちで一時停止中。
+
+- `docs/MIKKEOS_ITEM_STUDIO_SPEC_EXTRACT.md`: item-studio_2から台帳機能のみ抽出。写真補正・BASE連携は外部リンクに委譲。
+- Session: Order派生のため専用spec-extractドキュメントなし（マスタープラン4.4章に準拠）。
+
+Fund（利用希望者ヒアリング未実施）・Community（Academy会員モデル未確定）は、マスタープランに明記された前提条件が揃うまで着手を保留。
+
 ## 2026-07-13 追加
 
 ### `docs/MIKKEOS_EVENT_SPEC_EXTRACT.md` / Event MVP実装
