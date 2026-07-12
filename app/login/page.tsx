@@ -4,6 +4,8 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
+// TODO(将来): ?from=クエリ等でアプリ別の見出し出し分けを検討する。
+// 現在は共有ルートのためアプリ中立の文言に固定している。
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -35,45 +37,44 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#fbfaf8] px-5">
-      <div className="w-full max-w-md rounded-3xl border border-[#e8e1da] bg-white p-6 shadow-sm">
-        <p className="text-sm font-bold text-[#d9643a]">MarketNote</p>
-        <h1 className="mt-2 text-3xl font-bold text-[#25211f]">ログイン</h1>
-        <p className="mt-2 text-sm leading-6 text-[#79716b]">
-          MarketNoteから活動を記録して、StoryとDESKに反映します。
+    <main className="flex min-h-screen items-center justify-center bg-[var(--mikke-surface-soft)] px-5">
+      <div className="w-full max-w-md rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-6 shadow-sm">
+        <h1 className="text-3xl font-bold text-[var(--mikke-text)]">ログイン</h1>
+        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
+          ログインすると、活動の記録がStoryとDESKにつながります。
         </p>
 
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <label className="block">
-            <span className="text-sm font-bold text-[#25211f]">メールアドレス</span>
+            <span className="text-sm font-bold text-[var(--mikke-text)]">メールアドレス</span>
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               type="email"
               required
-              className="mt-2 w-full rounded-2xl border border-[#e8e1da] bg-[#fbfaf8] px-4 py-3 outline-none focus:border-[#d9643a]"
+              className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 outline-none focus:border-[var(--mikke-accent)]"
             />
           </label>
           <label className="block">
-            <span className="text-sm font-bold text-[#25211f]">パスワード</span>
+            <span className="text-sm font-bold text-[var(--mikke-text)]">パスワード</span>
             <input
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               type="password"
               required
               minLength={6}
-              className="mt-2 w-full rounded-2xl border border-[#e8e1da] bg-[#fbfaf8] px-4 py-3 outline-none focus:border-[#d9643a]"
+              className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 outline-none focus:border-[var(--mikke-accent)]"
             />
           </label>
 
           {message ? (
-            <p className="rounded-2xl bg-[#fff0e9] px-4 py-3 text-sm leading-6 text-[#8f3d22]">{message}</p>
+            <p className="rounded-lg bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-accent-strong)]">{message}</p>
           ) : null}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-2xl bg-[#d9643a] px-4 py-3 font-bold text-white disabled:opacity-60"
+            className="w-full rounded-lg bg-[var(--mikke-primary)] px-4 py-3 font-bold text-white disabled:opacity-60"
           >
             {loading ? "確認中..." : "ログイン"}
           </button>
@@ -81,11 +82,13 @@ export default function LoginPage() {
             type="button"
             onClick={handleSignUp}
             disabled={loading || !email || password.length < 6}
-            className="w-full rounded-2xl border border-[#e8e1da] bg-white px-4 py-3 font-bold text-[#25211f] disabled:opacity-50"
+            className="w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-4 py-3 font-bold text-[var(--mikke-text)] disabled:opacity-50"
           >
             新規登録
           </button>
         </form>
+
+        <p className="mt-6 text-center text-xs font-semibold text-[var(--mikke-muted-light)]">by mikke</p>
       </div>
     </main>
   );
