@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#fbfaf8] px-5">
       <div className="w-full max-w-md rounded-3xl border border-[#e8e1da] bg-white p-6 shadow-sm">
-        <p className="text-sm font-bold text-[#d9643a]">Mikke OS</p>
+        <p className="text-sm font-bold text-[#d9643a]">MarketNote</p>
         <h1 className="mt-2 text-3xl font-bold text-[#25211f]">ログイン</h1>
         <p className="mt-2 text-sm leading-6 text-[#79716b]">
           MarketNoteから活動を記録して、StoryとDESKに反映します。
