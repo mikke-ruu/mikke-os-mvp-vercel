@@ -25,7 +25,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace("/home");
+    router.replace("/os");
   }
 
   async function handleSignUp() {

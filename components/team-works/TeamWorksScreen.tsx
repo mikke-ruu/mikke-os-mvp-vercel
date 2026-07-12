@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { AuthGate } from "@/components/AuthGate";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -158,7 +159,7 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
     </>
   );
 
-  return (
+  const screen = (
     <MikkeAppShell appName="Team Works" title={config.title} subtitle={config.description} currentApp={{ label: "Team", href: "/apps/team-works" }}>
       <div className="tw-app min-w-0" data-text-scale={textScale}>
         <div className="tw-workspace min-w-0">
@@ -235,6 +236,10 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
       </div>
     </MikkeAppShell>
   );
+
+  // 学校・パートナーポータル(worker/client)はログイン不要の公開画面。
+  // 管理者データ(clients/participants/invoices/payouts等)を含むadminモードだけ保護する。
+  return mode === "admin" ? <AuthGate>{screen}</AuthGate> : screen;
 }
 
 function DesktopSidebar({ view, mode, setMode }: { view: TeamWorksView; mode: ViewMode; setMode: (mode: ViewMode) => void }) {
