@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, Clock3, Edit3, MapPin, Plus } from "lucide-react";
+import { HomeCalendar } from "@/components/marketnote/HomeCalendar";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { formatDate } from "@/lib/format";
-import { hasAppliedEntryStatus, listCheckItems, listMarketEvents } from "@/lib/marketnote";
-import type { MarketCheckItem, MarketEvent } from "@/types/database";
+import { hasAppliedEntryStatus, listCheckItems, listFinancialRecords, listMarketEvents, listReflections } from "@/lib/marketnote";
+import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
+type HomeTab = "calendar" | "list";
 type ListTab = "confirmed" | "all";
 type PaymentState = "paid" | "unpaid" | "not_required";
 type EventSummary = {
@@ -20,15 +22,22 @@ type EventSummary = {
 
 function MarketNoteContent() {
   const { profile } = useAuth();
+  const [homeTab, setHomeTab] = useState<HomeTab>("calendar");
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [checksByEvent, setChecksByEvent] = useState<Record<string, MarketCheckItem[]>>({});
+  const [financesByEvent, setFinancesByEvent] = useState<Record<string, MarketFinancialRecord[]>>({});
+  const [reflectionsByEvent, setReflectionsByEvent] = useState<Record<string, MarketReflection | undefined>>({});
   const [activeTab, setActiveTab] = useState<ListTab>("confirmed");
 
   useEffect(() => {
     let active = true;
 
     async function load() {
-      const nextEvents = await listMarketEvents(profile.id);
+      const [nextEvents, allFinances, allReflections] = await Promise.all([
+        listMarketEvents(profile.id),
+        listFinancialRecords(profile.id),
+        listReflections(profile.id)
+      ]);
       const checkPairs = await Promise.all(
         nextEvents.map(async (event) => [event.id, await listCheckItems(profile.id, event.id)] as const)
       );
@@ -36,6 +45,8 @@ function MarketNoteContent() {
       if (!active) return;
       setEvents(nextEvents);
       setChecksByEvent(Object.fromEntries(checkPairs));
+      setFinancesByEvent(groupByEventId(allFinances));
+      setReflectionsByEvent(Object.fromEntries(allReflections.map((reflection) => [reflection.market_event_id, reflection])));
     }
 
     load();
@@ -64,41 +75,87 @@ function MarketNoteContent() {
         <header className="mb-5 pt-2">
           <div className="grid grid-cols-[40px_1fr_40px] items-center">
             <span className="h-10 w-10" aria-hidden="true" />
-            <h1 className="text-center text-3xl font-semibold tracking-normal text-[var(--mikke-text)]">一覧</h1>
+            <h1 className="text-center text-3xl font-semibold tracking-normal text-[var(--mikke-text)]">MarketNote</h1>
             <span className="h-10 w-10" aria-hidden="true" />
           </div>
         </header>
 
-        <div className="-mx-4 mb-4 border-b border-[var(--mikke-line)]">
-          <div className="grid grid-cols-2 text-center text-sm font-bold">
-            <TabButton active={activeTab === "confirmed"} onClick={() => setActiveTab("confirmed")}>
-              出店確定
-            </TabButton>
-            <TabButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
-              すべて
-            </TabButton>
+        <div className="mb-4 flex items-center justify-between gap-2 px-1">
+          <div className="inline-flex rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-1">
+            <SegmentButton active={homeTab === "calendar"} onClick={() => setHomeTab("calendar")}>
+              カレンダー
+            </SegmentButton>
+            <SegmentButton active={homeTab === "list"} onClick={() => setHomeTab("list")}>
+              一覧
+            </SegmentButton>
           </div>
-        </div>
-
-        <div className="mb-4 flex items-center justify-between px-1">
-          <span className="text-sm font-semibold text-[var(--mikke-text-soft)]">日付が近い順</span>
           <Link href="/marketnote/new" className="inline-flex items-center gap-1 rounded-full border border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent)]">
             <Plus size={15} strokeWidth={1.8} />
             追加
           </Link>
         </div>
 
-        {filtered.length > 0 ? (
-          <div className="space-y-3">
-            {filtered.map((summary) => (
-              <EventListCard key={summary.event.id} summary={summary} />
-            ))}
-          </div>
+        {homeTab === "calendar" ? (
+          <HomeCalendar
+            events={events}
+            checksByEvent={checksByEvent}
+            financesByEvent={financesByEvent}
+            reflectionsByEvent={reflectionsByEvent}
+          />
         ) : (
-          <MikkeEmptyState title="表示できる予定がありません" helper="出店予定を追加すると、ここに日付順で表示されます。" />
+          <div>
+            <div className="-mx-4 mb-4 border-b border-[var(--mikke-line)]">
+              <div className="grid grid-cols-2 text-center text-sm font-bold">
+                <TabButton active={activeTab === "confirmed"} onClick={() => setActiveTab("confirmed")}>
+                  出店確定
+                </TabButton>
+                <TabButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
+                  すべて
+                </TabButton>
+              </div>
+            </div>
+
+            <div className="mb-4 px-1">
+              <span className="text-sm font-semibold text-[var(--mikke-text-soft)]">日付が近い順</span>
+            </div>
+
+            {filtered.length > 0 ? (
+              <div className="space-y-3">
+                {filtered.map((summary) => (
+                  <EventListCard key={summary.event.id} summary={summary} />
+                ))}
+              </div>
+            ) : (
+              <MikkeEmptyState title="表示できる予定がありません" helper="出店予定を追加すると、ここに日付順で表示されます。" />
+            )}
+          </div>
         )}
       </div>
     </MikkeAppShell>
+  );
+}
+
+function groupByEventId(records: MarketFinancialRecord[]) {
+  const map: Record<string, MarketFinancialRecord[]> = {};
+  for (const record of records) {
+    if (!record.market_event_id) continue;
+    if (!map[record.market_event_id]) map[record.market_event_id] = [];
+    map[record.market_event_id].push(record);
+  }
+  return map;
+}
+
+function SegmentButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+        active ? "bg-[var(--mikke-accent)] text-white" : "text-[var(--mikke-text-soft)]"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 

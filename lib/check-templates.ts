@@ -68,3 +68,32 @@ export function getActiveCheckTitles(template: CheckTemplate) {
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((item) => item.title.trim());
 }
+
+export function getActiveCheckItems(template: CheckTemplate) {
+  return [...template.items]
+    .filter((item) => item.isActive && item.title.trim())
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+// custom/none には確定した期日ルールがないため null を返す。
+// 表示側は due_date が null の場合、開催日を仮の期限として扱う（MVPフォールバック）。
+export function resolveDueDate(rule: CheckDueRule, eventDate: string): string | null {
+  if (!eventDate) return null;
+
+  const offsetDays: Partial<Record<CheckDueRule, number>> = {
+    event_day: 0,
+    previous_day: -1,
+    three_days_before: -3,
+    seven_days_before: -7
+  };
+
+  const offset = offsetDays[rule];
+  if (offset === undefined) return null;
+
+  const base = new Date(`${eventDate}T00:00:00`);
+  base.setDate(base.getDate() + offset);
+  const year = base.getFullYear();
+  const month = String(base.getMonth() + 1).padStart(2, "0");
+  const day = String(base.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}

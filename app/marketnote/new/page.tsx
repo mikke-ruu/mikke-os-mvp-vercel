@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
-import { getActiveCheckTitles, loadCheckTemplate } from "@/lib/check-templates";
+import { getActiveCheckItems, loadCheckTemplate, resolveDueDate } from "@/lib/check-templates";
 import { addCheckItem, addFinancialRecord, createMarketEvent, toggleCheckItem } from "@/lib/marketnote";
 import { defaultPaymentMethodSettings, getPaymentMethodNames, loadPaymentMethodSettings } from "@/lib/payment-methods";
 import type { MarketEvent } from "@/types/database";
@@ -61,6 +61,7 @@ function NewMarketEventContent() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [templateChecks, setTemplateChecks] = useState<string[]>([]);
+  const [templateDueRules, setTemplateDueRules] = useState<Record<string, string>>({});
   const [selectedChecks, setSelectedChecks] = useState<string[]>([]);
   const [customCheck, setCustomCheck] = useState("");
   const [timeOpen, setTimeOpen] = useState(false);
@@ -76,9 +77,10 @@ function NewMarketEventContent() {
       setEndDate(initialStartDate);
     }
 
-    const activeTemplateChecks = getActiveCheckTitles(loadCheckTemplate());
-    setTemplateChecks(activeTemplateChecks);
-    setSelectedChecks(activeTemplateChecks);
+    const activeTemplateItems = getActiveCheckItems(loadCheckTemplate());
+    setTemplateChecks(activeTemplateItems.map((item) => item.title));
+    setTemplateDueRules(Object.fromEntries(activeTemplateItems.map((item) => [item.title, item.dueRule])));
+    setSelectedChecks(activeTemplateItems.map((item) => item.title));
     setPaymentMethodOptions(getPaymentMethodNames(loadPaymentMethodSettings()));
   }, []);
 
@@ -164,7 +166,11 @@ function NewMarketEventContent() {
       customCheck.trim()
     ].filter(Boolean)));
 
-    await Promise.all(items.map((item) => addCheckItem(profile, created.id, item)));
+    await Promise.all(items.map((item) => {
+      const rule = templateDueRules[item];
+      const dueDate = rule ? resolveDueDate(rule as Parameters<typeof resolveDueDate>[0], startDate) : null;
+      return addCheckItem(profile, created.id, item, dueDate);
+    }));
   }
 
   function toggleCheck(label: string) {

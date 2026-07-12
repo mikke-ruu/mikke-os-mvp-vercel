@@ -15,6 +15,21 @@ export function formatMonthDay(value: string | null | undefined) {
   }).format(new Date(value));
 }
 
+const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
+
+export function formatMonthDayWeekday(value: string | null | undefined) {
+  if (!value) return "";
+  const date = new Date(value);
+  return `${formatMonthDay(value)}(${weekdayLabels[date.getDay()]})`;
+}
+
+export function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function formatYen(value: number | null | undefined) {
   return new Intl.NumberFormat("ja-JP", {
     style: "currency",

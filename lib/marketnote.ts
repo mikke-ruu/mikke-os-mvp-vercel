@@ -146,7 +146,7 @@ export async function listCheckItems(profileId: string, marketEventId: string) {
   return (data ?? []) as MarketCheckItem[];
 }
 
-export async function addCheckItem(profile: Profile, marketEventId: string, title: string) {
+export async function addCheckItem(profile: Profile, marketEventId: string, title: string, dueDate?: string | null) {
   const existing = await listCheckItems(profile.id, marketEventId);
   const { data, error } = await supabase
     .from("market_check_items")
@@ -155,6 +155,7 @@ export async function addCheckItem(profile: Profile, marketEventId: string, titl
       profile_id: profile.id,
       market_event_id: marketEventId,
       title,
+      due_date: dueDate ?? null,
       sort_order: existing.length + 1
     })
     .select("*")
