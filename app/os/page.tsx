@@ -6,7 +6,6 @@ import { ActivityLogList } from "@/components/mikkeos/ActivityLogList";
 import { AppCard } from "@/components/mikkeos/AppCard";
 import { MetricCard } from "@/components/mikkeos/MetricCard";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
-import { SupabaseOsSummaryTest } from "@/components/mikkeos/SupabaseOsSummaryTest";
 import { formatYen } from "@/lib/format";
 import { mikkeApps } from "@/lib/mikkeos/apps";
 import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
@@ -93,8 +92,6 @@ export default function OsPage() {
           ))}
         </div>
       </section>
-
-      <SupabaseOsSummaryTest />
     </MikkeAppShell>
   );
 }

@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { ActivityLogList } from "@/components/mikkeos/ActivityLogList";
 import { MetricCard } from "@/components/mikkeos/MetricCard";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
-import { SupabaseLogReadTest } from "@/components/mikkeos/SupabaseLogReadTest";
 import { mikkeApps } from "@/lib/mikkeos/apps";
 import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 import { filterLogs, getOsSummary } from "@/lib/mikkeos/selectors";
@@ -68,8 +67,6 @@ export default function LogPage() {
         </div>
         <ActivityLogList logs={filteredLogs} />
       </section>
-
-      <SupabaseLogReadTest />
     </MikkeAppShell>
   );
 }

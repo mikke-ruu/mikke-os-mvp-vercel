@@ -2,7 +2,6 @@
 
 import { DeskSummary } from "@/components/mikkeos/DeskSummary";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
-import { SupabaseDeskReadTest } from "@/components/mikkeos/SupabaseDeskReadTest";
 import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 
 export default function DeskPage() {
@@ -17,7 +16,6 @@ export default function DeskPage() {
       footerLabel="DESK by mikke"
     >
       <DeskSummary logs={logs} />
-      <SupabaseDeskReadTest />
     </MikkeAppShell>
   );
 }
