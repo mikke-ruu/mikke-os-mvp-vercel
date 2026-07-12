@@ -1,8 +1,22 @@
 # mikkeOS UI Docs Index
 
-更新日: 2026-07-12
+更新日: 2026-07-13
 
 mikkeOSのUI方針は、以下のdocsを参照します。
+
+## 2026-07-13 追加
+
+### `docs/MIKKEOS_EVENT_SPEC_EXTRACT.md` / Event MVP実装
+
+BP-2-b完了。7画面（公開4・管理3）実装済み。localStorage方式、AuthGate必須（初回実装時に抜けを自己発見・修正）。My Pageは第2パス送り。
+
+### `docs/MIKKEOS_ORDER_SPEC_EXTRACT.md` / Order MVP実装
+
+BP-1-a/b完了。旧miracoから「相談から始まる」思想を継承、ベージュ配色・チャット機能・単一HTML構造は不採用。7画面、ステータス4値に圧縮。Session/Fund派生を見越しメニュー・申込・ステータスを分離。
+
+### P2-b Wave 2（MarketNoteホームカレンダー）
+
+SPEC_01準拠の月カレンダー実装済み。開催前/終了後で表示切替、チェックテンプレ期日ルールを実イベントへ適用。
 
 ## 2026-07-12 追加
 
