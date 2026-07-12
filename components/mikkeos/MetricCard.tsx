@@ -10,10 +10,10 @@ export function MetricCard({
   tone?: "orange" | "green" | "navy" | "gray";
 }) {
   const tones = {
-    orange: "border-[#f2c8b8] bg-[#fff7f3] text-[#d9643a]",
-    green: "border-[#cde5d3] bg-[#f3fbf4] text-[#4f8a61]",
-    navy: "border-[#cfd9e5] bg-[#f5f8fb] text-[#243447]",
-    gray: "border-[#e8e1da] bg-white text-[#25211f]"
+    orange: "border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]",
+    green: "border-[var(--mikke-line)] bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]",
+    navy: "border-[var(--mikke-line)] bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]",
+    gray: "border-[var(--mikke-line)] bg-[var(--mikke-surface)] text-[var(--mikke-text)]"
   };
 
   return (
@@ -24,4 +24,3 @@ export function MetricCard({
     </div>
   );
 }
-
