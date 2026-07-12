@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Clock3, Edit3, Filter, MapPin, Plus } from "lucide-react";
+import { ChevronDown, Clock3, Edit3, MapPin, Plus } from "lucide-react";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { formatDate } from "@/lib/format";
-import { listCheckItems, listMarketEvents } from "@/lib/marketnote";
+import { hasAppliedEntryStatus, listCheckItems, listMarketEvents } from "@/lib/marketnote";
 import type { MarketCheckItem, MarketEvent } from "@/types/database";
 
 type ListTab = "confirmed" | "all";
@@ -65,9 +65,7 @@ function MarketNoteContent() {
           <div className="grid grid-cols-[40px_1fr_40px] items-center">
             <span className="h-10 w-10" aria-hidden="true" />
             <h1 className="text-center text-3xl font-semibold tracking-normal text-[var(--mikke-text)]">一覧</h1>
-            <button className="grid h-11 w-11 place-items-center rounded-full text-[var(--mikke-accent)]" aria-label="フィルター">
-              <Filter size={25} strokeWidth={1.7} />
-            </button>
+            <span className="h-10 w-10" aria-hidden="true" />
           </div>
         </header>
 
@@ -83,10 +81,7 @@ function MarketNoteContent() {
         </div>
 
         <div className="mb-4 flex items-center justify-between px-1">
-          <button className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--mikke-text-soft)]" type="button">
-            日付が近い順
-            <ChevronDown size={17} strokeWidth={1.7} />
-          </button>
+          <span className="text-sm font-semibold text-[var(--mikke-text-soft)]">日付が近い順</span>
           <Link href="/marketnote/new" className="inline-flex items-center gap-1 rounded-full border border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent)]">
             <Plus size={15} strokeWidth={1.8} />
             追加
@@ -132,7 +127,7 @@ function EventListCard({ summary }: { summary: EventSummary }) {
       className="block rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-[0_5px_16px_rgba(45,33,22,0.045)] transition hover:border-[var(--mikke-primary-border)]"
     >
       <div className="flex items-start justify-between gap-3">
-        <StatusChip status={event.status} />
+        <StatusChip status={event.status} applied={hasAppliedEntryStatus(event.private_note)} />
         <Edit3 size={17} strokeWidth={1.6} className="mt-1 shrink-0 text-[var(--mikke-muted)]" />
       </div>
 
@@ -164,10 +159,11 @@ function EventListCard({ summary }: { summary: EventSummary }) {
   );
 }
 
-function StatusChip({ status }: { status: MarketEvent["status"] }) {
+function StatusChip({ status, applied = false }: { status: MarketEvent["status"]; applied?: boolean }) {
+  const showApplied = applied && status === "planned";
   return (
-    <MikkeStatusBadge tone={status === "preparing" ? "primary" : "muted"} className="rounded-full py-1">
-      {statusLabel(status)}
+    <MikkeStatusBadge tone={showApplied || status === "preparing" ? "primary" : "muted"} className="rounded-full py-1">
+      {showApplied ? "申込済み" : statusLabel(status)}
       <ChevronDown size={14} strokeWidth={1.7} />
     </MikkeStatusBadge>
   );

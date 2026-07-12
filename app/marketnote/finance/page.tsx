@@ -374,27 +374,49 @@ function FinanceDraftSection({
   onChange: (draftId: string, patch: Partial<FinanceDraft>) => void;
   onRemove: (draft: FinanceDraft) => void;
 }) {
+  const [customDraftIds, setCustomDraftIds] = useState<string[]>([]);
+
   return (
     <div className="mt-3">
       <div className="mb-1.5 flex items-center justify-between">
         <h5 className="text-xs font-extrabold text-[var(--mikke-text-soft)]">{title}</h5>
-        <span className="text-[10px] font-bold text-[var(--mikke-muted-light)]">設定画面で管理予定</span>
+        <span className="text-[10px] font-bold text-[var(--mikke-muted-light)]">カテゴリは設定で編集できます</span>
       </div>
       <div className="space-y-1.5">
         {drafts.map((draft) => (
           <div key={draft.id} className="grid grid-cols-[1fr_96px_24px] items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-2 py-1.5">
             <div className="relative min-w-0">
-              <select
-                value={draft.title}
-                onChange={(inputEvent) => onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value })}
-                className="h-8 w-full min-w-0 appearance-none rounded-lg bg-[var(--mikke-surface-soft)] px-2 pr-7 text-xs font-bold text-[var(--mikke-text)] outline-none"
-              >
-                {draft.title && !categoryOptions.includes(draft.title) ? <option value={draft.title} hidden>{draft.title}</option> : null}
-                {categoryOptions.map((category) => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-              <ChevronDown size={13} className="pointer-events-none absolute right-2 top-2.5 text-[var(--mikke-accent)]" />
+              {customDraftIds.includes(draft.id) ? (
+                <input
+                  value={draft.title}
+                  onChange={(inputEvent) => onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value })}
+                  placeholder="カテゴリ名を入力"
+                  autoFocus
+                  className="h-8 w-full min-w-0 rounded-lg bg-[var(--mikke-surface-soft)] px-2 text-xs font-bold text-[var(--mikke-text)] outline-none"
+                />
+              ) : (
+                <>
+                  <select
+                    value={draft.title}
+                    onChange={(inputEvent) => {
+                      if (inputEvent.target.value === "__custom__") {
+                        setCustomDraftIds((current) => [...current, draft.id]);
+                        onChange(draft.id, { title: "", category: "" });
+                        return;
+                      }
+                      onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value });
+                    }}
+                    className="h-8 w-full min-w-0 appearance-none rounded-lg bg-[var(--mikke-surface-soft)] px-2 pr-7 text-xs font-bold text-[var(--mikke-text)] outline-none"
+                  >
+                    {draft.title && !categoryOptions.includes(draft.title) ? <option value={draft.title} hidden>{draft.title}</option> : null}
+                    {categoryOptions.map((category) => (
+                      <option key={category} value={category}>{category}</option>
+                    ))}
+                    <option value="__custom__">自由入力…</option>
+                  </select>
+                  <ChevronDown size={13} className="pointer-events-none absolute right-2 top-2.5 text-[var(--mikke-accent)]" />
+                </>
+              )}
               {isPaymentLinkedDraft(draft) ? (
                 <span className="mt-0.5 inline-flex rounded-full bg-[var(--mikke-surface-soft)] px-2 py-0.5 text-[10px] font-bold leading-none text-[var(--mikke-muted-light)]">支払い情報から反映</span>
               ) : null}

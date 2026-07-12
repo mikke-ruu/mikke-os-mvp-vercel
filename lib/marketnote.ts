@@ -9,6 +9,12 @@ import type {
   Profile
 } from "@/types/database";
 
+// DBのstatus列は create経路で planned/preparing のみ許容のため、
+// 「申込済み」は private_note の「入力ステータス:」行が正となる（DB変更は別フェーズ）。
+export function hasAppliedEntryStatus(privateNote: string | null | undefined) {
+  return Boolean(privateNote && privateNote.includes("入力ステータス: 申込済み"));
+}
+
 export async function listMarketEvents(profileId: string) {
   const { data, error } = await supabase
     .from("market_events")

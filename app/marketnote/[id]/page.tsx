@@ -77,6 +77,7 @@ function MarketDetailContent() {
   const [endDate, setEndDate] = useState("");
   const [multiDay, setMultiDay] = useState(false);
   const [status, setStatus] = useState<MarketEvent["status"]>("planned");
+  const [applied, setApplied] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [meetTime, setMeetTime] = useState("");
@@ -118,6 +119,7 @@ function MarketDetailContent() {
     setEndDate(meta.endDate || nextEvent.event_date);
     setMultiDay(meta.multiDay || Boolean(meta.endDate && meta.endDate !== nextEvent.event_date));
     setStatus(nextEvent.status);
+    setApplied(nextEvent.status === "planned" && matchNoteValue(nextEvent.private_note ?? "", "入力ステータス") === "申込済み");
     setStartTime(meta.startTime);
     setEndTime(meta.endTime);
     setMeetTime(meta.meetTime);
@@ -153,6 +155,7 @@ function MarketDetailContent() {
     try {
       const privateNote = buildPrivateNote({
         status,
+        applied,
         startDate: eventDate,
         endDate: normalizedEndDate,
         multiDay,
@@ -236,6 +239,7 @@ function MarketDetailContent() {
           venueName={venueName}
           address={address}
           status={status}
+          applied={applied}
           paymentStatus={paymentStatus}
           paymentMethod={paymentMethod}
           paymentAmount={paymentAmount}
@@ -243,7 +247,10 @@ function MarketDetailContent() {
           total={checks.length}
           progress={progress}
           checks={checks}
-          onStatusChange={setStatus}
+          onStatusChange={(nextStatus) => {
+            setStatus(nextStatus);
+            setApplied(false);
+          }}
           onToggleCheck={async (item, nextValue) => {
             await toggleCheckItem(profile, item, nextValue);
             await load();
@@ -362,6 +369,7 @@ function SummaryCard({
   venueName,
   address,
   status,
+  applied,
   paymentStatus,
   paymentMethod,
   paymentAmount,
@@ -383,6 +391,7 @@ function SummaryCard({
   venueName: string;
   address: string;
   status: MarketEvent["status"];
+  applied: boolean;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   paymentAmount: string;
@@ -399,7 +408,7 @@ function SummaryCard({
     <section className="rounded-[18px] border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-[0_4px_14px_rgba(45,33,22,0.04)]">
       <div className="relative w-fit">
         <button type="button" onClick={() => setStatusMenuOpen((current) => !current)} aria-expanded={statusMenuOpen}>
-          <StatusChip status={status} withChevron />
+          <StatusChip status={status} applied={applied} withChevron />
         </button>
         {statusMenuOpen ? (
           <div className="absolute left-0 top-8 z-20 w-32 overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] py-1 shadow-[0_8px_22px_rgba(45,33,22,0.12)]">
@@ -584,11 +593,12 @@ function MoneyInput({ value, onChange }: { value: string; onChange: (value: stri
   );
 }
 
-function StatusChip({ status, withChevron = false }: { status: MarketEvent["status"]; withChevron?: boolean }) {
-  const tone = status === "completed" ? "success" : status === "preparing" ? "primary" : "muted";
+function StatusChip({ status, applied = false, withChevron = false }: { status: MarketEvent["status"]; applied?: boolean; withChevron?: boolean }) {
+  const showApplied = applied && status === "planned";
+  const tone = status === "completed" ? "success" : showApplied || status === "preparing" ? "primary" : "muted";
   return (
     <MikkeStatusBadge tone={tone} className="rounded-full py-1">
-      {statusLabel(status)}{withChevron ? <ChevronDown size={13} /> : null}
+      {showApplied ? "申込済み" : statusLabel(status)}{withChevron ? <ChevronDown size={13} /> : null}
     </MikkeStatusBadge>
   );
 }
@@ -622,6 +632,7 @@ function matchNoteValue(note: string, label: string) {
 
 function buildPrivateNote(input: {
   status: MarketEvent["status"];
+  applied: boolean;
   startDate: string;
   endDate: string;
   multiDay: boolean;
@@ -634,7 +645,7 @@ function buildPrivateNote(input: {
   paymentAmount: string;
 }) {
   return [
-    `入力ステータス: ${statusLabel(input.status)}`,
+    `入力ステータス: ${input.applied && input.status === "planned" ? "申込済み" : statusLabel(input.status)}`,
     input.startDate ? `start_date: ${input.startDate}` : "",
     input.endDate ? `end_date: ${input.endDate}` : "",
     `複数日イベント: ${input.multiDay ? "true" : "false"}`,
