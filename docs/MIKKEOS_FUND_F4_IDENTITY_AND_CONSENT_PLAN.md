@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: 設計準備完了・DB変更と実装は未着手
+状態: F4-a読み取り確認・schemaレビュー完了、F4-b再編案の承認待ち
 
 ## 1. 目的
 
@@ -183,14 +183,16 @@ countsTowardSummary: false 初期
 
 ### F4-a: 読み取り確認・schema確定
 
+- 完了。結果は `MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` に記録
 - 実DBのprofiles/Auth設定/Data API設定を読み取り専用で確認
-- schema・policy SQLをレビュー用docsへ作成
-- DB変更なし
+- Fundの4テーブルは未作成、DB変更なし
+- Fund本体がlocalStorageのため、4テーブルだけではproject所有者をRLSで検証できない依存関係を確認
 
 ### F4-b: migration / RLS
 
-- 別承認後のみ
-- 4テーブル、constraint、index、RLS、policy
+- 別承認後のみ。F4-a結果を受けてF4-b1 / F4-b2へ分割
+- F4-b1: `fund_projects` + `fund_supports` の最小DB基盤、所有制約、RLS
+- F4-b2: claims + participations + public projection、server-side claim transaction
 - advisorと本人/他人/anonの否定テスト
 
 ### F4-c: 招待・マイページ
@@ -206,12 +208,13 @@ countsTowardSummary: false 初期
 - Storyの小さな参加行
 - 同意解除と限定公開伝播防止
 
-## 9. 実装開始に必要な承認
+## 9. 次工程に必要な承認
 
-ユーザー側で必要な判断は1点だけです。
+F4-aは完了しました。次に必要な判断は1点だけです。
 
 ```text
-F4-aの読み取り確認とschemaレビューへ進めてよいか。
+F4-b1として、Fund所有関係の最小DB基盤
+(fund_projects + fund_supports + RLS) のmigration案作成と実行へ進めてよいか。
 ```
 
-F4-aはDBを変更しません。F4-bのmigration/RLS実行は、F4-aの結果確認後に改めて承認を取ります。
+詳細と検収条件は `MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` を参照します。F4-b1のmigration/RLSは、この承認前には実行しません。

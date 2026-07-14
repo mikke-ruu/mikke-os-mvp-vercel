@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F3実装完了・F4設計準備完了・F4-a承認待ち
+状態: F3実装完了・F4-a schemaレビュー完了・F4-b1承認待ち
 
 ## 1. このdocsの役割
 
@@ -658,4 +658,4 @@ F1の対象:
 5. 禁止事項: DB / Supabase / RLS / migration / 他アプリ保存処理の変更なし
 ```
 
-F4は応援者本人の同定、双方の公開同意、限定公開伝播防止を含む。`MIKKEOS_FUND_F4_IDENTITY_AND_CONSENT_PLAN.md` で設計準備まで完了し、DBを変更しないF4-aの読み取り確認・schemaレビュー承認待ちとする。
+F4は応援者本人の同定、双方の公開同意、限定公開伝播防止を含む。`MIKKEOS_FUND_F4_IDENTITY_AND_CONSENT_PLAN.md` で設計を固定し、`MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` でF4-aの実DB読み取り確認を完了した。Fund本体がlocalStorageのため、F4-bは所有関係を作るF4-b1と招待・同意を作るF4-b2へ再編し、F4-b1の別承認待ちとする。
