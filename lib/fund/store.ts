@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import type {
   FundPlan,
   FundPlanInput,
+  FundAppLink,
+  FundChallengeRecord,
+  FundChallengeRecordInput,
   FundProject,
   FundProjectInput,
   FundSupport,
   FundSupportInput,
   FundSupportSummary,
   FundUpdate,
+  FundTargetService,
   FundUpdateInput
 } from "./types";
 
@@ -17,6 +21,8 @@ const PROJECTS_KEY = "mikke.fund.projects.v1";
 const PLANS_KEY = "mikke.fund.plans.v1";
 const SUPPORTS_KEY = "mikke.fund.supports.v1";
 const UPDATES_KEY = "mikke.fund.updates.v1";
+const CHALLENGE_RECORDS_KEY = "mikke.fund.challenge-records.v1";
+const APP_LINKS_KEY = "mikke.fund.app-links.v1";
 const UPDATED_EVENT_NAME = "mikke-fund:updated";
 const mockOwnerProfileId = "local-owner";
 
@@ -119,6 +125,14 @@ function readUpdates() {
   return readList<FundUpdate>(UPDATES_KEY, []);
 }
 
+function readChallengeRecords() {
+  return readList<FundChallengeRecord>(CHALLENGE_RECORDS_KEY, []);
+}
+
+function readAppLinks() {
+  return readList<FundAppLink>(APP_LINKS_KEY, []);
+}
+
 function writeList<T>(key: string, value: T[]) {
   window.localStorage.setItem(key, JSON.stringify(value));
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT_NAME));
@@ -129,6 +143,8 @@ export function useFundProjects() {
   const [plans, setPlans] = useState<FundPlan[]>([seedPlan]);
   const [supports, setSupports] = useState<FundSupport[]>([]);
   const [updates, setUpdates] = useState<FundUpdate[]>([]);
+  const [challengeRecords, setChallengeRecords] = useState<FundChallengeRecord[]>([]);
+  const [appLinks, setAppLinks] = useState<FundAppLink[]>([]);
 
   useEffect(() => {
     function refresh() {
@@ -136,6 +152,8 @@ export function useFundProjects() {
       setPlans(readPlans());
       setSupports(readSupports());
       setUpdates(readUpdates());
+      setChallengeRecords(readChallengeRecords());
+      setAppLinks(readAppLinks());
     }
     refresh();
     window.addEventListener("storage", refresh);
@@ -256,6 +274,44 @@ export function useFundProjects() {
     setUpdates(next);
   }
 
+  function saveChallengeRecord(input: FundChallengeRecordInput) {
+    const timestamp = nowIso();
+    const existing = readChallengeRecords().find((record) => record.projectId === input.projectId);
+    const record: FundChallengeRecord = {
+      ...input,
+      id: existing?.id ?? makeId("fund_challenge"),
+      publishedAt: input.visibility === "public" ? existing?.publishedAt ?? timestamp : null,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp
+    };
+    const next = [record, ...readChallengeRecords().filter((item) => item.projectId !== input.projectId)];
+    writeList(CHALLENGE_RECORDS_KEY, next);
+    setChallengeRecords(next);
+    return record;
+  }
+
+  function saveAppLinks(projectId: string, targets: FundTargetService[]) {
+    const timestamp = nowIso();
+    const existing = readAppLinks();
+    const existingForProject = existing.filter((link) => link.projectId === projectId);
+    const targetSet = new Set(targets);
+    const nextForProject = (Object.keys(fundTargetKeys) as FundTargetService[]).map<FundAppLink>((targetService) => {
+      const previous = existingForProject.find((link) => link.targetService === targetService);
+      return {
+        id: previous?.id ?? makeId("fund_app_link"),
+        projectId,
+        targetService,
+        linkStatus: targetSet.has(targetService) ? "ready" : "cancelled",
+        createdAt: previous?.createdAt ?? timestamp,
+        updatedAt: timestamp
+      };
+    });
+    const next = [...existing.filter((link) => link.projectId !== projectId), ...nextForProject];
+    writeList(APP_LINKS_KEY, next);
+    setAppLinks(next);
+    return nextForProject;
+  }
+
   const projectsWithProgress = projects.map((project) => ({
     ...project,
     currentValue: currentValueForProject(project, summarizeFundSupports(supports.filter((support) => support.projectId === project.id)))
@@ -266,15 +322,29 @@ export function useFundProjects() {
     plans,
     supports,
     updates,
+    challengeRecords,
+    appLinks,
     createProject,
     updateProject,
     replaceProjectPlans,
     createSupport,
     updateSupport,
     createUpdate,
-    updateFundUpdate
+    updateFundUpdate,
+    saveChallengeRecord,
+    saveAppLinks
   };
 }
+
+const fundTargetKeys: Record<FundTargetService, true> = {
+  order: true,
+  item_studio: true,
+  event: true,
+  session: true,
+  academy: true,
+  community: true,
+  team_works: true
+};
 
 export function canViewFundProject(project: FundProject) {
   return project.visibility !== "private" && project.status !== "draft";

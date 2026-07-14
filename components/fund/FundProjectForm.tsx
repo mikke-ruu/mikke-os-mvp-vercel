@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
+import { createFundCompletedActivity, createFundPublishedActivity } from "@/lib/fund/activity";
 import { useFundProjects } from "@/lib/fund/store";
 import {
   fundCampaignTypeLabels,
@@ -21,6 +22,7 @@ import {
   type FundVisibility
 } from "@/lib/fund/types";
 import { isValidFundExternalUrl, normalizeFundExternalUrl } from "@/lib/fund/url";
+import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 
 const projectTypes = Object.keys(fundProjectTypeLabels) as FundProjectType[];
 const campaignTypes = Object.keys(fundCampaignTypeLabels) as FundCampaignType[];
@@ -49,7 +51,8 @@ function emptyPlan(index: number): FundPlanInput {
 
 export function FundProjectForm({ project, projectPlans = [] }: { project?: FundProject; projectPlans?: FundPlanInput[] }) {
   const router = useRouter();
-  const { createProject, updateProject, replaceProjectPlans } = useFundProjects();
+  const { challengeRecords, createProject, updateProject, replaceProjectPlans } = useFundProjects();
+  const { addLog, removeLog } = useUnifiedActivityLogs();
   const [title, setTitle] = useState(project?.title ?? "");
   const [shortDescription, setShortDescription] = useState(project?.shortDescription ?? "");
   const [description, setDescription] = useState(project?.description ?? "");
@@ -145,6 +148,7 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
     if (project) {
       updateProject(project.id, payload);
       replaceProjectPlans(project.id, cleanPlans);
+      syncPublishedActivity({ ...project, ...payload });
       router.replace(`/apps/fund/${project.id}/edit`);
       setMessage("保存しました。");
       setSaving(false);
@@ -153,7 +157,19 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
 
     const created = createProject(payload);
     replaceProjectPlans(created.id, cleanPlans);
+    syncPublishedActivity(created);
     router.replace(`/apps/fund/${created.id}/edit`);
+  }
+
+  function syncPublishedActivity(nextProject: FundProject) {
+    if (nextProject.visibility !== "private" && nextProject.status !== "draft") {
+      addLog(createFundPublishedActivity(nextProject));
+      const challengeRecord = challengeRecords.find((record) => record.projectId === nextProject.id);
+      if (challengeRecord) addLog(createFundCompletedActivity(nextProject, challengeRecord));
+    } else {
+      removeLog("fund", nextProject.id, "fund_project_published");
+      removeLog("fund", nextProject.id, "fund_project_completed");
+    }
   }
 
   return (

@@ -8,7 +8,7 @@ import { useFundProjects } from "@/lib/fund/store";
 
 function FundPreviewContent() {
   const params = useParams<{ id: string }>();
-  const { projects, plans, updates } = useFundProjects();
+  const { projects, plans, updates, challengeRecords } = useFundProjects();
   const project = projects.find((item) => item.id === params.id);
 
   return (
@@ -20,6 +20,7 @@ function FundPreviewContent() {
           project={project}
           plans={plans.filter((plan) => plan.projectId === project.id)}
           updates={updates.filter((update) => update.projectId === project.id)}
+          challengeRecord={challengeRecords.find((record) => record.projectId === project.id)}
           preview
         />
       )}

@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F2実装完了・F3着手前で停止
+状態: F3実装完了・F4は本接続設計待ち
 
 ## 1. このdocsの役割
 
@@ -625,3 +625,37 @@ F1の対象:
 
 - ブラウザにテスト用ログイン情報がないため、管理3画面は認証後の目視未実施。未ログイン時にログイン画面で遮断されること、型チェック、build、AuthGate配置で確認した。
 - F3の挑戦の軌跡、Story入口、Activity Log、他アプリ連携は未着手。
+
+## 16. F3実装記録（2026-07-14）
+
+実装済み:
+
+- `/apps/fund/[id]/complete` の完成報告
+- `FundChallengeRecord` と公開詳細の「挑戦の軌跡」
+- `FundAppLink` の引き継ぎ候補保存
+- Storyの既存一覧内に、本人が選んだFund完成リンクを小さく表示
+- `fund_project_published` / `fund_support_recorded` / `fund_payment_confirmed` / `fund_fulfillment_completed` / `fund_project_completed` のlocal Activity Log変換
+- `appKey + sourceId + eventType` によるlocal Activity Log重複防止
+- 応援者・支払いログの強制private補強
+
+安全境界:
+
+```text
+- Storyへ出せるのは、Fund本体が閲覧可能・挑戦の軌跡がpublic・本人がStory表示ONの3条件を満たす場合だけ
+- Storyには完成報告本文を複製せず、タイトル・要約・Fund公開URLだけを渡す
+- 応援者名、メール、管理メモ、金額はStoryへ渡さない
+- 支払いログはprivate固定。金額がある場合だけDESK候補
+- 引き継ぎ先はready候補を保存するだけで、他アプリのレコードを作成しない
+```
+
+セルフチェック:
+
+```text
+1. 機械: npm.cmd run lint / build成功、Fund対象の直書きhex色・mikkeOS前面表示ゼロ
+2. 挙動: 完成記録、公開範囲、Story選択、引き継ぎ候補、Activity Log重複防止を確認
+3. 安全: Fund本体非公開時はStory入口を除去、支払い・応援者ログは強制private
+4. 共通影響: Storyを375 / 768 / 1280pxで確認し、メニュー内Fund導線も確認
+5. 禁止事項: DB / Supabase / RLS / migration / 他アプリ保存処理の変更なし
+```
+
+F4は応援者本人の同定、双方の公開同意、限定公開伝播防止を含むため、Supabase/Auth/RLS設計の承認まで着手しない。

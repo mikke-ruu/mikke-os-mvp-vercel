@@ -14,6 +14,7 @@ import {
   Palette,
   PlusCircle,
   QrCode,
+  Rocket,
   Share2,
   ShoppingBag,
   Sparkles,
@@ -145,7 +146,8 @@ const ownedApps: Array<{ key: AppKey; name: string; helper: string }> = [
   { key: "item_studio", name: "Item Studio", helper: "作品・商品を管理" },
   { key: "order", name: "Order", helper: "制作依頼を受ける" },
   { key: "session", name: "Session", helper: "予約と個別相談" },
-  { key: "academy", name: "Academy", helper: "講座を管理" }
+  { key: "academy", name: "Academy", helper: "講座を管理" },
+  { key: "fund", name: "Fund", helper: "挑戦と応援を管理" }
 ];
 
 const otherAppItems: Array<{ href: string; name: string; helper: string }> = [
@@ -177,6 +179,7 @@ const storyAdminItems: Array<{
 export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs: UnifiedActivityLog[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const storyMaterialCount = logs.filter((log) => log.visibility === "public" && log.storyEnabled).length;
+  const fundStoryLogs = logs.filter((log) => log.appKey === "fund" && log.eventType === "fund_project_completed" && log.visibility === "public" && log.storyEnabled);
   const displayName = profileView.displayName || profile.displayName;
 
   return (
@@ -317,8 +320,8 @@ export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs:
           </div>
         </MikkeSection>
 
-        <MikkeSection title="公開中の講座・イベント">
-          {publicPrograms.length > 0 ? (
+        <MikkeSection title="公開中・挑戦の記録">
+          {publicPrograms.length > 0 || fundStoryLogs.length > 0 ? (
             <div className="grid gap-2">
               {publicPrograms.map((program) => (
                 <MikkeListRow
@@ -326,6 +329,17 @@ export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs:
                   title={program.title}
                   label={program.label}
                   right={<MikkeStatusBadge>{program.status}</MikkeStatusBadge>}
+                />
+              ))}
+              {fundStoryLogs.map((log) => (
+                <MikkeListRow
+                  key={`${log.eventType}:${log.sourceId}`}
+                  title={log.title}
+                  label="Fund"
+                  helper={log.description}
+                  icon={Rocket}
+                  href={log.metadata?.publicPath}
+                  right={<MikkeStatusBadge tone="success">挑戦の軌跡</MikkeStatusBadge>}
                 />
               ))}
             </div>

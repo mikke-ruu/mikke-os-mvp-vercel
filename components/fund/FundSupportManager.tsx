@@ -5,6 +5,7 @@ import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { formatDate, formatYen } from "@/lib/format";
+import { createFundPaymentActivity, createFundSupportActivity } from "@/lib/fund/activity";
 import { summarizeFundSupports, useFundProjects } from "@/lib/fund/store";
 import {
   fundPaymentStatusLabels,
@@ -12,12 +13,15 @@ import {
   type FundPaymentStatus,
   type FundSupportRecordStatus
 } from "@/lib/fund/types";
+import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 
 const paymentStatuses = Object.keys(fundPaymentStatusLabels) as FundPaymentStatus[];
 const recordStatuses = Object.keys(fundSupportRecordStatusLabels) as FundSupportRecordStatus[];
 
 export function FundSupportManager({ projectId }: { projectId: string }) {
-  const { plans, supports, createSupport, updateSupport } = useFundProjects();
+  const { projects, plans, supports, createSupport, updateSupport } = useFundProjects();
+  const { addLog, removeLog } = useUnifiedActivityLogs();
+  const project = projects.find((item) => item.id === projectId);
   const projectPlans = plans.filter((plan) => plan.projectId === projectId);
   const projectSupports = supports.filter((support) => support.projectId === projectId).sort((a, b) => b.supportedAt.localeCompare(a.supportedAt));
   const summary = summarizeFundSupports(projectSupports);
@@ -37,7 +41,7 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
     event.preventDefault();
     if (!supporterName.trim()) return;
     const selectedPlan = projectPlans.find((plan) => plan.id === planId);
-    createSupport({
+    const support = createSupport({
       projectId,
       planId,
       supporterName: supporterName.trim(),
@@ -54,6 +58,10 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
       source: source.trim(),
       supportedAt
     });
+    if (project) {
+      addLog(createFundSupportActivity(project, support));
+      if (support.paymentStatus === "confirmed") addLog(createFundPaymentActivity(project, support));
+    }
     setSupporterName("");
     setSupporterEmail("");
     setPublicName("");
@@ -61,6 +69,30 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
     setAmount("");
     setQuantity("1");
     setComment("");
+  }
+
+  function changePaymentStatus(supportId: string, nextStatus: FundPaymentStatus) {
+    const support = projectSupports.find((item) => item.id === supportId);
+    if (!support) return;
+    updateSupport(supportId, { paymentStatus: nextStatus });
+    if (project && nextStatus === "confirmed" && support.recordStatus === "valid") {
+      addLog(createFundPaymentActivity(project, { ...support, paymentStatus: nextStatus }));
+    } else {
+      removeLog("fund", supportId, "fund_payment_confirmed");
+    }
+  }
+
+  function changeRecordStatus(supportId: string, nextStatus: FundSupportRecordStatus) {
+    const support = projectSupports.find((item) => item.id === supportId);
+    if (!support) return;
+    updateSupport(supportId, { recordStatus: nextStatus });
+    if (project && nextStatus === "valid") {
+      addLog(createFundSupportActivity(project, { ...support, recordStatus: nextStatus }));
+      if (support.paymentStatus === "confirmed") addLog(createFundPaymentActivity(project, support));
+      return;
+    }
+    removeLog("fund", supportId, "fund_support_recorded");
+    removeLog("fund", supportId, "fund_payment_confirmed");
   }
 
   return (
@@ -113,12 +145,12 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <label className="text-xs font-bold">決済確認
-                    <select value={support.paymentStatus} onChange={(event) => updateSupport(support.id, { paymentStatus: event.target.value as FundPaymentStatus })} className={smallSelectClass}>
+                    <select value={support.paymentStatus} onChange={(event) => changePaymentStatus(support.id, event.target.value as FundPaymentStatus)} className={smallSelectClass}>
                       {paymentStatuses.map((status) => <option key={status} value={status}>{fundPaymentStatusLabels[status]}</option>)}
                     </select>
                   </label>
                   <label className="text-xs font-bold">集計区分
-                    <select value={support.recordStatus} onChange={(event) => updateSupport(support.id, { recordStatus: event.target.value as FundSupportRecordStatus })} className={smallSelectClass}>
+                    <select value={support.recordStatus} onChange={(event) => changeRecordStatus(support.id, event.target.value as FundSupportRecordStatus)} className={smallSelectClass}>
                       {recordStatuses.map((status) => <option key={status} value={status}>{fundSupportRecordStatusLabels[status]}</option>)}
                     </select>
                   </label>

@@ -32,6 +32,9 @@ export type FundFulfillmentStatus =
   | "cancelled";
 export type FundSupportRecordStatus = "valid" | "test" | "duplicate" | "invalid";
 export type FundUpdateVisibility = "draft" | "public";
+export type FundChallengeRecordVisibility = "private" | "public";
+export type FundTargetService = "order" | "item_studio" | "event" | "session" | "academy" | "community" | "team_works";
+export type FundAppLinkStatus = "suggested" | "ready" | "linked" | "cancelled";
 
 export type FundProject = {
   id: string;
@@ -141,6 +144,32 @@ export type FundSupportSummary = {
   completedCount: number;
 };
 
+export type FundChallengeRecord = {
+  id: string;
+  projectId: string;
+  title: string;
+  summary: string;
+  outcome: string;
+  imageUrl: string;
+  visibility: FundChallengeRecordVisibility;
+  storyEnabled: boolean;
+  completedAt: string;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FundChallengeRecordInput = Omit<FundChallengeRecord, "id" | "publishedAt" | "createdAt" | "updatedAt">;
+
+export type FundAppLink = {
+  id: string;
+  projectId: string;
+  targetService: FundTargetService;
+  linkStatus: FundAppLinkStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const fundProjectTypeLabels: Record<FundProjectType, string> = {
   product: "新しい商品・作品",
   course: "講座・教材",
@@ -226,4 +255,14 @@ export const fundSupportRecordStatusLabels: Record<FundSupportRecordStatus, stri
   test: "テスト",
   duplicate: "重複",
   invalid: "無効"
+};
+
+export const fundTargetServiceLabels: Record<FundTargetService, { name: string; helper: string }> = {
+  order: { name: "Order", helper: "依頼受付や制作へつなぐ" },
+  item_studio: { name: "Item Studio", helper: "作品・商品として育てる" },
+  event: { name: "Event", helper: "開催と申込管理へつなぐ" },
+  session: { name: "Session", helper: "相談・予約メニューにする" },
+  academy: { name: "Academy", helper: "講座・教材として育てる" },
+  community: { name: "Community", helper: "会員モデル確定後の候補として残す" },
+  team_works: { name: "Team Works", helper: "チーム運営へ引き継ぐ" }
 };

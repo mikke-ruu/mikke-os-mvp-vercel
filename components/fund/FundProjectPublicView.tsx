@@ -1,12 +1,12 @@
 import { CalendarDays, ExternalLink, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { FundProgressSummary } from "./FundProgressSummary";
-import { fundCampaignTypeLabels, fundProjectStatusLabels, type FundPlan, type FundProject, type FundUpdate } from "@/lib/fund/types";
+import { fundCampaignTypeLabels, fundProjectStatusLabels, type FundChallengeRecord, type FundPlan, type FundProject, type FundUpdate } from "@/lib/fund/types";
 import { normalizeFundExternalUrl } from "@/lib/fund/url";
 import { formatDate, formatYen } from "@/lib/format";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 
-export function FundProjectPublicView({ project, plans, updates = [], preview = false }: { project: FundProject; plans: FundPlan[]; updates?: FundUpdate[]; preview?: boolean }) {
+export function FundProjectPublicView({ project, plans, updates = [], challengeRecord, preview = false }: { project: FundProject; plans: FundPlan[]; updates?: FundUpdate[]; challengeRecord?: FundChallengeRecord; preview?: boolean }) {
   const activePlans = plans.filter((plan) => preview || (plan.status !== "draft" && plan.status !== "hidden"));
   const visibleUpdates = updates
     .filter((update) => preview || update.visibility === "public")
@@ -123,6 +123,25 @@ export function FundProjectPublicView({ project, plans, updates = [], preview = 
               );
             })}
           </div>
+        </section>
+      ) : null}
+
+      {challengeRecord && (preview || challengeRecord.visibility === "public") ? (
+        <section className="mt-9 border-t border-[var(--mikke-line)] pt-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-xl font-bold tracking-normal">挑戦の軌跡</h2>
+            {preview && challengeRecord.visibility === "private" ? <MikkeStatusBadge tone="muted" className="px-2 py-1">非公開</MikkeStatusBadge> : null}
+          </div>
+          {normalizeFundExternalUrl(challengeRecord.imageUrl) ? (
+            <div className="mt-4 aspect-[16/9] overflow-hidden rounded-lg bg-[var(--mikke-surface-soft)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={normalizeFundExternalUrl(challengeRecord.imageUrl)} alt="" className="h-full w-full object-cover" />
+            </div>
+          ) : null}
+          <h3 className="mt-4 text-lg font-bold">{challengeRecord.title}</h3>
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{challengeRecord.summary}</p>
+          {challengeRecord.outcome ? <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{challengeRecord.outcome}</p> : null}
+          <p className="mt-3 text-xs font-semibold text-[var(--mikke-muted)]">完了日 {formatDate(challengeRecord.completedAt)}</p>
         </section>
       ) : null}
 

@@ -30,6 +30,8 @@ FundはOrder派生アプリとして `source_service: fund` を使用する。20
 - 挑戦完了: `fund_project_completed`。Fund内の「挑戦の軌跡」へのリンクをStory素材候補にできる。
 - 応援者本人の参加: `fund_participation_recorded`。本人と実行者の同意後のみStory候補、初期private。
 
+2026-07-14のF3では、上記のうち応援者本人の参加を除く5種類をlocal Activity Logへ接続した。local側でも `appKey + sourceId + eventType` を同一操作の重複防止キーとして扱う。応援者・支払いログはアダプターでも強制privateとし、Storyへ出せるのは本人が選択した `fund_project_completed` の要約リンクだけとする。
+
 作成日: 2026-07-08
 
 このdocsは、各アプリで発生する操作や記録を、mikkeOS共通の `activity_logs` にどう変換するかを整理するための初期ルール表です。

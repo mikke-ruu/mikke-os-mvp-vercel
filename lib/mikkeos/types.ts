@@ -47,6 +47,7 @@ export type UnifiedActivityLog = {
     storySection?: string;
     deskGroup?: string;
     sourceLabel?: string;
+    publicPath?: string;
   };
   createdAt: string;
 };

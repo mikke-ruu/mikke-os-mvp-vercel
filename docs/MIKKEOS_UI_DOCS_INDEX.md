@@ -15,11 +15,11 @@ mikkeOSのUI方針は、以下のdocsを参照します。
 - Orderの構造とUIパターンを再利用するが、型とlocalStorageキーはFund専用に分離。
 - F1 core MVP -> F2運用管理 -> F3挑戦の軌跡・OS連携 -> F4応援者同意 -> F5本接続の順。
 - 旧 `FUND_APP_CONCEPT.md` は履歴資料へ変更。
-- Fundの「ヒアリング前・仕様未確定」条件は解除。F2完了、F3着手前で停止。
+- Fundの「ヒアリング前・仕様未確定」条件は解除。F3完了、F4は本接続設計待ち。
 
-### Fund F1 / F2実装
+### Fund F1 / F2 / F3実装
 
-F1 core localStorage MVPとF2運用管理が完了。Fund専用型・store、管理7route、公開2route、単一目標、応援プラン、外部リンク、公開範囲、応援者手動登録、活動報告、提供管理を実装。F3（挑戦の軌跡・OS連携）は未着手。
+F1 core localStorage MVP、F2運用管理、F3挑戦の軌跡・OS連携が完了。管理8route、公開2route、完成報告、Storyの小さなFund入口、local Activity Log変換、他アプリへの引き継ぎ候補まで実装。F4（応援者アカウント・双方同意）は本接続設計待ち。
 
 ## 2026-07-13 追加（後続フェーズ計画）
 
@@ -39,12 +39,12 @@ EVENTモジュールの後続フェーズ計画（設計のみ・実装未着手
 
 ## 2026-07-13 追加（続報）
 
-BP-3（Item Studio）・BP-4（Session）も完了。Fundは2026-07-14に仕様固定とF2運用管理まで完了し、F3着手前で停止。Communityは前提条件待ち。
+BP-3（Item Studio）・BP-4（Session）も完了。Fundは2026-07-14に仕様固定とF3まで完了し、F4は本接続設計待ち。Communityは前提条件待ち。
 
 - `docs/MIKKEOS_ITEM_STUDIO_SPEC_EXTRACT.md`: item-studio_2から台帳機能のみ抽出。写真補正・BASE連携は外部リンクに委譲。
 - Session: Order派生のため専用spec-extractドキュメントなし（マスタープラン4.4章に準拠）。
 
-Fundは正式構想・実装計画・F1・F2が完成し、F3着手前で停止。CommunityはAcademy会員モデルが確定するまで着手を保留。
+Fundは正式構想・実装計画・F1〜F3が完成し、F4は本接続設計待ち。CommunityはAcademy会員モデルが確定するまで着手を保留。
 
 ## 2026-07-13 追加
 

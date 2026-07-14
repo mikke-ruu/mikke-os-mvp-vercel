@@ -28,7 +28,8 @@ const summaryIncludedEventTypes = new Set([
   "item_created",
   "item_sold",
   "session_booked",
-  "session_completed"
+  "session_completed",
+  "fund_project_completed"
 ]);
 
 const summaryExcludedEventTypes = new Set([
@@ -43,5 +44,9 @@ const summaryExcludedEventTypes = new Set([
   "memo_updated",
   "display_setting_updated",
   "status_changed",
-  "cancelled"
+  "cancelled",
+  "fund_project_published",
+  "fund_support_recorded",
+  "fund_payment_confirmed",
+  "fund_fulfillment_completed"
 ]);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, Newspaper, PackageCheck, Plus, Users } from "lucide-react";
+import { ExternalLink, Flag, Newspaper, PackageCheck, Plus, Users } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { FundProgressSummary } from "@/components/fund/FundProgressSummary";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
@@ -50,6 +50,7 @@ function FundDashboardContent() {
                 <ProjectLink href={`/apps/fund/${project.id}/supporters`} icon={<Users size={15} />} label="応援者" />
                 <ProjectLink href={`/apps/fund/${project.id}/updates`} icon={<Newspaper size={15} />} label="活動報告" />
                 <ProjectLink href={`/apps/fund/${project.id}/fulfillment`} icon={<PackageCheck size={15} />} label="提供状況" />
+                <ProjectLink href={`/apps/fund/${project.id}/complete`} icon={<Flag size={15} />} label="完成記録" />
               </div>
             </section>
           ))}

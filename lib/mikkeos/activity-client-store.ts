@@ -44,7 +44,23 @@ export function useUnifiedActivityLogs() {
   }, []);
 
   function addLog(log: UnifiedActivityLog) {
-    const nextLogs = [log, ...readLogsFromStorage()];
+    const nextLogs = [
+      log,
+      ...readLogsFromStorage().filter(
+        (existing) =>
+          existing.appKey !== log.appKey ||
+          existing.sourceId !== log.sourceId ||
+          existing.eventType !== log.eventType
+      )
+    ];
+    writeLogsToStorage(nextLogs);
+    setLogs(nextLogs);
+  }
+
+  function removeLog(appKey: UnifiedActivityLog["appKey"], sourceId: string, eventType: string) {
+    const nextLogs = readLogsFromStorage().filter(
+      (log) => log.appKey !== appKey || log.sourceId !== sourceId || log.eventType !== eventType
+    );
     writeLogsToStorage(nextLogs);
     setLogs(nextLogs);
   }
@@ -54,6 +70,5 @@ export function useUnifiedActivityLogs() {
     setLogs(mockActivityLogs);
   }
 
-  return { logs, addLog, resetLogs };
+  return { logs, addLog, removeLog, resetLogs };
 }
-

@@ -86,7 +86,9 @@ function shouldForcePrivateStory(log: UnifiedActivityLog, hasFinancialValue: boo
     log.eventType === "payment_method_updated" ||
     log.eventType === "team_works_invoice_created" ||
     log.eventType === "team_works_invoice_paid" ||
-    log.eventType === "team_works_partner_reward_recorded"
+    log.eventType === "team_works_partner_reward_recorded" ||
+    log.eventType === "fund_support_recorded" ||
+    log.eventType === "fund_payment_confirmed"
   );
 }
 
