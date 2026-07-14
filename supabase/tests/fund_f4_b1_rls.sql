@@ -18,6 +18,15 @@ declare
   affected_count integer;
   suffix text := substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
 begin
+  if has_table_privilege('authenticated', 'public.fund_projects', 'truncate')
+    or has_table_privilege('authenticated', 'public.fund_projects', 'references')
+    or has_table_privilege('authenticated', 'public.fund_projects', 'trigger')
+    or has_table_privilege('authenticated', 'public.fund_supports', 'truncate')
+    or has_table_privilege('authenticated', 'public.fund_supports', 'references')
+    or has_table_privilege('authenticated', 'public.fund_supports', 'trigger') then
+    raise exception 'authenticated has Fund privileges beyond CRUD';
+  end if;
+
   select profiles.user_id, profiles.id
   into owner_a_user_id, owner_a_profile_id
   from public.profiles

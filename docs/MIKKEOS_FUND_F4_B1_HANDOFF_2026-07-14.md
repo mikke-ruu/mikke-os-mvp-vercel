@@ -1,12 +1,13 @@
 # Fund F4-b1 Handoff
 
 作成日: 2026-07-14
+更新日: 2026-07-15
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
 対象branch: `master`
 
-状態: migration適用済み・anon遮断確認済み・actor別RLS検収待ち
+状態: migration履歴整合済み・anon遮断確認済み・actor別RLSは2人目profile待ち
 
 ## 1. 最初に読むもの
 
@@ -46,6 +47,15 @@ public.set_fund_updated_at()
 
 UI保存処理は変更していない。Fund F1-F3は引き続きlocalStorageで動作する。
 
+2026-07-15にCLI接続を復旧し、実DBとmigration SQLを照合した。照合時に見つかった次の差分もF4-b1内で是正済み。
+
+```text
+- authenticatedに残っていたTRUNCATE / REFERENCES / TRIGGERを失効させ、CRUDだけに限定
+- SQL Editor初期適用時の自動constraint名をmigrationの明示名へ統一
+- Fund projectの所有者profile複合FKにcovering indexを追加
+- migration SQLを実DBへ再適用し「Fund F4-b1 migration applied」を確認
+```
+
 ## 3. 読み取り確認済み
 
 anon keyによるData API確認:
@@ -55,66 +65,53 @@ anon keyによるData API確認:
 | `fund_projects` | 401 | 42501 | anon権限なし |
 | `fund_supports` | 401 | 42501 | anon権限なし |
 
-応援者名、メール、金額を持つ `fund_supports` がanonへ公開されていないことを確認した。実データ値の読み取り、insert、update、deleteは行っていない。
+応援者名、メール、金額を持つ `fund_supports` がanonへ公開されていないことを確認した。2026-07-15の権限是正後にも両tableで同じ `401 / 42501` を再確認済み。実データ値の読み取りは行っていない。
 
 ## 4. まだ完了していないこと
 
 F4-b1は次を終えるまで合格・完了扱いにしない。
 
 ```text
-1. supabase/tests/fund_f4_b1_rls.sql をSQL Editorで実行
-2. owner A / owner Bが自分のproject/supportだけ見えることを確認
-3. 他人project/supportのUPDATEとINSERTが拒否されることを確認
-4. test SQL末尾のROLLBACKにより一時データが残らないことを確認
-5. Supabase Database Advisor確認
-6. migration履歴の整合
-7. npm.cmd run lint / build
+1. 正規の利用フローで2人目のAuth user + profileが作成されるのを待つ
+2. supabase/tests/fund_f4_b1_rls.sql を再実行
+3. owner A / owner Bが自分のproject/supportだけ見えることを確認
+4. 他人project/supportのUPDATEとINSERTが拒否されることを確認
+5. test SQL末尾のROLLBACKにより一時データが残らないことを確認
 ```
 
-RLS testは異なるAuth userに属するprofileが2件必要。足りない場合はテストが明示的に停止する。無理にAuth userを作らない。
+2026-07-15の実行で `distinct profile users = 1` を確認し、testは `Fund F4-b1 RLS test requires profiles for two different auth users` で明示停止した。テスト行のinsert前に停止するため、一時データは作成されていない。無理にAuth userを作らない。
 
 ## 5. migration履歴の注意
 
-CLI loginのverification code自体は成功したが、このCodex環境ではCLI tokenが次プロセスへ保持されなかった。そのため `supabase db push` ではなくSQL Editorで手動適用した。
-
-結果として、実DB schemaには反映済みだが、`supabase_migrations.schema_migrations` にversion `20260714070637` が登録されたことは未確認。
-
-次の担当は、CLI接続が使える環境で必ず次の順に確認する。
+2026-07-15にSupabase CLI 2.105.0の認証が後続プロセスでも有効なことを確認し、repoをproject ref `nttqpprkqbynxyldbnjs` へlinkした。
 
 ```text
-supabase --version
-supabase link --project-ref nttqpprkqbynxyldbnjs
-supabase migration list
-supabase migration repair --help
+Local          | Remote
+20260714070637 | 20260714070637
 ```
 
-実DBとmigration SQLが一致することを確認してから、CLIの現行helpに従ってversion `20260714070637` をappliedとしてrepairする。確認前に `db push` を実行しない。
-
-migration SQL自体は再実行時にtable/indexを壊さないよう、主要DDLとpolicy/triggerをidempotentにしてある。ただしmigration履歴確認を省略してよいという意味ではない。
+実DBのcolumn / constraint / index / trigger / function / grant / RLS policyをmigration SQLと照合・是正した後、`supabase migration repair 20260714070637 --status applied --linked` を実行済み。`db push` は実行していない。
 
 ## 6. ブラウザ・CLIの経緯
 
 ```text
 - Supabase CLI 2.105.0はインストール済み
-- CLI loginのverification code承認は成功
-- tokenが後続processへ保持されずprojects listは認証不可
-- Chrome画面操作はChatGPT Chrome Extension / native host未接続で利用不可
-- ユーザーがSQL Editorへ手動貼り付けして適用
+- CLI projects list / link / db query / migration repair / advisors実行成功
+- migration履歴のLocal / Remote一致確認済み
+- Database AdvisorでFUND固有のsecurity警告なし
+- FUND固有の複合FK index不足を是正済み
+- 新規tableのunused index INFOは使用履歴がまだ無いため想定内
+- 他アプリ由来の既存Advisor警告はFUNDの範囲外として変更していない
 ```
-
-同じCLI loginを繰り返さない。次の環境でCLI credentialが保持できるか、またはSupabase Dashboardの正式なmigration運用へ寄せる。
 
 ## 7. 次の実行手順
 
 ```text
 1. git statusで他者のManager docs変更を巻き込まないことを確認
-2. migration historyを確認・repair
-3. supabase/tests/fund_f4_b1_rls.sqlを実行
-4. Database Advisorを確認
-5. anon RESTを再確認
-6. lint / build
-7. F4-b1 docsを完了へ更新してコミット
-8. F4-b2は改めてユーザー承認を取る
+2. 正規の2人目profileが存在する状態で `supabase/tests/fund_f4_b1_rls.sql` を再実行
+3. actor別RLS passとROLLBACKを確認
+4. F4-b1 docsを完了へ更新してFundのみコミット
+5. F4-b2は改めてユーザー承認を取る
 ```
 
 ## 8. 同時に存在する別作業

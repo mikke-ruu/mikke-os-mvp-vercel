@@ -58,10 +58,61 @@ create table if not exists public.fund_projects (
     unique (owner_profile_id, slug)
 );
 
+-- Normalize constraint names when this migration is applied after an earlier
+-- SQL Editor draft that created the same constraints without explicit names.
+do $$
+begin
+  if exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.fund_projects'::regclass
+      and conname = 'fund_projects_owner_profile_id_owner_user_id_fkey'
+  ) and not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.fund_projects'::regclass
+      and conname = 'fund_projects_owner_profile_fkey'
+  ) then
+    alter table public.fund_projects
+      rename constraint fund_projects_owner_profile_id_owner_user_id_fkey
+      to fund_projects_owner_profile_fkey;
+  end if;
+
+  if exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.fund_projects'::regclass
+      and conname = 'fund_projects_slug_check'
+  ) and not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.fund_projects'::regclass
+      and conname = 'fund_projects_slug_format_check'
+  ) then
+    alter table public.fund_projects
+      rename constraint fund_projects_slug_check
+      to fund_projects_slug_format_check;
+  end if;
+
+  if exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.fund_projects'::regclass
+      and conname = 'fund_projects_owner_profile_id_slug_key'
+  ) and not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.fund_projects'::regclass
+      and conname = 'fund_projects_owner_profile_slug_unique'
+  ) then
+    alter table public.fund_projects
+      rename constraint fund_projects_owner_profile_id_slug_key
+      to fund_projects_owner_profile_slug_unique;
+  end if;
+end;
+$$;
+
 create index if not exists fund_projects_owner_user_id_idx
   on public.fund_projects (owner_user_id);
 
-create unique index fund_projects_owner_source_local_id_unique_idx
+create index if not exists fund_projects_owner_profile_id_owner_user_id_idx
+  on public.fund_projects (owner_profile_id, owner_user_id);
+
+create unique index if not exists fund_projects_owner_source_local_id_unique_idx
   on public.fund_projects (owner_user_id, source_local_id)
   where source_local_id is not null;
 
@@ -126,7 +177,7 @@ create table if not exists public.fund_supports (
 create index if not exists fund_supports_project_id_idx
   on public.fund_supports (project_id);
 
-create unique index fund_supports_project_source_local_id_unique_idx
+create unique index if not exists fund_supports_project_source_local_id_unique_idx
   on public.fund_supports (project_id, source_local_id)
   where source_local_id is not null;
 
@@ -160,8 +211,8 @@ alter table public.fund_projects force row level security;
 alter table public.fund_supports enable row level security;
 alter table public.fund_supports force row level security;
 
-revoke all on table public.fund_projects from public, anon;
-revoke all on table public.fund_supports from public, anon;
+revoke all on table public.fund_projects from public, anon, authenticated;
+revoke all on table public.fund_supports from public, anon, authenticated;
 grant select, insert, update, delete on table public.fund_projects to authenticated;
 grant select, insert, update, delete on table public.fund_supports to authenticated;
 grant all on table public.fund_projects to service_role;

@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F4-a完了・F4-b1 migration適用済み・actor別RLS検収待ち
+状態: F4-a完了・F4-b1 migration履歴整合済み・actor別RLSは2人目profile待ち
 
 ## 1. 結論
 
@@ -240,13 +240,17 @@ Supabase Database Advisorも確認し、security definer view、RLS無効、過�
 
 ## 8. F4-b1適用後の現在地
 
-2026-07-14に `fund_projects` / `fund_supports` とRLSを対象Supabaseへ適用した。anon RESTは両tableとも `401 / 42501` で遮断を確認済み。
+2026-07-14に `fund_projects` / `fund_supports` とRLSを対象Supabaseへ適用した。2026-07-15に実DBとmigrationを照合し、authenticatedをCRUDのみへ制限、constraint名の統一、所有者profile複合FK index追加を行った。anon RESTは両tableとも `401 / 42501` で再確認済み。
 
 ```text
+完了:
+- Database Advisor確認（FUND固有security警告なし、複合FK index不足は是正）
+- CLI migration履歴のLocal / Remote一致
+- anon REST再確認
+- lint / build
+
 未完了:
-- actor別transaction RLS test
-- Database Advisor
-- CLI migration履歴の整合
+- actor別transaction RLS test（異なるAuth userに属するprofileが現在1件のため安全停止）
 ```
 
-詳細は `MIKKEOS_FUND_F4_B1_HANDOFF_2026-07-14.md`。これらを完了するまでF4-b1は合格扱いにせず、F4-b2へ進まない。
+詳細は `MIKKEOS_FUND_F4_B1_HANDOFF_2026-07-14.md`。actor別testを完了するまでF4-b1は合格扱いにせず、F4-b2へ進まない。
