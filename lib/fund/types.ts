@@ -1,0 +1,139 @@
+export type FundProjectType = "product" | "course" | "event" | "session" | "community" | "place" | "activity" | "other";
+export type FundCampaignType = "preorder" | "early_application" | "reservation" | "sponsorship" | "support" | "interest";
+export type FundStage = "concept" | "campaign" | "realization";
+export type FundProjectStatus =
+  | "draft"
+  | "interest_open"
+  | "ready"
+  | "open"
+  | "goal_reached"
+  | "closed"
+  | "in_progress"
+  | "delivering"
+  | "completed"
+  | "postponed"
+  | "cancelled"
+  | "archived";
+export type FundVisibility = "private" | "unlisted" | "public";
+export type FundGoalType = "amount" | "supporters" | "reservations" | "participants" | "vendors" | "sponsors";
+export type FundPlanType = FundCampaignType | "non_financial";
+export type FundPlanStatus = "draft" | "active" | "sold_out" | "closed" | "hidden";
+
+export type FundProject = {
+  id: string;
+  ownerProfileId: string;
+  profileSlug: string;
+  slug: string;
+  title: string;
+  shortDescription: string;
+  description: string;
+  projectType: FundProjectType;
+  campaignType: FundCampaignType;
+  stage: FundStage;
+  status: FundProjectStatus;
+  visibility: FundVisibility;
+  coverImageUrl: string;
+  goalType: FundGoalType;
+  goalValue: number;
+  currentValue: number;
+  displayAmount: boolean;
+  startAt: string;
+  endAt: string;
+  externalPaymentUrl: string;
+  externalApplicationUrl: string;
+  whyNow: string;
+  audience: string;
+  useOfSupport: string;
+  schedule: string;
+  riskNotes: string;
+  cancellationPolicy: string;
+  contactNote: string;
+  publishedAt: string | null;
+  completedAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FundPlan = {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  planType: FundPlanType;
+  price: number | null;
+  quantityLimit: number | null;
+  perPersonLimit: number | null;
+  deliveryDate: string;
+  externalPaymentUrl: string;
+  externalApplicationUrl: string;
+  requiredInformationNote: string;
+  requiresShipping: boolean;
+  status: FundPlanStatus;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FundPlanInput = Omit<FundPlan, "id" | "projectId" | "createdAt" | "updatedAt"> & { id?: string };
+export type FundProjectInput = Omit<FundProject, "id" | "ownerProfileId" | "currentValue" | "publishedAt" | "completedAt" | "archivedAt" | "createdAt" | "updatedAt">;
+
+export const fundProjectTypeLabels: Record<FundProjectType, string> = {
+  product: "新しい商品・作品",
+  course: "講座・教材",
+  event: "イベント",
+  session: "体験・相談",
+  community: "コミュニティ",
+  place: "場所・設備",
+  activity: "活動の継続",
+  other: "その他"
+};
+
+export const fundCampaignTypeLabels: Record<FundCampaignType, string> = {
+  preorder: "先行購入",
+  early_application: "先行申込",
+  reservation: "参加予約",
+  sponsorship: "協賛",
+  support: "応援",
+  interest: "興味登録"
+};
+
+export const fundProjectStatusLabels: Record<FundProjectStatus, string> = {
+  draft: "下書き",
+  interest_open: "興味受付中",
+  ready: "募集準備中",
+  open: "応援受付中",
+  goal_reached: "目標達成",
+  closed: "募集終了",
+  in_progress: "制作・準備中",
+  delivering: "提供中",
+  completed: "完成",
+  postponed: "延期",
+  cancelled: "中止",
+  archived: "アーカイブ"
+};
+
+export const fundVisibilityLabels: Record<FundVisibility, string> = {
+  private: "非公開",
+  unlisted: "限定URL",
+  public: "公開"
+};
+
+export const fundGoalTypeLabels: Record<FundGoalType, string> = {
+  amount: "金額",
+  supporters: "応援者",
+  reservations: "予約",
+  participants: "参加者",
+  vendors: "出店者",
+  sponsors: "協賛者"
+};
+
+export const fundGoalUnitLabels: Record<FundGoalType, string> = {
+  amount: "円",
+  supporters: "人",
+  reservations: "件",
+  participants: "人",
+  vendors: "組",
+  sponsors: "件"
+};

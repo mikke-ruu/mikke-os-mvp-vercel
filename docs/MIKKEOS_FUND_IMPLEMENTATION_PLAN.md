@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: 仕様固定・実装引き継ぎ待ち
+状態: F1実装完了・F2着手指示待ち
 
 ## 1. このdocsの役割
 
@@ -567,3 +567,34 @@ F1の対象:
 - Communityの前提条件は変わらない。
 - 料金プラン、法務文言、本人確認、本部機能はプロダクト構想として保持するが、F1〜F3のコード範囲には入れない。
 - 応援者側Story連携は重要な独自価値だが、同意・本人同定・限定公開制御が必要なためF4へ分離する。
+
+## 14. F1実装記録（2026-07-14）
+
+実装済み:
+
+- Fund専用 `types.ts` / `store.ts` / 外部URL検証
+- `/apps/fund` 管理ホーム
+- `/apps/fund/new`
+- `/apps/fund/[id]/edit`
+- `/apps/fund/[id]/preview`
+- `/fund/[profileSlug]`
+- `/fund/[profileSlug]/[projectSlug]`
+- 単一目標、応援プラン、公開範囲、外部申込・決済リンク
+- `apps.ts` のFundを `prototype` へ更新
+
+セルフチェック:
+
+```text
+1. UI: MikkeAppShell / 共通部品 / --mikke-* tokens、直書きhex色ゼロ
+2. 挙動: publicは本人トップと詳細、unlistedは詳細URLのみ、private/draftは公開遮断
+3. 安全: 管理4routeはAuthGate、外部URLはhttp/httpsのみ、決済・個人情報保存なし
+4. ブランド: 公開面はFundが主役、mikkeOS前面表示なし、Fund by mikkeは小さなfooterのみ
+5. 品質: npm.cmd run lint / build成功、公開2画面を375 / 768 / 1280px確認
+```
+
+ブラウザ検証補足:
+
+- 公開2画面は3幅で横はみ出しなし。
+- `/apps/fund` は未ログイン時に `/login` へ遷移し、認証境界を確認。
+- ブラウザにテスト用ログイン情報がないため、管理4画面の認証後スクリーンショットは未実施。型チェック・build・AuthGate配置で確認した。
+- F2以降は未着手。

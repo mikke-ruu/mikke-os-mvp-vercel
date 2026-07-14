@@ -15,7 +15,11 @@ mikkeOSのUI方針は、以下のdocsを参照します。
 - Orderの構造とUIパターンを再利用するが、型とlocalStorageキーはFund専用に分離。
 - F1 core MVP -> F2運用管理 -> F3挑戦の軌跡・OS連携 -> F4応援者同意 -> F5本接続の順。
 - 旧 `FUND_APP_CONCEPT.md` は履歴資料へ変更。
-- Fundの「ヒアリング前・仕様未確定」条件は解除。実装はF1着手指示待ち。
+- Fundの「ヒアリング前・仕様未確定」条件は解除。F1完了、F2着手指示待ち。
+
+### Fund F1実装
+
+F1 core localStorage MVP完了。Fund専用型・store、管理4route、公開2route、単一目標、応援プラン、外部リンク、公開範囲を実装。F2（応援者手動登録・活動報告・提供管理）は着手指示待ち。
 
 ## 2026-07-13 追加（後続フェーズ計画）
 
@@ -35,12 +39,12 @@ EVENTモジュールの後続フェーズ計画（設計のみ・実装未着手
 
 ## 2026-07-13 追加（続報）
 
-BP-3（Item Studio）・BP-4（Session）も完了。Fundは2026-07-14に仕様固定・実装計画まで完了し、F1着手指示待ち。Communityは前提条件待ち。
+BP-3（Item Studio）・BP-4（Session）も完了。Fundは2026-07-14に仕様固定とF1実装まで完了し、F2着手指示待ち。Communityは前提条件待ち。
 
 - `docs/MIKKEOS_ITEM_STUDIO_SPEC_EXTRACT.md`: item-studio_2から台帳機能のみ抽出。写真補正・BASE連携は外部リンクに委譲。
 - Session: Order派生のため専用spec-extractドキュメントなし（マスタープラン4.4章に準拠）。
 
-Fundは正式構想と実装計画が完成し、F1着手指示待ち。CommunityはAcademy会員モデルが確定するまで着手を保留。
+Fundは正式構想・実装計画・F1が完成し、F2着手指示待ち。CommunityはAcademy会員モデルが確定するまで着手を保留。
 
 ## 2026-07-13 追加
 

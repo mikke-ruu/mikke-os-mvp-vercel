@@ -267,7 +267,7 @@ Storyの「作品」タブの供給源はItem Studioにする。Story側に別�
 
 Order MVPとの差分は「日時枠の管理」だけ。カレンダーUIはMarketNoteのカレンダー実装（SPEC_01）を参考にできる。着手はOrder完成後に判断。
 
-### 4.5 Fund（正式構想・実装計画完成 → F1着手指示待ち）
+### 4.5 Fund（正式構想・F1完成 → F2着手指示待ち）
 
 2026-07-14に `G:/Musubiプロジェクト/Mikke OS/MikkeOS Fund 正式構想書.md` が完成した。
 repo内の実装順・型・ルート・検収条件は `MIKKEOS_FUND_IMPLEMENTATION_PLAN.md` を正典とする。
