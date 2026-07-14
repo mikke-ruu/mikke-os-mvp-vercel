@@ -18,6 +18,20 @@ export type FundVisibility = "private" | "unlisted" | "public";
 export type FundGoalType = "amount" | "supporters" | "reservations" | "participants" | "vendors" | "sponsors";
 export type FundPlanType = FundCampaignType | "non_financial";
 export type FundPlanStatus = "draft" | "active" | "sold_out" | "closed" | "hidden";
+export type FundPaymentStatus = "unknown" | "pending" | "confirmed" | "refunded" | "cancelled";
+export type FundFulfillmentStatus =
+  | "not_required"
+  | "waiting"
+  | "preparing"
+  | "scheduled"
+  | "shipped"
+  | "participated"
+  | "in_service"
+  | "completed"
+  | "on_hold"
+  | "cancelled";
+export type FundSupportRecordStatus = "valid" | "test" | "duplicate" | "invalid";
+export type FundUpdateVisibility = "draft" | "public";
 
 export type FundProject = {
   id: string;
@@ -79,6 +93,54 @@ export type FundPlan = {
 export type FundPlanInput = Omit<FundPlan, "id" | "projectId" | "createdAt" | "updatedAt"> & { id?: string };
 export type FundProjectInput = Omit<FundProject, "id" | "ownerProfileId" | "currentValue" | "publishedAt" | "completedAt" | "archivedAt" | "createdAt" | "updatedAt">;
 
+export type FundSupport = {
+  id: string;
+  projectId: string;
+  planId: string;
+  supporterUserId: string;
+  supporterName: string;
+  supporterEmail: string;
+  publicName: string;
+  isAnonymous: boolean;
+  supportType: FundPlanType;
+  amount: number | null;
+  quantity: number;
+  paymentStatus: FundPaymentStatus;
+  fulfillmentStatus: FundFulfillmentStatus;
+  recordStatus: FundSupportRecordStatus;
+  comment: string;
+  source: string;
+  supportedAt: string;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FundSupportInput = Omit<FundSupport, "id" | "supporterUserId" | "completedAt" | "cancelledAt" | "createdAt" | "updatedAt">;
+
+export type FundUpdate = {
+  id: string;
+  projectId: string;
+  title: string;
+  body: string;
+  imageUrl: string;
+  visibility: FundUpdateVisibility;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type FundUpdateInput = Omit<FundUpdate, "id" | "publishedAt" | "createdAt" | "updatedAt">;
+
+export type FundSupportSummary = {
+  supporterCount: number;
+  supportCount: number;
+  quantity: number;
+  confirmedAmount: number;
+  completedCount: number;
+};
+
 export const fundProjectTypeLabels: Record<FundProjectType, string> = {
   product: "新しい商品・作品",
   course: "講座・教材",
@@ -136,4 +198,32 @@ export const fundGoalUnitLabels: Record<FundGoalType, string> = {
   participants: "人",
   vendors: "組",
   sponsors: "件"
+};
+
+export const fundPaymentStatusLabels: Record<FundPaymentStatus, string> = {
+  unknown: "未確認",
+  pending: "確認待ち",
+  confirmed: "実行者確認済み",
+  refunded: "返金済み",
+  cancelled: "キャンセル"
+};
+
+export const fundFulfillmentStatusLabels: Record<FundFulfillmentStatus, string> = {
+  not_required: "提供なし",
+  waiting: "対応待ち",
+  preparing: "準備中",
+  scheduled: "提供予定",
+  shipped: "発送済み",
+  participated: "参加済み",
+  in_service: "提供中",
+  completed: "提供完了",
+  on_hold: "対応保留",
+  cancelled: "キャンセル"
+};
+
+export const fundSupportRecordStatusLabels: Record<FundSupportRecordStatus, string> = {
+  valid: "有効",
+  test: "テスト",
+  duplicate: "重複",
+  invalid: "無効"
 };

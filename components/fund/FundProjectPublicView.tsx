@@ -1,13 +1,16 @@
 import { CalendarDays, ExternalLink, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { FundProgressSummary } from "./FundProgressSummary";
-import { fundCampaignTypeLabels, fundProjectStatusLabels, type FundPlan, type FundProject } from "@/lib/fund/types";
+import { fundCampaignTypeLabels, fundProjectStatusLabels, type FundPlan, type FundProject, type FundUpdate } from "@/lib/fund/types";
 import { normalizeFundExternalUrl } from "@/lib/fund/url";
 import { formatDate, formatYen } from "@/lib/format";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 
-export function FundProjectPublicView({ project, plans, preview = false }: { project: FundProject; plans: FundPlan[]; preview?: boolean }) {
+export function FundProjectPublicView({ project, plans, updates = [], preview = false }: { project: FundProject; plans: FundPlan[]; updates?: FundUpdate[]; preview?: boolean }) {
   const activePlans = plans.filter((plan) => preview || (plan.status !== "draft" && plan.status !== "hidden"));
+  const visibleUpdates = updates
+    .filter((update) => preview || update.visibility === "public")
+    .sort((a, b) => (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt));
   const coverImageUrl = normalizeFundExternalUrl(project.coverImageUrl);
   const projectApplicationUrl = normalizeFundExternalUrl(project.externalApplicationUrl);
   const projectPaymentUrl = normalizeFundExternalUrl(project.externalPaymentUrl);
@@ -91,6 +94,35 @@ export function FundProjectPublicView({ project, plans, preview = false }: { pro
             <ShieldCheck size={15} className="mt-0.5 shrink-0" />
             申込・決済・返金はプロジェクト実行者が外部サービスで管理します。Mikkeが代金を預かることはありません。
           </p>
+        </section>
+      ) : null}
+
+      {visibleUpdates.length > 0 ? (
+        <section className="mt-9 border-t border-[var(--mikke-line)] pt-6">
+          <h2 className="text-xl font-bold tracking-normal">活動報告</h2>
+          <div className="mt-3 space-y-6">
+            {visibleUpdates.map((update) => {
+              const imageUrl = normalizeFundExternalUrl(update.imageUrl);
+              return (
+                <article key={update.id} className="border-t border-[var(--mikke-line)] pt-5 first:border-t-0 first:pt-0">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <h3 className="text-base font-bold">{update.title}</h3>
+                    <div className="flex items-center gap-2">
+                      {preview && update.visibility === "draft" ? <MikkeStatusBadge tone="muted" className="px-2 py-1">下書き</MikkeStatusBadge> : null}
+                      <time className="text-xs font-semibold text-[var(--mikke-muted)]">{formatDate(update.publishedAt ?? update.createdAt)}</time>
+                    </div>
+                  </div>
+                  {imageUrl ? (
+                    <div className="mt-3 aspect-[16/9] overflow-hidden rounded-lg bg-[var(--mikke-surface-soft)]">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                    </div>
+                  ) : null}
+                  <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{update.body}</p>
+                </article>
+              );
+            })}
+          </div>
         </section>
       ) : null}
 

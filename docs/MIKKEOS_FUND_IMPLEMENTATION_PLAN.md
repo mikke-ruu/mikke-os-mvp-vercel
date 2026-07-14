@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F1実装完了・F2着手指示待ち
+状態: F2実装完了・F3着手前で停止
 
 ## 1. このdocsの役割
 
@@ -598,3 +598,30 @@ F1の対象:
 - `/apps/fund` は未ログイン時に `/login` へ遷移し、認証境界を確認。
 - ブラウザにテスト用ログイン情報がないため、管理4画面の認証後スクリーンショットは未実施。型チェック・build・AuthGate配置で確認した。
 - F2以降は未着手。
+
+## 15. F2実装記録（2026-07-14）
+
+実装済み:
+
+- `FundSupport` / `FundUpdate` と専用localStorage保存
+- `/apps/fund/[id]/supporters` の応援者手動登録・決済確認・集計区分
+- `/apps/fund/[id]/updates` の活動報告下書き・公開管理
+- `/apps/fund/[id]/fulfillment` の提供状態管理
+- 応援者数・応援件数・数量・実行者確認済み金額の分離集計
+- refunded / cancelled / test / duplicate / invalid の集計除外
+- 公開詳細への公開済み活動報告と集計値注記の反映
+
+セルフチェック:
+
+```text
+1. 機械: npm.cmd run lint / build成功、Fund対象の直書きhex色・mikkeOS前面表示ゼロ
+2. 挙動: 応援者数と件数を分離し、除外状態は進捗へ加算しない
+3. 安全: 管理3routeはAuthGate、公開側へ氏名・メール・管理メモ・決済状態を渡さない
+4. ブランド: 公開面はFundが主役、Fund by mikkeは小さなfooterのみ
+5. 表示: 公開詳細を375 / 768 / 1280pxで確認し、横はみ出しなし
+```
+
+補足:
+
+- ブラウザにテスト用ログイン情報がないため、管理3画面は認証後の目視未実施。未ログイン時にログイン画面で遮断されること、型チェック、build、AuthGate配置で確認した。
+- F3の挑戦の軌跡、Story入口、Activity Log、他アプリ連携は未着手。

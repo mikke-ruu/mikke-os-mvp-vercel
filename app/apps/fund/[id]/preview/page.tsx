@@ -8,7 +8,7 @@ import { useFundProjects } from "@/lib/fund/store";
 
 function FundPreviewContent() {
   const params = useParams<{ id: string }>();
-  const { projects, plans } = useFundProjects();
+  const { projects, plans, updates } = useFundProjects();
   const project = projects.find((item) => item.id === params.id);
 
   return (
@@ -16,7 +16,12 @@ function FundPreviewContent() {
       {!project ? (
         <p className="text-sm text-[var(--mikke-muted)]">このFundは見つかりませんでした。</p>
       ) : (
-        <FundProjectPublicView project={project} plans={plans.filter((plan) => plan.projectId === project.id)} preview />
+        <FundProjectPublicView
+          project={project}
+          plans={plans.filter((plan) => plan.projectId === project.id)}
+          updates={updates.filter((update) => update.projectId === project.id)}
+          preview
+        />
       )}
     </MikkeAppShell>
   );

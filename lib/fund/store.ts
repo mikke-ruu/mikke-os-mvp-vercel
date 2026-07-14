@@ -1,10 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FundPlan, FundPlanInput, FundProject, FundProjectInput } from "./types";
+import type {
+  FundPlan,
+  FundPlanInput,
+  FundProject,
+  FundProjectInput,
+  FundSupport,
+  FundSupportInput,
+  FundSupportSummary,
+  FundUpdate,
+  FundUpdateInput
+} from "./types";
 
 const PROJECTS_KEY = "mikke.fund.projects.v1";
 const PLANS_KEY = "mikke.fund.plans.v1";
+const SUPPORTS_KEY = "mikke.fund.supports.v1";
+const UPDATES_KEY = "mikke.fund.updates.v1";
 const UPDATED_EVENT_NAME = "mikke-fund:updated";
 const mockOwnerProfileId = "local-owner";
 
@@ -99,6 +111,14 @@ function readPlans() {
   return readList(PLANS_KEY, [seedPlan]);
 }
 
+function readSupports() {
+  return readList<FundSupport>(SUPPORTS_KEY, []);
+}
+
+function readUpdates() {
+  return readList<FundUpdate>(UPDATES_KEY, []);
+}
+
 function writeList<T>(key: string, value: T[]) {
   window.localStorage.setItem(key, JSON.stringify(value));
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT_NAME));
@@ -107,11 +127,15 @@ function writeList<T>(key: string, value: T[]) {
 export function useFundProjects() {
   const [projects, setProjects] = useState<FundProject[]>([seedProject]);
   const [plans, setPlans] = useState<FundPlan[]>([seedPlan]);
+  const [supports, setSupports] = useState<FundSupport[]>([]);
+  const [updates, setUpdates] = useState<FundUpdate[]>([]);
 
   useEffect(() => {
     function refresh() {
       setProjects(readProjects());
       setPlans(readPlans());
+      setSupports(readSupports());
+      setUpdates(readUpdates());
     }
     refresh();
     window.addEventListener("storage", refresh);
@@ -175,9 +199,112 @@ export function useFundProjects() {
     setPlans(next);
   }
 
-  return { projects, plans, createProject, updateProject, replaceProjectPlans };
+  function createSupport(input: FundSupportInput) {
+    const timestamp = nowIso();
+    const support: FundSupport = {
+      ...input,
+      id: makeId("fund_support"),
+      supporterUserId: "",
+      completedAt: input.fulfillmentStatus === "completed" ? timestamp : null,
+      cancelledAt: input.paymentStatus === "cancelled" ? timestamp : null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const next = [support, ...readSupports()];
+    writeList(SUPPORTS_KEY, next);
+    setSupports(next);
+    return support;
+  }
+
+  function updateSupport(id: string, patch: Partial<FundSupport>) {
+    const timestamp = nowIso();
+    const next = readSupports().map((support) => {
+      if (support.id !== id) return support;
+      const updated = { ...support, ...patch, updatedAt: timestamp };
+      updated.completedAt = updated.fulfillmentStatus === "completed" ? updated.completedAt ?? timestamp : null;
+      updated.cancelledAt = updated.paymentStatus === "cancelled" ? updated.cancelledAt ?? timestamp : null;
+      return updated;
+    });
+    writeList(SUPPORTS_KEY, next);
+    setSupports(next);
+  }
+
+  function createUpdate(input: FundUpdateInput) {
+    const timestamp = nowIso();
+    const update: FundUpdate = {
+      ...input,
+      id: makeId("fund_update"),
+      publishedAt: input.visibility === "public" ? timestamp : null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    const next = [update, ...readUpdates()];
+    writeList(UPDATES_KEY, next);
+    setUpdates(next);
+    return update;
+  }
+
+  function updateFundUpdate(id: string, patch: Partial<FundUpdate>) {
+    const timestamp = nowIso();
+    const next = readUpdates().map((update) => {
+      if (update.id !== id) return update;
+      const updated = { ...update, ...patch, updatedAt: timestamp };
+      if (!updated.publishedAt && updated.visibility === "public") updated.publishedAt = timestamp;
+      return updated;
+    });
+    writeList(UPDATES_KEY, next);
+    setUpdates(next);
+  }
+
+  const projectsWithProgress = projects.map((project) => ({
+    ...project,
+    currentValue: currentValueForProject(project, summarizeFundSupports(supports.filter((support) => support.projectId === project.id)))
+  }));
+
+  return {
+    projects: projectsWithProgress,
+    plans,
+    supports,
+    updates,
+    createProject,
+    updateProject,
+    replaceProjectPlans,
+    createSupport,
+    updateSupport,
+    createUpdate,
+    updateFundUpdate
+  };
 }
 
 export function canViewFundProject(project: FundProject) {
   return project.visibility !== "private" && project.status !== "draft";
+}
+
+export function summarizeFundSupports(supports: FundSupport[]): FundSupportSummary {
+  const valid = supports.filter(
+    (support) =>
+      support.recordStatus === "valid" &&
+      support.paymentStatus !== "refunded" &&
+      support.paymentStatus !== "cancelled" &&
+      support.fulfillmentStatus !== "cancelled"
+  );
+  const supporterKeys = new Set(
+    valid.map((support) =>
+      (support.supporterUserId || support.supporterEmail || support.supporterName).trim().toLowerCase()
+    ).filter(Boolean)
+  );
+
+  return {
+    supporterCount: supporterKeys.size,
+    supportCount: valid.length,
+    quantity: valid.reduce((sum, support) => sum + Math.max(1, support.quantity), 0),
+    confirmedAmount: valid.reduce((sum, support) => sum + (support.paymentStatus === "confirmed" ? support.amount ?? 0 : 0), 0),
+    completedCount: valid.filter((support) => support.fulfillmentStatus === "completed").length
+  };
+}
+
+function currentValueForProject(project: FundProject, summary: FundSupportSummary) {
+  if (project.goalType === "amount") return summary.confirmedAmount;
+  if (project.goalType === "supporters") return summary.supporterCount;
+  return summary.quantity;
 }

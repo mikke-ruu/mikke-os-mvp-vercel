@@ -7,7 +7,7 @@ import { canViewFundProject, useFundProjects } from "@/lib/fund/store";
 
 export default function FundProjectPage() {
   const params = useParams<{ profileSlug: string; projectSlug: string }>();
-  const { projects, plans } = useFundProjects();
+  const { projects, plans, updates } = useFundProjects();
   const project = projects.find((item) => item.profileSlug === params.profileSlug && item.slug === params.projectSlug);
 
   if (!project || !canViewFundProject(project)) {
@@ -20,7 +20,11 @@ export default function FundProjectPage() {
 
   return (
     <FundPublicShell backHref={`/fund/${params.profileSlug}`}>
-      <FundProjectPublicView project={project} plans={plans.filter((plan) => plan.projectId === project.id)} />
+      <FundProjectPublicView
+        project={project}
+        plans={plans.filter((plan) => plan.projectId === project.id)}
+        updates={updates.filter((update) => update.projectId === project.id && update.visibility === "public")}
+      />
     </FundPublicShell>
   );
 }

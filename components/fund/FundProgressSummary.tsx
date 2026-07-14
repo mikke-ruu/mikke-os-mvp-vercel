@@ -32,6 +32,7 @@ export function FundProgressSummary({ project, publicView = false }: { project: 
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--mikke-line-soft)]">
         <div className="h-full rounded-full bg-[var(--mikke-accent)]" style={{ width: `${percent}%` }} />
       </div>
+      {publicView ? <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">表示値は実行者が登録・確認した内容に基づきます。</p> : null}
     </div>
   );
 }

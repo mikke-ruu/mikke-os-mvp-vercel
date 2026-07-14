@@ -267,7 +267,7 @@ Storyの「作品」タブの供給源はItem Studioにする。Story側に別�
 
 Order MVPとの差分は「日時枠の管理」だけ。カレンダーUIはMarketNoteのカレンダー実装（SPEC_01）を参考にできる。着手はOrder完成後に判断。
 
-### 4.5 Fund（正式構想・F1完成 → F2着手指示待ち）
+### 4.5 Fund（正式構想・F2完成 → F3着手前で停止）
 
 2026-07-14に `G:/Musubiプロジェクト/Mikke OS/MikkeOS Fund 正式構想書.md` が完成した。
 repo内の実装順・型・ルート・検収条件は `MIKKEOS_FUND_IMPLEMENTATION_PLAN.md` を正典とする。
@@ -275,9 +275,10 @@ repo内の実装順・型・ルート・検収条件は `MIKKEOS_FUND_IMPLEMENTA
 
 ```text
 - Order完成後に着手（Orderの読み替え: メニュー→応援プラン、申込→支援）。
-- Order MVPは完成済み。正式構想をF1〜F5へ分割し、最初はF1だけ実装する。
-- F1はlocalStorage、外部申込・外部決済リンク、単一目標、公開ページまで。
-- F2以降へ一気に進まず、各パッケージで検収・コミットする。
+- Order MVPは完成済み。正式構想をF1〜F5へ分割して実装する。
+- F1はlocalStorage、外部申込・外部決済リンク、単一目標、公開ページまで完了。
+- F2は応援者手動登録、活動報告、提供管理、除外集計まで完了。
+- F3以降へ一気に進まず、各パッケージで検収・コミットする。
 - 言葉のルール厳守: 「出資・投資・配当」禁止、「応援・支援・予約購入」を使う。
 - アプリ名は Fund 単体。Mikke Fundとしない（Branding Policyと一致）。
 ```

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ExternalLink, Plus } from "lucide-react";
+import { ExternalLink, Newspaper, PackageCheck, Plus, Users } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { FundProgressSummary } from "@/components/fund/FundProgressSummary";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
@@ -46,6 +46,11 @@ function FundDashboardContent() {
                 </div>
               </div>
               <div className="mt-4 max-w-xl"><FundProgressSummary project={project} /></div>
+              <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-[var(--mikke-line)] pt-3">
+                <ProjectLink href={`/apps/fund/${project.id}/supporters`} icon={<Users size={15} />} label="応援者" />
+                <ProjectLink href={`/apps/fund/${project.id}/updates`} icon={<Newspaper size={15} />} label="活動報告" />
+                <ProjectLink href={`/apps/fund/${project.id}/fulfillment`} icon={<PackageCheck size={15} />} label="提供状況" />
+              </div>
             </section>
           ))}
         </div>
@@ -54,6 +59,10 @@ function FundDashboardContent() {
       )}
     </MikkeAppShell>
   );
+}
+
+function ProjectLink({ href, icon, label }: { href: string; icon: React.ReactNode; label: string }) {
+  return <Link href={href} className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--mikke-primary)]">{icon}{label}</Link>;
 }
 
 export default function FundAppPage() {
