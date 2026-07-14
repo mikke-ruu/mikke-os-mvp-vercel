@@ -15,11 +15,15 @@ mikkeOSのUI方針は、以下のdocsを参照します。
 - Orderの構造とUIパターンを再利用するが、型とlocalStorageキーはFund専用に分離。
 - F1 core MVP -> F2運用管理 -> F3挑戦の軌跡・OS連携 -> F4応援者同意 -> F5本接続の順。
 - 旧 `FUND_APP_CONCEPT.md` は履歴資料へ変更。
-- Fundの「ヒアリング前・仕様未確定」条件は解除。F3完了、F4は本接続設計待ち。
+- Fundの「ヒアリング前・仕様未確定」条件は解除。F3完了、F4設計準備完了、F4-a承認待ち。
 
 ### Fund F1 / F2 / F3実装
 
-F1 core localStorage MVP、F2運用管理、F3挑戦の軌跡・OS連携が完了。管理8route、公開2route、完成報告、Storyの小さなFund入口、local Activity Log変換、他アプリへの引き継ぎ候補まで実装。F4（応援者アカウント・双方同意）は本接続設計待ち。
+F1 core localStorage MVP、F2運用管理、F3挑戦の軌跡・OS連携が完了。管理8route、公開2route、完成報告、Storyの小さなFund入口、local Activity Log変換、他アプリへの引き継ぎ候補まで実装。F4（応援者アカウント・双方同意）は設計準備完了、F4-a承認待ち。
+
+### `docs/MIKKEOS_FUND_F4_IDENTITY_AND_CONSENT_PLAN.md`
+
+F4の本人同定・招待受取・双方同意・公開解除・限定公開伝播防止を設計。owner-private / shared-safe / public-safeを分離し、メール一致だけの自動紐づけや金額公開を禁止した。F4-aはDB変更なしの実DB読み取り確認とschemaレビュー、F4-b以降は別承認とする。
 
 ## 2026-07-13 追加（後続フェーズ計画）
 
@@ -39,12 +43,12 @@ EVENTモジュールの後続フェーズ計画（設計のみ・実装未着手
 
 ## 2026-07-13 追加（続報）
 
-BP-3（Item Studio）・BP-4（Session）も完了。Fundは2026-07-14に仕様固定とF3まで完了し、F4は本接続設計待ち。Communityは前提条件待ち。
+BP-3（Item Studio）・BP-4（Session）も完了。Fundは2026-07-14に仕様固定とF3、F4設計準備まで完了し、F4-a承認待ち。Communityは前提条件待ち。
 
 - `docs/MIKKEOS_ITEM_STUDIO_SPEC_EXTRACT.md`: item-studio_2から台帳機能のみ抽出。写真補正・BASE連携は外部リンクに委譲。
 - Session: Order派生のため専用spec-extractドキュメントなし（マスタープラン4.4章に準拠）。
 
-Fundは正式構想・実装計画・F1〜F3が完成し、F4は本接続設計待ち。CommunityはAcademy会員モデルが確定するまで着手を保留。
+Fundは正式構想・実装計画・F1〜F3とF4設計準備が完成し、F4-a承認待ち。CommunityはAcademy会員モデルが確定するまで着手を保留。
 
 ## 2026-07-13 追加
 
@@ -193,8 +197,8 @@ MIKKEOS_PRIMITIVES_WP3.md
 ## 3. 次の作業候補
 
 ```text
-1. WP-3: Story既存マークアップから共通UI部品を切り出す
-2. /apps配下の残り詳細画面を共通UIへ寄せる
-3. P1: Team Works統一前の現状確認
-4. P2: MarketNote完成へ進む
+1. Fund F4-a: 実DBの読み取り確認とschemaレビュー（DB変更なし・承認待ち）
+2. Fund F4-b以降: migration / RLS / 招待・同意実装（F4-a検収後に別承認）
+3. Community: Academy会員モデル確定後に仕様化
+4. Event portal / MarketNote連携: 既存後続計画の優先順位判断待ち
 ```

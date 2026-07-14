@@ -165,7 +165,11 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
     if (nextProject.visibility !== "private" && nextProject.status !== "draft") {
       addLog(createFundPublishedActivity(nextProject));
       const challengeRecord = challengeRecords.find((record) => record.projectId === nextProject.id);
-      if (challengeRecord) addLog(createFundCompletedActivity(nextProject, challengeRecord));
+      if (challengeRecord && nextProject.visibility === "public") {
+        addLog(createFundCompletedActivity(nextProject, challengeRecord));
+      } else {
+        removeLog("fund", nextProject.id, "fund_project_completed");
+      }
     } else {
       removeLog("fund", nextProject.id, "fund_project_published");
       removeLog("fund", nextProject.id, "fund_project_completed");

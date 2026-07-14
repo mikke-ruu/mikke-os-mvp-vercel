@@ -28,7 +28,7 @@ export function FundCompleteManager({ project }: { project: FundProject }) {
   const [targets, setTargets] = useState<FundTargetService[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [message, setMessage] = useState("");
-  const projectCanBeShared = project.visibility !== "private" && project.status !== "draft";
+  const projectCanBeShared = project.visibility === "public" && project.status !== "draft";
 
   useEffect(() => {
     if (initialized) return;
@@ -93,7 +93,7 @@ export function FundCompleteManager({ project }: { project: FundProject }) {
             </label>
           </div>
           <p className="text-xs leading-5 text-[var(--mikke-muted)]">Storyには本文を複製せず、この挑戦の軌跡へのリンクだけを表示します。金額や応援者情報は表示しません。</p>
-          {!projectCanBeShared ? <p className="text-xs font-bold text-[var(--mikke-primary)]">Fund本体を限定公開または公開にすると、Story表示を選べます。</p> : null}
+          {!projectCanBeShared ? <p className="text-xs font-bold text-[var(--mikke-primary)]">Fund本体を公開すると、Story表示を選べます。限定公開の内容はStoryへ広げません。</p> : null}
         </div>
       </MikkeSection>
 
