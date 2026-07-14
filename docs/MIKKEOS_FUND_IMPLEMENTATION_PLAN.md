@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F3実装完了・F4-a schemaレビュー完了・F4-b1承認待ち
+状態: F3実装完了・F4-b1 migration適用済み・actor別RLS検収待ち
 
 ## 1. このdocsの役割
 

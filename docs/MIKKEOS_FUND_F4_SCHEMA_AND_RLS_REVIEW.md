@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F4-a完了・DB変更なし・F4-b再編案の承認待ち
+状態: F4-a完了・F4-b1 migration適用済み・actor別RLS検収待ち
 
 ## 1. 結論
 
@@ -238,13 +238,15 @@ Supabase Database Advisorも確認し、security definer view、RLS無効、過�
 5. 次工程: F4-bをb1/b2へ再編し、別承認まで停止
 ```
 
-## 8. F4-b開始に必要な承認
+## 8. F4-b1適用後の現在地
 
-次に必要な判断は1点です。
+2026-07-14に `fund_projects` / `fund_supports` とRLSを対象Supabaseへ適用した。anon RESTは両tableとも `401 / 42501` で遮断を確認済み。
 
 ```text
-F4-b1として、Fund所有関係の最小DB基盤
-(fund_projects + fund_supports + RLS) のmigration案作成と実行へ進めてよいか。
+未完了:
+- actor別transaction RLS test
+- Database Advisor
+- CLI migration履歴の整合
 ```
 
-承認後も、実行前にmigration SQLと否定テスト手順を提示し、対象projectを再確認します。
+詳細は `MIKKEOS_FUND_F4_B1_HANDOFF_2026-07-14.md`。これらを完了するまでF4-b1は合格扱いにせず、F4-b2へ進まない。

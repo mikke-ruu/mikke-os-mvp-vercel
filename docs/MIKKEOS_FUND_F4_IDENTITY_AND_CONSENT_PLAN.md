@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F4-a読み取り確認・schemaレビュー完了、F4-b再編案の承認待ち
+状態: F4-b1 migration適用済み・actor別RLS検収待ち、F4-b2未着手
 
 ## 1. 目的
 
@@ -190,8 +190,8 @@ countsTowardSummary: false 初期
 
 ### F4-b: migration / RLS
 
-- 別承認後のみ。F4-a結果を受けてF4-b1 / F4-b2へ分割
-- F4-b1: `fund_projects` + `fund_supports` の最小DB基盤、所有制約、RLS
+- F4-a結果を受けてF4-b1 / F4-b2へ分割
+- F4-b1: `fund_projects` + `fund_supports` の最小DB基盤、所有制約、RLS。2026-07-14にmigration適用済み、actor別RLS検収待ち
 - F4-b2: claims + participations + public projection、server-side claim transaction
 - advisorと本人/他人/anonの否定テスト
 
@@ -210,11 +210,10 @@ countsTowardSummary: false 初期
 
 ## 9. 次工程に必要な承認
 
-F4-aは完了しました。次に必要な判断は1点だけです。
+F4-b1 migrationは適用済みです。actor別RLS検収とmigration履歴整合を完了するまでF4-b2へ進みません。
 
 ```text
-F4-b1として、Fund所有関係の最小DB基盤
-(fund_projects + fund_supports + RLS) のmigration案作成と実行へ進めてよいか。
+F4-b1検収完了後、F4-b2のmigration / claim実装へ進めてよいかを改めて確認する。
 ```
 
-詳細と検収条件は `MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` を参照します。F4-b1のmigration/RLSは、この承認前には実行しません。
+現在地と次の手順は `MIKKEOS_FUND_F4_B1_HANDOFF_2026-07-14.md`、設計条件は `MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` を参照します。
