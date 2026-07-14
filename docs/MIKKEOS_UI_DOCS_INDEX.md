@@ -1,8 +1,21 @@
 # mikkeOS UI Docs Index
 
-更新日: 2026-07-13
+更新日: 2026-07-14
 
 mikkeOSのUI方針は、以下のdocsを参照します。
+
+## 2026-07-14 追加（Fund正式構想の一本化）
+
+### `docs/MIKKEOS_FUND_IMPLEMENTATION_PLAN.md`
+
+`G:/Musubiプロジェクト/Mikke OS/MikkeOS Fund 正式構想書.md` を、現在のOrder派生構造、MikkeAppShell、共通部品、Activity Log安全規約へ落とし込んだFund実装計画。
+
+- Fundは個人プロジェクトページ。検索ポータルにしない。
+- Mikkeは資金を預からず、初期版は外部申込・外部決済リンク方式。
+- Orderの構造とUIパターンを再利用するが、型とlocalStorageキーはFund専用に分離。
+- F1 core MVP -> F2運用管理 -> F3挑戦の軌跡・OS連携 -> F4応援者同意 -> F5本接続の順。
+- 旧 `FUND_APP_CONCEPT.md` は履歴資料へ変更。
+- Fundの「ヒアリング前・仕様未確定」条件は解除。実装はF1着手指示待ち。
 
 ## 2026-07-13 追加（後続フェーズ計画）
 
@@ -22,12 +35,12 @@ EVENTモジュールの後続フェーズ計画（設計のみ・実装未着手
 
 ## 2026-07-13 追加（続報）
 
-BP-3（Item Studio）・BP-4（Session）も完了。実行ラインは Fund・Community の着手条件待ちで一時停止中。
+BP-3（Item Studio）・BP-4（Session）も完了。Fundは2026-07-14に仕様固定・実装計画まで完了し、F1着手指示待ち。Communityは前提条件待ち。
 
 - `docs/MIKKEOS_ITEM_STUDIO_SPEC_EXTRACT.md`: item-studio_2から台帳機能のみ抽出。写真補正・BASE連携は外部リンクに委譲。
 - Session: Order派生のため専用spec-extractドキュメントなし（マスタープラン4.4章に準拠）。
 
-Fund（利用希望者ヒアリング未実施）・Community（Academy会員モデル未確定）は、マスタープランに明記された前提条件が揃うまで着手を保留。
+Fundは正式構想と実装計画が完成し、F1着手指示待ち。CommunityはAcademy会員モデルが確定するまで着手を保留。
 
 ## 2026-07-13 追加
 

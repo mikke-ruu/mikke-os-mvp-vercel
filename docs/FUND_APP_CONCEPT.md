@@ -1,5 +1,9 @@
 # Fund App Concept
 
+> 2026-07-14更新: このdocsは初期構想の履歴資料です。現在の事業仕様は
+> `G:/Musubiプロジェクト/Mikke OS/MikkeOS Fund 正式構想書.md`、repo内の実装順・型・ルートは
+> `docs/MIKKEOS_FUND_IMPLEMENTATION_PLAN.md` を正典とします。
+
 Fundは、Mikke OSの将来アプリ構想です。今すぐ実装するものではなく、Order再構築、DESK Contacts、DESK収支、Story、Item Studioへ派生できるようにするための構想メモとして保存します。
 
 ## 1. アプリ名

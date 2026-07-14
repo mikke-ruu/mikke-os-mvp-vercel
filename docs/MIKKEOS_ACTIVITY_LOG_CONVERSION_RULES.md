@@ -20,13 +20,21 @@ Team Worksでは以下を初期規約にする。
 - 学校請求: `team_works_invoice_created` / `team_works_invoice_paid`。DESK対象、強制private。
 - パートナー報酬: `team_works_partner_reward_recorded`。DESK対象、強制private。
 
-FundはOrder派生の将来アプリとして `source_service: fund` を予約する。実装前なので、詳細行はOrder設計後に追加する。
+FundはOrder派生アプリとして `source_service: fund` を使用する。2026-07-14の正式構想と実装計画に基づく初期変換候補は次のとおり。
+
+- プロジェクト公開: `fund_project_published`。Story素材候補だがprivate / limited初期。
+- 目標達成: `fund_goal_reached`。Story実績候補だが自動表示しない。
+- 応援受付: `fund_support_recorded`。応援者情報・金額はprivate。
+- 支払い確認: `fund_payment_confirmed`。DESK revenue候補、強制private。
+- 提供完了: `fund_fulfillment_completed`。個人情報を含まない集計値だけStory素材候補。
+- 挑戦完了: `fund_project_completed`。Fund内の「挑戦の軌跡」へのリンクをStory素材候補にできる。
+- 応援者本人の参加: `fund_participation_recorded`。本人と実行者の同意後のみStory候補、初期private。
 
 作成日: 2026-07-08
 
 このdocsは、各アプリで発生する操作や記録を、mikkeOS共通の `activity_logs` にどう変換するかを整理するための初期ルール表です。
 
-目的は、今後 MarketNote / Item Studio / Order / Academy / Community / Team Works / Session / Event をSupabase本接続する時に、Story / DESK / OS Home の扱いがブレないようにすることです。
+目的は、今後 MarketNote / Item Studio / Order / Fund / Academy / Community / Team Works / Session / Event をSupabase本接続する時に、Story / DESK / OS Home の扱いがブレないようにすることです。
 
 Storyは公開Activity Log一覧ではなく、名刺・自己紹介・ミニホームページ・活動ポートフォリオとして扱います。このdocs内の `Story対象` は、原則として「Storyへ自動表示するログ」ではなく「本人が選べばStory Profileの数字・作品・レビュー・リンクなどに使えるStory素材候補」と読み替えます。
 

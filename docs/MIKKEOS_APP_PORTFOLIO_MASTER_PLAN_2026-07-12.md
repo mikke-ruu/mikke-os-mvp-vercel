@@ -267,14 +267,17 @@ Storyの「作品」タブの供給源はItem Studioにする。Story側に別�
 
 Order MVPとの差分は「日時枠の管理」だけ。カレンダーUIはMarketNoteのカレンダー実装（SPEC_01）を参考にできる。着手はOrder完成後に判断。
 
-### 4.5 Fund（構想段階 → Orderの派生・利用希望者あり）
+### 4.5 Fund（正式構想・実装計画完成 → F1着手指示待ち）
 
-設計は `FUND_APP_CONCEPT.md` が正典。ここでは順番と接続だけ確定する。
+2026-07-14に `G:/Musubiプロジェクト/Mikke OS/MikkeOS Fund 正式構想書.md` が完成した。
+repo内の実装順・型・ルート・検収条件は `MIKKEOS_FUND_IMPLEMENTATION_PLAN.md` を正典とする。
+`FUND_APP_CONCEPT.md` は初期構想の履歴資料へ変更した。
 
 ```text
 - Order完成後に着手（Orderの読み替え: メニュー→応援プラン、申込→支援）。
-- 着手前に、2026-07-04の利用希望者へヒアリングして
-  MVP機能（CONCEPT 6章の9項目）を絞り込む。
+- Order MVPは完成済み。正式構想をF1〜F5へ分割し、最初はF1だけ実装する。
+- F1はlocalStorage、外部申込・外部決済リンク、単一目標、公開ページまで。
+- F2以降へ一気に進まず、各パッケージで検収・コミットする。
 - 言葉のルール厳守: 「出資・投資・配当」禁止、「応援・支援・予約購入」を使う。
 - アプリ名は Fund 単体。Mikke Fundとしない（Branding Policyと一致）。
 ```
@@ -337,7 +340,7 @@ BP-2-b: Event MVP実装（4.2章のサブセットのみ）
 BP-3-a: Item Studio仕様抽出（読む対象: item-studio_2/item-studio.html, 引き継ぎ書）
 BP-3-b: Item Studio MVP実装（台帳のみ・写真補正は外部リンク）
 BP-4:   Session実装（BP-1-b完了後に判断。単独の仕様抽出は不要）
-BP-5:   Fund実装（BP-1-b完了後。FUND_APP_CONCEPT.mdが仕様。着手前ヒアリング）
+BP-5:   Fund実装（BP-1-b完了済み。MIKKEOS_FUND_IMPLEMENTATION_PLAN.mdのF1から段階実装）
 BP-6:   Community（Academyの会員モデル確定後に仕様化）
 ```
 
@@ -357,7 +360,7 @@ Session / Fund の実装は BP-1-b（Order）がレビューを通ってから�
 ```text
 決済（Stripe等）の実装方式      → 各アプリのSupabase本接続フェーズで
 Mikkeruu-codexのActivity Log接続 → 別フェーズで検討
-Fundの手数料・料金プラン         → ヒアリング後
+Fundの料金確定・法務文言・本部運用 → F5前に別途判断
 Communityの詳細設計              → Academy会員モデル確定後
 ```
 
