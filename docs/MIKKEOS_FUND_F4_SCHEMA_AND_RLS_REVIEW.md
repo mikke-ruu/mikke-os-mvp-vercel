@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F4-a完了・F4-b1 migration履歴整合済み・actor別RLSは2人目profile待ち
+状態: F4-a完了・F4-b1検収完了・F4-b2未承認・未着手
 
 ## 1. 結論
 
@@ -249,8 +249,8 @@ Supabase Database Advisorも確認し、security definer view、RLS無効、過�
 - anon REST再確認
 - lint / build
 
-未完了:
-- actor別transaction RLS test（異なるAuth userに属するprofileが現在1件のため安全停止）
+完了:
+- actor別transaction RLS test（owner A / Bの分離、他人更新・追加拒否、ROLLBACKの残存なし）
 ```
 
-詳細は `MIKKEOS_FUND_F4_B1_HANDOFF_2026-07-14.md`。actor別testを完了するまでF4-b1は合格扱いにせず、F4-b2へ進まない。
+詳細は `MIKKEOS_FUND_F4_B1_HANDOFF_2026-07-14.md`。F4-b1は合格・完了とする。F4-b2へは別承認まで進まない。

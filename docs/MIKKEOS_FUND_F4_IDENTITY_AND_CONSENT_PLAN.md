@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F4-b1 migration履歴整合済み・actor別RLSは2人目profile待ち、F4-b2未着手
+状態: F4-b1検収完了・F4-b2未承認・未着手
 
 ## 1. 目的
 
@@ -191,7 +191,7 @@ countsTowardSummary: false 初期
 ### F4-b: migration / RLS
 
 - F4-a結果を受けてF4-b1 / F4-b2へ分割
-- F4-b1: `fund_projects` + `fund_supports` の最小DB基盤、所有制約、RLS。2026-07-15にmigration履歴・Advisor・anon再確認まで完了、actor別RLSは2人目profile待ち
+- F4-b1: `fund_projects` + `fund_supports` の最小DB基盤、所有制約、RLS。2026-07-15にmigration履歴・Advisor・anon再確認・actor別RLS否定testまで完了
 - F4-b2: claims + participations + public projection、server-side claim transaction
 - advisorと本人/他人/anonの否定テスト
 
@@ -210,7 +210,7 @@ countsTowardSummary: false 初期
 
 ## 9. 次工程に必要な承認
 
-F4-b1 migrationは適用・履歴整合済みです。正規の2人目profileができた後にactor別RLS検収を完了するまでF4-b2へ進みません。
+F4-b1は検収完了です。F4-b2のmigration / claim実装へ進めてよいか、改めて確認を取る。
 
 ```text
 F4-b1検収完了後、F4-b2のmigration / claim実装へ進めてよいかを改めて確認する。

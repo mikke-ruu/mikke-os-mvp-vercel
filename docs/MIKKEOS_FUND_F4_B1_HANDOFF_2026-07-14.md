@@ -7,7 +7,7 @@
 
 対象branch: `master`
 
-状態: migration履歴整合済み・anon遮断確認済み・actor別RLSは2人目profile待ち
+状態: F4-b1検収完了・F4-b2未承認・未着手
 
 ## 1. 最初に読むもの
 
@@ -18,7 +18,7 @@
 4. supabase/tests/fund_f4_b1_rls.sql
 ```
 
-F4-b2へは進まない。まずこのdocsの未完了項目を終えてF4-b1を検収する。
+F4-b1は検収完了。F4-b2へは改めてユーザー承認を取るまで進まない。
 
 ## 2. 完了したこと
 
@@ -67,19 +67,20 @@ anon keyによるData API確認:
 
 応援者名、メール、金額を持つ `fund_supports` がanonへ公開されていないことを確認した。2026-07-15の権限是正後にも両tableで同じ `401 / 42501` を再確認済み。実データ値の読み取りは行っていない。
 
-## 4. まだ完了していないこと
+## 4. actor別RLS検収結果
 
-F4-b1は次を終えるまで合格・完了扱いにしない。
+2026-07-15に実行し、F4-b1のactor別RLSを検収完了とした。
 
 ```text
-1. 正規の利用フローで2人目のAuth user + profileが作成されるのを待つ
-2. supabase/tests/fund_f4_b1_rls.sql を再実行
-3. owner A / owner Bが自分のproject/supportだけ見えることを確認
-4. 他人project/supportのUPDATEとINSERTが拒否されることを確認
-5. test SQL末尾のROLLBACKにより一時データが残らないことを確認
+- Auth user 2件 / distinct profile users 2件を確認
+- anonのfund_projects / fund_supports SELECTが権限拒否されることを確認
+- owner A / owner Bが自分のproject / supportだけ見えることを確認
+- owner Aがowner Bのproject / supportをUPDATEできないことを確認
+- owner Aがowner B所有のproject / supportをINSERTできないことを確認
+- transactionはエラーなくROLLBACKされ、rls-接頭辞の一時project残存数は0件
 ```
 
-2026-07-15の実行で `distinct profile users = 1` を確認し、testは `Fund F4-b1 RLS test requires profiles for two different auth users` で明示停止した。テスト行のinsert前に停止するため、一時データは作成されていない。無理にAuth userを作らない。
+anonはtable権限の段階で拒否されることが正しいため、RLS testは「0件」だけでなく `insufficient_privilege` の拒否も合格として検証する形へ修正した。
 
 ## 5. migration履歴の注意
 
@@ -108,10 +109,8 @@ Local          | Remote
 
 ```text
 1. git statusで他者のManager docs変更を巻き込まないことを確認
-2. 正規の2人目profileが存在する状態で `supabase/tests/fund_f4_b1_rls.sql` を再実行
-3. actor別RLS passとROLLBACKを確認
-4. F4-b1 docsを完了へ更新してFundのみコミット
-5. F4-b2は改めてユーザー承認を取る
+2. F4-b1完了記録とtest SQL修正をFundのみコミット
+3. F4-b2は改めてユーザー承認を取る
 ```
 
 ## 8. 同時に存在する別作業

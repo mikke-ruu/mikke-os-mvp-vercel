@@ -88,19 +88,23 @@ begin
   perform set_config('request.jwt.claim.role', 'anon', true);
   execute 'set local role anon';
 
-  select count(*) into visible_count
-  from public.fund_projects
-  where id in (project_a_id, project_b_id);
-  if visible_count <> 0 then
+  begin
+    perform 1
+    from public.fund_projects
+    where id in (project_a_id, project_b_id);
     raise exception 'anon could read Fund projects';
-  end if;
+  exception
+    when insufficient_privilege then null;
+  end;
 
-  select count(*) into visible_count
-  from public.fund_supports
-  where id in (support_a_id, support_b_id);
-  if visible_count <> 0 then
+  begin
+    perform 1
+    from public.fund_supports
+    where id in (support_a_id, support_b_id);
     raise exception 'anon could read owner-private Fund supports';
-  end if;
+  exception
+    when insufficient_privilege then null;
+  end;
 
   execute 'reset role';
   perform set_config(
