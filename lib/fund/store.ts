@@ -164,44 +164,55 @@ export function useFundProjects() {
     };
   }, []);
 
-  function createProject(input: FundProjectInput) {
+  function prepareProject(input: FundProjectInput, existing?: FundProject) {
     const timestamp = nowIso();
-    const project: FundProject = {
+    return {
+      ...existing,
       ...input,
-      id: makeId("fund_project"),
-      ownerProfileId: mockOwnerProfileId,
-      currentValue: 0,
-      publishedAt: input.visibility !== "private" && input.status !== "draft" ? timestamp : null,
-      completedAt: input.status === "completed" ? timestamp : null,
-      archivedAt: input.status === "archived" ? timestamp : null,
-      createdAt: timestamp,
+      id: existing?.id ?? makeId("fund_project"),
+      ownerProfileId: existing?.ownerProfileId ?? mockOwnerProfileId,
+      currentValue: existing?.currentValue ?? 0,
+      publishedAt: existing?.publishedAt ?? (input.visibility !== "private" && input.status !== "draft" ? timestamp : null),
+      completedAt: existing?.completedAt ?? (input.status === "completed" ? timestamp : null),
+      archivedAt: existing?.archivedAt ?? (input.status === "archived" ? timestamp : null),
+      createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp
-    };
-    const next = [project, ...readProjects()];
+    } satisfies FundProject;
+  }
+
+  function saveProject(project: FundProject) {
+    const next = [project, ...readProjects().filter((item) => item.id !== project.id)];
     writeList(PROJECTS_KEY, next);
     setProjects(next);
+  }
+
+  function createProject(input: FundProjectInput) {
+    const project = prepareProject(input);
+    saveProject(project);
     return project;
   }
 
   function updateProject(id: string, patch: Partial<FundProject>) {
     const timestamp = nowIso();
+    let savedProject: FundProject | null = null;
     const next = readProjects().map((project) => {
       if (project.id !== id) return project;
       const updated = { ...project, ...patch, updatedAt: timestamp };
       if (!updated.publishedAt && updated.visibility !== "private" && updated.status !== "draft") updated.publishedAt = timestamp;
       if (!updated.completedAt && updated.status === "completed") updated.completedAt = timestamp;
       if (!updated.archivedAt && updated.status === "archived") updated.archivedAt = timestamp;
+      savedProject = updated;
       return updated;
     });
     writeList(PROJECTS_KEY, next);
     setProjects(next);
+    return savedProject;
   }
 
-  function replaceProjectPlans(projectId: string, inputs: FundPlanInput[]) {
+  function prepareProjectPlans(projectId: string, inputs: FundPlanInput[]) {
     const timestamp = nowIso();
     const existing = readPlans();
-    const kept = existing.filter((plan) => plan.projectId !== projectId);
-    const nextForProject = inputs.map<FundPlan>((input, index) => {
+    return inputs.map<FundPlan>((input, index) => {
       const previous = input.id ? existing.find((plan) => plan.id === input.id && plan.projectId === projectId) : undefined;
       return {
         ...input,
@@ -212,9 +223,18 @@ export function useFundProjects() {
         updatedAt: timestamp
       };
     });
-    const next = [...kept, ...nextForProject];
+  }
+
+  function saveProjectPlans(projectId: string, projectPlans: FundPlan[]) {
+    const next = [...readPlans().filter((plan) => plan.projectId !== projectId), ...projectPlans];
     writeList(PLANS_KEY, next);
     setPlans(next);
+  }
+
+  function replaceProjectPlans(projectId: string, inputs: FundPlanInput[]) {
+    const projectPlans = prepareProjectPlans(projectId, inputs);
+    saveProjectPlans(projectId, projectPlans);
+    return projectPlans;
   }
 
   function createSupport(input: FundSupportInput) {
@@ -324,6 +344,10 @@ export function useFundProjects() {
     updates,
     challengeRecords,
     appLinks,
+    prepareProject,
+    saveProject,
+    prepareProjectPlans,
+    saveProjectPlans,
     createProject,
     updateProject,
     replaceProjectPlans,

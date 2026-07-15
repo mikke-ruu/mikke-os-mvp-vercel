@@ -6,7 +6,7 @@ import { normalizeFundExternalUrl } from "@/lib/fund/url";
 import { formatDate, formatYen } from "@/lib/format";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 
-export function FundProjectPublicView({ project, plans, updates = [], challengeRecord, preview = false }: { project: FundProject; plans: FundPlan[]; updates?: FundUpdate[]; challengeRecord?: FundChallengeRecord; preview?: boolean }) {
+export function FundProjectPublicView({ project, plans, updates = [], challengeRecord, preview = false, localOnly = false }: { project: FundProject; plans: FundPlan[]; updates?: FundUpdate[]; challengeRecord?: FundChallengeRecord; preview?: boolean; localOnly?: boolean }) {
   const activePlans = plans.filter((plan) => preview || (plan.status !== "draft" && plan.status !== "hidden"));
   const visibleUpdates = updates
     .filter((update) => preview || update.visibility === "public")
@@ -17,9 +17,9 @@ export function FundProjectPublicView({ project, plans, updates = [], challengeR
 
   return (
     <article>
-      {preview ? (
+      {preview || localOnly ? (
         <p className="mb-4 rounded-lg border border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] px-4 py-3 text-xs font-bold text-[var(--mikke-primary)]">
-          プレビューです。このページは現在、この端末内だけで確認できます。
+          {preview ? "プレビューです。このページは現在、この端末内だけで確認できます。" : "この内容は移行中の端末データです。ほかの端末にはまだ公開されていません。"}
         </p>
       ) : null}
 

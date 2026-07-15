@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowRight } from "lucide-react";
@@ -7,15 +8,39 @@ import { FundPublicShell } from "@/components/fund/FundPublicShell";
 import { FundProgressSummary } from "@/components/fund/FundProgressSummary";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
+import { getPublicFundProjects } from "@/lib/fund/public";
 import { useFundProjects } from "@/lib/fund/store";
-import { fundProjectStatusLabels } from "@/lib/fund/types";
+import { fundProjectStatusLabels, type FundProject } from "@/lib/fund/types";
 
 export default function FundProfilePage() {
   const params = useParams<{ profileSlug: string }>();
   const { projects } = useFundProjects();
-  const publicProjects = projects
+  const [remoteProjects, setRemoteProjects] = useState<FundProject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const localProjects = projects
     .filter((project) => project.profileSlug === params.profileSlug && project.visibility === "public" && project.status !== "draft")
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const publicProjects = loadFailed ? localProjects : remoteProjects;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setLoadFailed(false);
+    getPublicFundProjects(params.profileSlug)
+      .then((items) => {
+        if (active) setRemoteProjects(items);
+      })
+      .catch(() => {
+        if (active) setLoadFailed(true);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [params.profileSlug]);
 
   return (
     <FundPublicShell>
@@ -23,7 +48,15 @@ export default function FundProfilePage() {
       <h1 className="mt-2 text-3xl font-bold tracking-normal">これから始めたいこと</h1>
       <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--mikke-text-soft)]">新しい挑戦を、最初のお客様や応援してくれる方と一緒に形にしていきます。</p>
 
-      {publicProjects.length > 0 ? (
+      {loadFailed && localProjects.length > 0 ? (
+        <p className="mt-5 rounded-lg border border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] px-4 py-3 text-xs font-bold text-[var(--mikke-primary)]">
+          公開データを取得できなかったため、この端末の内容を表示しています。
+        </p>
+      ) : null}
+
+      {loading ? (
+        <p className="mt-8 text-sm text-[var(--mikke-muted)]">プロジェクトを読み込んでいます。</p>
+      ) : publicProjects.length > 0 ? (
         <div className="mt-8 space-y-7">
           {publicProjects.map((project) => (
             <article key={project.id} className="border-t border-[var(--mikke-line)] pt-5 first:border-t-0 first:pt-0">

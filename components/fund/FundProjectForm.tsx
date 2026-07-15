@@ -3,8 +3,10 @@
 import { FormEvent, useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthGate";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { createFundCompletedActivity, createFundPublishedActivity } from "@/lib/fund/activity";
+import { saveFundProjectContent } from "@/lib/fund/database";
 import { useFundProjects } from "@/lib/fund/store";
 import {
   fundCampaignTypeLabels,
@@ -51,7 +53,8 @@ function emptyPlan(index: number): FundPlanInput {
 
 export function FundProjectForm({ project, projectPlans = [] }: { project?: FundProject; projectPlans?: FundPlanInput[] }) {
   const router = useRouter();
-  const { challengeRecords, createProject, updateProject, replaceProjectPlans } = useFundProjects();
+  const { profile } = useAuth();
+  const { challengeRecords, prepareProject, saveProject, prepareProjectPlans, saveProjectPlans } = useFundProjects();
   const { addLog, removeLog } = useUnifiedActivityLogs();
   const [title, setTitle] = useState(project?.title ?? "");
   const [shortDescription, setShortDescription] = useState(project?.shortDescription ?? "");
@@ -95,7 +98,7 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
     setPlans((current) => current.map((plan, planIndex) => (planIndex === index ? { ...plan, ...patch } : plan)));
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
     if (!canSave) {
@@ -118,7 +121,7 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
       }));
 
     const payload = {
-      profileSlug: project?.profileSlug ?? "ayumi",
+      profileSlug: profile.handle || project?.profileSlug || "ayumi",
       slug: project?.slug ?? makeProjectSlug(title),
       title: title.trim(),
       shortDescription: shortDescription.trim(),
@@ -145,20 +148,25 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
       contactNote: contactNote.trim()
     };
 
-    if (project) {
-      updateProject(project.id, payload);
-      replaceProjectPlans(project.id, cleanPlans);
-      syncPublishedActivity({ ...project, ...payload });
-      router.replace(`/apps/fund/${project.id}/edit`);
-      setMessage("保存しました。");
-      setSaving(false);
-      return;
-    }
+    const nextProject = prepareProject(payload, project);
+    const nextPlans = prepareProjectPlans(nextProject.id, cleanPlans);
 
-    const created = createProject(payload);
-    replaceProjectPlans(created.id, cleanPlans);
-    syncPublishedActivity(created);
-    router.replace(`/apps/fund/${created.id}/edit`);
+    try {
+      await saveFundProjectContent({
+        ownerProfileId: profile.id,
+        project: nextProject,
+        plans: nextPlans
+      });
+      saveProject(nextProject);
+      saveProjectPlans(nextProject.id, nextPlans);
+      syncPublishedActivity(nextProject);
+      router.replace(`/apps/fund/${nextProject.id}/edit`);
+      if (project) setMessage("保存しました。");
+    } catch {
+      setMessage("保存できませんでした。時間をおいて、もう一度お試しください。");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function syncPublishedActivity(nextProject: FundProject) {
@@ -211,7 +219,15 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
       <MikkeSection title="どこを目標にしますか？">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="目標の種類">
-            <select value={goalType} onChange={(event) => setGoalType(event.target.value as FundGoalType)} className={inputClass}>
+            <select
+              value={goalType}
+              onChange={(event) => {
+                const nextGoalType = event.target.value as FundGoalType;
+                setGoalType(nextGoalType);
+                if (nextGoalType !== "amount") setDisplayAmount(false);
+              }}
+              className={inputClass}
+            >
               {goalTypes.map((type) => <option key={type} value={type}>{fundGoalTypeLabels[type]}</option>)}
             </select>
           </Field>

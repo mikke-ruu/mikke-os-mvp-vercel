@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F3実装完了・F4-b1/F4-b2/F4-c/F4-d検収完了・F5未着手
+状態: F3実装完了・F4検収完了・F5-a検収完了・F5-b未着手
 
 ## 1. このdocsの役割
 
@@ -462,15 +462,14 @@ localStorageだけで本人同定を完成させないため、F4はSupabase/Aut
 
 ### F5: 本接続・運営機能
 
-別指示があるまで着手禁止です。
+F5は `MIKKEOS_FUND_F5_SUPABASE_CONNECTION_PLAN.md` の段階移行に従います。
 
-- Supabaseテーブル・migration・RLS
-- 本人確認、通報、利用停止
-- メール通知
-- 分析、CSV、アーカイブプラン
-- パスコード・会員限定公開
-- Webhook
-- 将来ポータル
+- F5-a完了: Fund本文・planのowner-private正本、公開専用投影、DB-first保存、公開画面のSupabase優先読み
+- F5-b次: owner一覧・編集初期値のDB正本化と、既存localStorageデータの本人確認付き一回移行
+- F5-c以降: 活動報告、提供管理、完成記録を順に接続
+- 通報、通知、CSV、Webhook、unlisted tokenは本体接続後に必要性を判断
+
+F5-aの実DB検収結果は `MIKKEOS_FUND_F5_A_HANDOFF_2026-07-16.md` に記録します。
 
 ## 10. 共通の禁止事項
 
