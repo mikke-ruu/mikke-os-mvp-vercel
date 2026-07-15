@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F3実装完了・F4-b1/F4-b2/F4-c検収完了・F4-d未着手
+状態: F3実装完了・F4-b1/F4-b2/F4-c/F4-d検収完了・F5未着手
 
 ## 1. このdocsの役割
 
@@ -658,7 +658,7 @@ F1の対象:
 5. 禁止事項: DB / Supabase / RLS / migration / 他アプリ保存処理の変更なし
 ```
 
-F4は応援者本人の同定、双方の公開同意、限定公開伝播防止を含む。`MIKKEOS_FUND_F4_IDENTITY_AND_CONSENT_PLAN.md` で設計を固定し、`MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` でF4-aの実DB読み取り確認を完了した。Fund本体がlocalStorageのため、F4-bは所有関係を作るF4-b1と招待・同意を作るF4-b2へ再編した。F4-b1/F4-b2はmigration履歴・Advisor・anon再確認・actor別RLS否定testまで完了した。F4-cは招待発行・取消、応援者本人の受取と公開設定、実行者側の連携状態表示、private Activity Logまで実DBで検収した。F4-dのStory反映・双方同意解除UIは未着手。
+F4は応援者本人の同定、双方の公開同意、限定公開伝播防止を含む。`MIKKEOS_FUND_F4_IDENTITY_AND_CONSENT_PLAN.md` で設計を固定し、`MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` でF4-aの実DB読み取り確認を完了した。Fund本体がlocalStorageのため、F4-bは所有関係を作るF4-b1と招待・同意を作るF4-b2へ再編した。F4-b1/F4-b2はmigration履歴・Advisor・anon再確認・actor別RLS否定testまで完了した。F4-cは招待発行・取消、応援者本人の受取と公開設定、実行者側の連携状態表示、private Activity Logまで実DBで検収した。F4-dはStoryの小さな参加行、実行者側の公開許可・停止、private/unlistedと双方取消時の伝播停止まで実DBで検収した。
 
 ## 17. F4-c実装記録（2026-07-15）
 
@@ -687,3 +687,35 @@ F4は応援者本人の同定、双方の公開同意、限定公開伝播防止
 - F4-cでDBへ同期するのは招待対象のproject/supportだけ。Fund本体の全項目・活動報告・提供管理は引き続きlocalStorage中心
 - Storyの参加行と実行者側の同意解除UIはF4-d
 - 別端末で使えるFund公開面の全面本接続はF5
+
+## 18. F4-d実装記録（2026-07-15）
+
+実装済み:
+
+- `fund_public_participations` に公開プロジェクト名だけを追加
+- Storyの既存「公開中・挑戦の記録」へ、公開名参加だけを小さなFund行として表示
+- `/apps/fund/[id]/supporters` に実行者の「Story公開を許可／停止」を追加
+- owner handleに `_` が含まれるMikke IDの公開URL互換と、handle変更時の再同期
+- 匿名参加はFundの公開投影へ残しつつ、個人Storyには紐づけない
+
+実DB検収:
+
+```text
+- migrations:
+  20260715132817_fund_f4_d_story_projection.sql
+  20260715135018_fund_f4_d_profile_handle_paths.sql
+- Local / Remote migration履歴一致
+- owner / supporter / anonのactor別test成功、全fixtureはROLLBACK
+- private / unlisted / owner revoke / supporter revokeで公開投影0件
+- public + 双方granted + public_nameでStory安全列だけを投影
+- anonymousではsupporter_profile_id=null、表示名は「匿名の応援者」
+- `_` を含むowner handleとhandle変更後の公開URL再同期を確認
+- Database AdvisorのFund警告は認証ユーザー専用SECURITY DEFINER RPCの既知4件のみ
+- lint / build成功、実データでStory参加行をブラウザ確認し一時データ削除済み
+```
+
+境界:
+
+- F4はMikke ID参加・双方同意・Story入口まで完了
+- Fund本文、活動報告、提供管理、完成記録はまだlocalStorage中心
+- Storyから開いたFund本文を別端末でも読めるようにする全面本接続はF5

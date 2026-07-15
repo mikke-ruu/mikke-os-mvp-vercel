@@ -11,6 +11,8 @@ import {
   createFundSupportInvite,
   getFundSupportIdentityStatuses,
   revokeFundSupportInvite,
+  updateOwnerFundParticipationConsent,
+  type FundParticipation,
   type FundSupportIdentityStatus
 } from "@/lib/fund/identity";
 import { summarizeFundSupports, useFundProjects } from "@/lib/fund/store";
@@ -113,6 +115,39 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
       if (inviteDraft?.claimId === claimId) setInviteDraft(null);
     } catch (error) {
       setInviteError({ supportId: support.id, message: error instanceof Error ? error.message : "招待を取り消せませんでした。" });
+    } finally {
+      setIdentityAction(null);
+    }
+  }
+
+  async function changeOwnerConsent(
+    support: FundSupport,
+    participationId: string,
+    nextStatus: FundParticipation["owner_consent_status"]
+  ) {
+    setIdentityAction(`owner-consent:${support.id}`);
+    setInviteError(null);
+    try {
+      await updateOwnerFundParticipationConsent({
+        participationId,
+        ownerConsentStatus: nextStatus
+      });
+      setIdentityStatuses((current) => {
+        const currentStatus = current[support.id];
+        if (!currentStatus?.participation) return current;
+        return {
+          ...current,
+          [support.id]: {
+            ...currentStatus,
+            participation: {
+              ...currentStatus.participation,
+              ownerConsentStatus: nextStatus
+            }
+          }
+        };
+      });
+    } catch (error) {
+      setInviteError({ supportId: support.id, message: error instanceof Error ? error.message : "Storyの公開設定を変更できませんでした。" });
     } finally {
       setIdentityAction(null);
     }
@@ -224,6 +259,7 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
                   const participation = identityStatus?.participation;
                   const isIssuing = identityAction === `issue:${support.id}`;
                   const isRevoking = identityAction === `revoke:${support.id}`;
+                  const isChangingOwnerConsent = identityAction === `owner-consent:${support.id}`;
                   return <>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -246,15 +282,38 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
                 </div>
                 <p className="mt-2 text-xs text-[var(--mikke-muted)]">数量 {support.quantity}・{support.amount != null ? formatYen(support.amount) : "金額なし"}・{support.source || "申込元未登録"}</p>
                 {participation ? (
-                  <p className="mt-3 rounded-lg bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--mikke-accent-strong)]">
-                    Mikke ID受取済み・公開設定: {supporterConsentLabels[participation.supporterConsentStatus]}
-                  </p>
+                  <div className="mt-3 rounded-lg bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--mikke-accent-strong)]">
+                    <p>Mikke ID受取済み</p>
+                    <p className="mt-1 leading-5">
+                      応援者: {supporterConsentLabels[participation.supporterConsentStatus]}
+                      ・表示: {displayModeLabels[participation.displayMode]}
+                      ・あなた: {ownerConsentLabels[participation.ownerConsentStatus]}
+                    </p>
+                  </div>
                 ) : activeClaim ? (
                   <p className="mt-3 text-xs font-semibold text-[var(--mikke-muted)]">招待中・{formatInviteExpiry(activeClaim.expiresAt)}まで有効</p>
                 ) : null}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   {participation ? (
-                    <button type="button" disabled className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)] opacity-60">受取済み</button>
+                    <>
+                      <button type="button" disabled className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)] opacity-60">受取済み</button>
+                      <button
+                        type="button"
+                        onClick={() => changeOwnerConsent(
+                          support,
+                          participation.id,
+                          participation.ownerConsentStatus === "granted" ? "revoked" : "granted"
+                        )}
+                        disabled={isChangingOwnerConsent}
+                        className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-45"
+                      >
+                        {isChangingOwnerConsent
+                          ? "変更中…"
+                          : participation.ownerConsentStatus === "granted"
+                            ? "Story公開を停止"
+                            : "Story公開を許可"}
+                      </button>
+                    </>
                   ) : activeClaim ? (
                     <button type="button" onClick={() => revokeMikkeInvite(support, activeClaim.id)} disabled={isRevoking} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-45">
                       {isRevoking ? "取消中…" : "招待を取り消す"}
@@ -292,6 +351,16 @@ const supporterConsentLabels: Record<FundSupportIdentityStatus["participation"] 
   pending: "まだ公開しない",
   granted: "公開を許可",
   revoked: "公開を取消済み"
+};
+const ownerConsentLabels: Record<FundParticipation["owner_consent_status"], string> = {
+  pending: "確認待ち",
+  granted: "Story公開を許可",
+  revoked: "Story公開を停止"
+};
+const displayModeLabels: Record<FundParticipation["display_mode"], string> = {
+  hidden: "非公開",
+  public_name: "公開名",
+  anonymous: "匿名"
 };
 function formatInviteExpiry(value: string) { return new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(new Date(value)); }
 const inputClass = "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";

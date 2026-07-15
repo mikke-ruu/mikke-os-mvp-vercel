@@ -26,7 +26,7 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
-import { useState, type ComponentType } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { MikkeActionCard } from "./MikkeActionCard";
 import { MikkeEmptyState } from "./MikkeEmptyState";
 import { MikkeListRow } from "./MikkeListRow";
@@ -34,6 +34,7 @@ import { MikkeSection } from "./MikkeSection";
 import { MikkeStatusBadge } from "./MikkeStatusBadge";
 import { getAppPath } from "@/lib/mikkeos/routes";
 import type { AppKey, UnifiedActivityLog, UnifiedProfile } from "@/lib/mikkeos/types";
+import { getFundStoryParticipations, type FundStoryParticipation } from "@/lib/fund/story";
 
 type SummaryItem = {
   label: string;
@@ -178,9 +179,24 @@ const storyAdminItems: Array<{
 
 export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs: UnifiedActivityLog[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const storyMaterialCount = logs.filter((log) => log.visibility === "public" && log.storyEnabled).length;
+  const [fundParticipations, setFundParticipations] = useState<FundStoryParticipation[]>([]);
+  const storyMaterialCount = logs.filter((log) => log.visibility === "public" && log.storyEnabled).length + fundParticipations.length;
   const fundStoryLogs = logs.filter((log) => log.appKey === "fund" && log.eventType === "fund_project_completed" && log.visibility === "public" && log.storyEnabled);
   const displayName = profileView.displayName || profile.displayName;
+
+  useEffect(() => {
+    let cancelled = false;
+    getFundStoryParticipations(profileView.handle)
+      .then((items) => {
+        if (!cancelled) setFundParticipations(items);
+      })
+      .catch(() => {
+        if (!cancelled) setFundParticipations([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="mx-auto max-w-3xl text-[var(--mikke-text)]">
@@ -321,7 +337,7 @@ export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs:
         </MikkeSection>
 
         <MikkeSection title="公開中・挑戦の記録">
-          {publicPrograms.length > 0 || fundStoryLogs.length > 0 ? (
+          {publicPrograms.length > 0 || fundStoryLogs.length > 0 || fundParticipations.length > 0 ? (
             <div className="grid gap-2">
               {publicPrograms.map((program) => (
                 <MikkeListRow
@@ -340,6 +356,17 @@ export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs:
                   icon={Rocket}
                   href={log.metadata?.publicPath}
                   right={<MikkeStatusBadge tone="success">挑戦の軌跡</MikkeStatusBadge>}
+                />
+              ))}
+              {fundParticipations.map((participation) => (
+                <MikkeListRow
+                  key={participation.participationId}
+                  title={`${participation.projectTitle}を応援しています`}
+                  label="Fund"
+                  helper="応援として参加"
+                  icon={UsersRound}
+                  href={participation.publicFundPath}
+                  right={<MikkeStatusBadge tone="success">応援中</MikkeStatusBadge>}
                 />
               ))}
             </div>

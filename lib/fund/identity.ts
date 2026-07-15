@@ -70,6 +70,17 @@ export async function updateMyFundParticipationConsent(input: {
   if (error) throw error;
 }
 
+export async function updateOwnerFundParticipationConsent(input: {
+  participationId: string;
+  ownerConsentStatus: FundParticipation["owner_consent_status"];
+}) {
+  const { error } = await supabase.rpc("update_fund_participation_consent", {
+    p_participation_id: input.participationId,
+    p_owner_consent_status: input.ownerConsentStatus
+  });
+  if (error) throw error;
+}
+
 export async function getFundSupportIdentityStatuses(sourceLocalIds: string[]) {
   if (sourceLocalIds.length === 0) return [] as FundSupportIdentityStatus[];
 

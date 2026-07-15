@@ -4,13 +4,13 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F4-b1/F4-b2/F4-c検収完了・F4-d未着手
+状態: F4-b1/F4-b2/F4-c/F4-d検収完了・F5未着手
 
 ## 1. 目的
 
 F4は、外部で受け付けた応援をMikke IDへ安全に紐づけ、実行者と応援者の双方が同意した場合だけ、応援者本人のStoryへ参加記録を表示できるようにする段階です。
 
-このdocsでは実装境界、データ分離、同意状態、RLS検収条件を固定します。migration、RLS、Supabase本接続、保存処理はまだ変更しません。
+このdocsでは実装境界、データ分離、同意状態、RLS検収条件を固定します。F4-dまで、この条件に沿ったmigration、RLS、招待・同意・Story接続を実DBへ適用済みです。
 
 参照した現行Supabase公式資料:
 
@@ -98,7 +98,6 @@ owner_consent_status
 supporter_consent_status
 public_name
 display_mode
-story_enabled
 created_at
 updated_at
 ```
@@ -117,6 +116,7 @@ Story公開に必要な最小情報だけを持つ投影です。
 ```text
 participation_id
 project_id
+project_title
 supporter_profile_id
 display_name
 is_anonymous
@@ -170,14 +170,14 @@ owner revoked または supporter revoked
 ```text
 eventType: fund_participation_recorded
 sourceId: participation.id
-visibility: private 初期
-storyEnabled: 双方同意 + Fund public + display_mode != hidden の場合だけtrue
+visibility: private 固定
+storyEnabled: false 固定
 deskEnabled: false
 amountType: none
-countsTowardSummary: false 初期
+countsTowardSummary: false 固定
 ```
 
-公開用title・descriptionへ実行者の管理名やメールを流用しません。公開名は応援者が選んだ `public_name` または匿名表示だけを使用します。
+Activity Logは参加のprivate原記録として保持し、Story表示には使いません。公開Storyは `fund_public_participations` だけを読みます。公開名は応援者が選んだ `public_name` または匿名表示だけを使用し、実行者の管理名やメールを流用しません。
 
 ## 8. 実装パッケージ案
 
@@ -203,18 +203,21 @@ countsTowardSummary: false 初期
 - `fund_participation_recorded` private Activity Logを受取transactionへ追加
 - 2アカウントで招待発行・受取・匿名公開を実DB検収
 
-### F4-d: Story反映・解除
+### F4-d: Story反映・解除（完了）
 
-- 公開投影
-- Storyの小さな参加行
-- 同意解除と限定公開伝播防止
+- 公開投影へStory表示用の `project_title` を追加
+- Storyの既存一覧へ公開名参加だけを小さなFund行として表示
+- 実行者側の公開許可・停止UIを追加
+- owner/supporter取消、private/unlistedで公開投影を即時除外
+- 匿名参加は `supporter_profile_id=null` のままFund公開面に残し、個人Storyには表示しない
+- `_` を含むMikke ID handleの公開URLとhandle変更時の再同期を実DB検収
 
 ## 9. 次工程
 
-F4-cは検収完了です。次はF4-dを別コミットで実施します。
+F4はF4-dまで検収完了です。次はF5の全面本接続を、別計画・別コミットで開始するか判断します。
 
 ```text
-F4-d: Storyの小さな参加行、実行者側の同意解除、解除時の公開停止、public以外の伝播防止を実装・検収する。
+F5: Fund本文、活動報告、提供管理、完成記録をSupabaseへ本接続し、別端末でも公開Fund本文を読める状態にする。
 ```
 
-現在地と次の手順は `MIKKEOS_FUND_F4_C_HANDOFF_2026-07-15.md`、設計条件は `MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` を参照します。
+現在地と次の手順は `MIKKEOS_FUND_F4_D_HANDOFF_2026-07-15.md`、設計条件は `MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` を参照します。

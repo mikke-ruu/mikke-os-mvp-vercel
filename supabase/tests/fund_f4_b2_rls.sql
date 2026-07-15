@@ -37,6 +37,10 @@ begin
     raise exception 'Fund F4-b2 RLS test requires profiles for two different auth users';
   end if;
 
+  update public.profiles
+  set handle = 'rls_owner_' || suffix
+  where id = owner_a_profile_id;
+
   insert into public.fund_projects (owner_user_id, owner_profile_id, source_local_id, slug, title)
   values (owner_a_user_id, owner_a_profile_id, 'rls-b2-' || suffix, 'rls-b2-' || suffix, 'F4-b2 verification')
   returning id into project_id;
@@ -114,6 +118,13 @@ begin
     'public_name'
   );
 
+  select count(*) into visible_count
+  from public.fund_public_participations
+  where participation_id = v_participation_id;
+  if visible_count <> 0 then
+    raise exception 'private Fund project propagated to the public projection';
+  end if;
+
   begin
     perform public.accept_fund_support_claim(v_invite_token);
     raise exception 'a redeemed claim token was reused';
@@ -122,9 +133,27 @@ begin
 
   execute 'reset role';
   update public.fund_projects set visibility = 'public' where id = project_id;
-  select count(*) into visible_count from public.fund_public_participations where participation_id = v_participation_id;
+  select count(*) into visible_count
+  from public.fund_public_participations
+  where participation_id = v_participation_id
+    and project_title = 'F4-b2 verification'
+    and supporter_profile_id = supporter_b_profile_id
+    and display_name = 'Supporter B'
+    and is_anonymous = false
+    and public_fund_path = '/fund/rls_owner_' || suffix || '/rls-b2-' || suffix;
   if visible_count <> 1 then
-    raise exception 'public projection was not created after both consents and public visibility';
+    raise exception 'public projection was not created with the Story-safe fields';
+  end if;
+
+  update public.profiles
+  set handle = 'rls_owner_changed_' || suffix
+  where id = owner_a_profile_id;
+  select count(*) into visible_count
+  from public.fund_public_participations
+  where participation_id = v_participation_id
+    and public_fund_path = '/fund/rls_owner_changed_' || suffix || '/rls-b2-' || suffix;
+  if visible_count <> 1 then
+    raise exception 'owner handle change did not resync the public Fund path';
   end if;
 
   perform set_config('request.jwt.claims', '{"role":"anon"}', true);
@@ -153,6 +182,52 @@ begin
   select count(*) into visible_count from public.fund_public_participations where participation_id = v_participation_id;
   if visible_count <> 0 then
     raise exception 'revoked consent did not remove the public projection';
+  end if;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', owner_a_user_id, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', owner_a_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  perform public.update_fund_participation_consent(v_participation_id, 'granted');
+  execute 'reset role';
+  select count(*) into visible_count from public.fund_public_participations where participation_id = v_participation_id;
+  if visible_count <> 1 then
+    raise exception 'owner could not regrant public projection consent';
+  end if;
+
+  update public.fund_projects set visibility = 'unlisted' where id = project_id;
+  select count(*) into visible_count from public.fund_public_participations where participation_id = v_participation_id;
+  if visible_count <> 0 then
+    raise exception 'unlisted Fund project propagated to the public projection';
+  end if;
+  update public.fund_projects set visibility = 'public' where id = project_id;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', supporter_b_user_id, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', supporter_b_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  perform public.update_fund_participation_consent(v_participation_id, null, 'revoked', null, null);
+  execute 'reset role';
+  select count(*) into visible_count from public.fund_public_participations where participation_id = v_participation_id;
+  if visible_count <> 0 then
+    raise exception 'supporter revoke did not remove the public projection';
+  end if;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', supporter_b_user_id, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', supporter_b_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  perform public.update_fund_participation_consent(v_participation_id, null, 'granted', 'Hidden Supporter', 'anonymous');
+  execute 'reset role';
+  select count(*) into visible_count
+  from public.fund_public_participations
+  where participation_id = v_participation_id
+    and project_title = 'F4-b2 verification'
+    and supporter_profile_id is null
+    and display_name = '匿名の応援者'
+    and is_anonymous = true;
+  if visible_count <> 1 then
+    raise exception 'anonymous projection exposed identity or omitted the public Fund row';
   end if;
 
   perform set_config('request.jwt.claims', json_build_object('sub', owner_a_user_id, 'role', 'authenticated')::text, true);
