@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F3実装完了・F4-b1検収完了・F4-b2未承認・未着手
+状態: F3実装完了・F4-b1/F4-b2/F4-c検収完了・F4-d未着手
 
 ## 1. このdocsの役割
 
@@ -658,4 +658,32 @@ F1の対象:
 5. 禁止事項: DB / Supabase / RLS / migration / 他アプリ保存処理の変更なし
 ```
 
-F4は応援者本人の同定、双方の公開同意、限定公開伝播防止を含む。`MIKKEOS_FUND_F4_IDENTITY_AND_CONSENT_PLAN.md` で設計を固定し、`MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` でF4-aの実DB読み取り確認を完了した。Fund本体がlocalStorageのため、F4-bは所有関係を作るF4-b1と招待・同意を作るF4-b2へ再編した。F4-b1はmigration履歴・Advisor・anon再確認・actor別RLS否定testまで完了した。F4-b2は未承認・未着手。
+F4は応援者本人の同定、双方の公開同意、限定公開伝播防止を含む。`MIKKEOS_FUND_F4_IDENTITY_AND_CONSENT_PLAN.md` で設計を固定し、`MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` でF4-aの実DB読み取り確認を完了した。Fund本体がlocalStorageのため、F4-bは所有関係を作るF4-b1と招待・同意を作るF4-b2へ再編した。F4-b1/F4-b2はmigration履歴・Advisor・anon再確認・actor別RLS否定testまで完了した。F4-cは招待発行・取消、応援者本人の受取と公開設定、実行者側の連携状態表示、private Activity Logまで実DBで検収した。F4-dのStory反映・双方同意解除UIは未着手。
+
+## 17. F4-c実装記録（2026-07-15）
+
+実装済み:
+
+- ログイン後に元の招待URLへ戻る `next` 導線
+- `/apps/fund/[id]/supporters` の招待発行・有効期限表示・取消・受取済み状態
+- `/fund/invite/[token]` のMikke ID受取
+- `/fund/me` と `/fund/me/[participationId]` の公開名・匿名・非公開・取消設定
+- 受取時に `fund_participation_recorded` をprivate・金額なし・Story非表示で原子的に記録
+- 既存参加へのprivate Activity Log補完
+
+実DB検収:
+
+```text
+- migration: 20260715124228_fund_f4_c_participation_activity.sql
+- Local / Remote migration履歴一致
+- owner / supporter / anonのactor別test成功、transactionはROLLBACK
+- 匿名公開投影: is_anonymous=true、supporter_profile_id=null、表示名は「匿名の応援者」
+- private Activity Log: 1件、visibility=private、Story/集計/金額はすべて無効
+- Fund RPCはanon EXECUTE不可、authenticatedのみ、search_path固定
+```
+
+境界:
+
+- F4-cでDBへ同期するのは招待対象のproject/supportだけ。Fund本体の全項目・活動報告・提供管理は引き続きlocalStorage中心
+- Storyの参加行と実行者側の同意解除UIはF4-d
+- 別端末で使えるFund公開面の全面本接続はF5

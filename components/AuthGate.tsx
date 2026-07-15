@@ -48,7 +48,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setUser(nextUser);
       if (!nextUser) {
         setLoading(false);
-        if (pathname !== "/login") router.replace("/login");
+        if (pathname !== "/login") router.replace(`/login?next=${encodeURIComponent(pathname)}`);
         return;
       }
       try {
@@ -63,7 +63,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setUser(nextUser);
       if (!nextUser) {
         setProfile(null);
-        router.replace("/login");
+        router.replace(`/login?next=${encodeURIComponent(pathname)}`);
       }
     });
 

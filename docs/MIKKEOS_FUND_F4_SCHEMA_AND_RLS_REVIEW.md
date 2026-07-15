@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F4-a完了・F4-b1検収完了・F4-b2未承認・未着手
+状態: F4-a/F4-b1/F4-b2/F4-c検収完了・F4-d未着手
 
 ## 1. 結論
 
@@ -254,3 +254,9 @@ Supabase Database Advisorも確認し、security definer view、RLS無効、過�
 ```
 
 詳細は `MIKKEOS_FUND_F4_B1_HANDOFF_2026-07-14.md`。F4-b1は合格・完了とする。F4-b2へは別承認まで進まない。
+
+## 9. F4-b2 / F4-c完了追記（2026-07-15）
+
+F4-b2のclaims / participations / public projectionとactor別RLS testを実DBへ適用・検収した。続くF4-cでは招待発行・取消、Mikke ID受取、応援者の公開設定、実行者側の連携状態表示、private Activity Logを接続した。
+
+最新の現在地と検収結果は `MIKKEOS_FUND_F4_C_HANDOFF_2026-07-15.md` を参照する。上のF4-a/F4-b1記録は当時の停止条件として保持する。

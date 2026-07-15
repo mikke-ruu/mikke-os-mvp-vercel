@@ -25,7 +25,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.replace("/os");
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/os");
   }
 
   async function handleSignUp() {

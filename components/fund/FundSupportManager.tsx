@@ -1,16 +1,24 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useAuth } from "@/components/AuthGate";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { formatDate, formatYen } from "@/lib/format";
 import { createFundPaymentActivity, createFundSupportActivity } from "@/lib/fund/activity";
+import {
+  createFundSupportInvite,
+  getFundSupportIdentityStatuses,
+  revokeFundSupportInvite,
+  type FundSupportIdentityStatus
+} from "@/lib/fund/identity";
 import { summarizeFundSupports, useFundProjects } from "@/lib/fund/store";
 import {
   fundPaymentStatusLabels,
   fundSupportRecordStatusLabels,
   type FundPaymentStatus,
+  type FundSupport,
   type FundSupportRecordStatus
 } from "@/lib/fund/types";
 import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
@@ -19,6 +27,7 @@ const paymentStatuses = Object.keys(fundPaymentStatusLabels) as FundPaymentStatu
 const recordStatuses = Object.keys(fundSupportRecordStatusLabels) as FundSupportRecordStatus[];
 
 export function FundSupportManager({ projectId }: { projectId: string }) {
+  const { user, profile } = useAuth();
   const { projects, plans, supports, createSupport, updateSupport } = useFundProjects();
   const { addLog, removeLog } = useUnifiedActivityLogs();
   const project = projects.find((item) => item.id === projectId);
@@ -36,6 +45,78 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
   const [comment, setComment] = useState("");
   const [source, setSource] = useState("外部申込");
   const [supportedAt, setSupportedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [identityStatuses, setIdentityStatuses] = useState<Record<string, FundSupportIdentityStatus>>({});
+  const [identityLoadError, setIdentityLoadError] = useState("");
+  const [identityAction, setIdentityAction] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<{ supportId: string; message: string } | null>(null);
+  const [inviteDraft, setInviteDraft] = useState<{ supportId: string; claimId: string; inviteUrl: string; expiresAt: string } | null>(null);
+  const supportIdsKey = projectSupports.map((support) => support.id).join("|");
+
+  useEffect(() => {
+    let cancelled = false;
+    const sourceLocalIds = supportIdsKey ? supportIdsKey.split("|") : [];
+    setIdentityLoadError("");
+    getFundSupportIdentityStatuses(sourceLocalIds).then((items) => {
+      if (cancelled) return;
+      setIdentityStatuses(Object.fromEntries(items.map((item) => [item.sourceLocalId, item])));
+    }).catch(() => {
+      if (!cancelled) setIdentityLoadError("Mikke IDとの連携状態を読み込めませんでした。");
+    });
+    return () => { cancelled = true; };
+  }, [supportIdsKey]);
+
+  async function issueMikkeInvite(support: FundSupport) {
+    if (!project || support.recordStatus !== "valid") return;
+    setIdentityAction(`issue:${support.id}`);
+    setInviteError(null);
+    setInviteDraft(null);
+    try {
+      const claim = await createFundSupportInvite({
+        project,
+        support,
+        owner: { userId: user.id, profileId: profile.id }
+      });
+      setIdentityStatuses((current) => ({
+        ...current,
+        [support.id]: {
+          sourceLocalId: support.id,
+          activeClaim: { id: claim.claimId, expiresAt: claim.expiresAt },
+          participation: current[support.id]?.participation ?? null
+        }
+      }));
+      setInviteDraft({
+        supportId: support.id,
+        claimId: claim.claimId,
+        inviteUrl: `${window.location.origin}/fund/invite/${claim.inviteToken}`,
+        expiresAt: claim.expiresAt
+      });
+    } catch (error) {
+      setInviteError({ supportId: support.id, message: error instanceof Error ? error.message : "招待を作成できませんでした。" });
+    } finally {
+      setIdentityAction(null);
+    }
+  }
+
+  async function revokeMikkeInvite(support: FundSupport, claimId: string) {
+    setIdentityAction(`revoke:${support.id}`);
+    setInviteError(null);
+    try {
+      await revokeFundSupportInvite(claimId);
+      setIdentityStatuses((current) => ({
+        ...current,
+        [support.id]: {
+          sourceLocalId: support.id,
+          activeClaim: null,
+          participation: current[support.id]?.participation ?? null
+        }
+      }));
+      if (inviteDraft?.claimId === claimId) setInviteDraft(null);
+    } catch (error) {
+      setInviteError({ supportId: support.id, message: error instanceof Error ? error.message : "招待を取り消せませんでした。" });
+    } finally {
+      setIdentityAction(null);
+    }
+  }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -132,10 +213,18 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
       </MikkeSection>
 
       <MikkeSection title="応援者一覧">
+        {identityLoadError ? <p className="mb-3 text-xs font-semibold text-[var(--mikke-danger)]">{identityLoadError}</p> : null}
         {projectSupports.length > 0 ? (
           <div className="divide-y divide-[var(--mikke-line)]">
             {projectSupports.map((support) => (
               <div key={support.id} className="py-4 first:pt-0">
+                {(() => {
+                  const identityStatus = identityStatuses[support.id];
+                  const activeClaim = identityStatus?.activeClaim;
+                  const participation = identityStatus?.participation;
+                  const isIssuing = identityAction === `issue:${support.id}`;
+                  const isRevoking = identityAction === `revoke:${support.id}`;
+                  return <>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-bold">{support.supporterName}</p>
@@ -156,6 +245,39 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
                   </label>
                 </div>
                 <p className="mt-2 text-xs text-[var(--mikke-muted)]">数量 {support.quantity}・{support.amount != null ? formatYen(support.amount) : "金額なし"}・{support.source || "申込元未登録"}</p>
+                {participation ? (
+                  <p className="mt-3 rounded-lg bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs font-semibold text-[var(--mikke-accent-strong)]">
+                    Mikke ID受取済み・公開設定: {supporterConsentLabels[participation.supporterConsentStatus]}
+                  </p>
+                ) : activeClaim ? (
+                  <p className="mt-3 text-xs font-semibold text-[var(--mikke-muted)]">招待中・{formatInviteExpiry(activeClaim.expiresAt)}まで有効</p>
+                ) : null}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {participation ? (
+                    <button type="button" disabled className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)] opacity-60">受取済み</button>
+                  ) : activeClaim ? (
+                    <button type="button" onClick={() => revokeMikkeInvite(support, activeClaim.id)} disabled={isRevoking} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-45">
+                      {isRevoking ? "取消中…" : "招待を取り消す"}
+                    </button>
+                  ) : (
+                    <button type="button" onClick={() => issueMikkeInvite(support)} disabled={support.recordStatus !== "valid" || isIssuing} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-45">
+                      {isIssuing ? "招待を作成中…" : "Mikke IDに招待"}
+                    </button>
+                  )}
+                  {support.recordStatus !== "valid" ? <span className="text-xs text-[var(--mikke-muted)]">有効な応援記録のみ招待できます</span> : null}
+                </div>
+                {inviteError?.supportId === support.id ? <p className="mt-2 text-xs font-semibold text-[var(--mikke-danger)]">{inviteError.message}</p> : null}
+                {inviteDraft?.supportId === support.id && activeClaim?.id === inviteDraft.claimId ? (
+                  <div className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] p-3">
+                    <p className="text-xs font-bold">応援者へ渡す招待URL（{formatInviteExpiry(inviteDraft.expiresAt)}まで有効）</p>
+                    <div className="mt-2 flex gap-2">
+                      <input readOnly value={inviteDraft.inviteUrl} className="min-w-0 flex-1 rounded border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-2 py-1.5 text-xs" />
+                      <button type="button" onClick={() => navigator.clipboard.writeText(inviteDraft.inviteUrl)} className="rounded border border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold">コピー</button>
+                    </div>
+                  </div>
+                ) : null}
+                  </>;
+                })()}
               </div>
             ))}
           </div>
@@ -166,6 +288,12 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
 }
 
 function Summary({ label, value }: { label: string; value: string }) { return <div><p className="text-xs font-bold text-[var(--mikke-muted)]">{label}</p><p className="mt-1 text-lg font-bold">{value}</p></div>; }
+const supporterConsentLabels: Record<FundSupportIdentityStatus["participation"] extends infer T ? T extends { supporterConsentStatus: infer S } ? S & string : never : never, string> = {
+  pending: "まだ公開しない",
+  granted: "公開を許可",
+  revoked: "公開を取消済み"
+};
+function formatInviteExpiry(value: string) { return new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(new Date(value)); }
 const inputClass = "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
 const smallSelectClass = "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-2 py-2 text-xs outline-none";
 function Field({ label, required = false, className = "", children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) { return <label className={`block ${className}`}><span className="text-xs font-bold">{label}{required ? <span className="ml-1 text-[var(--mikke-accent)]">*</span> : null}</span>{children}</label>; }

@@ -78,6 +78,21 @@ begin
   if visible_count <> 1 then
     raise exception 'supporter could not read own participation';
   end if;
+  select count(*) into visible_count
+  from public.activity_logs
+  where user_id = supporter_b_user_id
+    and profile_id = supporter_b_profile_id
+    and activity_type = 'fund_participation_recorded'
+    and source_service = 'fund'
+    and source_record_id = v_participation_id::text
+    and visibility = 'private'
+    and display_on_story = false
+    and counts_toward_summary = false
+    and has_financial_value = false
+    and amount is null;
+  if visible_count <> 1 then
+    raise exception 'claim acceptance did not create one private non-financial Activity Log';
+  end if;
 
   begin
     update public.fund_participations set owner_consent_status = 'revoked' where id = v_participation_id;
@@ -119,6 +134,13 @@ begin
   select count(*) into visible_count from public.fund_public_participations where participation_id = v_participation_id;
   if visible_count <> 1 then
     raise exception 'anon could not read the public-safe projection';
+  end if;
+  select count(*) into visible_count
+  from public.activity_logs
+  where source_service = 'fund'
+    and source_record_id = v_participation_id::text;
+  if visible_count <> 0 then
+    raise exception 'anon could read the private Fund participation Activity Log';
   end if;
   execute 'reset role';
 

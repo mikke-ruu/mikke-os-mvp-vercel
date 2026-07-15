@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F4-b1検収完了・F4-b2未承認・未着手
+状態: F4-b1/F4-b2/F4-c検収完了・F4-d未着手
 
 ## 1. 目的
 
@@ -192,15 +192,16 @@ countsTowardSummary: false 初期
 
 - F4-a結果を受けてF4-b1 / F4-b2へ分割
 - F4-b1: `fund_projects` + `fund_supports` の最小DB基盤、所有制約、RLS。2026-07-15にmigration履歴・Advisor・anon再確認・actor別RLS否定testまで完了
-- F4-b2: claims + participations + public projection、server-side claim transaction
-- advisorと本人/他人/anonの否定テスト
+- F4-b2: claims + participations + public projection、server-side claim transaction。2026-07-15に実DB適用・actor別否定test・migration履歴一致まで完了
+- advisorと本人/他人/anonの否定テストを完了
 
-### F4-c: 招待・マイページ
+### F4-c: 招待・マイページ（完了）
 
-- 招待作成・受取・取消
-- 応援者マイページ
-- 双方同意
-- private Activity Log
+- 招待作成・受取・取消を実装
+- 応援者マイページを実装
+- 応援者同意と実行者側の状態表示を実装
+- `fund_participation_recorded` private Activity Logを受取transactionへ追加
+- 2アカウントで招待発行・受取・匿名公開を実DB検収
 
 ### F4-d: Story反映・解除
 
@@ -208,12 +209,12 @@ countsTowardSummary: false 初期
 - Storyの小さな参加行
 - 同意解除と限定公開伝播防止
 
-## 9. 次工程に必要な承認
+## 9. 次工程
 
-F4-b1は検収完了です。F4-b2のmigration / claim実装へ進めてよいか、改めて確認を取る。
+F4-cは検収完了です。次はF4-dを別コミットで実施します。
 
 ```text
-F4-b1検収完了後、F4-b2のmigration / claim実装へ進めてよいかを改めて確認する。
+F4-d: Storyの小さな参加行、実行者側の同意解除、解除時の公開停止、public以外の伝播防止を実装・検収する。
 ```
 
-現在地と次の手順は `MIKKEOS_FUND_F4_B1_HANDOFF_2026-07-14.md`、設計条件は `MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` を参照します。
+現在地と次の手順は `MIKKEOS_FUND_F4_C_HANDOFF_2026-07-15.md`、設計条件は `MIKKEOS_FUND_F4_SCHEMA_AND_RLS_REVIEW.md` を参照します。
