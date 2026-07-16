@@ -42,6 +42,14 @@ function ownerUpdatesKey(ownerProfileId: string) {
   return `mikke.fund.owner-updates.v2.${ownerProfileId}`;
 }
 
+function ownerChallengeRecordsKey(ownerProfileId: string) {
+  return `mikke.fund.owner-challenge-records.v2.${ownerProfileId}`;
+}
+
+function ownerAppLinksKey(ownerProfileId: string) {
+  return `mikke.fund.owner-app-links.v2.${ownerProfileId}`;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -141,12 +149,16 @@ function readUpdates(ownerProfileId?: string) {
   return ownerProfileId ? readList<FundUpdate>(ownerUpdatesKey(ownerProfileId), []) : readList<FundUpdate>(UPDATES_KEY, []);
 }
 
-function readChallengeRecords() {
-  return readList<FundChallengeRecord>(CHALLENGE_RECORDS_KEY, []);
+function readChallengeRecords(ownerProfileId?: string) {
+  return ownerProfileId
+    ? readList<FundChallengeRecord>(ownerChallengeRecordsKey(ownerProfileId), [])
+    : readList<FundChallengeRecord>(CHALLENGE_RECORDS_KEY, []);
 }
 
-function readAppLinks() {
-  return readList<FundAppLink>(APP_LINKS_KEY, []);
+function readAppLinks(ownerProfileId?: string) {
+  return ownerProfileId
+    ? readList<FundAppLink>(ownerAppLinksKey(ownerProfileId), [])
+    : readList<FundAppLink>(APP_LINKS_KEY, []);
 }
 
 function writeList<T>(key: string, value: T[]) {
@@ -196,18 +208,38 @@ export function getLegacyFundSupportsForMigration() {
   }
 }
 
+export function getLegacyFundCompletionForMigration() {
+  if (typeof window === "undefined") return null;
+  const rawChallengeRecords = window.localStorage.getItem(CHALLENGE_RECORDS_KEY);
+  const rawAppLinks = window.localStorage.getItem(APP_LINKS_KEY);
+  if (!rawChallengeRecords && !rawAppLinks) return null;
+
+  try {
+    const challengeRecords = rawChallengeRecords ? JSON.parse(rawChallengeRecords) as FundChallengeRecord[] : [];
+    const appLinks = rawAppLinks ? JSON.parse(rawAppLinks) as FundAppLink[] : [];
+    if (!Array.isArray(challengeRecords) || !Array.isArray(appLinks)) return null;
+    return { challengeRecords, appLinks };
+  } catch {
+    return null;
+  }
+}
+
 export function cacheOwnerFundContent(
   ownerProfileId: string,
   projects: FundProject[],
   plans: FundPlan[],
   supports: FundSupport[],
-  updates: FundUpdate[]
+  updates: FundUpdate[],
+  challengeRecords: FundChallengeRecord[],
+  appLinks: FundAppLink[]
 ) {
   if (typeof window === "undefined") return;
   writeList(ownerProjectsKey(ownerProfileId), projects);
   writeList(ownerPlansKey(ownerProfileId), plans);
   writeList(ownerSupportsKey(ownerProfileId), supports);
   writeList(ownerUpdatesKey(ownerProfileId), updates);
+  writeList(ownerChallengeRecordsKey(ownerProfileId), challengeRecords);
+  writeList(ownerAppLinksKey(ownerProfileId), appLinks);
 }
 
 export function useFundProjects(ownerProfileId?: string) {
@@ -224,8 +256,8 @@ export function useFundProjects(ownerProfileId?: string) {
       setPlans(readPlans(ownerProfileId));
       setSupports(readSupports(ownerProfileId));
       setUpdates(readUpdates(ownerProfileId));
-      setChallengeRecords(readChallengeRecords());
-      setAppLinks(readAppLinks());
+      setChallengeRecords(readChallengeRecords(ownerProfileId));
+      setAppLinks(readAppLinks(ownerProfileId));
     }
     refresh();
     window.addEventListener("storage", refresh);
@@ -368,7 +400,7 @@ export function useFundProjects(ownerProfileId?: string) {
 
   function saveChallengeRecord(input: FundChallengeRecordInput) {
     const timestamp = nowIso();
-    const existing = readChallengeRecords().find((record) => record.projectId === input.projectId);
+    const existing = readChallengeRecords(ownerProfileId).find((record) => record.projectId === input.projectId);
     const record: FundChallengeRecord = {
       ...input,
       id: existing?.id ?? makeId("fund_challenge"),
@@ -376,15 +408,15 @@ export function useFundProjects(ownerProfileId?: string) {
       createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp
     };
-    const next = [record, ...readChallengeRecords().filter((item) => item.projectId !== input.projectId)];
-    writeList(CHALLENGE_RECORDS_KEY, next);
+    const next = [record, ...readChallengeRecords(ownerProfileId).filter((item) => item.projectId !== input.projectId)];
+    writeList(ownerProfileId ? ownerChallengeRecordsKey(ownerProfileId) : CHALLENGE_RECORDS_KEY, next);
     setChallengeRecords(next);
     return record;
   }
 
   function saveAppLinks(projectId: string, targets: FundTargetService[]) {
     const timestamp = nowIso();
-    const existing = readAppLinks();
+    const existing = readAppLinks(ownerProfileId);
     const existingForProject = existing.filter((link) => link.projectId === projectId);
     const targetSet = new Set(targets);
     const nextForProject = (Object.keys(fundTargetKeys) as FundTargetService[]).map<FundAppLink>((targetService) => {
@@ -399,7 +431,7 @@ export function useFundProjects(ownerProfileId?: string) {
       };
     });
     const next = [...existing.filter((link) => link.projectId !== projectId), ...nextForProject];
-    writeList(APP_LINKS_KEY, next);
+    writeList(ownerProfileId ? ownerAppLinksKey(ownerProfileId) : APP_LINKS_KEY, next);
     setAppLinks(next);
     return nextForProject;
   }

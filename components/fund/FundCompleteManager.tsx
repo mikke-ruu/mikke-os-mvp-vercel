@@ -7,18 +7,30 @@ import { useAuth } from "@/components/AuthGate";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { createFundCompletedActivity } from "@/lib/fund/activity";
-import { notifyFundDatabaseUpdated, saveFundProjectContent } from "@/lib/fund/database";
-import { useFundProjects } from "@/lib/fund/store";
-import { fundTargetServiceLabels, type FundPlan, type FundProject, type FundTargetService } from "@/lib/fund/types";
+import { notifyFundDatabaseUpdated, saveFundCompletion } from "@/lib/fund/database";
+import {
+  fundTargetServiceLabels,
+  type FundAppLink,
+  type FundChallengeRecord,
+  type FundProject,
+  type FundTargetService
+} from "@/lib/fund/types";
 import { isValidFundExternalUrl, normalizeFundExternalUrl } from "@/lib/fund/url";
 import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 import { getAppPath } from "@/lib/mikkeos/routes";
 
 const targetServices = Object.keys(fundTargetServiceLabels) as FundTargetService[];
 
-export function FundCompleteManager({ project, projectPlans }: { project: FundProject; projectPlans: FundPlan[] }) {
+export function FundCompleteManager({
+  project,
+  challengeRecords,
+  appLinks
+}: {
+  project: FundProject;
+  challengeRecords: FundChallengeRecord[];
+  appLinks: FundAppLink[];
+}) {
   const { profile } = useAuth();
-  const { challengeRecords, appLinks, saveChallengeRecord, saveAppLinks, updateProject } = useFundProjects(profile.id);
   const { addLog } = useUnifiedActivityLogs();
   const existingRecord = challengeRecords.find((record) => record.projectId === project.id);
   const [title, setTitle] = useState(`${project.title}を実現しました`);
@@ -37,7 +49,6 @@ export function FundCompleteManager({ project, projectPlans }: { project: FundPr
   useEffect(() => {
     if (initialized) return;
     const savedTargets = appLinks.filter((link) => link.projectId === project.id && (link.linkStatus === "ready" || link.linkStatus === "linked"));
-    if (!existingRecord && savedTargets.length === 0 && challengeRecords.length === 0 && appLinks.length === 0) return;
     if (existingRecord) {
       setTitle(existingRecord.title);
       setSummary(existingRecord.summary);
@@ -61,25 +72,29 @@ export function FundCompleteManager({ project, projectPlans }: { project: FundPr
     setSaving(true);
     setMessage("");
     const completedProject = { ...project, stage: "realization" as const, status: "completed" as const };
+    const timestamp = new Date().toISOString();
+    const record: FundChallengeRecord = {
+      id: existingRecord?.id ?? `fund_challenge_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      projectId: project.id,
+      title: title.trim(),
+      summary: summary.trim(),
+      outcome: outcome.trim(),
+      imageUrl: normalizeFundExternalUrl(imageUrl),
+      visibility,
+      storyEnabled: visibility === "public" && projectCanBeShared && storyEnabled,
+      completedAt,
+      publishedAt: visibility === "public" ? existingRecord?.publishedAt ?? timestamp : null,
+      createdAt: existingRecord?.createdAt ?? timestamp,
+      updatedAt: timestamp
+    };
 
     try {
-      await saveFundProjectContent({
+      await saveFundCompletion({
         ownerProfileId: profile.id,
-        project: completedProject,
-        plans: projectPlans
-      });
-      const record = saveChallengeRecord({
         projectId: project.id,
-        title: title.trim(),
-        summary: summary.trim(),
-        outcome: outcome.trim(),
-        imageUrl: normalizeFundExternalUrl(imageUrl),
-        visibility,
-        storyEnabled: visibility === "public" && projectCanBeShared && storyEnabled,
-        completedAt
+        record,
+        targets
       });
-      saveAppLinks(project.id, targets);
-      updateProject(project.id, { stage: "realization", status: "completed" });
       notifyFundDatabaseUpdated(profile.id);
       addLog(createFundCompletedActivity(completedProject, record));
       setMessage("挑戦の軌跡を保存しました。");

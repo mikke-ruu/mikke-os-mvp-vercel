@@ -34,7 +34,12 @@ import { MikkeSection } from "./MikkeSection";
 import { MikkeStatusBadge } from "./MikkeStatusBadge";
 import { getAppPath } from "@/lib/mikkeos/routes";
 import type { AppKey, UnifiedActivityLog, UnifiedProfile } from "@/lib/mikkeos/types";
-import { getFundStoryParticipations, type FundStoryParticipation } from "@/lib/fund/story";
+import {
+  getFundStoryCompletions,
+  getFundStoryParticipations,
+  type FundStoryCompletion,
+  type FundStoryParticipation
+} from "@/lib/fund/story";
 
 type SummaryItem = {
   label: string;
@@ -179,19 +184,39 @@ const storyAdminItems: Array<{
 
 export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs: UnifiedActivityLog[] }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [fundCompletions, setFundCompletions] = useState<FundStoryCompletion[]>([]);
   const [fundParticipations, setFundParticipations] = useState<FundStoryParticipation[]>([]);
-  const storyMaterialCount = logs.filter((log) => log.visibility === "public" && log.storyEnabled).length + fundParticipations.length;
-  const fundStoryLogs = logs.filter((log) => log.appKey === "fund" && log.eventType === "fund_project_completed" && log.visibility === "public" && log.storyEnabled);
+  const remoteCompletionPaths = new Set(fundCompletions.map((completion) => completion.publicFundPath));
+  const visibleStoryLogs = logs.filter((log) => {
+    if (log.visibility !== "public" || !log.storyEnabled) return false;
+    return !(
+      log.appKey === "fund" &&
+      log.eventType === "fund_project_completed" &&
+      log.metadata?.publicPath &&
+      remoteCompletionPaths.has(log.metadata.publicPath)
+    );
+  });
+  const storyMaterialCount = visibleStoryLogs.length + fundCompletions.length + fundParticipations.length;
+  const fundStoryLogs = visibleStoryLogs.filter((log) => log.appKey === "fund" && log.eventType === "fund_project_completed");
   const displayName = profileView.displayName || profile.displayName;
 
   useEffect(() => {
     let cancelled = false;
-    getFundStoryParticipations(profileView.handle)
-      .then((items) => {
-        if (!cancelled) setFundParticipations(items);
+    Promise.all([
+      getFundStoryCompletions(profileView.handle),
+      getFundStoryParticipations(profileView.handle)
+    ])
+      .then(([completions, participations]) => {
+        if (!cancelled) {
+          setFundCompletions(completions);
+          setFundParticipations(participations);
+        }
       })
       .catch(() => {
-        if (!cancelled) setFundParticipations([]);
+        if (!cancelled) {
+          setFundCompletions([]);
+          setFundParticipations([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -337,7 +362,7 @@ export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs:
         </MikkeSection>
 
         <MikkeSection title="公開中・挑戦の記録">
-          {publicPrograms.length > 0 || fundStoryLogs.length > 0 || fundParticipations.length > 0 ? (
+          {publicPrograms.length > 0 || fundCompletions.length > 0 || fundStoryLogs.length > 0 || fundParticipations.length > 0 ? (
             <div className="grid gap-2">
               {publicPrograms.map((program) => (
                 <MikkeListRow
@@ -345,6 +370,17 @@ export function StoryProfile({ profile, logs }: { profile: UnifiedProfile; logs:
                   title={program.title}
                   label={program.label}
                   right={<MikkeStatusBadge>{program.status}</MikkeStatusBadge>}
+                />
+              ))}
+              {fundCompletions.map((completion) => (
+                <MikkeListRow
+                  key={completion.challengeRecordId}
+                  title={completion.title}
+                  label="Fund"
+                  helper={completion.summary}
+                  icon={Rocket}
+                  href={completion.publicFundPath}
+                  right={<MikkeStatusBadge tone="success">挑戦の軌跡</MikkeStatusBadge>}
                 />
               ))}
               {fundStoryLogs.map((log) => (

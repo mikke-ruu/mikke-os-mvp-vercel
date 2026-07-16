@@ -7,6 +7,32 @@ export type FundStoryParticipation = {
   publishedAt: string;
 };
 
+export type FundStoryCompletion = {
+  challengeRecordId: string;
+  title: string;
+  summary: string;
+  publicFundPath: string;
+  completedAt: string;
+};
+
+export async function getFundStoryCompletions(profileHandle: string) {
+  const { data, error } = await supabase
+    .from("fund_public_challenge_records")
+    .select("challenge_record_id, title, summary, public_fund_path, completed_at")
+    .eq("profile_slug", profileHandle)
+    .eq("story_enabled", true)
+    .order("completed_at", { ascending: false });
+  if (error) throw error;
+
+  return (data ?? []).map((item) => ({
+    challengeRecordId: item.challenge_record_id as string,
+    title: item.title as string,
+    summary: item.summary as string,
+    publicFundPath: item.public_fund_path as string,
+    completedAt: item.completed_at as string
+  })) satisfies FundStoryCompletion[];
+}
+
 export async function getFundStoryParticipations(profileHandle: string) {
   const { data: profile, error: profileError } = await supabase
     .from("profiles")

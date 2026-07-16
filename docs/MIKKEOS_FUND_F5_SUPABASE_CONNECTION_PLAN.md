@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F5-d検収完了・F5-e未着手
+状態: F5-e検収完了・F5-f未着手
 
 ## 1. 目的
 
@@ -110,13 +110,13 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 9. migration履歴、RLS否定test、Database Advisor、lint、buildが成功
 ```
 
-## 7. F5-d完了後も残る境界
+## 7. F5-e完了後も残る境界
 
-- 完成記録はF5-eまでlocalStorage表示
-- challenge record / app link候補はF5-eまでlocalStorage正本
-- 応援・決済・提供状態はDB正本。private Activity LogはDB保存成功後だけ既存の冪等keyで更新
+- 完成記録・次アプリ候補・完了Activity LogはDB正本
+- 公開FundとStoryはowner-private正本を直接読まず、公開専用の完成記録投影だけを読む
+- 次アプリ候補は引継ぎ意思だけを保存し、各アプリのデータを自動作成しない
 - unlistedは安全なtoken方式が決まるまで外部共有不可
-- 通知・通報・CSV・Webhookにはまだ進まない
+- 通知・通報・CSV・Webhook・削除保全期間はF5-fで必要性を判断してから実装する
 
 ## 8. F5-a検収結果
 
@@ -188,3 +188,23 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 - lint / build成功。build ID: `w52gkH6PogZc0gHr9SkJp`
 
 詳細は `MIKKEOS_FUND_F5_D_HANDOFF_2026-07-16.md` を参照します。F5-eにはまだ進みません。
+
+## 12. F5-e検収結果
+
+2026-07-16に実DBへ `20260716120919_fund_f5_e_completion_records.sql` を適用しました。
+
+- owner-private `fund_challenge_records` / `fund_app_links` とpublic-safe `fund_public_challenge_records` を追加
+- `save_fund_completion` を `security invoker` で実装し、project完了・完成記録・次アプリ候補を1 transactionで保存
+- 完成記録はprojectごとに1件。同じprojectの再保存ではDB UUIDとlocal source IDを維持
+- 次アプリ候補は `suggested / ready / linked / cancelled` で保持し、選択解除は削除せず `cancelled` へ更新
+- 完成Activity Logはprivate・非金額でDBへupsertし、Story公開条件を満たす場合だけachievement / summary対象にする
+- Storyと公開Fundは公開専用投影だけを読み、端末内の既存完成ログとは公開pathで重複排除
+- 旧 `mikke.fund.challenge-records.v1` / `mikke.fund.app-links.v1` は現在profileが所有するproject分だけ一回移行し、別profile相当は保全
+- owner / 別authenticated actor / anon、private / public、Story ON/OFF、親project公開切替、handle変更、同一source ID再保存をSQL testで検収
+- F4-b1 / F4-b2 / F5-a / F5-b / F5-c / F5-d回帰test成功、全fixtureはROLLBACK済み
+- 実データはproject 1件・支援1件・Mikke ID参加1件を維持。完成記録・次アプリ候補は未作成0件、fixture残件0件
+- F5-e由来の新しいDatabase Advisor警告0件。既存Fund項目はsecurity WARN 4件・performance INFO 5件で増加なし
+- Local / Remote migration履歴は `20260716120919` まで一致
+- lint / build成功。実ブラウザーで完成記録画面と7つの次アプリ候補を表示し、console error 0件
+
+詳細は `MIKKEOS_FUND_F5_E_HANDOFF_2026-07-16.md` を参照します。F5-fにはまだ進みません。

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import type { FundPlan, FundProject, FundUpdate } from "./types";
+import type { FundChallengeRecord, FundPlan, FundProject, FundUpdate } from "./types";
 
 type PublicProjectRow = {
   project_id: string;
@@ -65,9 +65,23 @@ type PublicUpdateRow = {
   updated_at: string;
 };
 
+type PublicChallengeRecordRow = {
+  challenge_record_id: string;
+  project_id: string;
+  title: string;
+  summary: string;
+  outcome: string;
+  image_url: string;
+  story_enabled: boolean;
+  completed_at: string;
+  published_at: string;
+  updated_at: string;
+};
+
 const publicProjectColumns = "project_id, owner_profile_id, profile_slug, slug, title, short_description, description, project_type, campaign_type, stage, status, cover_image_url, goal_type, goal_value, current_value, display_amount, start_at, end_at, external_payment_url, external_application_url, why_now, audience, use_of_support, schedule, risk_notes, cancellation_policy, contact_note, published_at, completed_at, created_at, updated_at";
 const publicPlanColumns = "plan_id, project_id, title, description, image_url, plan_type, price, quantity_limit, per_person_limit, delivery_date, external_payment_url, external_application_url, status, sort_order, created_at, updated_at";
 const publicUpdateColumns = "update_id, project_id, title, body, image_url, published_at, created_at, updated_at";
+const publicChallengeRecordColumns = "challenge_record_id, project_id, title, summary, outcome, image_url, story_enabled, completed_at, published_at, updated_at";
 
 export async function getPublicFundProject(profileSlug: string, projectSlug: string) {
   const { data: project, error: projectError } = await supabase
@@ -79,24 +93,38 @@ export async function getPublicFundProject(profileSlug: string, projectSlug: str
   if (projectError) throw projectError;
   if (!project) return null;
 
-  const { data: plans, error: plansError } = await supabase
-    .from("fund_public_plans")
-    .select(publicPlanColumns)
-    .eq("project_id", project.project_id)
-    .order("sort_order", { ascending: true });
-  if (plansError) throw plansError;
+  const [plansResult, updatesResult, challengeRecordResult] = await Promise.all([
+    supabase
+      .from("fund_public_plans")
+      .select(publicPlanColumns)
+      .eq("project_id", project.project_id)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("fund_public_updates")
+      .select(publicUpdateColumns)
+      .eq("project_id", project.project_id)
+      .order("published_at", { ascending: false }),
+    supabase
+      .from("fund_public_challenge_records")
+      .select(publicChallengeRecordColumns)
+      .eq("project_id", project.project_id)
+      .maybeSingle()
+  ]);
 
-  const { data: updates, error: updatesError } = await supabase
-    .from("fund_public_updates")
-    .select(publicUpdateColumns)
-    .eq("project_id", project.project_id)
-    .order("published_at", { ascending: false });
+  const { data: plans, error: plansError } = plansResult;
+  if (plansError) throw plansError;
+  const { data: updates, error: updatesError } = updatesResult;
   if (updatesError) throw updatesError;
+  const { data: challengeRecord, error: challengeRecordError } = challengeRecordResult;
+  if (challengeRecordError) throw challengeRecordError;
 
   return {
     project: mapPublicProject(project as unknown as PublicProjectRow),
     plans: (plans ?? []).map((plan) => mapPublicPlan(plan as unknown as PublicPlanRow)),
-    updates: (updates ?? []).map((update) => mapPublicUpdate(update as unknown as PublicUpdateRow))
+    updates: (updates ?? []).map((update) => mapPublicUpdate(update as unknown as PublicUpdateRow)),
+    challengeRecord: challengeRecord
+      ? mapPublicChallengeRecord(challengeRecord as unknown as PublicChallengeRecordRow)
+      : undefined
   };
 }
 
@@ -181,6 +209,23 @@ function mapPublicUpdate(row: PublicUpdateRow): FundUpdate {
     visibility: "public",
     publishedAt: row.published_at,
     createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapPublicChallengeRecord(row: PublicChallengeRecordRow): FundChallengeRecord {
+  return {
+    id: row.challenge_record_id,
+    projectId: row.project_id,
+    title: row.title,
+    summary: row.summary,
+    outcome: row.outcome,
+    imageUrl: row.image_url,
+    visibility: "public",
+    storyEnabled: row.story_enabled,
+    completedAt: row.completed_at,
+    publishedAt: row.published_at,
+    createdAt: row.published_at,
     updatedAt: row.updated_at
   };
 }

@@ -1,5 +1,14 @@
 import { supabase } from "@/lib/supabase/client";
-import type { FundPlan, FundProject, FundSupport, FundUpdate, FundUpdateInput } from "./types";
+import type {
+  FundAppLink,
+  FundChallengeRecord,
+  FundPlan,
+  FundProject,
+  FundSupport,
+  FundTargetService,
+  FundUpdate,
+  FundUpdateInput
+} from "./types";
 
 export const FUND_DATABASE_UPDATED_EVENT = "mikke-fund:database-updated";
 
@@ -105,6 +114,30 @@ type OwnerFundParticipationRow = {
   supporter_user_id: string;
 };
 
+type OwnerFundChallengeRecordRow = {
+  source_local_id: string;
+  project_id: string;
+  title: string;
+  summary: string;
+  outcome: string;
+  image_url: string;
+  visibility: FundChallengeRecord["visibility"];
+  story_enabled: boolean;
+  completed_at: string;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type OwnerFundAppLinkRow = {
+  id: string;
+  project_id: string;
+  target_service: FundTargetService;
+  link_status: FundAppLink["linkStatus"];
+  created_at: string;
+  updated_at: string;
+};
+
 const ownerProjectColumns = `
   id, owner_profile_id, source_local_id, slug, title, short_description,
   description, project_type, campaign_type, stage, status, visibility,
@@ -131,6 +164,15 @@ const ownerSupportColumns = `
   supporter_email, public_name, is_anonymous, comment, support_type,
   amount, quantity, payment_status, fulfillment_status, record_status,
   source, supported_at, completed_at, cancelled_at, created_at, updated_at
+`;
+
+const ownerChallengeRecordColumns = `
+  source_local_id, project_id, title, summary, outcome, image_url,
+  visibility, story_enabled, completed_at, published_at, created_at, updated_at
+`;
+
+const ownerAppLinkColumns = `
+  id, project_id, target_service, link_status, created_at, updated_at
 `;
 
 export async function saveFundProjectContent(input: {
@@ -175,6 +217,22 @@ export async function saveFundSupport(input: {
   return data as string;
 }
 
+export async function saveFundCompletion(input: {
+  ownerProfileId: string;
+  projectId: string;
+  record: FundChallengeRecord;
+  targets: FundTargetService[];
+}) {
+  const { data, error } = await supabase.rpc("save_fund_completion", {
+    p_owner_profile_id: input.ownerProfileId,
+    p_project_source_local_id: input.projectId,
+    p_record: input.record,
+    p_targets: input.targets
+  });
+  if (error) throw error;
+  return data as string;
+}
+
 export async function getOwnerFundContent(ownerProfileId: string, profileSlug: string) {
   const { data: projectData, error: projectError } = await supabase
     .from("fund_projects")
@@ -190,9 +248,11 @@ export async function getOwnerFundContent(ownerProfileId: string, profileSlug: s
   let updateRows: OwnerFundUpdateRow[] = [];
   let supportRows: OwnerFundSupportRow[] = [];
   let participationRows: OwnerFundParticipationRow[] = [];
+  let challengeRecordRows: OwnerFundChallengeRecordRow[] = [];
+  let appLinkRows: OwnerFundAppLinkRow[] = [];
 
   if (databaseProjectIds.length > 0) {
-    const [planResult, updateResult, supportResult] = await Promise.all([
+    const [planResult, updateResult, supportResult, challengeRecordResult, appLinkResult] = await Promise.all([
       supabase
         .from("fund_plans")
         .select(ownerPlanColumns)
@@ -207,15 +267,29 @@ export async function getOwnerFundContent(ownerProfileId: string, profileSlug: s
         .from("fund_supports")
         .select(ownerSupportColumns)
         .in("project_id", databaseProjectIds)
-        .order("supported_at", { ascending: false })
+        .order("supported_at", { ascending: false }),
+      supabase
+        .from("fund_challenge_records")
+        .select(ownerChallengeRecordColumns)
+        .in("project_id", databaseProjectIds)
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("fund_app_links")
+        .select(ownerAppLinkColumns)
+        .in("project_id", databaseProjectIds)
+        .order("created_at", { ascending: true })
     ]);
 
     if (planResult.error) throw planResult.error;
     if (updateResult.error) throw updateResult.error;
     if (supportResult.error) throw supportResult.error;
+    if (challengeRecordResult.error) throw challengeRecordResult.error;
+    if (appLinkResult.error) throw appLinkResult.error;
     planRows = (planResult.data ?? []) as unknown as OwnerFundPlanRow[];
     updateRows = (updateResult.data ?? []) as unknown as OwnerFundUpdateRow[];
     supportRows = (supportResult.data ?? []) as unknown as OwnerFundSupportRow[];
+    challengeRecordRows = (challengeRecordResult.data ?? []) as unknown as OwnerFundChallengeRecordRow[];
+    appLinkRows = (appLinkResult.data ?? []) as unknown as OwnerFundAppLinkRow[];
 
     if (supportRows.length > 0) {
       const { data: participationData, error: participationError } = await supabase
@@ -332,6 +406,36 @@ export async function getOwnerFundContent(ownerProfileId: string, profileSlug: s
         publishedAt: update.published_at,
         createdAt: update.created_at,
         updatedAt: update.updated_at
+      }];
+    }),
+    challengeRecords: challengeRecordRows.flatMap<FundChallengeRecord>((record) => {
+      const sourceProjectId = sourceIdByDatabaseId.get(record.project_id);
+      if (!sourceProjectId) return [];
+      return [{
+        id: record.source_local_id,
+        projectId: sourceProjectId,
+        title: record.title,
+        summary: record.summary,
+        outcome: record.outcome,
+        imageUrl: record.image_url,
+        visibility: record.visibility,
+        storyEnabled: record.story_enabled,
+        completedAt: record.completed_at,
+        publishedAt: record.published_at,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at
+      }];
+    }),
+    appLinks: appLinkRows.flatMap<FundAppLink>((link) => {
+      const sourceProjectId = sourceIdByDatabaseId.get(link.project_id);
+      if (!sourceProjectId) return [];
+      return [{
+        id: link.id,
+        projectId: sourceProjectId,
+        targetService: link.target_service,
+        linkStatus: link.link_status,
+        createdAt: link.created_at,
+        updatedAt: link.updated_at
       }];
     })
   };
