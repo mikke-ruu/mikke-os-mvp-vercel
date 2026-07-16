@@ -4,6 +4,7 @@ import { FolderKanban } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import { teamWorksTemplate } from "@/lib/team-works";
 
 export function TeamWorksProjectsShell({
   title,
@@ -16,6 +17,7 @@ export function TeamWorksProjectsShell({
 }) {
   const pathname = usePathname();
   const projectsActive = pathname.startsWith("/apps/team-works/projects");
+  const templatesActive = pathname.startsWith("/apps/team-works/project-templates");
 
   return (
     <MikkeAppShell
@@ -29,7 +31,7 @@ export function TeamWorksProjectsShell({
         <Link
           href="/apps/team-works"
           className={`rounded-lg px-3 py-2 text-xs font-bold ${
-            projectsActive ? "text-[var(--mikke-muted)]" : "bg-[var(--mikke-primary)] text-white"
+            projectsActive || templatesActive ? "text-[var(--mikke-muted)]" : "bg-[var(--mikke-primary)] text-white"
           }`}
         >
           継続業務
@@ -42,6 +44,16 @@ export function TeamWorksProjectsShell({
         >
           プロジェクト
         </Link>
+        {teamWorksTemplate.featureSettings.enableProjectTemplates ? (
+          <Link
+            href="/apps/team-works/project-templates"
+            className={`rounded-lg px-3 py-2 text-xs font-bold ${
+              templatesActive ? "bg-[var(--mikke-primary)] text-white" : "text-[var(--mikke-muted)]"
+            }`}
+          >
+            テンプレート
+          </Link>
+        ) : null}
       </nav>
       {children}
     </MikkeAppShell>

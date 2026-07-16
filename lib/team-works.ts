@@ -280,6 +280,7 @@ export const teamWorksTemplate: TeamWorksTemplate = {
   featureSettings: {
     ...teamWorksProjectFeatureDefaults,
     enableProjects: true,
+    enableProjectTemplates: true,
     frontSite: true,
     inquiry: true,
     scheduling: true,

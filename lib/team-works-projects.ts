@@ -206,6 +206,8 @@ export type ProjectTemplatePhase = {
   weight: number;
   required: boolean;
   ownerRoleName: string;
+  startCondition: string;
+  completionCondition: string;
   clientVisible: boolean;
 };
 
@@ -217,11 +219,23 @@ export type ProjectTemplateTask = {
   position: number;
   standardOffsetDays: number;
   priority: ProjectTaskPriority;
+  required: boolean;
   assigneeRoleName: string;
   checklist: string[];
   requiresDeliverable: boolean;
   requiresApproval: boolean;
   requiresClientAction: boolean;
+  clientVisible: boolean;
+};
+
+export type ProjectTemplateForm = {
+  id: string;
+  phaseId: string;
+  taskId: string | null;
+  name: string;
+  inputRoleName: string;
+  reviewerRoleName: string;
+  required: boolean;
   clientVisible: boolean;
 };
 
@@ -235,6 +249,7 @@ export type ProjectTemplate = {
   roleNames: string[];
   phases: ProjectTemplatePhase[];
   tasks: ProjectTemplateTask[];
+  forms: ProjectTemplateForm[];
   featureSettings: {
     clientPortal: boolean;
     deliverables: boolean;

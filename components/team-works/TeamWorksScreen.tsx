@@ -12,6 +12,7 @@ import {
   ChevronUp,
   ClipboardCheck,
   FolderKanban,
+  Layers3,
   Languages,
   MessageCircle,
   RotateCcw,
@@ -182,12 +183,22 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
         <div className="min-w-0 lg:hidden">
           <ModeSwitcher mode={mode} setMode={setMode} />
           {mode === "admin" && teamWorksTemplate.featureSettings.enableProjects ? (
-            <Link
-              href="/apps/team-works/projects"
-              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-xs font-bold text-[var(--mikke-primary)]"
-            >
-              <FolderKanban size={16} /> プロジェクトを開く
-            </Link>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <Link
+                href="/apps/team-works/projects"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-xs font-bold text-[var(--mikke-primary)]"
+              >
+                <FolderKanban size={16} /> プロジェクト
+              </Link>
+              {teamWorksTemplate.featureSettings.enableProjectTemplates ? (
+                <Link
+                  href="/apps/team-works/project-templates"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-xs font-bold text-[var(--mikke-primary)]"
+                >
+                  <Layers3 size={16} /> テンプレート
+                </Link>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
@@ -292,6 +303,12 @@ function DesktopSidebar({ view, mode, setMode }: { view: TeamWorksView; mode: Vi
               <FolderKanban size={18} />
               <span>プロジェクト</span>
             </Link>
+            {teamWorksTemplate.featureSettings.enableProjectTemplates ? (
+              <Link href="/apps/team-works/project-templates" className="tw-sidebar-link">
+                <Layers3 size={18} />
+                <span>テンプレート</span>
+              </Link>
+            ) : null}
           </div>
         ) : null}
       </nav>
