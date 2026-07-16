@@ -50,6 +50,14 @@ export type LabelSettings = {
 export type TranslationScope = "front_site" | "forms" | "client_portal" | "client_messages" | "worker_portal" | "admin";
 
 export type FeatureSettings = {
+  enableRecurringOperations: boolean;
+  enableProjects: boolean;
+  enableProjectTemplates: boolean;
+  enableProjectClientPortal: boolean;
+  enableDeliverables: boolean;
+  enableProjectComments: boolean;
+  enableProjectPayouts: boolean;
+  enableProjectInvoices: boolean;
   frontSite: boolean;
   inquiry: boolean;
   scheduling: boolean;
@@ -249,6 +257,14 @@ export const teamWorksTemplate: TeamWorksTemplate = {
     invoices: "学校請求"
   },
   featureSettings: {
+    enableRecurringOperations: true,
+    enableProjects: false,
+    enableProjectTemplates: false,
+    enableProjectClientPortal: false,
+    enableDeliverables: false,
+    enableProjectComments: false,
+    enableProjectPayouts: false,
+    enableProjectInvoices: false,
     frontSite: true,
     inquiry: true,
     scheduling: true,
@@ -660,7 +676,17 @@ export const teamWorksSchemaPlan = [
   "template_settings",
   "label_settings",
   "feature_settings",
-  "translation_settings"
+  "translation_settings",
+  "team_works_projects",
+  "team_works_project_roles",
+  "team_works_project_members",
+  "team_works_project_phases",
+  "team_works_project_tasks",
+  "team_works_project_task_check_items",
+  "team_works_project_deliverables",
+  "team_works_project_comments",
+  "team_works_project_templates",
+  "team_works_project_template_versions"
 ];
 
 export function createTeamWorksId(prefix: string) {

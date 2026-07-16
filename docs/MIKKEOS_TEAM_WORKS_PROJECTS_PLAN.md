@@ -5,7 +5,7 @@
 実装: TW-P番号を指定してcodexまたはSonnetへ依頼する前提
 
 統合更新: 2026-07-16（Codex）
-現在地: Fund F5完了後の計画統合完了。Team Works実装は未着手で、次はTW-P0。
+現在地: TW-P0（型・localStorage store・汎用デモ）実装・検収完了。次はTW-P1。
 
 このdocsは、次の2つの構想書を、現在の一本化実行ライン・既存Team Works構造・共通部品・安全規約へ落とし込んだ実装計画です。
 
@@ -313,4 +313,30 @@ migration・RLS・actor別否定テストを一体で設計する。
 - DELETE権限・アーカイブ・保持期間をmigration前に決める。
 - owner/他owner/client/worker/anonの否定テスト、Database Advisor、
   migration履歴整合を完走してから本接続完了とする。
+```
+
+## 11. TW-P0実装結果（2026-07-16）
+
+```text
+実装:
+- lib/team-works-projects.tsを追加。
+- Project / ProjectPhase / ProjectTask / ProjectDeliverable / ProjectComment /
+  ProjectTemplate / ProjectTemplateVersion / ProjectMember / ProjectRoleを定義。
+- mikke.team-works.projects.v1とmikke.team-works.project-templates.v1の
+  localStorage store、更新event、React hook、resetを追加。
+- 業種色・実在案件・個人情報を含まない「サンプル制作案件」1件だけをseed。
+- 工程比重による進捗計算を追加。保留時は直前の進捗率を保持する。
+- FeatureSettingsへ8フラグを追加。既存継続業務はtrue、プロジェクト系はfalse。
+- teamWorksSchemaPlanへteam_works_* prefixの将来テーブル名を追加。
+
+検収:
+- localStorageの保存・読込・reset、seed件数、重み付き進捗、保留時進捗を確認。
+- lint成功。
+- build成功（69 routes）。
+- TeamWorksScreen.tsx、既存ルート、既存継続業務stateは未変更。
+
+未着手境界:
+- プロジェクト画面・ルート・ナビはまだ作らない。
+- ジェネレーター、自社テンプレ保存UI、ポータルはまだ作らない。
+- Supabase / Activity Log / DESK / Storyへ接続しない。
 ```
