@@ -4,18 +4,20 @@ import { useEffect, useMemo, useState } from "react";
 import { FUND_DATABASE_UPDATED_EVENT, getOwnerFundContent } from "./database";
 import { migrateLegacyFundContent } from "./legacy-migration";
 import { cacheOwnerFundContent, useFundProjects } from "./store";
+import { migrateLegacyFundSupports } from "./support-migration";
 import { migrateLegacyFundUpdates } from "./update-migration";
-import type { FundPlan, FundProject, FundUpdate } from "./types";
+import type { FundPlan, FundProject, FundSupport, FundUpdate } from "./types";
 
 type OwnerFundContent = {
   projects: FundProject[];
   plans: FundPlan[];
+  supports: FundSupport[];
   updates: FundUpdate[];
 };
 
 export function useOwnerFundContent(ownerProfileId: string, profileSlug: string) {
   const cache = useFundProjects(ownerProfileId);
-  const [content, setContent] = useState<OwnerFundContent>({ projects: [], plans: [], updates: [] });
+  const [content, setContent] = useState<OwnerFundContent>({ projects: [], plans: [], supports: [], updates: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [migrationNotice, setMigrationNotice] = useState("");
@@ -47,22 +49,40 @@ export function useOwnerFundContent(ownerProfileId: string, profileSlug: string)
         if (updateMigration.migratedCount > 0) {
           databaseContent = await getOwnerFundContent(ownerProfileId, profileSlug);
         }
-        cacheOwnerFundContent(ownerProfileId, databaseContent.projects, databaseContent.plans, databaseContent.updates);
+        const supportMigration = await migrateLegacyFundSupports({
+          ownerProfileId,
+          databaseProjects: databaseContent.projects
+        });
+        if (supportMigration.migratedCount > 0) {
+          databaseContent = await getOwnerFundContent(ownerProfileId, profileSlug);
+        }
+        cacheOwnerFundContent(
+          ownerProfileId,
+          databaseContent.projects,
+          databaseContent.plans,
+          databaseContent.supports,
+          databaseContent.updates
+        );
 
         if (!active) return;
         setContent(databaseContent);
         const migratedParts = [
           projectMigration.migratedCount > 0 ? `Fund ${projectMigration.migratedCount}件` : "",
-          updateMigration.migratedCount > 0 ? `活動報告 ${updateMigration.migratedCount}件` : ""
+          updateMigration.migratedCount > 0 ? `活動報告 ${updateMigration.migratedCount}件` : "",
+          supportMigration.migratedCount > 0 ? `応援記録 ${supportMigration.migratedCount}件` : ""
         ].filter(Boolean);
         if (migratedParts.length > 0) {
           setMigrationNotice(`以前の${migratedParts.join("・")}を引き継ぎました。`);
-        } else if (projectMigration.preservedCount > 0 || updateMigration.preservedCount > 0) {
+        } else if (
+          projectMigration.preservedCount > 0 ||
+          updateMigration.preservedCount > 0 ||
+          supportMigration.preservedCount > 0
+        ) {
           setMigrationNotice("別のプロフィールに紐づく以前のFundデータは移行せず、そのまま残しています。");
         }
       } catch {
         if (!active) return;
-        setContent({ projects: [], plans: [], updates: [] });
+        setContent({ projects: [], plans: [], supports: [], updates: [] });
         setError("Fundを読み込めませんでした。時間をおいて、もう一度お試しください。");
       } finally {
         if (active) setLoading(false);
@@ -93,6 +113,7 @@ export function useOwnerFundContent(ownerProfileId: string, profileSlug: string)
   return {
     projects,
     plans: content.plans,
+    supports: content.supports,
     updates: content.updates,
     challengeRecords: cache.challengeRecords,
     loading,

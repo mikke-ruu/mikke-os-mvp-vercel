@@ -34,6 +34,10 @@ function ownerPlansKey(ownerProfileId: string) {
   return `mikke.fund.owner-plans.v2.${ownerProfileId}`;
 }
 
+function ownerSupportsKey(ownerProfileId: string) {
+  return `mikke.fund.owner-supports.v2.${ownerProfileId}`;
+}
+
 function ownerUpdatesKey(ownerProfileId: string) {
   return `mikke.fund.owner-updates.v2.${ownerProfileId}`;
 }
@@ -129,8 +133,8 @@ function readPlans(ownerProfileId?: string) {
   return ownerProfileId ? readList<FundPlan>(ownerPlansKey(ownerProfileId), []) : readList(PLANS_KEY, [seedPlan]);
 }
 
-function readSupports() {
-  return readList<FundSupport>(SUPPORTS_KEY, []);
+function readSupports(ownerProfileId?: string) {
+  return ownerProfileId ? readList<FundSupport>(ownerSupportsKey(ownerProfileId), []) : readList<FundSupport>(SUPPORTS_KEY, []);
 }
 
 function readUpdates(ownerProfileId?: string) {
@@ -179,10 +183,30 @@ export function getLegacyFundUpdatesForMigration() {
   }
 }
 
-export function cacheOwnerFundContent(ownerProfileId: string, projects: FundProject[], plans: FundPlan[], updates: FundUpdate[]) {
+export function getLegacyFundSupportsForMigration() {
+  if (typeof window === "undefined") return null;
+  const rawSupports = window.localStorage.getItem(SUPPORTS_KEY);
+  if (!rawSupports) return null;
+
+  try {
+    const supports = JSON.parse(rawSupports) as FundSupport[];
+    return Array.isArray(supports) ? supports : null;
+  } catch {
+    return null;
+  }
+}
+
+export function cacheOwnerFundContent(
+  ownerProfileId: string,
+  projects: FundProject[],
+  plans: FundPlan[],
+  supports: FundSupport[],
+  updates: FundUpdate[]
+) {
   if (typeof window === "undefined") return;
   writeList(ownerProjectsKey(ownerProfileId), projects);
   writeList(ownerPlansKey(ownerProfileId), plans);
+  writeList(ownerSupportsKey(ownerProfileId), supports);
   writeList(ownerUpdatesKey(ownerProfileId), updates);
 }
 
@@ -198,7 +222,7 @@ export function useFundProjects(ownerProfileId?: string) {
     function refresh() {
       setProjects(readProjects(ownerProfileId));
       setPlans(readPlans(ownerProfileId));
-      setSupports(readSupports());
+      setSupports(readSupports(ownerProfileId));
       setUpdates(readUpdates(ownerProfileId));
       setChallengeRecords(readChallengeRecords());
       setAppLinks(readAppLinks());
@@ -296,22 +320,22 @@ export function useFundProjects(ownerProfileId?: string) {
       createdAt: timestamp,
       updatedAt: timestamp
     };
-    const next = [support, ...readSupports()];
-    writeList(SUPPORTS_KEY, next);
+    const next = [support, ...readSupports(ownerProfileId)];
+    writeList(ownerProfileId ? ownerSupportsKey(ownerProfileId) : SUPPORTS_KEY, next);
     setSupports(next);
     return support;
   }
 
   function updateSupport(id: string, patch: Partial<FundSupport>) {
     const timestamp = nowIso();
-    const next = readSupports().map((support) => {
+    const next = readSupports(ownerProfileId).map((support) => {
       if (support.id !== id) return support;
       const updated = { ...support, ...patch, updatedAt: timestamp };
       updated.completedAt = updated.fulfillmentStatus === "completed" ? updated.completedAt ?? timestamp : null;
       updated.cancelledAt = updated.paymentStatus === "cancelled" ? updated.cancelledAt ?? timestamp : null;
       return updated;
     });
-    writeList(SUPPORTS_KEY, next);
+    writeList(ownerProfileId ? ownerSupportsKey(ownerProfileId) : SUPPORTS_KEY, next);
     setSupports(next);
   }
 

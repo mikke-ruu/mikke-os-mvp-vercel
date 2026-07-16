@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import type { FundPlan, FundProject, FundUpdate, FundUpdateInput } from "./types";
+import type { FundPlan, FundProject, FundSupport, FundUpdate, FundUpdateInput } from "./types";
 
 export const FUND_DATABASE_UPDATED_EVENT = "mikke-fund:database-updated";
 
@@ -76,6 +76,35 @@ type OwnerFundUpdateRow = {
   updated_at: string;
 };
 
+type OwnerFundSupportRow = {
+  id: string;
+  project_id: string;
+  source_local_id: string;
+  plan_source_id: string | null;
+  supporter_name: string;
+  supporter_email: string | null;
+  public_name: string;
+  is_anonymous: boolean;
+  comment: string;
+  support_type: FundSupport["supportType"];
+  amount: number | null;
+  quantity: number;
+  payment_status: FundSupport["paymentStatus"];
+  fulfillment_status: FundSupport["fulfillmentStatus"];
+  record_status: FundSupport["recordStatus"];
+  source: string;
+  supported_at: string;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+type OwnerFundParticipationRow = {
+  support_id: string;
+  supporter_user_id: string;
+};
+
 const ownerProjectColumns = `
   id, owner_profile_id, source_local_id, slug, title, short_description,
   description, project_type, campaign_type, stage, status, visibility,
@@ -95,6 +124,13 @@ const ownerPlanColumns = `
 const ownerUpdateColumns = `
   source_local_id, project_id, title, body, image_url, visibility,
   published_at, created_at, updated_at
+`;
+
+const ownerSupportColumns = `
+  id, project_id, source_local_id, plan_source_id, supporter_name,
+  supporter_email, public_name, is_anonymous, comment, support_type,
+  amount, quantity, payment_status, fulfillment_status, record_status,
+  source, supported_at, completed_at, cancelled_at, created_at, updated_at
 `;
 
 export async function saveFundProjectContent(input: {
@@ -125,6 +161,20 @@ export async function saveFundUpdate(input: {
   return data as string;
 }
 
+export async function saveFundSupport(input: {
+  ownerProfileId: string;
+  projectId: string;
+  support: FundSupport;
+}) {
+  const { data, error } = await supabase.rpc("save_fund_support", {
+    p_owner_profile_id: input.ownerProfileId,
+    p_project_source_local_id: input.projectId,
+    p_support: input.support
+  });
+  if (error) throw error;
+  return data as string;
+}
+
 export async function getOwnerFundContent(ownerProfileId: string, profileSlug: string) {
   const { data: projectData, error: projectError } = await supabase
     .from("fund_projects")
@@ -138,28 +188,49 @@ export async function getOwnerFundContent(ownerProfileId: string, profileSlug: s
   const databaseProjectIds = projectRows.map((project) => project.id);
   let planRows: OwnerFundPlanRow[] = [];
   let updateRows: OwnerFundUpdateRow[] = [];
+  let supportRows: OwnerFundSupportRow[] = [];
+  let participationRows: OwnerFundParticipationRow[] = [];
 
   if (databaseProjectIds.length > 0) {
-    const { data: planData, error: planError } = await supabase
-      .from("fund_plans")
-      .select(ownerPlanColumns)
-      .in("project_id", databaseProjectIds)
-      .order("sort_order", { ascending: true });
+    const [planResult, updateResult, supportResult] = await Promise.all([
+      supabase
+        .from("fund_plans")
+        .select(ownerPlanColumns)
+        .in("project_id", databaseProjectIds)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("fund_updates")
+        .select(ownerUpdateColumns)
+        .in("project_id", databaseProjectIds)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("fund_supports")
+        .select(ownerSupportColumns)
+        .in("project_id", databaseProjectIds)
+        .order("supported_at", { ascending: false })
+    ]);
 
-    if (planError) throw planError;
-    planRows = (planData ?? []) as unknown as OwnerFundPlanRow[];
+    if (planResult.error) throw planResult.error;
+    if (updateResult.error) throw updateResult.error;
+    if (supportResult.error) throw supportResult.error;
+    planRows = (planResult.data ?? []) as unknown as OwnerFundPlanRow[];
+    updateRows = (updateResult.data ?? []) as unknown as OwnerFundUpdateRow[];
+    supportRows = (supportResult.data ?? []) as unknown as OwnerFundSupportRow[];
 
-    const { data: updateData, error: updateError } = await supabase
-      .from("fund_updates")
-      .select(ownerUpdateColumns)
-      .in("project_id", databaseProjectIds)
-      .order("created_at", { ascending: false });
-
-    if (updateError) throw updateError;
-    updateRows = (updateData ?? []) as unknown as OwnerFundUpdateRow[];
+    if (supportRows.length > 0) {
+      const { data: participationData, error: participationError } = await supabase
+        .from("fund_participations")
+        .select("support_id, supporter_user_id")
+        .in("support_id", supportRows.map((support) => support.id));
+      if (participationError) throw participationError;
+      participationRows = (participationData ?? []) as unknown as OwnerFundParticipationRow[];
+    }
   }
 
   const sourceIdByDatabaseId = new Map(projectRows.map((project) => [project.id, project.source_local_id]));
+  const supporterUserIdBySupportId = new Map(
+    participationRows.map((participation) => [participation.support_id, participation.supporter_user_id])
+  );
 
   return {
     projects: projectRows.map<FundProject>((project) => ({
@@ -219,6 +290,33 @@ export async function getOwnerFundContent(ownerProfileId: string, profileSlug: s
         sortOrder: plan.sort_order,
         createdAt: plan.created_at,
         updatedAt: plan.updated_at
+      }];
+    }),
+    supports: supportRows.flatMap<FundSupport>((support) => {
+      const sourceProjectId = sourceIdByDatabaseId.get(support.project_id);
+      if (!sourceProjectId) return [];
+      return [{
+        id: support.source_local_id,
+        projectId: sourceProjectId,
+        planId: support.plan_source_id ?? "",
+        supporterUserId: supporterUserIdBySupportId.get(support.id) ?? "",
+        supporterName: support.supporter_name,
+        supporterEmail: support.supporter_email ?? "",
+        publicName: support.public_name,
+        isAnonymous: support.is_anonymous,
+        supportType: support.support_type,
+        amount: support.amount === null ? null : Number(support.amount),
+        quantity: support.quantity,
+        paymentStatus: support.payment_status,
+        fulfillmentStatus: support.fulfillment_status,
+        recordStatus: support.record_status,
+        comment: support.comment,
+        source: support.source,
+        supportedAt: support.supported_at.slice(0, 10),
+        completedAt: support.completed_at,
+        cancelledAt: support.cancelled_at,
+        createdAt: support.created_at,
+        updatedAt: support.updated_at
       }];
     }),
     updates: updateRows.flatMap<FundUpdate>((update) => {

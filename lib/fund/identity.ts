@@ -134,64 +134,28 @@ type FundIdentityOwner = {
   profileId: string;
 };
 
-async function ensureFundProjectForIdentity(project: FundProject, owner: FundIdentityOwner) {
-  const { data: existing, error: lookupError } = await supabase
+async function getFundProjectForIdentity(project: FundProject, owner: FundIdentityOwner) {
+  const { data, error } = await supabase
     .from("fund_projects")
     .select("id")
     .eq("owner_user_id", owner.userId)
+    .eq("owner_profile_id", owner.profileId)
     .eq("source_local_id", project.id)
     .maybeSingle();
-  if (lookupError) throw lookupError;
-
-  const payload = {
-    owner_user_id: owner.userId,
-    owner_profile_id: owner.profileId,
-    source_local_id: project.id,
-    slug: project.slug,
-    title: project.title,
-    visibility: project.visibility,
-    status: project.status
-  };
-  const query = existing
-    ? supabase.from("fund_projects").update(payload).eq("id", existing.id)
-    : supabase.from("fund_projects").insert(payload);
-  const { data, error } = await query.select("id").single();
   if (error) throw error;
+  if (!data) throw new Error("Fundを先に保存してから、Mikke IDの招待を作成してください。");
   return data.id as string;
 }
 
-async function ensureFundSupportForIdentity(projectId: string, support: FundSupport) {
-  const { data: existing, error: lookupError } = await supabase
+async function getFundSupportForIdentity(projectId: string, support: FundSupport) {
+  const { data, error } = await supabase
     .from("fund_supports")
     .select("id")
     .eq("project_id", projectId)
     .eq("source_local_id", support.id)
     .maybeSingle();
-  if (lookupError) throw lookupError;
-
-  const payload = {
-    project_id: projectId,
-    source_local_id: support.id,
-    plan_source_id: support.planId || null,
-    supporter_name: support.supporterName,
-    supporter_email: support.supporterEmail || null,
-    comment: support.comment || null,
-    support_type: support.supportType,
-    amount: support.amount,
-    quantity: support.quantity,
-    payment_status: support.paymentStatus,
-    fulfillment_status: support.fulfillmentStatus,
-    record_status: support.recordStatus,
-    source: support.source || "manual",
-    supported_at: new Date(`${support.supportedAt}T00:00:00.000Z`).toISOString(),
-    completed_at: support.completedAt,
-    cancelled_at: support.cancelledAt
-  };
-  const query = existing
-    ? supabase.from("fund_supports").update(payload).eq("id", existing.id)
-    : supabase.from("fund_supports").insert(payload);
-  const { data, error } = await query.select("id").single();
   if (error) throw error;
+  if (!data) throw new Error("応援記録を先に保存してから、Mikke IDの招待を作成してください。");
   return data.id as string;
 }
 
@@ -201,8 +165,8 @@ export async function createFundSupportInvite(input: {
   owner: FundIdentityOwner;
   expiresInDays?: number;
 }) {
-  const projectId = await ensureFundProjectForIdentity(input.project, input.owner);
-  const supportId = await ensureFundSupportForIdentity(projectId, input.support);
+  const projectId = await getFundProjectForIdentity(input.project, input.owner);
+  const supportId = await getFundSupportForIdentity(projectId, input.support);
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + Math.min(Math.max(input.expiresInDays ?? 14, 1), 30));
 

@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F5-c検収完了・F5-d未着手
+状態: F5-d検収完了・F5-e未着手
 
 ## 1. 目的
 
@@ -110,10 +110,11 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 9. migration履歴、RLS否定test、Database Advisor、lint、buildが成功
 ```
 
-## 7. F5-c完了後も残る境界
+## 7. F5-d完了後も残る境界
 
 - 完成記録はF5-eまでlocalStorage表示
-- 応援・提供記録由来のowner進捗値はF5-dまで既存localStorage集計
+- challenge record / app link候補はF5-eまでlocalStorage正本
+- 応援・決済・提供状態はDB正本。private Activity LogはDB保存成功後だけ既存の冪等keyで更新
 - unlistedは安全なtoken方式が決まるまで外部共有不可
 - 通知・通報・CSV・Webhookにはまだ進まない
 
@@ -166,3 +167,24 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 - lint / build成功。build ID: `HMS2o0jsrVuxSnbpGrkWb`
 
 詳細は `MIKKEOS_FUND_F5_C_HANDOFF_2026-07-16.md` を参照します。F5-dにはまだ進みません。
+
+## 11. F5-d検収結果
+
+2026-07-16に実DBへ `20260716113100_fund_f5_d_support_management.sql` を適用しました。
+
+- 既存 `fund_supports` を応援者・決済確認・集計区分・提供状況のowner-private正本へ接続
+- `source_local_id` を必須かつproject内uniqueにし、同一source IDの再保存ではDB UUIDを維持
+- `public_name` / `is_anonymous` をowner-private列として追加し、応援者名・メール・管理メモ・決済・提供状態を公開投影へ出さない境界を維持
+- `completed_at` / `cancelled_at` を状態と一致するようtriggerで正規化
+- 保存RPCは `security invoker` + owner RLS。service roleはブラウザで不使用
+- Mikke ID招待時のproject / support shadow writeを廃止し、保存済みDB行を参照するだけに変更
+- private Activity LogはDB保存成功後だけ更新し、失敗時の二重記録を防止
+- 旧 `mikke.fund.supports.v1` は、現在profileがDB上で所有するproject IDに一致する支援だけ一回upsertし、別profile相当は削除せず保全
+- owner / 支援者actor / 別actor / anon、公開進捗、同一source ID再保存、Mikke ID参加・同意投影をSQL testで検収
+- F4-b1 / F4-b2 / F5-a / F5-b / F5-c回帰test成功、全F5-d fixtureはROLLBACK済み
+- 実データは支援1件・Mikke ID参加紐付け1件を維持。source ID欠損・日時不整合・fixture残件は0件
+- F5-d由来の新しいDatabase Advisor警告0件。既存Fund項目はsecurity WARN 4件・performance INFO 5件で増加なし
+- Local / Remote migration履歴は `20260716113100` まで一致
+- lint / build成功。build ID: `w52gkH6PogZc0gHr9SkJp`
+
+詳細は `MIKKEOS_FUND_F5_D_HANDOFF_2026-07-16.md` を参照します。F5-eにはまだ進みません。

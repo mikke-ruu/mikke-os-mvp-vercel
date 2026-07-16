@@ -7,6 +7,7 @@ import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { formatDate, formatYen } from "@/lib/format";
 import { createFundPaymentActivity, createFundSupportActivity } from "@/lib/fund/activity";
+import { notifyFundDatabaseUpdated, saveFundSupport } from "@/lib/fund/database";
 import {
   createFundSupportInvite,
   getFundSupportIdentityStatuses,
@@ -15,11 +16,13 @@ import {
   type FundParticipation,
   type FundSupportIdentityStatus
 } from "@/lib/fund/identity";
-import { summarizeFundSupports, useFundProjects } from "@/lib/fund/store";
+import { summarizeFundSupports } from "@/lib/fund/store";
 import {
   fundPaymentStatusLabels,
   fundSupportRecordStatusLabels,
+  type FundPlan,
   type FundPaymentStatus,
+  type FundProject,
   type FundSupport,
   type FundSupportRecordStatus
 } from "@/lib/fund/types";
@@ -28,13 +31,19 @@ import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 const paymentStatuses = Object.keys(fundPaymentStatusLabels) as FundPaymentStatus[];
 const recordStatuses = Object.keys(fundSupportRecordStatusLabels) as FundSupportRecordStatus[];
 
-export function FundSupportManager({ projectId }: { projectId: string }) {
+export function FundSupportManager({
+  project,
+  plans,
+  supports
+}: {
+  project: FundProject;
+  plans: FundPlan[];
+  supports: FundSupport[];
+}) {
   const { user, profile } = useAuth();
-  const { projects, plans, supports, createSupport, updateSupport } = useFundProjects(profile.id);
   const { addLog, removeLog } = useUnifiedActivityLogs();
-  const project = projects.find((item) => item.id === projectId);
-  const projectPlans = plans.filter((plan) => plan.projectId === projectId);
-  const projectSupports = supports.filter((support) => support.projectId === projectId).sort((a, b) => b.supportedAt.localeCompare(a.supportedAt));
+  const projectPlans = plans.filter((plan) => plan.projectId === project.id);
+  const projectSupports = supports.filter((support) => support.projectId === project.id).sort((a, b) => b.supportedAt.localeCompare(a.supportedAt));
   const summary = summarizeFundSupports(projectSupports);
   const [supporterName, setSupporterName] = useState("");
   const [supporterEmail, setSupporterEmail] = useState("");
@@ -52,6 +61,8 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
   const [identityAction, setIdentityAction] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<{ supportId: string; message: string } | null>(null);
   const [inviteDraft, setInviteDraft] = useState<{ supportId: string; claimId: string; inviteUrl: string; expiresAt: string } | null>(null);
+  const [supportAction, setSupportAction] = useState<string | null>(null);
+  const [supportSaveError, setSupportSaveError] = useState("");
   const supportIdsKey = projectSupports.map((support) => support.id).join("|");
 
   useEffect(() => {
@@ -157,13 +168,16 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
     }
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!supporterName.trim()) return;
     const selectedPlan = projectPlans.find((plan) => plan.id === planId);
-    const support = createSupport({
-      projectId,
+    const timestamp = new Date().toISOString();
+    const support: FundSupport = {
+      id: makeSupportId(),
+      projectId: project.id,
       planId,
+      supporterUserId: "",
       supporterName: supporterName.trim(),
       supporterEmail: supporterEmail.trim(),
       publicName: publicName.trim(),
@@ -176,43 +190,76 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
       recordStatus: "valid",
       comment: comment.trim(),
       source: source.trim(),
-      supportedAt
-    });
-    if (project) {
+      supportedAt,
+      completedAt: null,
+      cancelledAt: paymentStatus === "cancelled" ? timestamp : null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+
+    setSupportAction("create");
+    setSupportSaveError("");
+    try {
+      await saveFundSupport({ ownerProfileId: profile.id, projectId: project.id, support });
       addLog(createFundSupportActivity(project, support));
       if (support.paymentStatus === "confirmed") addLog(createFundPaymentActivity(project, support));
-    }
-    setSupporterName("");
-    setSupporterEmail("");
-    setPublicName("");
-    setIsAnonymous(false);
-    setAmount("");
-    setQuantity("1");
-    setComment("");
-  }
-
-  function changePaymentStatus(supportId: string, nextStatus: FundPaymentStatus) {
-    const support = projectSupports.find((item) => item.id === supportId);
-    if (!support) return;
-    updateSupport(supportId, { paymentStatus: nextStatus });
-    if (project && nextStatus === "confirmed" && support.recordStatus === "valid") {
-      addLog(createFundPaymentActivity(project, { ...support, paymentStatus: nextStatus }));
-    } else {
-      removeLog("fund", supportId, "fund_payment_confirmed");
+      notifyFundDatabaseUpdated(profile.id);
+      setSupporterName("");
+      setSupporterEmail("");
+      setPublicName("");
+      setIsAnonymous(false);
+      setAmount("");
+      setQuantity("1");
+      setComment("");
+    } catch {
+      setSupportSaveError("応援記録を保存できませんでした。入力内容を確認して、もう一度お試しください。");
+    } finally {
+      setSupportAction(null);
     }
   }
 
-  function changeRecordStatus(supportId: string, nextStatus: FundSupportRecordStatus) {
+  async function changePaymentStatus(supportId: string, nextStatus: FundPaymentStatus) {
     const support = projectSupports.find((item) => item.id === supportId);
     if (!support) return;
-    updateSupport(supportId, { recordStatus: nextStatus });
-    if (project && nextStatus === "valid") {
-      addLog(createFundSupportActivity(project, { ...support, recordStatus: nextStatus }));
-      if (support.paymentStatus === "confirmed") addLog(createFundPaymentActivity(project, support));
-      return;
+    const nextSupport = { ...support, paymentStatus: nextStatus, updatedAt: new Date().toISOString() };
+    setSupportAction(`payment:${supportId}`);
+    setSupportSaveError("");
+    try {
+      await saveFundSupport({ ownerProfileId: profile.id, projectId: project.id, support: nextSupport });
+      if (nextStatus === "confirmed" && support.recordStatus === "valid") {
+        addLog(createFundPaymentActivity(project, nextSupport));
+      } else {
+        removeLog("fund", supportId, "fund_payment_confirmed");
+      }
+      notifyFundDatabaseUpdated(profile.id);
+    } catch {
+      setSupportSaveError("決済確認を保存できませんでした。もう一度お試しください。");
+    } finally {
+      setSupportAction(null);
     }
-    removeLog("fund", supportId, "fund_support_recorded");
-    removeLog("fund", supportId, "fund_payment_confirmed");
+  }
+
+  async function changeRecordStatus(supportId: string, nextStatus: FundSupportRecordStatus) {
+    const support = projectSupports.find((item) => item.id === supportId);
+    if (!support) return;
+    const nextSupport = { ...support, recordStatus: nextStatus, updatedAt: new Date().toISOString() };
+    setSupportAction(`record:${supportId}`);
+    setSupportSaveError("");
+    try {
+      await saveFundSupport({ ownerProfileId: profile.id, projectId: project.id, support: nextSupport });
+      if (nextStatus === "valid") {
+        addLog(createFundSupportActivity(project, nextSupport));
+        if (support.paymentStatus === "confirmed") addLog(createFundPaymentActivity(project, nextSupport));
+      } else {
+        removeLog("fund", supportId, "fund_support_recorded");
+        removeLog("fund", supportId, "fund_payment_confirmed");
+      }
+      notifyFundDatabaseUpdated(profile.id);
+    } catch {
+      setSupportSaveError("集計区分を保存できませんでした。もう一度お試しください。");
+    } finally {
+      setSupportAction(null);
+    }
   }
 
   return (
@@ -225,6 +272,7 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
       </div>
 
       <MikkeSection title="応援を手動登録">
+        {supportSaveError ? <p className="mb-3 text-xs font-semibold text-[var(--mikke-danger)]">{supportSaveError}</p> : null}
         <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
           <Field label="応援者名" required><input value={supporterName} onChange={(event) => setSupporterName(event.target.value)} className={inputClass} required /></Field>
           <Field label="メールアドレス"><input value={supporterEmail} onChange={(event) => setSupporterEmail(event.target.value)} type="email" className={inputClass} /></Field>
@@ -246,7 +294,7 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
           <Field label="公開名（任意）"><input value={publicName} onChange={(event) => setPublicName(event.target.value)} className={inputClass} /></Field>
           <label className="flex items-end gap-2 pb-2 text-sm font-semibold"><input type="checkbox" checked={isAnonymous} onChange={(event) => setIsAnonymous(event.target.checked)} /> 匿名希望</label>
           <Field label="コメント・管理メモ" className="sm:col-span-2"><textarea value={comment} onChange={(event) => setComment(event.target.value)} rows={2} className={`${inputClass} resize-none`} /></Field>
-          <button type="submit" className="rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white sm:col-span-2">応援を登録</button>
+          <button type="submit" disabled={Boolean(supportAction)} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-45 sm:col-span-2">{supportAction === "create" ? "保存中…" : "応援を登録"}</button>
         </form>
         <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">カード番号、銀行情報、配送先はFundに入力しないでください。決済は外部サービスで管理します。</p>
       </MikkeSection>
@@ -274,12 +322,12 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
                 </div>
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <label className="text-xs font-bold">決済確認
-                    <select value={support.paymentStatus} onChange={(event) => changePaymentStatus(support.id, event.target.value as FundPaymentStatus)} className={smallSelectClass}>
+                    <select value={support.paymentStatus} onChange={(event) => void changePaymentStatus(support.id, event.target.value as FundPaymentStatus)} disabled={Boolean(supportAction)} className={smallSelectClass}>
                       {paymentStatuses.map((status) => <option key={status} value={status}>{fundPaymentStatusLabels[status]}</option>)}
                     </select>
                   </label>
                   <label className="text-xs font-bold">集計区分
-                    <select value={support.recordStatus} onChange={(event) => changeRecordStatus(support.id, event.target.value as FundSupportRecordStatus)} className={smallSelectClass}>
+                    <select value={support.recordStatus} onChange={(event) => void changeRecordStatus(support.id, event.target.value as FundSupportRecordStatus)} disabled={Boolean(supportAction)} className={smallSelectClass}>
                       {recordStatuses.map((status) => <option key={status} value={status}>{fundSupportRecordStatusLabels[status]}</option>)}
                     </select>
                   </label>
@@ -367,6 +415,7 @@ const displayModeLabels: Record<FundParticipation["display_mode"], string> = {
   anonymous: "匿名"
 };
 function formatInviteExpiry(value: string) { return new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" }).format(new Date(value)); }
+function makeSupportId() { return `fund_support_${crypto.randomUUID()}`; }
 const inputClass = "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
 const smallSelectClass = "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-2 py-2 text-xs outline-none";
 function Field({ label, required = false, className = "", children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) { return <label className={`block ${className}`}><span className="text-xs font-bold">{label}{required ? <span className="ml-1 text-[var(--mikke-accent)]">*</span> : null}</span>{children}</label>; }

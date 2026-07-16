@@ -166,9 +166,11 @@ begin
   begin
     insert into public.fund_supports (
       project_id,
+      source_local_id,
       supporter_name
     ) values (
       project_b_id,
+      'rls-forbidden-support-' || suffix,
       'must be rejected'
     );
     raise exception 'owner A inserted a support into owner B project';
