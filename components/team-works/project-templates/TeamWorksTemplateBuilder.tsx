@@ -3,15 +3,18 @@
 import {
   ArrowDown,
   ArrowUp,
+  Archive,
   Check,
   Copy,
   GripVertical,
+  History,
   Plus,
   Save,
   Trash2
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import {
@@ -24,6 +27,12 @@ import {
   type ProjectTemplatePhase,
   type ProjectTemplateTask
 } from "@/lib/team-works-projects";
+import {
+  createTeamWorksTemplateVersion,
+  duplicateTeamWorksProjectTemplate,
+  overwriteTeamWorksTemplateVersion
+} from "@/lib/team-works-project-templates";
+import { teamWorksInitialState } from "@/lib/team-works";
 import {
   TeamWorksProjectField,
   teamWorksProjectInputClass
@@ -38,7 +47,8 @@ const templateStatusLabels: Record<ProjectTemplate["status"], string> = {
 const priorities = Object.keys(projectTaskPriorityLabels) as ProjectTaskPriority[];
 
 export function TeamWorksTemplateBuilder({ templateId }: { templateId: string }) {
-  const { hydrated, templateState, saveTemplateState } = useTeamWorksProjectStore();
+  const router = useRouter();
+  const { hydrated, projectState, templateState, saveTemplateState } = useTeamWorksProjectStore();
   const storedTemplate = templateState.templates.find((template) => template.id === templateId);
   const [draftState, setDraft] = useState<ProjectTemplate | null>(null);
   const draft = draftState as ProjectTemplate;
@@ -55,6 +65,9 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
     () => draft?.phases.reduce((sum, phase) => sum + Math.max(0, phase.weight), 0) ?? 0,
     [draft]
   );
+  const versions = templateState.versions.filter((version) => version.templateId === templateId).sort((a, b) => b.version - a.version);
+  const currentVersion = versions.find((version) => version.id === draft?.currentVersionId) ?? null;
+  const usedProjectCount = projectState.projects.filter((project) => project.templateId === templateId).length;
 
   function change(next: ProjectTemplate) {
     const standardDurationDays = next.phases.reduce((sum, phase) => sum + Math.max(0, phase.standardDays), 0);
@@ -63,20 +76,64 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
     setSaveError(false);
   }
 
-  function save() {
+  function save(mode: "overwrite" | "new_version" = "overwrite") {
     if (!draft || !draft.name.trim()) return;
     if (draft.status === "active" && (draft.phases.length === 0 || totalWeight !== 100)) {
       setSavedMessage("利用中にするには、工程を1件以上用意し、比重の合計を100%にしてください。");
       setSaveError(true);
       return;
     }
-    const saved = { ...draft, name: draft.name.trim(), description: draft.description.trim(), updatedAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const saved = { ...draft, name: draft.name.trim(), description: draft.description.trim(), updatedAt: now };
+    const hadCurrentVersion = templateState.versions.some((version) => version.id === saved.currentVersionId);
+    const versionResult = mode === "new_version"
+      ? createTeamWorksTemplateVersion({
+          template: saved,
+          versions: templateState.versions,
+          createdByMemberId: teamWorksInitialState.workers[0]?.id ?? "team_works_owner",
+          now,
+          createId: createTeamWorksProjectId
+        })
+      : overwriteTeamWorksTemplateVersion({
+          template: saved,
+          versions: templateState.versions,
+          createdByMemberId: teamWorksInitialState.workers[0]?.id ?? "team_works_owner",
+          now,
+          createId: createTeamWorksProjectId
+        });
+    saveTemplateState({
+      templates: templateState.templates.map((template) => template.id === saved.id ? versionResult.template : template),
+      versions: versionResult.versions
+    });
+    setDraft(versionResult.template);
+    const saveKind = mode === "new_version"
+      ? "新しい版として保存"
+      : hadCurrentVersion
+        ? "上書き保存"
+        : "初回バージョンとして保存";
+    setSavedMessage(`Ver.${versionResult.version.version}を${saveKind}しました。`);
+    setSaveError(false);
+  }
+
+  function duplicateTemplate() {
+    const now = new Date().toISOString();
+    const copy = duplicateTeamWorksProjectTemplate({ template: draft, now, createId: createTeamWorksProjectId });
     saveTemplateState({
       ...templateState,
-      templates: templateState.templates.map((template) => template.id === saved.id ? saved : template)
+      templates: [copy, ...templateState.templates]
     });
-    setDraft(saved);
-    setSavedMessage("自社テンプレートを保存しました。");
+    router.push(`/apps/team-works/project-templates/${copy.id}`);
+  }
+
+  function archiveTemplate() {
+    const now = new Date().toISOString();
+    const archived = { ...draft, status: "archived" as const, updatedAt: now };
+    saveTemplateState({
+      ...templateState,
+      templates: templateState.templates.map((template) => template.id === archived.id ? archived : template)
+    });
+    setDraft(archived);
+    setSavedMessage("テンプレートをアーカイブしました。");
     setSaveError(false);
   }
 
@@ -282,17 +339,19 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
 
   return (
     <div className="space-y-6">
-      <section className="sticky top-2 z-10 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
+      <section className="sticky top-24 z-20 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold text-[var(--mikke-muted)]">自社専用テンプレート</p>
             <p className="mt-1 text-sm font-bold">工程 {draft.phases.length}件・タスク {draft.tasks.length}件・比重 {totalWeight}%</p>
+            <p className="mt-1 text-xs text-[var(--mikke-muted)]">{currentVersion ? `現在 Ver.${currentVersion.version}` : "バージョン未作成"}・使用中プロジェクト {usedProjectCount}件</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {savedMessage ? <span className={`inline-flex items-center gap-1 text-xs font-bold ${saveError ? "text-[var(--mikke-danger)]" : "text-[var(--mikke-success)]"}`}>{saveError ? null : <Check size={14} />} {savedMessage}</span> : null}
-            <button type="button" onClick={save} disabled={!draft.name.trim()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">
-              <Save size={16} /> 自社テンプレートとして保存
+            <button type="button" onClick={() => save("overwrite")} disabled={!draft.name.trim()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">
+              <Save size={16} /> {currentVersion ? "現在の版へ上書き" : "Ver.1として保存"}
             </button>
+            <button type="button" onClick={() => save("new_version")} disabled={!draft.name.trim()} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-4 py-2.5 text-sm font-bold disabled:opacity-40"><History size={16} /> 新バージョン保存</button>
           </div>
         </div>
       </section>
@@ -459,12 +518,30 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
         })}
       </section>
 
+      <MikkeSection title="バージョン履歴">
+        {versions.length > 0 ? (
+          <div className="space-y-2">
+            {versions.map((version) => (
+              <div key={version.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--mikke-line)] p-3 text-sm">
+                <div>
+                  <p className="font-bold">Ver.{version.version} {version.id === draft.currentVersionId ? <span className="ml-2 text-xs text-[var(--mikke-accent)]">現在の版</span> : null}</p>
+                  <p className="mt-1 text-xs text-[var(--mikke-muted)]">工程 {version.snapshot.phases.length}件・タスク {version.snapshot.tasks.length}件・{new Date(version.createdAt).toLocaleString("ja-JP")}</p>
+                </div>
+                <span className="text-xs text-[var(--mikke-muted)]">進行中案件へは自動反映しません</span>
+              </div>
+            ))}
+          </div>
+        ) : <MikkeEmptyState title="バージョンはまだありません" helper="上書き保存でVer.1を作成できます。" />}
+      </MikkeSection>
+
       <section className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-bg)] p-5 text-center">
-        <p className="text-sm font-bold">テンプレートから案件を作る機能はTW-P3で追加します。</p>
-        <p className="mt-1 text-xs text-[var(--mikke-muted)]">この段階では、自社テンプレートの作成・編集・保存まで利用できます。</p>
+        <p className="text-sm font-bold">テンプレート管理</p>
+        <p className="mt-1 text-xs text-[var(--mikke-muted)]">案件作成時は現在の版をコピーし、その後のテンプレート変更を既存案件へ自動反映しません。</p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <Link href="/apps/team-works/project-templates" className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-4 py-2.5 text-sm font-bold">一覧へ戻る</Link>
-          <button type="button" onClick={save} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white"><Save size={16} /> 保存する</button>
+          {draft.status === "active" ? <Link href={`/apps/team-works/projects/new?templateId=${draft.id}`} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white">このテンプレートから案件を作る</Link> : null}
+          <button type="button" onClick={duplicateTemplate} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-4 py-2.5 text-sm font-bold"><Copy size={16} /> 複製</button>
+          {draft.status !== "archived" ? <button type="button" onClick={archiveTemplate} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-4 py-2.5 text-sm font-bold text-[var(--mikke-danger)]"><Archive size={16} /> アーカイブ</button> : null}
         </div>
       </section>
     </div>

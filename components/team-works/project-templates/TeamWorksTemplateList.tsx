@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Layers3, Plus, Sparkles } from "lucide-react";
+import { Archive, Copy, Layers3, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
@@ -11,6 +11,7 @@ import {
   type ProjectTemplate
 } from "@/lib/team-works-projects";
 import { teamWorksTemplate } from "@/lib/team-works";
+import { duplicateTeamWorksProjectTemplate } from "@/lib/team-works-project-templates";
 
 const templateStatusLabels: Record<ProjectTemplate["status"], string> = {
   draft: "下書き",
@@ -20,7 +21,7 @@ const templateStatusLabels: Record<ProjectTemplate["status"], string> = {
 
 export function TeamWorksTemplateList() {
   const router = useRouter();
-  const { hydrated, templateState, saveTemplateState } = useTeamWorksProjectStore();
+  const { hydrated, projectState, templateState, saveTemplateState } = useTeamWorksProjectStore();
   const activeCount = templateState.templates.filter((template) => template.status === "active").length;
   const draftCount = templateState.templates.filter((template) => template.status === "draft").length;
   const archivedCount = templateState.templates.filter((template) => template.status === "archived").length;
@@ -54,6 +55,24 @@ export function TeamWorksTemplateList() {
       templates: [template, ...templateState.templates]
     });
     router.push(`/apps/team-works/project-templates/${template.id}`);
+  }
+
+  function duplicateTemplate(template: ProjectTemplate) {
+    const copy = duplicateTeamWorksProjectTemplate({
+      template,
+      now: new Date().toISOString(),
+      createId: createTeamWorksProjectId
+    });
+    saveTemplateState({ ...templateState, templates: [copy, ...templateState.templates] });
+    router.push(`/apps/team-works/project-templates/${copy.id}`);
+  }
+
+  function archiveTemplate(template: ProjectTemplate) {
+    const archived = { ...template, status: "archived" as const, updatedAt: new Date().toISOString() };
+    saveTemplateState({
+      ...templateState,
+      templates: templateState.templates.map((item) => item.id === template.id ? archived : item)
+    });
   }
 
   if (!hydrated) {
@@ -106,7 +125,10 @@ export function TeamWorksTemplateList() {
           />
         ) : (
           <div className="space-y-3">
-            {templateState.templates.map((template) => (
+            {templateState.templates.map((template) => {
+              const currentVersion = templateState.versions.find((version) => version.id === template.currentVersionId);
+              const usedProjectCount = projectState.projects.filter((project) => project.templateId === template.id).length;
+              return (
               <article key={template.id} className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -119,24 +141,32 @@ export function TeamWorksTemplateList() {
                     <h3 className="mt-2 text-base font-bold">{template.name}</h3>
                     <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">{template.description || "説明はありません。"}</p>
                   </div>
-                  <Link
-                    href={`/apps/team-works/project-templates/${template.id}`}
-                    className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]"
-                  >
-                    編集する
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    {template.status === "active" ? <Link href={`/apps/team-works/projects/new?templateId=${template.id}`} className="rounded-lg bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">案件を作る</Link> : null}
+                    <Link href={`/apps/team-works/project-templates/${template.id}`} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">編集する</Link>
+                  </div>
                 </div>
-                <div className="mt-4 grid gap-2 text-xs text-[var(--mikke-muted)] sm:grid-cols-4">
+                <div className="mt-4 grid gap-2 text-xs text-[var(--mikke-muted)] sm:grid-cols-3 lg:grid-cols-6">
                   <span>工程 {template.phases.length}件</span>
                   <span>タスク {template.tasks.length}件</span>
                   <span>役割 {template.roleNames.length}件</span>
                   <span>標準 {template.standardDurationDays || 0}日</span>
+                  <span>{currentVersion ? `Ver.${currentVersion.version}` : "版未作成"}</span>
+                  <span>使用中 {usedProjectCount}件</span>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--mikke-line)] pt-3">
+                  <span className="text-xs text-[var(--mikke-muted)]">最終更新 {new Date(template.updatedAt).toLocaleString("ja-JP")}</span>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => duplicateTemplate(template)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><Copy size={14} /> 複製</button>
+                    {template.status !== "archived" ? <button type="button" onClick={() => archiveTemplate(template)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)]"><Archive size={14} /> アーカイブ</button> : null}
+                  </div>
                 </div>
                 {template.status === "archived" ? (
                   <p className="mt-3 inline-flex items-center gap-1 text-xs text-[var(--mikke-muted)]"><Archive size={14} /> 新規案件には表示しません</p>
                 ) : null}
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import {
   createTeamWorksProjectId,
@@ -12,6 +12,10 @@ import {
   type ProjectRole,
   type ProjectStatus
 } from "@/lib/team-works-projects";
+import {
+  createTeamWorksTemplateVersion,
+  instantiateTeamWorksProjectTemplate
+} from "@/lib/team-works-project-templates";
 import { teamWorksInitialState, teamWorksTemplate } from "@/lib/team-works";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 
@@ -19,7 +23,8 @@ const statuses = Object.keys(projectStatusLabels) as ProjectStatus[];
 
 export function TeamWorksProjectForm() {
   const router = useRouter();
-  const { projectState, saveProjectState } = useTeamWorksProjectStore();
+  const searchParams = useSearchParams();
+  const { projectState, templateState, saveProjectState, saveTemplateState } = useTeamWorksProjectStore();
   const clients = teamWorksInitialState.clients;
   const workers = teamWorksInitialState.workers;
   const [name, setName] = useState("");
@@ -36,6 +41,23 @@ export function TeamWorksProjectForm() {
   const [memo, setMemo] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState(searchParams.get("templateId") ?? "empty");
+  const [appliedTemplateId, setAppliedTemplateId] = useState("");
+  const availableTemplates = templateState.templates.filter((template) => template.status === "active" || template.id === selectedTemplateId);
+  const selectedTemplate = templateState.templates.find((template) => template.id === selectedTemplateId) ?? null;
+  const selectedVersion = selectedTemplate
+    ? templateState.versions.find((version) => version.id === selectedTemplate.currentVersionId) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!selectedTemplate || appliedTemplateId === selectedTemplate.id) return;
+    setName(`${selectedTemplate.name}の新しいプロジェクト`);
+    setDescription(selectedTemplate.description);
+    setGoal(selectedTemplate.phases.at(-1)?.completionCondition ?? "テンプレートの完了条件を満たす");
+    setClientVisible(selectedTemplate.featureSettings.clientPortal);
+    setStatus("preparing");
+    setAppliedTemplateId(selectedTemplate.id);
+  }, [selectedTemplate, appliedTemplateId]);
 
   function toggleMember(workerId: string) {
     if (workerId === leaderWorkerId) return;
@@ -59,6 +81,61 @@ export function TeamWorksProjectForm() {
 
     setSaving(true);
     const now = new Date().toISOString();
+    if (selectedTemplate) {
+      let templateVersion = selectedVersion;
+      if (!templateVersion) {
+        const versionResult = createTeamWorksTemplateVersion({
+          template: selectedTemplate,
+          versions: templateState.versions,
+          createdByMemberId: leaderWorkerId,
+          now,
+          createId: createTeamWorksProjectId
+        });
+        templateVersion = versionResult.version;
+        saveTemplateState({
+          templates: templateState.templates.map((template) => template.id === selectedTemplate.id ? versionResult.template : template),
+          versions: versionResult.versions
+        });
+      }
+      const selectedWorkerIds = Array.from(new Set([leaderWorkerId, ...memberWorkerIds].filter(Boolean)));
+      const generated = instantiateTeamWorksProjectTemplate({
+        template: selectedTemplate,
+        templateVersion,
+        input: {
+          organizationId: teamWorksTemplate.organizationId,
+          clientId,
+          name: name.trim(),
+          description: description.trim(),
+          goal: goal.trim(),
+          status,
+          startDate,
+          dueDate,
+          budget: budget ? Number(budget) : null,
+          leaderWorkerId,
+          selectedWorkers: selectedWorkerIds.map((workerId) => ({
+            id: workerId,
+            name: workers.find((worker) => worker.id === workerId)?.name ?? "担当メンバー"
+          })),
+          clientVisible,
+          memo: memo.trim()
+        },
+        now,
+        createId: createTeamWorksProjectId
+      });
+      saveProjectState({
+        ...projectState,
+        projects: [generated.project, ...projectState.projects],
+        projectRoles: [...projectState.projectRoles, ...generated.projectRoles],
+        projectMembers: [...projectState.projectMembers, ...generated.projectMembers],
+        phases: [...projectState.phases, ...generated.phases],
+        tasks: [...projectState.tasks, ...generated.tasks],
+        taskCheckItems: [...projectState.taskCheckItems, ...generated.taskCheckItems],
+        forms: [...projectState.forms, ...generated.forms],
+        deliverables: [...projectState.deliverables, ...generated.deliverables]
+      });
+      router.push(`/apps/team-works/projects/${generated.project.id}`);
+      return;
+    }
     const projectId = createTeamWorksProjectId("team_works_project");
     const leaderRoleId = createTeamWorksProjectId("team_works_project_role_leader");
     const memberRoleId = createTeamWorksProjectId("team_works_project_role_member");
@@ -153,11 +230,32 @@ export function TeamWorksProjectForm() {
           <TeamWorksProjectField label="予算（任意）">
             <input value={budget} onChange={(event) => setBudget(event.target.value.replace(/\D/g, ""))} inputMode="numeric" className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
-          <TeamWorksProjectField label="使用テンプレート" helper="テンプレートとジェネレーターはTW-P2で追加します。">
-            <select value="empty" disabled className={`${teamWorksProjectInputClass} disabled:opacity-70`}>
+          <TeamWorksProjectField label="使用テンプレート" helper="作成時点のテンプレート版をコピーし、案件側の編集は元テンプレートへ自動反映しません。">
+            <select
+              value={selectedTemplateId}
+              onChange={(event) => {
+                setSelectedTemplateId(event.target.value);
+                setAppliedTemplateId("");
+              }}
+              className={teamWorksProjectInputClass}
+            >
               <option value="empty">空のプロジェクト</option>
+              {availableTemplates.map((template) => (
+                <option key={template.id} value={template.id}>{template.name}</option>
+              ))}
             </select>
           </TeamWorksProjectField>
+          {selectedTemplate ? (
+            <div className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-bg)] p-4 text-xs sm:col-span-2">
+              <p className="font-bold">{selectedTemplate.name} {selectedVersion ? `Ver.${selectedVersion.version}` : "（初回作成時にVer.1を保存）"}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-[var(--mikke-muted)] sm:grid-cols-4">
+                <span>工程 {selectedTemplate.phases.length}件</span>
+                <span>タスク {selectedTemplate.tasks.length}件</span>
+                <span>役割 {selectedTemplate.roleNames.length}件</span>
+                <span>フォーム {selectedTemplate.forms.length}件</span>
+              </div>
+            </div>
+          ) : null}
         </div>
       </MikkeSection>
 
@@ -203,7 +301,7 @@ export function TeamWorksProjectForm() {
 
       {message ? <p className="mb-3 text-sm font-bold text-[var(--mikke-danger)]">{message}</p> : null}
       <button type="submit" disabled={saving || !name.trim()} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
-        {saving ? "作成しています…" : "プロジェクトを作成"}
+        {saving ? "作成しています…" : selectedTemplate ? "テンプレートからプロジェクトを作成" : "プロジェクトを作成"}
       </button>
     </form>
   );

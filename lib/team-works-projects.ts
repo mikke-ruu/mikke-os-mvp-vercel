@@ -138,6 +138,8 @@ export type ProjectPhase = {
   startDate: string;
   dueDate: string;
   ownerMemberId: string;
+  startCondition: string;
+  completionCondition: string;
   clientVisible: boolean;
 };
 
@@ -160,11 +162,24 @@ export type ProjectTask = {
   assigneeMemberId: string;
   dueDate: string;
   requiresDeliverable: boolean;
+  requiresApproval: boolean;
   requiresClientAction: boolean;
   clientVisible: boolean;
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type ProjectForm = {
+  id: string;
+  projectId: string;
+  phaseId: string;
+  taskId: string | null;
+  name: string;
+  inputRoleId: string;
+  reviewerRoleId: string;
+  required: boolean;
+  clientVisible: boolean;
 };
 
 export type ProjectDeliverable = {
@@ -278,6 +293,7 @@ export type TeamWorksProjectStoreState = {
   phases: ProjectPhase[];
   tasks: ProjectTask[];
   taskCheckItems: ProjectTaskCheckItem[];
+  forms: ProjectForm[];
   deliverables: ProjectDeliverable[];
   comments: ProjectComment[];
 };
@@ -364,6 +380,8 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       startDate: "2026-07-14",
       dueDate: "2026-07-20",
       ownerMemberId: "project_member_demo_leader",
+      startCondition: "プロジェクトを開始できる状態になったら",
+      completionCondition: "目的・範囲・確認方法が合意できたら",
       clientVisible: true
     },
     {
@@ -378,6 +396,8 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       startDate: "2026-07-21",
       dueDate: "2026-08-05",
       ownerMemberId: "project_member_demo_creator",
+      startCondition: "要件整理が完了したら",
+      completionCondition: "確認用の初稿が完成したら",
       clientVisible: true
     },
     {
@@ -392,6 +412,8 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       startDate: "2026-08-06",
       dueDate: "2026-08-14",
       ownerMemberId: "project_member_demo_leader",
+      startCondition: "制作が完了したら",
+      completionCondition: "完成内容の確認と納品が終わったら",
       clientVisible: true
     }
   ],
@@ -407,6 +429,7 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       assigneeMemberId: "project_member_demo_leader",
       dueDate: "2026-07-18",
       requiresDeliverable: false,
+      requiresApproval: false,
       requiresClientAction: false,
       clientVisible: true,
       completedAt: "2026-07-18T00:00:00.000Z",
@@ -424,6 +447,7 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       assigneeMemberId: "project_member_demo_creator",
       dueDate: "2026-07-30",
       requiresDeliverable: true,
+      requiresApproval: true,
       requiresClientAction: false,
       clientVisible: true,
       completedAt: null,
@@ -441,6 +465,7 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       assigneeMemberId: "project_member_demo_leader",
       dueDate: "2026-08-10",
       requiresDeliverable: false,
+      requiresApproval: true,
       requiresClientAction: true,
       clientVisible: true,
       completedAt: null,
@@ -464,6 +489,7 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       position: 1
     }
   ],
+  forms: [],
   deliverables: [],
   comments: []
 };
@@ -518,7 +544,11 @@ function notifyProjectStoreUpdated() {
 }
 
 export function readTeamWorksProjectStore() {
-  return readStorage(TEAM_WORKS_PROJECTS_STORAGE_KEY, teamWorksProjectDemoState, isProjectStoreState);
+  const state = readStorage(TEAM_WORKS_PROJECTS_STORAGE_KEY, teamWorksProjectDemoState, isProjectStoreState);
+  return {
+    ...state,
+    forms: Array.isArray(state.forms) ? state.forms : []
+  };
 }
 
 export function readTeamWorksProjectTemplateStore() {

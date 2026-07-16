@@ -44,7 +44,7 @@ const taskStatuses = Object.keys(projectTaskStatusLabels) as ProjectTaskStatus[]
 const taskPriorities = Object.keys(projectTaskPriorityLabels) as ProjectTaskPriority[];
 
 export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
-  const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
+  const { hydrated, projectState, templateState, saveProjectState } = useTeamWorksProjectStore();
   const [tab, setTab] = useState<ProjectTab>("overview");
   const project = projectState.projects.find((item) => item.id === projectId);
 
@@ -53,6 +53,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
 
   const phases = projectState.phases.filter((phase) => phase.projectId === project.id).sort((a, b) => a.position - b.position);
   const tasks = projectState.tasks.filter((task) => task.projectId === project.id);
+  const forms = projectState.forms.filter((form) => form.projectId === project.id);
   const deliverables = projectState.deliverables.filter((item) => item.projectId === project.id);
   const members = projectState.projectMembers.filter((member) => member.projectId === project.id);
   const roles = projectState.projectRoles.filter((role) => role.projectId === project.id);
@@ -60,6 +61,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
   const waitingTaskCount = tasks.filter((task) => ["client_response_pending", "internal_review_pending", "revision_requested"].includes(task.status)).length;
   const delayedTaskCount = tasks.filter((task) => isDelayedTask(task)).length;
   const leader = members.find((member) => member.id === project.leaderMemberId);
+  const sourceVersion = templateState.versions.find((version) => version.id === project.templateVersionId);
   const currentProjectId = project.id;
 
   function updateProject(patch: Partial<Project>) {
@@ -80,6 +82,11 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
                 {projectStatusLabels[project.status]}
               </MikkeStatusBadge>
               <span className="text-xs font-bold text-[var(--mikke-muted)]">{clientLabel(project.clientId)}</span>
+              {sourceVersion ? (
+                <span className="rounded-full bg-[var(--mikke-bg)] px-2 py-1 text-xs font-bold text-[var(--mikke-muted)]">
+                  {sourceVersion.snapshot.name} Ver.{sourceVersion.version}から作成
+                </span>
+              ) : null}
             </div>
             <h2 className="mt-3 text-2xl font-bold tracking-normal">{project.name}</h2>
             {project.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--mikke-text-soft)]">{project.description}</p> : null}
@@ -128,7 +135,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
         })}
       </div>
 
-      {tab === "overview" ? <OverviewTab project={project} phases={phases} tasks={tasks} /> : null}
+      {tab === "overview" ? <OverviewTab project={project} phases={phases} tasks={tasks} formsCount={forms.length} deliverablesCount={deliverables.length} /> : null}
       {tab === "phases" ? <PhasesTab project={project} phases={phases} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "tasks" ? <TasksTab project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "deliverables" ? (
@@ -165,16 +172,18 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
   );
 }
 
-function OverviewTab({ project, phases, tasks }: { project: NonNullable<ReturnType<typeof useTeamWorksProjectStore>["projectState"]["projects"][number]>; phases: ProjectPhase[]; tasks: ProjectTask[] }) {
+function OverviewTab({ project, phases, tasks, formsCount, deliverablesCount }: { project: NonNullable<ReturnType<typeof useTeamWorksProjectStore>["projectState"]["projects"][number]>; phases: ProjectPhase[]; tasks: ProjectTask[]; formsCount: number; deliverablesCount: number }) {
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       <MikkeSection title="目的・完成条件">
         <p className="text-sm leading-7 text-[var(--mikke-text-soft)]">{project.goal || "目的はまだ入力されていません。"}</p>
       </MikkeSection>
       <MikkeSection title="進行状況">
-        <dl className="grid grid-cols-2 gap-4 text-sm">
+        <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
           <DescriptionItem label="工程" value={`${phases.length}件`} />
           <DescriptionItem label="タスク" value={`${tasks.length}件`} />
+          <DescriptionItem label="フォーム" value={`${formsCount}件`} />
+          <DescriptionItem label="成果物枠" value={`${deliverablesCount}件`} />
           <DescriptionItem label="クライアント共有" value={project.clientVisible ? "対象" : "非公開"} />
           <DescriptionItem label="予算" value={project.budget === null ? "未設定" : `${project.budget.toLocaleString("ja-JP")}円`} />
         </dl>
@@ -238,6 +247,8 @@ function PhasesTab({
       startDate: project.startDate,
       dueDate,
       ownerMemberId,
+      startCondition: phases.length > 0 ? "前の工程が完了したら" : "プロジェクトを開始できる状態になったら",
+      completionCondition: "必要な作業と確認が終わったら",
       clientVisible: project.clientVisible
     };
     persistPhases([...state.phases, phase]);
@@ -359,6 +370,7 @@ function TasksTab({
       assigneeMemberId,
       dueDate,
       requiresDeliverable: false,
+      requiresApproval: false,
       requiresClientAction: false,
       clientVisible: project.clientVisible,
       completedAt: null,
