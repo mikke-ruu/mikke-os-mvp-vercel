@@ -9,7 +9,6 @@ import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import {
   calculateProjectProgress,
   createTeamWorksProjectId,
-  projectDeliverableStatusLabels,
   projectPhaseProgress,
   projectPhaseStatusLabels,
   projectStatusLabels,
@@ -26,6 +25,7 @@ import {
   type TeamWorksProjectStoreState
 } from "@/lib/team-works-projects";
 import { teamWorksInitialState } from "@/lib/team-works";
+import { TeamWorksProjectDeliverables } from "./TeamWorksProjectDeliverables";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 
 type ProjectTab = "overview" | "phases" | "tasks" | "deliverables" | "members";
@@ -138,19 +138,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
       {tab === "overview" ? <OverviewTab project={project} phases={phases} tasks={tasks} formsCount={forms.length} deliverablesCount={deliverables.length} /> : null}
       {tab === "phases" ? <PhasesTab project={project} phases={phases} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "tasks" ? <TasksTab project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
-      {tab === "deliverables" ? (
-        <MikkeSection title="成果物">
-          {deliverables.length > 0 ? (
-            <div className="space-y-2">
-              {deliverables.map((item) => (
-                <MikkeListRow key={item.id} title={item.title} helper={`バージョン ${item.version}`} label={projectDeliverableStatusLabels[item.status]} icon={FileCheck2} />
-              ))}
-            </div>
-          ) : (
-            <MikkeEmptyState title="成果物はまだありません" helper="提出・確認・承認の操作はTW-P5で追加します。" />
-          )}
-        </MikkeSection>
-      ) : null}
+      {tab === "deliverables" ? <TeamWorksProjectDeliverables project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "members" ? (
         <MikkeSection title="参加メンバー">
           {members.length > 0 ? (

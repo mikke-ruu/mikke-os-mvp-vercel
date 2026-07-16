@@ -7,6 +7,7 @@ import type {
 } from "./team-works-projects";
 
 export const TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID = "client_sakura";
+export const TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID = "client_portal_demo_member";
 
 const clientDeliverableStatuses = new Set<ProjectDeliverableStatus>([
   "client_review",
@@ -59,6 +60,16 @@ export type ClientProjectDeliverableView = {
   updatedAt: string;
 };
 
+export type ClientProjectCommentView = {
+  id: string;
+  phaseId: string | null;
+  taskId: string | null;
+  deliverableId: string | null;
+  authorLabel: "あなた" | "制作チーム";
+  body: string;
+  createdAt: string;
+};
+
 export type ClientProjectSummary = {
   id: string;
   name: string;
@@ -80,6 +91,7 @@ export type ClientProjectDetailView = {
   phases: ClientProjectPhaseView[];
   tasks: ClientProjectTaskView[];
   deliverables: ClientProjectDeliverableView[];
+  comments: ClientProjectCommentView[];
   actions: ClientProjectAction[];
   reviewDeliverables: ClientProjectDeliverableView[];
   approvedDeliverables: ClientProjectDeliverableView[];
@@ -149,6 +161,25 @@ export function createTeamWorksClientProjectDetail(
       status: deliverable.status,
       updatedAt: deliverable.updatedAt
     }));
+  const visibleDeliverableIds = new Set(deliverables.map((deliverable) => deliverable.id));
+
+  const comments = state.comments
+    .filter((comment) =>
+      comment.projectId === projectId
+      && comment.audience === "client"
+      && (comment.phaseId === null || visiblePhaseIds.has(comment.phaseId))
+      && (comment.taskId === null || visibleTaskIds.has(comment.taskId))
+      && (comment.deliverableId === null || visibleDeliverableIds.has(comment.deliverableId))
+    )
+    .map<ClientProjectCommentView>((comment) => ({
+      id: comment.id,
+      phaseId: comment.phaseId,
+      taskId: comment.taskId,
+      deliverableId: comment.deliverableId,
+      authorLabel: comment.authorMemberId === TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID ? "あなた" : "制作チーム",
+      body: comment.body,
+      createdAt: comment.createdAt
+    }));
 
   const actions: ClientProjectAction[] = tasks
     .filter((task) => task.requiresClientAction && !completedTaskStatuses.has(task.status))
@@ -161,12 +192,12 @@ export function createTeamWorksClientProjectDetail(
     }));
 
   deliverables
-    .filter((deliverable) => ["client_review", "revision_requested"].includes(deliverable.status))
+    .filter((deliverable) => deliverable.status === "client_review")
     .forEach((deliverable) => actions.push({
       id: deliverable.id,
       kind: "deliverable",
       title: deliverable.title,
-      helper: deliverable.status === "client_review" ? "内容を確認してください" : "修正内容を確認してください",
+      helper: "内容を確認してください",
       dueDate: ""
     }));
 
@@ -204,6 +235,7 @@ export function createTeamWorksClientProjectDetail(
     phases,
     tasks,
     deliverables,
+    comments,
     actions,
     reviewDeliverables,
     approvedDeliverables

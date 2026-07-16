@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertCircle, ArrowLeft, CalendarDays, CheckCircle2, ExternalLink, FileCheck2, ListChecks } from "lucide-react";
+import { FormEvent, useState } from "react";
+import { AlertCircle, ArrowLeft, CalendarDays, CheckCircle2, ExternalLink, FileCheck2, ListChecks, MessageSquareText } from "lucide-react";
 import Link from "next/link";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
@@ -8,18 +9,24 @@ import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import {
   createTeamWorksClientProjectDetail,
   TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID,
+  TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID,
+  type ClientProjectCommentView,
   type ClientProjectDeliverableView
 } from "@/lib/team-works-client-projects";
+import { transitionProjectDeliverable } from "@/lib/team-works-project-deliverables";
 import {
+  createTeamWorksProjectId,
   projectDeliverableStatusLabels,
   projectPhaseStatusLabels,
   projectStatusLabels,
   projectTaskStatusLabels,
-  useTeamWorksProjectStore
+  useTeamWorksProjectStore,
+  type ProjectDeliverableStatus
 } from "@/lib/team-works-projects";
+import { teamWorksProjectInputClass } from "@/components/team-works/projects/TeamWorksProjectsShell";
 
 export function TeamWorksClientProjectDetail({ projectId }: { projectId: string }) {
-  const { hydrated, projectState } = useTeamWorksProjectStore();
+  const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
   const detail = createTeamWorksClientProjectDetail(projectState, TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID, projectId);
 
   if (!hydrated) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">共有プロジェクトを読み込んでいます。</p>;
@@ -32,7 +39,58 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
     );
   }
 
-  const { project, phases, tasks, actions, reviewDeliverables, approvedDeliverables } = detail;
+  const { project, phases, tasks, comments, actions, reviewDeliverables, approvedDeliverables } = detail;
+
+  function updateDeliverable(deliverableId: string, nextStatus: ProjectDeliverableStatus, body: string) {
+    const deliverable = projectState.deliverables.find((item) => item.id === deliverableId && item.projectId === project.id && item.clientVisible);
+    if (!deliverable) return;
+    const now = new Date().toISOString();
+    const nextDeliverable = transitionProjectDeliverable({
+      deliverable,
+      nextStatus,
+      actor: "client",
+      memberId: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID,
+      now
+    });
+    saveProjectState({
+      ...projectState,
+      projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item),
+      deliverables: projectState.deliverables.map((item) => item.id === deliverable.id ? nextDeliverable : item),
+      comments: body.trim() ? [...projectState.comments, {
+        id: createTeamWorksProjectId("team_works_project_comment"),
+        projectId: project.id,
+        phaseId: deliverable.phaseId,
+        taskId: deliverable.taskId,
+        deliverableId: deliverable.id,
+        authorMemberId: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID,
+        audience: "client",
+        body: body.trim(),
+        createdAt: now,
+        updatedAt: now
+      }] : projectState.comments
+    });
+  }
+
+  function addProjectComment(body: string) {
+    if (!body.trim()) return;
+    const now = new Date().toISOString();
+    saveProjectState({
+      ...projectState,
+      projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item),
+      comments: [...projectState.comments, {
+        id: createTeamWorksProjectId("team_works_project_comment"),
+        projectId: project.id,
+        phaseId: null,
+        taskId: null,
+        deliverableId: null,
+        authorMemberId: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID,
+        audience: "client",
+        body: body.trim(),
+        createdAt: now,
+        updatedAt: now
+      }]
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -112,9 +170,11 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
       </MikkeSection>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <DeliverableSection title="確認する成果物" items={reviewDeliverables} empty="確認待ちの成果物はありません。" />
-        <DeliverableSection title="承認済み・納品済み" items={approvedDeliverables} empty="承認済みの成果物はまだありません。" />
+        <DeliverableSection title="確認する成果物" items={reviewDeliverables} comments={comments} empty="確認待ちの成果物はありません。" onAction={updateDeliverable} />
+        <DeliverableSection title="承認済み・納品済み" items={approvedDeliverables} comments={comments} empty="承認済みの成果物はまだありません。" />
       </div>
+
+      <SharedComments comments={comments.filter((comment) => !comment.deliverableId)} onSubmit={addProjectComment} />
     </div>
   );
 }
@@ -123,22 +183,19 @@ function SummaryCard({ label, value, icon: Icon }: { label: string; value: strin
   return <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4"><Icon size={18} className="text-[var(--mikke-primary)]" /><p className="mt-3 text-xs font-bold text-[var(--mikke-muted)]">{label}</p><p className="mt-1 text-lg font-bold">{value}</p></div>;
 }
 
-function DeliverableSection({ title, items, empty }: { title: string; items: ClientProjectDeliverableView[]; empty: string }) {
+function DeliverableSection({ title, items, comments, empty, onAction }: {
+  title: string;
+  items: ClientProjectDeliverableView[];
+  comments: ClientProjectCommentView[];
+  empty: string;
+  onAction?: (deliverableId: string, status: ProjectDeliverableStatus, body: string) => void;
+}) {
   return (
     <MikkeSection title={title}>
       {items.length > 0 ? (
         <div className="space-y-2">
           {items.map((item) => (
-            <article key={item.id} className="rounded-lg border border-[var(--mikke-line)] p-3">
-              <div className="flex items-start gap-3">
-                <FileCheck2 size={18} className="mt-0.5 shrink-0 text-[var(--mikke-primary)]" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold">{item.title}</p>
-                  <p className="mt-1 text-xs text-[var(--mikke-muted)]">Ver.{item.version}・{projectDeliverableStatusLabels[item.status]}</p>
-                </div>
-                {item.type === "url" && item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}
-              </div>
-            </article>
+            <ClientDeliverableCard key={item.id} item={item} comments={comments.filter((comment) => comment.deliverableId === item.id)} onAction={onAction} />
           ))}
         </div>
       ) : <p className="text-sm text-[var(--mikke-muted)]">{empty}</p>}
@@ -146,7 +203,55 @@ function DeliverableSection({ title, items, empty }: { title: string; items: Cli
   );
 }
 
+function ClientDeliverableCard({ item, comments, onAction }: { item: ClientProjectDeliverableView; comments: ClientProjectCommentView[]; onAction?: (deliverableId: string, status: ProjectDeliverableStatus, body: string) => void }) {
+  const [body, setBody] = useState("");
+  const canReview = item.status === "client_review" && Boolean(onAction);
+
+  function act(status: ProjectDeliverableStatus) {
+    if (status === "revision_requested" && !body.trim()) return;
+    onAction?.(item.id, status, body);
+    setBody("");
+  }
+
+  return (
+    <article className="rounded-lg border border-[var(--mikke-line)] p-3">
+      <div className="flex items-start gap-3">
+        <FileCheck2 size={18} className="mt-0.5 shrink-0 text-[var(--mikke-primary)]" />
+        <div className="min-w-0 flex-1"><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">Ver.{item.version}・{projectDeliverableStatusLabels[item.status]}</p></div>
+        {item.type === "url" && item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}
+      </div>
+      <ClientCommentList comments={comments} />
+      {canReview ? (
+        <div className="mt-3 border-t border-[var(--mikke-line)] pt-3">
+          <textarea value={body} onChange={(event) => setBody(event.target.value)} className={`${teamWorksProjectInputClass} min-h-20 resize-y`} placeholder="修正依頼の場合は、直してほしい点を入力してください。" />
+          <div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => act("approved")} className="rounded-lg bg-[var(--mikke-success)] px-3 py-2 text-xs font-bold text-white">承認する</button><button type="button" onClick={() => act("revision_requested")} disabled={!body.trim()} className="rounded-lg border border-[var(--mikke-danger)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:cursor-not-allowed disabled:opacity-40">修正を依頼</button></div>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function SharedComments({ comments, onSubmit }: { comments: ClientProjectCommentView[]; onSubmit: (body: string) => void }) {
+  const [body, setBody] = useState("");
+  function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); onSubmit(body); setBody(""); }
+  return (
+    <MikkeSection title="共有コメント">
+      <ClientCommentList comments={comments} empty="共有コメントはまだありません。" />
+      <form onSubmit={submit} className="mt-4 flex flex-col gap-2 sm:flex-row"><input value={body} onChange={(event) => setBody(event.target.value)} className={`${teamWorksProjectInputClass} flex-1`} placeholder="制作チームへのコメント" required /><button type="submit" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white"><MessageSquareText size={14} /> 送信</button></form>
+    </MikkeSection>
+  );
+}
+
+function ClientCommentList({ comments, empty }: { comments: ClientProjectCommentView[]; empty?: string }) {
+  if (comments.length === 0) return empty ? <p className="text-sm text-[var(--mikke-muted)]">{empty}</p> : null;
+  return <div className="mt-3 space-y-2">{comments.map((comment) => <div key={comment.id} className="rounded-lg bg-[var(--mikke-bg)] p-3"><p className="text-[11px] font-bold text-[var(--mikke-muted)]">{comment.authorLabel}・{formatDateTime(comment.createdAt)}</p><p className="mt-1 text-sm leading-6">{comment.body}</p></div>)}</div>;
+}
+
 function formatDate(value: string) {
   if (!value) return "未設定";
   return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "numeric", day: "numeric" }).format(new Date(`${value}T00:00:00`));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }

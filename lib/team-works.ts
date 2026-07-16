@@ -282,6 +282,8 @@ export const teamWorksTemplate: TeamWorksTemplate = {
     enableProjects: true,
     enableProjectTemplates: true,
     enableProjectClientPortal: true,
+    enableDeliverables: true,
+    enableProjectComments: true,
     frontSite: true,
     inquiry: true,
     scheduling: true,
