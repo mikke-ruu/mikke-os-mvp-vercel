@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import type { FundPlan, FundProject } from "./types";
+import type { FundPlan, FundProject, FundUpdate } from "./types";
 
 type PublicProjectRow = {
   project_id: string;
@@ -54,8 +54,20 @@ type PublicPlanRow = {
   updated_at: string;
 };
 
+type PublicUpdateRow = {
+  update_id: string;
+  project_id: string;
+  title: string;
+  body: string;
+  image_url: string;
+  published_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 const publicProjectColumns = "project_id, owner_profile_id, profile_slug, slug, title, short_description, description, project_type, campaign_type, stage, status, cover_image_url, goal_type, goal_value, current_value, display_amount, start_at, end_at, external_payment_url, external_application_url, why_now, audience, use_of_support, schedule, risk_notes, cancellation_policy, contact_note, published_at, completed_at, created_at, updated_at";
 const publicPlanColumns = "plan_id, project_id, title, description, image_url, plan_type, price, quantity_limit, per_person_limit, delivery_date, external_payment_url, external_application_url, status, sort_order, created_at, updated_at";
+const publicUpdateColumns = "update_id, project_id, title, body, image_url, published_at, created_at, updated_at";
 
 export async function getPublicFundProject(profileSlug: string, projectSlug: string) {
   const { data: project, error: projectError } = await supabase
@@ -74,9 +86,17 @@ export async function getPublicFundProject(profileSlug: string, projectSlug: str
     .order("sort_order", { ascending: true });
   if (plansError) throw plansError;
 
+  const { data: updates, error: updatesError } = await supabase
+    .from("fund_public_updates")
+    .select(publicUpdateColumns)
+    .eq("project_id", project.project_id)
+    .order("published_at", { ascending: false });
+  if (updatesError) throw updatesError;
+
   return {
     project: mapPublicProject(project as unknown as PublicProjectRow),
-    plans: (plans ?? []).map((plan) => mapPublicPlan(plan as unknown as PublicPlanRow))
+    plans: (plans ?? []).map((plan) => mapPublicPlan(plan as unknown as PublicPlanRow)),
+    updates: (updates ?? []).map((update) => mapPublicUpdate(update as unknown as PublicUpdateRow))
   };
 }
 
@@ -146,6 +166,20 @@ function mapPublicPlan(row: PublicPlanRow): FundPlan {
     requiresShipping: false,
     status: row.status,
     sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function mapPublicUpdate(row: PublicUpdateRow): FundUpdate {
+  return {
+    id: row.update_id,
+    projectId: row.project_id,
+    title: row.title,
+    body: row.body,
+    imageUrl: row.image_url,
+    visibility: "public",
+    publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };

@@ -55,7 +55,7 @@ export default function FundProjectPage() {
       <FundProjectPublicView
         project={project}
         plans={remoteContent?.plans ?? plans.filter((plan) => plan.projectId === project.id)}
-        updates={remoteContent ? [] : updates.filter((update) => update.projectId === project.id && update.visibility === "public")}
+        updates={remoteContent?.updates ?? updates.filter((update) => update.projectId === project.id && update.visibility === "public")}
         challengeRecord={remoteContent ? undefined : challengeRecords.find((record) => record.projectId === project.id && record.visibility === "public")}
         localOnly={!remoteContent}
       />

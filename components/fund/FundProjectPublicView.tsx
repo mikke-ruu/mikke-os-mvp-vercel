@@ -19,7 +19,7 @@ export function FundProjectPublicView({ project, plans, updates = [], challengeR
     <article>
       {preview || localOnly ? (
         <p className="mb-4 rounded-lg border border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] px-4 py-3 text-xs font-bold text-[var(--mikke-primary)]">
-          {preview ? "プレビューです。このページは現在、この端末内だけで確認できます。" : "この内容は移行中の端末データです。ほかの端末にはまだ公開されていません。"}
+          {preview ? "公開前の内容も含むプレビューです。" : "この内容は移行中の端末データです。ほかの端末にはまだ公開されていません。"}
         </p>
       ) : null}
 

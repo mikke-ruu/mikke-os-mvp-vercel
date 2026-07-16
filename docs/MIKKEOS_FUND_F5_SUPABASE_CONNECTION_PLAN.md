@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F5-b検収完了・F5-c未着手
+状態: F5-c検収完了・F5-d未着手
 
 ## 1. 目的
 
@@ -110,9 +110,9 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 9. migration履歴、RLS否定test、Database Advisor、lint、buildが成功
 ```
 
-## 7. F5-b完了後も残る境界
+## 7. F5-c完了後も残る境界
 
-- 活動報告と完成記録はF5-c / F5-eまでlocalStorage表示
+- 完成記録はF5-eまでlocalStorage表示
 - 応援・提供記録由来のowner進捗値はF5-dまで既存localStorage集計
 - unlistedは安全なtoken方式が決まるまで外部共有不可
 - 通知・通報・CSV・Webhookにはまだ進まない
@@ -148,3 +148,21 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 - 2人目のactorではowner一覧0件、`ayumi`へ切替後は実DBのFund 1件をowner一覧に表示し、RLSの分離と正本読込を実画面で確認
 
 詳細は `MIKKEOS_FUND_F5_B_HANDOFF_2026-07-16.md` を参照します。F5-cは別パッケージとして開始します。
+
+## 10. F5-c検収結果
+
+2026-07-16に実DBへ `20260716105132_fund_f5_c_activity_updates.sql` を適用しました。
+
+- owner-private `fund_updates` とpublic-safe `fund_public_updates` を追加
+- draftは公開投影0件、publicは親projectが公開中の場合だけ同期
+- 本文、画像URL、公開日時をDB制約とtriggerで正規化し、下書きへ戻すと公開日時と投影を削除
+- owner読取り・保存と公開詳細画面をDB正本へ接続
+- 旧 `mikke.fund.updates.v1` は、現在profileがDB上で所有するproject IDに一致する報告だけ一回移行
+- owner / 別authenticated actor / anon、親projectのprivate/public切替、無効画像URLをSQL testで検収
+- F4-b1 / F4-b2 / F5-a / F5-b回帰test成功、全fixtureはROLLBACK済み
+- `fund_updates` / `fund_public_updates` はRLS有効かつforce。実DBのF5-c fixture残件0件
+- F5-c由来の新しいDatabase Advisor警告0件。既存Fund警告・INFOの増加なし
+- Local / Remote migration履歴は `20260716105132` まで一致
+- lint / build成功。build ID: `HMS2o0jsrVuxSnbpGrkWb`
+
+詳細は `MIKKEOS_FUND_F5_C_HANDOFF_2026-07-16.md` を参照します。F5-dにはまだ進みません。

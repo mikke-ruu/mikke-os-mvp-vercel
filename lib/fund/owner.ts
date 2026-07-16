@@ -4,16 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { FUND_DATABASE_UPDATED_EVENT, getOwnerFundContent } from "./database";
 import { migrateLegacyFundContent } from "./legacy-migration";
 import { cacheOwnerFundContent, useFundProjects } from "./store";
-import type { FundPlan, FundProject } from "./types";
+import { migrateLegacyFundUpdates } from "./update-migration";
+import type { FundPlan, FundProject, FundUpdate } from "./types";
 
 type OwnerFundContent = {
   projects: FundProject[];
   plans: FundPlan[];
+  updates: FundUpdate[];
 };
 
 export function useOwnerFundContent(ownerProfileId: string, profileSlug: string) {
   const cache = useFundProjects(ownerProfileId);
-  const [content, setContent] = useState<OwnerFundContent>({ projects: [], plans: [] });
+  const [content, setContent] = useState<OwnerFundContent>({ projects: [], plans: [], updates: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [migrationNotice, setMigrationNotice] = useState("");
@@ -28,27 +30,39 @@ export function useOwnerFundContent(ownerProfileId: string, profileSlug: string)
 
       try {
         let databaseContent = await getOwnerFundContent(ownerProfileId, profileSlug);
-        const migration = await migrateLegacyFundContent({
+        const projectMigration = await migrateLegacyFundContent({
           ownerProfileId,
           profileSlug,
           databaseProjects: databaseContent.projects
         });
 
-        if (migration.migratedCount > 0) {
+        if (projectMigration.migratedCount > 0) {
           databaseContent = await getOwnerFundContent(ownerProfileId, profileSlug);
         }
-        cacheOwnerFundContent(ownerProfileId, databaseContent.projects, databaseContent.plans);
+        const updateMigration = await migrateLegacyFundUpdates({
+          ownerProfileId,
+          databaseProjects: databaseContent.projects,
+          databaseUpdates: databaseContent.updates
+        });
+        if (updateMigration.migratedCount > 0) {
+          databaseContent = await getOwnerFundContent(ownerProfileId, profileSlug);
+        }
+        cacheOwnerFundContent(ownerProfileId, databaseContent.projects, databaseContent.plans, databaseContent.updates);
 
         if (!active) return;
         setContent(databaseContent);
-        if (migration.migratedCount > 0) {
-          setMigrationNotice(`以前のFund ${migration.migratedCount}件を引き継ぎました。`);
-        } else if (migration.preservedCount > 0) {
-          setMigrationNotice("別のプロフィールに紐づく以前のFundは移行せず、そのまま残しています。");
+        const migratedParts = [
+          projectMigration.migratedCount > 0 ? `Fund ${projectMigration.migratedCount}件` : "",
+          updateMigration.migratedCount > 0 ? `活動報告 ${updateMigration.migratedCount}件` : ""
+        ].filter(Boolean);
+        if (migratedParts.length > 0) {
+          setMigrationNotice(`以前の${migratedParts.join("・")}を引き継ぎました。`);
+        } else if (projectMigration.preservedCount > 0 || updateMigration.preservedCount > 0) {
+          setMigrationNotice("別のプロフィールに紐づく以前のFundデータは移行せず、そのまま残しています。");
         }
       } catch {
         if (!active) return;
-        setContent({ projects: [], plans: [] });
+        setContent({ projects: [], plans: [], updates: [] });
         setError("Fundを読み込めませんでした。時間をおいて、もう一度お試しください。");
       } finally {
         if (active) setLoading(false);
@@ -79,7 +93,7 @@ export function useOwnerFundContent(ownerProfileId: string, profileSlug: string)
   return {
     projects,
     plans: content.plans,
-    updates: cache.updates,
+    updates: content.updates,
     challengeRecords: cache.challengeRecords,
     loading,
     error,

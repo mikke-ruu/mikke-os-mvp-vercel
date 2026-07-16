@@ -34,6 +34,10 @@ function ownerPlansKey(ownerProfileId: string) {
   return `mikke.fund.owner-plans.v2.${ownerProfileId}`;
 }
 
+function ownerUpdatesKey(ownerProfileId: string) {
+  return `mikke.fund.owner-updates.v2.${ownerProfileId}`;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -129,8 +133,8 @@ function readSupports() {
   return readList<FundSupport>(SUPPORTS_KEY, []);
 }
 
-function readUpdates() {
-  return readList<FundUpdate>(UPDATES_KEY, []);
+function readUpdates(ownerProfileId?: string) {
+  return ownerProfileId ? readList<FundUpdate>(ownerUpdatesKey(ownerProfileId), []) : readList<FundUpdate>(UPDATES_KEY, []);
 }
 
 function readChallengeRecords() {
@@ -162,10 +166,24 @@ export function getLegacyFundContentForMigration() {
   }
 }
 
-export function cacheOwnerFundContent(ownerProfileId: string, projects: FundProject[], plans: FundPlan[]) {
+export function getLegacyFundUpdatesForMigration() {
+  if (typeof window === "undefined") return null;
+  const rawUpdates = window.localStorage.getItem(UPDATES_KEY);
+  if (!rawUpdates) return null;
+
+  try {
+    const updates = JSON.parse(rawUpdates) as FundUpdate[];
+    return Array.isArray(updates) ? updates : null;
+  } catch {
+    return null;
+  }
+}
+
+export function cacheOwnerFundContent(ownerProfileId: string, projects: FundProject[], plans: FundPlan[], updates: FundUpdate[]) {
   if (typeof window === "undefined") return;
   writeList(ownerProjectsKey(ownerProfileId), projects);
   writeList(ownerPlansKey(ownerProfileId), plans);
+  writeList(ownerUpdatesKey(ownerProfileId), updates);
 }
 
 export function useFundProjects(ownerProfileId?: string) {
@@ -181,7 +199,7 @@ export function useFundProjects(ownerProfileId?: string) {
       setProjects(readProjects(ownerProfileId));
       setPlans(readPlans(ownerProfileId));
       setSupports(readSupports());
-      setUpdates(readUpdates());
+      setUpdates(readUpdates(ownerProfileId));
       setChallengeRecords(readChallengeRecords());
       setAppLinks(readAppLinks());
     }
@@ -306,21 +324,21 @@ export function useFundProjects(ownerProfileId?: string) {
       createdAt: timestamp,
       updatedAt: timestamp
     };
-    const next = [update, ...readUpdates()];
-    writeList(UPDATES_KEY, next);
+    const next = [update, ...readUpdates(ownerProfileId)];
+    writeList(ownerProfileId ? ownerUpdatesKey(ownerProfileId) : UPDATES_KEY, next);
     setUpdates(next);
     return update;
   }
 
   function updateFundUpdate(id: string, patch: Partial<FundUpdate>) {
     const timestamp = nowIso();
-    const next = readUpdates().map((update) => {
+    const next = readUpdates(ownerProfileId).map((update) => {
       if (update.id !== id) return update;
       const updated = { ...update, ...patch, updatedAt: timestamp };
       if (!updated.publishedAt && updated.visibility === "public") updated.publishedAt = timestamp;
       return updated;
     });
-    writeList(UPDATES_KEY, next);
+    writeList(ownerProfileId ? ownerUpdatesKey(ownerProfileId) : UPDATES_KEY, next);
     setUpdates(next);
   }
 

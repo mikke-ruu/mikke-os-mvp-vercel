@@ -6,25 +6,71 @@ import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { formatDate } from "@/lib/format";
-import { useFundProjects } from "@/lib/fund/store";
-import type { FundUpdateVisibility } from "@/lib/fund/types";
+import { notifyFundDatabaseUpdated, saveFundUpdate } from "@/lib/fund/database";
+import type { FundUpdate, FundUpdateVisibility } from "@/lib/fund/types";
 import { isValidFundExternalUrl, normalizeFundExternalUrl } from "@/lib/fund/url";
 
-export function FundUpdateManager({ projectId }: { projectId: string }) {
+export function FundUpdateManager({ projectId, updates }: { projectId: string; updates: FundUpdate[] }) {
   const { profile } = useAuth();
-  const { updates, createUpdate, updateFundUpdate } = useFundProjects(profile.id);
   const projectUpdates = updates.filter((update) => update.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [visibility, setVisibility] = useState<FundUpdateVisibility>("draft");
+  const [saving, setSaving] = useState(false);
+  const [pendingUpdateId, setPendingUpdateId] = useState("");
+  const [saveError, setSaveError] = useState("");
   const validImage = isValidFundExternalUrl(imageUrl);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!title.trim() || !body.trim() || !validImage) return;
-    createUpdate({ projectId, title: title.trim(), body: body.trim(), imageUrl: normalizeFundExternalUrl(imageUrl), visibility });
-    setTitle(""); setBody(""); setImageUrl(""); setVisibility("draft");
+    setSaving(true);
+    setSaveError("");
+    try {
+      await saveFundUpdate({
+        ownerProfileId: profile.id,
+        projectId,
+        update: {
+          id: `fund_update_${crypto.randomUUID()}`,
+          projectId,
+          title: title.trim(),
+          body: body.trim(),
+          imageUrl: normalizeFundExternalUrl(imageUrl),
+          visibility
+        }
+      });
+      setTitle(""); setBody(""); setImageUrl(""); setVisibility("draft");
+      notifyFundDatabaseUpdated(profile.id);
+    } catch {
+      setSaveError("活動報告を保存できませんでした。時間をおいて、もう一度お試しください。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggleVisibility(update: FundUpdate) {
+    setPendingUpdateId(update.id);
+    setSaveError("");
+    try {
+      await saveFundUpdate({
+        ownerProfileId: profile.id,
+        projectId,
+        update: {
+          id: update.id,
+          projectId,
+          title: update.title,
+          body: update.body,
+          imageUrl: update.imageUrl,
+          visibility: update.visibility === "public" ? "draft" : "public"
+        }
+      });
+      notifyFundDatabaseUpdated(profile.id);
+    } catch {
+      setSaveError("公開状態を変更できませんでした。時間をおいて、もう一度お試しください。");
+    } finally {
+      setPendingUpdateId("");
+    }
   }
 
   return (
@@ -38,7 +84,8 @@ export function FundUpdateManager({ projectId }: { projectId: string }) {
           <Field label="公開状態">
             <select value={visibility} onChange={(event) => setVisibility(event.target.value as FundUpdateVisibility)} className={inputClass}><option value="draft">下書き</option><option value="public">公開</option></select>
           </Field>
-          <button type="submit" disabled={!title.trim() || !body.trim() || !validImage} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">活動報告を保存</button>
+          {saveError ? <p className="text-xs font-bold text-[var(--mikke-danger)]">{saveError}</p> : null}
+          <button type="submit" disabled={saving || !title.trim() || !body.trim() || !validImage} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? "保存しています…" : "活動報告を保存"}</button>
         </form>
       </MikkeSection>
 
@@ -47,7 +94,7 @@ export function FundUpdateManager({ projectId }: { projectId: string }) {
           <article key={update.id} className="py-4 first:pt-0">
             <div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold">{update.title}</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">{formatDate(update.publishedAt ?? update.createdAt)}</p></div><MikkeStatusBadge tone={update.visibility === "public" ? "success" : "muted"} className="px-2 py-1">{update.visibility === "public" ? "公開" : "下書き"}</MikkeStatusBadge></div>
             <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{update.body}</p>
-            <button type="button" onClick={() => updateFundUpdate(update.id, { visibility: update.visibility === "public" ? "draft" : "public" })} className="mt-3 text-xs font-bold text-[var(--mikke-primary)]">{update.visibility === "public" ? "下書きに戻す" : "公開する"}</button>
+            <button type="button" disabled={pendingUpdateId === update.id} onClick={() => void toggleVisibility(update)} className="mt-3 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">{pendingUpdateId === update.id ? "変更しています…" : update.visibility === "public" ? "下書きに戻す" : "公開する"}</button>
           </article>
         ))}</div> : <MikkeEmptyState title="活動報告はまだありません" helper="進んだことを少しずつ残せます。" />}
       </MikkeSection>

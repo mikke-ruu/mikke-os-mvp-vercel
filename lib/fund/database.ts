@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import type { FundPlan, FundProject } from "./types";
+import type { FundPlan, FundProject, FundUpdate, FundUpdateInput } from "./types";
 
 export const FUND_DATABASE_UPDATED_EVENT = "mikke-fund:database-updated";
 
@@ -64,6 +64,18 @@ type OwnerFundPlanRow = {
   updated_at: string;
 };
 
+type OwnerFundUpdateRow = {
+  source_local_id: string;
+  project_id: string;
+  title: string;
+  body: string;
+  image_url: string;
+  visibility: FundUpdate["visibility"];
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const ownerProjectColumns = `
   id, owner_profile_id, source_local_id, slug, title, short_description,
   description, project_type, campaign_type, stage, status, visibility,
@@ -80,6 +92,11 @@ const ownerPlanColumns = `
   requires_shipping, status, sort_order, created_at, updated_at
 `;
 
+const ownerUpdateColumns = `
+  source_local_id, project_id, title, body, image_url, visibility,
+  published_at, created_at, updated_at
+`;
+
 export async function saveFundProjectContent(input: {
   ownerProfileId: string;
   project: FundProject;
@@ -89,6 +106,20 @@ export async function saveFundProjectContent(input: {
     p_owner_profile_id: input.ownerProfileId,
     p_project: input.project,
     p_plans: input.plans
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function saveFundUpdate(input: {
+  ownerProfileId: string;
+  projectId: string;
+  update: FundUpdateInput & { id: string };
+}) {
+  const { data, error } = await supabase.rpc("save_fund_update", {
+    p_owner_profile_id: input.ownerProfileId,
+    p_project_source_local_id: input.projectId,
+    p_update: input.update
   });
   if (error) throw error;
   return data as string;
@@ -106,6 +137,7 @@ export async function getOwnerFundContent(ownerProfileId: string, profileSlug: s
   const projectRows = (projectData ?? []) as unknown as OwnerFundProjectRow[];
   const databaseProjectIds = projectRows.map((project) => project.id);
   let planRows: OwnerFundPlanRow[] = [];
+  let updateRows: OwnerFundUpdateRow[] = [];
 
   if (databaseProjectIds.length > 0) {
     const { data: planData, error: planError } = await supabase
@@ -116,6 +148,15 @@ export async function getOwnerFundContent(ownerProfileId: string, profileSlug: s
 
     if (planError) throw planError;
     planRows = (planData ?? []) as unknown as OwnerFundPlanRow[];
+
+    const { data: updateData, error: updateError } = await supabase
+      .from("fund_updates")
+      .select(ownerUpdateColumns)
+      .in("project_id", databaseProjectIds)
+      .order("created_at", { ascending: false });
+
+    if (updateError) throw updateError;
+    updateRows = (updateData ?? []) as unknown as OwnerFundUpdateRow[];
   }
 
   const sourceIdByDatabaseId = new Map(projectRows.map((project) => [project.id, project.source_local_id]));
@@ -178,6 +219,21 @@ export async function getOwnerFundContent(ownerProfileId: string, profileSlug: s
         sortOrder: plan.sort_order,
         createdAt: plan.created_at,
         updatedAt: plan.updated_at
+      }];
+    }),
+    updates: updateRows.flatMap<FundUpdate>((update) => {
+      const sourceProjectId = sourceIdByDatabaseId.get(update.project_id);
+      if (!sourceProjectId) return [];
+      return [{
+        id: update.source_local_id,
+        projectId: sourceProjectId,
+        title: update.title,
+        body: update.body,
+        imageUrl: update.image_url,
+        visibility: update.visibility,
+        publishedAt: update.published_at,
+        createdAt: update.created_at,
+        updatedAt: update.updated_at
       }];
     })
   };
