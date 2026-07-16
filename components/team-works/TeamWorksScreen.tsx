@@ -27,6 +27,8 @@ import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
+import { TeamWorksAdminProjectDashboard } from "@/components/team-works/projects/TeamWorksAdminProjectDashboard";
+import { TeamWorksWorkerModeNav } from "@/components/team-works/worker-projects/TeamWorksWorkerModeNav";
 import {
   createTeamWorksId,
   formatSessionTime,
@@ -440,7 +442,14 @@ function OperationsDashboardView({
   const completedSessions = state.sessions.filter((session) => session.status === "completed");
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_390px]">
+    <div className="space-y-6">
+      <section aria-labelledby="team-works-recurring-dashboard">
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--mikke-accent)]">Recurring work</p>
+          <h3 id="team-works-recurring-dashboard" className="mt-1 text-lg font-bold">継続業務</h3>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">授業・割当・報告など、日々繰り返す運営を確認します。</p>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_390px]">
       <div className="grid gap-4">
         <Panel title="今日の運営ボード" lead="授業、Zoom、担当、次に使う資料をここで確認します。">
           <div className="grid gap-2.5">
@@ -493,6 +502,9 @@ function OperationsDashboardView({
           </div>
         </Panel>
       </div>
+        </div>
+      </section>
+      {teamWorksTemplate.featureSettings.enableProjects ? <TeamWorksAdminProjectDashboard /> : null}
     </div>
   );
 }
@@ -927,11 +939,18 @@ function WorkerPortalView({ state, updateState, helpers }: ScreenProps & { helpe
   }
 
   if (!firstSession || !selectedParticipant) {
-    return <Empty text="表示できる授業がまだありません。" />;
+    return (
+      <div className="space-y-4">
+        {teamWorksTemplate.featureSettings.enableProjects ? <div className="border-b border-[var(--mikke-line)] pb-4"><TeamWorksWorkerModeNav /></div> : null}
+        <Empty text="表示できる授業がまだありません。" />
+      </div>
+    );
   }
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)_360px]">
+    <div className="space-y-4">
+      {teamWorksTemplate.featureSettings.enableProjects ? <div className="border-b border-[var(--mikke-line)] pb-4"><TeamWorksWorkerModeNav /></div> : null}
+      <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)_360px]">
       <Panel title="今日の授業">
         <div className="grid gap-3">
           {workerSessions.map((session) => {
@@ -1020,6 +1039,7 @@ function WorkerPortalView({ state, updateState, helpers }: ScreenProps & { helpe
       <div className="grid gap-3">
         <AvailabilityBox state={state} workerId={worker?.id ?? ""} onSave={saveAvailability} />
         <MessageBox state={state} targetId={worker?.id ?? ""} role="worker" updateState={updateState} />
+      </div>
       </div>
     </div>
   );

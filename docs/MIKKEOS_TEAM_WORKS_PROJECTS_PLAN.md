@@ -5,7 +5,7 @@
 実装: TW-P番号を指定してcodexまたはSonnetへ依頼する前提
 
 統合更新: 2026-07-17（Codex）
-現在地: TW-P5（成果物ワークフロー＋コメント）実装・検収完了。次はTW-P6。
+現在地: TW-P6（workerポータル・ダッシュボード）実装・検収完了。次はTW-P7の着手判断。
 
 このdocsは、次の2つの構想書を、現在の一本化実行ライン・既存Team Works構造・共通部品・安全規約へ落とし込んだ実装計画です。
 
@@ -491,4 +491,41 @@ migration・RLS・actor別否定テストを一体で設計する。
 - actorはlocalStorage検証用。Supabase本接続時にAuth/RLSと実memberへ置き換える。
 - workerポータルと管理者ダッシュボードのプロジェクト表示はTW-P6。
 - Supabase / Activity Log / DESK / Storyへの本接続はまだ行わない。
+```
+
+## 17. TW-P6実装結果（2026-07-17）
+
+```text
+実装:
+- /apps/team-works/portal/worker/projects に担当プロジェクト一覧を追加。
+- /apps/team-works/portal/worker/projects/[projectId] に担当内容の詳細を追加。
+- project_members.organizationMemberIdとworker IDを照合し、本人が参加する案件、
+  本人が担当する工程・タスク・成果物・関連コメントだけを専用型へ投影。
+- worker一覧へ担当案件数・担当タスク数・今やること・期限超過を追加。
+- worker詳細へ今やること、自分の工程とタスク、担当成果物、関連コメントを追加。
+- 既存レッスン実施画面とプロジェクト画面を「継続業務 / プロジェクト」で分離。
+  継続業務が0件でもプロジェクト導線は残る。
+- 管理者ダッシュボードを「継続業務」「プロジェクト」の独立セクションに分け、
+  進行中案件・確認/修正待ち・期限超過タスク・案件カードを追加。
+- 業種色のない標準デモ案件もworker_hanako / worker_ichiroへ紐付け、
+  fresh localStorageでもworker投影を検収できる状態にした。
+
+検収:
+- 佐藤花子へ1件だけ割り当てた状態で、そのタスクだけがworker詳細に表示され、
+  鈴木一郎担当タスクは0件表示であることを確認。
+- worker詳細に予算、内部メモ、報酬が表示されないことを確認。
+- 未参加プロジェクトのworker用詳細URLが拒否表示になることを確認。
+- 既存レッスン実施画面で「継続業務 / プロジェクト」切替を確認。
+- 管理ダッシュボードで継続業務見出し、プロジェクト見出し、案件カードが
+  独立したセクションとして表示されることを確認。
+- lint成功。
+- build成功（75 static pages。新規2 routesを含む）。
+
+現在の境界:
+- worker IDはlocalStorage検証用の固定デモactor。Supabase本接続時に
+  Auth/RLSとorganization_membersの実actorへ置き換える。
+- worker側はTW-P6範囲では担当内容の確認に限定。タスク状態更新や成果物提出は
+  本接続時の権限設計と合わせて実装する。
+- フォーム項目リッチ型、テンプレ改善ループ、報酬/請求実接続、Manager連携は
+  TW-P7候補であり、着手範囲は別途判断する。
 ```

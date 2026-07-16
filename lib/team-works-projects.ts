@@ -353,7 +353,7 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
     {
       id: "project_member_demo_leader",
       projectId: demoProjectId,
-      organizationMemberId: "organization_member_demo_leader",
+      organizationMemberId: "worker_hanako",
       displayName: "進行担当",
       projectRoleId: "project_role_demo_leader",
       joinedAt: demoCreatedAt
@@ -361,7 +361,7 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
     {
       id: "project_member_demo_creator",
       projectId: demoProjectId,
-      organizationMemberId: "organization_member_demo_creator",
+      organizationMemberId: "worker_ichiro",
       displayName: "制作担当",
       projectRoleId: "project_role_demo_creator",
       joinedAt: demoCreatedAt
