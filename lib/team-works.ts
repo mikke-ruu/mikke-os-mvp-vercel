@@ -231,6 +231,27 @@ export type TeamWorksViewConfig = {
   icon: LucideIcon;
 };
 
+export const teamWorksProjectFeatureDefaults = {
+  enableRecurringOperations: true,
+  enableProjects: false,
+  enableProjectTemplates: false,
+  enableProjectClientPortal: false,
+  enableDeliverables: false,
+  enableProjectComments: false,
+  enableProjectPayouts: false,
+  enableProjectInvoices: false
+} satisfies Pick<
+  FeatureSettings,
+  | "enableRecurringOperations"
+  | "enableProjects"
+  | "enableProjectTemplates"
+  | "enableProjectClientPortal"
+  | "enableDeliverables"
+  | "enableProjectComments"
+  | "enableProjectPayouts"
+  | "enableProjectInvoices"
+>;
+
 export const teamWorksTemplate: TeamWorksTemplate = {
   organizationId: "org_rin_ring_demo",
   templateKey: "japanese_conversation_training",
@@ -257,14 +278,8 @@ export const teamWorksTemplate: TeamWorksTemplate = {
     invoices: "学校請求"
   },
   featureSettings: {
-    enableRecurringOperations: true,
-    enableProjects: false,
-    enableProjectTemplates: false,
-    enableProjectClientPortal: false,
-    enableDeliverables: false,
-    enableProjectComments: false,
-    enableProjectPayouts: false,
-    enableProjectInvoices: false,
+    ...teamWorksProjectFeatureDefaults,
+    enableProjects: true,
     frontSite: true,
     inquiry: true,
     scheduling: true,

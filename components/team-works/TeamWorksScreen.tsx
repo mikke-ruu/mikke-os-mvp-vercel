@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardCheck,
+  FolderKanban,
   Languages,
   MessageCircle,
   RotateCcw,
@@ -180,6 +181,14 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
 
         <div className="min-w-0 lg:hidden">
           <ModeSwitcher mode={mode} setMode={setMode} />
+          {mode === "admin" && teamWorksTemplate.featureSettings.enableProjects ? (
+            <Link
+              href="/apps/team-works/projects"
+              className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-xs font-bold text-[var(--mikke-primary)]"
+            >
+              <FolderKanban size={16} /> プロジェクトを開く
+            </Link>
+          ) : null}
         </div>
 
         <section className="grid min-w-0 grid-cols-2 gap-3 md:grid-cols-4">
@@ -276,6 +285,15 @@ function DesktopSidebar({ view, mode, setMode }: { view: TeamWorksView; mode: Vi
             })}
           </div>
         ))}
+        {mode === "admin" && teamWorksTemplate.featureSettings.enableProjects ? (
+          <div className="tw-sidebar-group">
+            <p className="tw-sidebar-group-title">プロジェクト</p>
+            <Link href="/apps/team-works/projects" className="tw-sidebar-link">
+              <FolderKanban size={18} />
+              <span>プロジェクト</span>
+            </Link>
+          </div>
+        ) : null}
       </nav>
       <div className="tw-sidebar-footer">
         <p className="tw-helper font-bold">次に整える場所</p>

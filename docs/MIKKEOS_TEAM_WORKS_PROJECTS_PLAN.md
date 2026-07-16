@@ -5,7 +5,7 @@
 実装: TW-P番号を指定してcodexまたはSonnetへ依頼する前提
 
 統合更新: 2026-07-16（Codex）
-現在地: TW-P0（型・localStorage store・汎用デモ）実装・検収完了。次はTW-P1。
+現在地: TW-P1（プロジェクト管理UI）実装・検収完了。次はTW-P2。
 
 このdocsは、次の2つの構想書を、現在の一本化実行ライン・既存Team Works構造・共通部品・安全規約へ落とし込んだ実装計画です。
 
@@ -339,4 +339,32 @@ migration・RLS・actor別否定テストを一体で設計する。
 - プロジェクト画面・ルート・ナビはまだ作らない。
 - ジェネレーター、自社テンプレ保存UI、ポータルはまだ作らない。
 - Supabase / Activity Log / DESK / Storyへ接続しない。
+```
+
+## 12. TW-P1実装結果（2026-07-16）
+
+```text
+実装:
+- /apps/team-works/projects に概要指標・絞り込み付き一覧を追加。
+- /apps/team-works/projects/new に空プロジェクトの新規作成画面を追加。
+- /apps/team-works/projects/[projectId] に概要・工程・タスク・成果物・
+  メンバーの5タブを持つ詳細画面を追加。
+- 工程・タスクの追加、状態変更、担当割当、比重による全体進捗更新をstoreへ接続。
+- Team Works管理者ナビに、機能フラグ有効時だけプロジェクト導線を追加。
+- プロジェクト系フラグの標準値はOFFを維持し、現在のデモ組織だけ
+  enableProjectsをONにして検収可能にした。
+- 全ルートをAuthGateで保護し、共通MikkeAppShellと--mikke-* tokenを使用。
+
+検収:
+- 新規作成 → 詳細 → 工程追加 → 工程を進行中へ変更 → 全体進捗50%反映を確認。
+- タスク追加、工程・担当者との関連付け、状態変更を確認。
+- 375px / 768px / 1280pxで横はみ出しなし。
+- ブラウザコンソールerrorなし。
+- lint成功。
+- build成功（71 routes）。
+
+未着手境界:
+- ジェネレーター、テンプレートビルダー、自社テンプレ保存はTW-P2。
+- クライアントポータルはTW-P4、成果物アップロードはTW-P5。
+- Supabase / Activity Log / DESK / Storyへはまだ接続しない。
 ```

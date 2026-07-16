@@ -39,6 +39,55 @@ export type ProjectDeliverableStatus =
 export type ProjectCommentAudience = "internal" | "client";
 export type ProjectTemplateStatus = "draft" | "active" | "archived";
 
+export const projectStatusLabels: Record<ProjectStatus, string> = {
+  draft: "下書き",
+  preparing: "準備中",
+  in_progress: "進行中",
+  client_review: "クライアント確認待ち",
+  internal_review: "制作側確認待ち",
+  on_hold: "保留",
+  delivery_preparation: "納品準備中",
+  completed: "完了",
+  cancelled: "キャンセル"
+};
+
+export const projectPhaseStatusLabels: Record<ProjectPhaseStatus, string> = {
+  not_started: "未着手",
+  in_progress: "進行中",
+  review_pending: "確認待ち",
+  revising: "修正中",
+  completed: "完了",
+  on_hold: "保留"
+};
+
+export const projectTaskStatusLabels: Record<ProjectTaskStatus, string> = {
+  not_started: "未着手",
+  in_progress: "対応中",
+  client_response_pending: "クライアント回答待ち",
+  internal_review_pending: "制作側確認待ち",
+  revision_requested: "修正依頼",
+  approved: "承認済み",
+  completed: "完了",
+  on_hold: "保留"
+};
+
+export const projectTaskPriorityLabels: Record<ProjectTaskPriority, string> = {
+  low: "低",
+  normal: "通常",
+  high: "高",
+  urgent: "緊急"
+};
+
+export const projectDeliverableStatusLabels: Record<ProjectDeliverableStatus, string> = {
+  draft: "下書き",
+  submitted: "提出済み",
+  internal_review: "制作側確認中",
+  client_review: "クライアント確認中",
+  revision_requested: "修正依頼",
+  approved: "承認済み",
+  delivered: "納品済み"
+};
+
 export type Project = {
   id: string;
   organizationId: string;
