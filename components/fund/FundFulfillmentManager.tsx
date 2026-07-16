@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/AuthGate";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { createFundFulfillmentActivity } from "@/lib/fund/activity";
@@ -10,7 +11,8 @@ import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 const statuses = Object.keys(fundFulfillmentStatusLabels) as FundFulfillmentStatus[];
 
 export function FundFulfillmentManager({ projectId }: { projectId: string }) {
-  const { projects, plans, supports, updateSupport } = useFundProjects();
+  const { profile } = useAuth();
+  const { projects, plans, supports, updateSupport } = useFundProjects(profile.id);
   const { addLog, removeLog } = useUnifiedActivityLogs();
   const project = projects.find((item) => item.id === projectId);
   const projectSupports = supports.filter(

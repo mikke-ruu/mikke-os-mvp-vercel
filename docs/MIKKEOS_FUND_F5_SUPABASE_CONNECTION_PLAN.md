@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F5-a検収完了・F5-b未着手
+状態: F5-b検収完了・F5-c未着手
 
 ## 1. 目的
 
@@ -21,6 +21,8 @@ F5は、F1〜F3でlocalStorageに作ったFund本文・応援方法・活動報�
 - 新しいpublic表はmigration内で明示的にGRANTし、同時にRLSを有効化する。
 - owner書き込みはauthenticated + 所有条件を必須にし、service roleをブラウザへ出さない。
 - F5-aの保存RPCは `security invoker` とし、既存RLSを迂回しない。
+- owner読取りはRLSに加え `owner_profile_id` をqueryで明示し、DB読込失敗時はcacheに退避しない。
+- localStorageのproject / plan cacheはprofile別keyに分離し、DB保存成功後だけ更新する。
 - F4の招待・同意・Story参加投影は壊さず、そのまま再利用する。
 
 ## 3. 公開範囲
@@ -67,6 +69,8 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 - localStorage既存データの本人確認付き一回移行
 - DB保存成功後だけowner cacheを更新する順序へ変更
 - localStorageを正本扱いする分岐を除去
+- `source_local_id` をDB UUIDと現行route IDの安定接続keyとして必須化
+- 本人判定は現行profile handleと旧 `profileSlug` の一致に限定し、別profileデータは削除・移行せず保全
 
 ### F5-c: 活動報告
 
@@ -106,10 +110,10 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 9. migration履歴、RLS否定test、Database Advisor、lint、buildが成功
 ```
 
-## 7. F5-a完了後も残る境界
+## 7. F5-b完了後も残る境界
 
 - 活動報告と完成記録はF5-c / F5-eまでlocalStorage表示
-- owner一覧と編集初期値はF5-bまでlocalStorage cache中心
+- 応援・提供記録由来のowner進捗値はF5-dまで既存localStorage集計
 - unlistedは安全なtoken方式が決まるまで外部共有不可
 - 通知・通報・CSV・Webhookにはまだ進まない
 
@@ -128,3 +132,19 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 - lint / build成功
 
 詳細は `MIKKEOS_FUND_F5_A_HANDOFF_2026-07-16.md` を参照します。
+
+## 9. F5-b検収結果
+
+2026-07-16に実DBへ `20260715165421_fund_f5_b_owner_source_ids.sql` を適用しました。
+
+- owner一覧・編集・preview・応援管理・提供管理・完成記録routeのproject / plan初期値をDB正本化
+- DB行→ `FundProject` / `FundPlan` 変換は `source_local_id` を現行route IDとして使う単一adapterへ集約
+- 実DBの `fund_projects.source_local_id` をNOT NULL、1〜160文字、owner内uniqueに固定
+- 旧データはprofile handle一致時だけ一回移行し、既存source IDはskip、失敗時はmarkerを付けず再実行可能
+- owner / 別authenticated actor / anon、同一source IDの2回保存、F4-b1 / F4-b2 / F5-a回帰test成功
+- テストfixtureはROLLBACK済み、実DBはproject 1件、source ID欠損・長さ違反0件
+- F5-b由来の新しいDatabase Advisor警告0件。既存Fund警告はF4のsecurity-definer RPC 4件とインデックスINFO 5件
+- lint / build成功
+- 2人目のactorではowner一覧0件、`ayumi`へ切替後は実DBのFund 1件をowner一覧に表示し、RLSの分離と正本読込を実画面で確認
+
+詳細は `MIKKEOS_FUND_F5_B_HANDOFF_2026-07-16.md` を参照します。F5-cは別パッケージとして開始します。

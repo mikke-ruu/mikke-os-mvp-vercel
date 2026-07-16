@@ -3,19 +3,22 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { useAuth } from "@/components/AuthGate";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { createFundCompletedActivity } from "@/lib/fund/activity";
+import { notifyFundDatabaseUpdated, saveFundProjectContent } from "@/lib/fund/database";
 import { useFundProjects } from "@/lib/fund/store";
-import { fundTargetServiceLabels, type FundProject, type FundTargetService } from "@/lib/fund/types";
+import { fundTargetServiceLabels, type FundPlan, type FundProject, type FundTargetService } from "@/lib/fund/types";
 import { isValidFundExternalUrl, normalizeFundExternalUrl } from "@/lib/fund/url";
 import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 import { getAppPath } from "@/lib/mikkeos/routes";
 
 const targetServices = Object.keys(fundTargetServiceLabels) as FundTargetService[];
 
-export function FundCompleteManager({ project }: { project: FundProject }) {
-  const { challengeRecords, appLinks, saveChallengeRecord, saveAppLinks, updateProject } = useFundProjects();
+export function FundCompleteManager({ project, projectPlans }: { project: FundProject; projectPlans: FundPlan[] }) {
+  const { profile } = useAuth();
+  const { challengeRecords, appLinks, saveChallengeRecord, saveAppLinks, updateProject } = useFundProjects(profile.id);
   const { addLog } = useUnifiedActivityLogs();
   const existingRecord = challengeRecords.find((record) => record.projectId === project.id);
   const [title, setTitle] = useState(`${project.title}を実現しました`);
@@ -28,6 +31,7 @@ export function FundCompleteManager({ project }: { project: FundProject }) {
   const [targets, setTargets] = useState<FundTargetService[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
   const projectCanBeShared = project.visibility === "public" && project.status !== "draft";
 
   useEffect(() => {
@@ -51,23 +55,39 @@ export function FundCompleteManager({ project }: { project: FundProject }) {
     setTargets((current) => current.includes(target) ? current.filter((item) => item !== target) : [...current, target]);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!title.trim() || !summary.trim() || !isValidFundExternalUrl(imageUrl)) return;
-    const record = saveChallengeRecord({
-      projectId: project.id,
-      title: title.trim(),
-      summary: summary.trim(),
-      outcome: outcome.trim(),
-      imageUrl: normalizeFundExternalUrl(imageUrl),
-      visibility,
-      storyEnabled: visibility === "public" && projectCanBeShared && storyEnabled,
-      completedAt
-    });
-    saveAppLinks(project.id, targets);
-    updateProject(project.id, { stage: "realization", status: "completed" });
-    addLog(createFundCompletedActivity({ ...project, stage: "realization", status: "completed" }, record));
-    setMessage("挑戦の軌跡を保存しました。");
+    setSaving(true);
+    setMessage("");
+    const completedProject = { ...project, stage: "realization" as const, status: "completed" as const };
+
+    try {
+      await saveFundProjectContent({
+        ownerProfileId: profile.id,
+        project: completedProject,
+        plans: projectPlans
+      });
+      const record = saveChallengeRecord({
+        projectId: project.id,
+        title: title.trim(),
+        summary: summary.trim(),
+        outcome: outcome.trim(),
+        imageUrl: normalizeFundExternalUrl(imageUrl),
+        visibility,
+        storyEnabled: visibility === "public" && projectCanBeShared && storyEnabled,
+        completedAt
+      });
+      saveAppLinks(project.id, targets);
+      updateProject(project.id, { stage: "realization", status: "completed" });
+      notifyFundDatabaseUpdated(profile.id);
+      addLog(createFundCompletedActivity(completedProject, record));
+      setMessage("挑戦の軌跡を保存しました。");
+    } catch {
+      setMessage("保存できませんでした。時間をおいて、もう一度お試しください。");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const savedLinks = appLinks.filter((link) => link.projectId === project.id && (link.linkStatus === "ready" || link.linkStatus === "linked"));
@@ -110,7 +130,7 @@ export function FundCompleteManager({ project }: { project: FundProject }) {
       </MikkeSection>
 
       {message ? <p className="mb-3 inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-success)]"><CheckCircle2 size={17} />{message}</p> : null}
-      <button type="submit" disabled={!title.trim() || !summary.trim() || !isValidFundExternalUrl(imageUrl)} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">完成記録を保存</button>
+      <button type="submit" disabled={!title.trim() || !summary.trim() || !isValidFundExternalUrl(imageUrl) || saving} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">{saving ? "保存中…" : "完成記録を保存"}</button>
 
       {savedLinks.length > 0 ? (
         <div className="mt-6 border-t border-[var(--mikke-line)] pt-5">

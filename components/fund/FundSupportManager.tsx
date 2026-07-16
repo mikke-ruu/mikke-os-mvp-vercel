@@ -30,7 +30,7 @@ const recordStatuses = Object.keys(fundSupportRecordStatusLabels) as FundSupport
 
 export function FundSupportManager({ projectId }: { projectId: string }) {
   const { user, profile } = useAuth();
-  const { projects, plans, supports, createSupport, updateSupport } = useFundProjects();
+  const { projects, plans, supports, createSupport, updateSupport } = useFundProjects(profile.id);
   const { addLog, removeLog } = useUnifiedActivityLogs();
   const project = projects.find((item) => item.id === projectId);
   const projectPlans = plans.filter((plan) => plan.projectId === projectId);
@@ -53,6 +53,10 @@ export function FundSupportManager({ projectId }: { projectId: string }) {
   const [inviteError, setInviteError] = useState<{ supportId: string; message: string } | null>(null);
   const [inviteDraft, setInviteDraft] = useState<{ supportId: string; claimId: string; inviteUrl: string; expiresAt: string } | null>(null);
   const supportIdsKey = projectSupports.map((support) => support.id).join("|");
+
+  useEffect(() => {
+    if (!planId && projectPlans.length > 0) setPlanId(projectPlans[0].id);
+  }, [planId, projectPlans]);
 
   useEffect(() => {
     let cancelled = false;

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { useAuth } from "@/components/AuthGate";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
@@ -10,7 +11,8 @@ import type { FundUpdateVisibility } from "@/lib/fund/types";
 import { isValidFundExternalUrl, normalizeFundExternalUrl } from "@/lib/fund/url";
 
 export function FundUpdateManager({ projectId }: { projectId: string }) {
-  const { updates, createUpdate, updateFundUpdate } = useFundProjects();
+  const { profile } = useAuth();
+  const { updates, createUpdate, updateFundUpdate } = useFundProjects(profile.id);
   const projectUpdates = updates.filter((update) => update.projectId === projectId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");

@@ -26,6 +26,14 @@ const APP_LINKS_KEY = "mikke.fund.app-links.v1";
 const UPDATED_EVENT_NAME = "mikke-fund:updated";
 const mockOwnerProfileId = "local-owner";
 
+function ownerProjectsKey(ownerProfileId: string) {
+  return `mikke.fund.owner-projects.v2.${ownerProfileId}`;
+}
+
+function ownerPlansKey(ownerProfileId: string) {
+  return `mikke.fund.owner-plans.v2.${ownerProfileId}`;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -109,12 +117,12 @@ function readList<T>(key: string, fallback: T[]) {
   }
 }
 
-function readProjects() {
-  return readList(PROJECTS_KEY, [seedProject]);
+function readProjects(ownerProfileId?: string) {
+  return ownerProfileId ? readList<FundProject>(ownerProjectsKey(ownerProfileId), []) : readList(PROJECTS_KEY, [seedProject]);
 }
 
-function readPlans() {
-  return readList(PLANS_KEY, [seedPlan]);
+function readPlans(ownerProfileId?: string) {
+  return ownerProfileId ? readList<FundPlan>(ownerPlansKey(ownerProfileId), []) : readList(PLANS_KEY, [seedPlan]);
 }
 
 function readSupports() {
@@ -138,9 +146,31 @@ function writeList<T>(key: string, value: T[]) {
   window.dispatchEvent(new CustomEvent(UPDATED_EVENT_NAME));
 }
 
-export function useFundProjects() {
-  const [projects, setProjects] = useState<FundProject[]>([seedProject]);
-  const [plans, setPlans] = useState<FundPlan[]>([seedPlan]);
+export function getLegacyFundContentForMigration() {
+  if (typeof window === "undefined") return null;
+  const rawProjects = window.localStorage.getItem(PROJECTS_KEY);
+  if (!rawProjects) return null;
+
+  try {
+    const projects = JSON.parse(rawProjects) as FundProject[];
+    const rawPlans = window.localStorage.getItem(PLANS_KEY);
+    const plans = rawPlans ? JSON.parse(rawPlans) as FundPlan[] : [];
+    if (!Array.isArray(projects) || !Array.isArray(plans)) return null;
+    return { projects, plans };
+  } catch {
+    return null;
+  }
+}
+
+export function cacheOwnerFundContent(ownerProfileId: string, projects: FundProject[], plans: FundPlan[]) {
+  if (typeof window === "undefined") return;
+  writeList(ownerProjectsKey(ownerProfileId), projects);
+  writeList(ownerPlansKey(ownerProfileId), plans);
+}
+
+export function useFundProjects(ownerProfileId?: string) {
+  const [projects, setProjects] = useState<FundProject[]>(ownerProfileId ? [] : [seedProject]);
+  const [plans, setPlans] = useState<FundPlan[]>(ownerProfileId ? [] : [seedPlan]);
   const [supports, setSupports] = useState<FundSupport[]>([]);
   const [updates, setUpdates] = useState<FundUpdate[]>([]);
   const [challengeRecords, setChallengeRecords] = useState<FundChallengeRecord[]>([]);
@@ -148,8 +178,8 @@ export function useFundProjects() {
 
   useEffect(() => {
     function refresh() {
-      setProjects(readProjects());
-      setPlans(readPlans());
+      setProjects(readProjects(ownerProfileId));
+      setPlans(readPlans(ownerProfileId));
       setSupports(readSupports());
       setUpdates(readUpdates());
       setChallengeRecords(readChallengeRecords());
@@ -162,7 +192,7 @@ export function useFundProjects() {
       window.removeEventListener("storage", refresh);
       window.removeEventListener(UPDATED_EVENT_NAME, refresh);
     };
-  }, []);
+  }, [ownerProfileId]);
 
   function prepareProject(input: FundProjectInput, existing?: FundProject) {
     const timestamp = nowIso();
@@ -170,7 +200,7 @@ export function useFundProjects() {
       ...existing,
       ...input,
       id: existing?.id ?? makeId("fund_project"),
-      ownerProfileId: existing?.ownerProfileId ?? mockOwnerProfileId,
+      ownerProfileId: existing?.ownerProfileId ?? ownerProfileId ?? mockOwnerProfileId,
       currentValue: existing?.currentValue ?? 0,
       publishedAt: existing?.publishedAt ?? (input.visibility !== "private" && input.status !== "draft" ? timestamp : null),
       completedAt: existing?.completedAt ?? (input.status === "completed" ? timestamp : null),
@@ -181,8 +211,8 @@ export function useFundProjects() {
   }
 
   function saveProject(project: FundProject) {
-    const next = [project, ...readProjects().filter((item) => item.id !== project.id)];
-    writeList(PROJECTS_KEY, next);
+    const next = [project, ...readProjects(ownerProfileId).filter((item) => item.id !== project.id)];
+    writeList(ownerProfileId ? ownerProjectsKey(ownerProfileId) : PROJECTS_KEY, next);
     setProjects(next);
   }
 
@@ -195,7 +225,7 @@ export function useFundProjects() {
   function updateProject(id: string, patch: Partial<FundProject>) {
     const timestamp = nowIso();
     let savedProject: FundProject | null = null;
-    const next = readProjects().map((project) => {
+    const next = readProjects(ownerProfileId).map((project) => {
       if (project.id !== id) return project;
       const updated = { ...project, ...patch, updatedAt: timestamp };
       if (!updated.publishedAt && updated.visibility !== "private" && updated.status !== "draft") updated.publishedAt = timestamp;
@@ -204,14 +234,14 @@ export function useFundProjects() {
       savedProject = updated;
       return updated;
     });
-    writeList(PROJECTS_KEY, next);
+    writeList(ownerProfileId ? ownerProjectsKey(ownerProfileId) : PROJECTS_KEY, next);
     setProjects(next);
     return savedProject;
   }
 
   function prepareProjectPlans(projectId: string, inputs: FundPlanInput[]) {
     const timestamp = nowIso();
-    const existing = readPlans();
+    const existing = readPlans(ownerProfileId);
     return inputs.map<FundPlan>((input, index) => {
       const previous = input.id ? existing.find((plan) => plan.id === input.id && plan.projectId === projectId) : undefined;
       return {
@@ -226,8 +256,8 @@ export function useFundProjects() {
   }
 
   function saveProjectPlans(projectId: string, projectPlans: FundPlan[]) {
-    const next = [...readPlans().filter((plan) => plan.projectId !== projectId), ...projectPlans];
-    writeList(PLANS_KEY, next);
+    const next = [...readPlans(ownerProfileId).filter((plan) => plan.projectId !== projectId), ...projectPlans];
+    writeList(ownerProfileId ? ownerPlansKey(ownerProfileId) : PLANS_KEY, next);
     setPlans(next);
   }
 

@@ -1,19 +1,20 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthGate, useAuth } from "@/components/AuthGate";
 import { FundFulfillmentManager } from "@/components/fund/FundFulfillmentManager";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
-import { useFundProjects } from "@/lib/fund/store";
+import { useOwnerFundContent } from "@/lib/fund/owner";
 
 function FundFulfillmentContent() {
   const params = useParams<{ id: string }>();
-  const { projects } = useFundProjects();
+  const { profile } = useAuth();
+  const { projects, loading, error } = useOwnerFundContent(profile.id, profile.handle);
   const project = projects.find((item) => item.id === params.id);
 
   return (
     <MikkeAppShell appName="Fund" title="提供状況" subtitle={project?.title} currentApp={{ label: "Fund", href: "/apps/fund" }} footerLabel="Fund by mikke">
-      {project ? <FundFulfillmentManager projectId={project.id} /> : <p className="text-sm text-[var(--mikke-muted)]">このFundは見つかりませんでした。</p>}
+      {loading ? <p className="text-sm text-[var(--mikke-muted)]">Fundを読み込んでいます。</p> : error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">{error}</p> : project ? <FundFulfillmentManager projectId={project.id} /> : <p className="text-sm text-[var(--mikke-muted)]">このFundは見つかりませんでした。</p>}
     </MikkeAppShell>
   );
 }

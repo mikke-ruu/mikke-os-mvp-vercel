@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { ExternalLink, Flag, Newspaper, PackageCheck, Plus, Users } from "lucide-react";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthGate, useAuth } from "@/components/AuthGate";
 import { FundProgressSummary } from "@/components/fund/FundProgressSummary";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
-import { useFundProjects } from "@/lib/fund/store";
+import { useOwnerFundContent } from "@/lib/fund/owner";
 import { fundProjectStatusLabels, fundVisibilityLabels } from "@/lib/fund/types";
 
 function FundDashboardContent() {
-  const { projects } = useFundProjects();
+  const { profile } = useAuth();
+  const { projects, loading, error, migrationNotice } = useOwnerFundContent(profile.id, profile.handle);
   const sorted = [...projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 
   return (
@@ -23,7 +24,13 @@ function FundDashboardContent() {
         </Link>
       </div>
 
-      {sorted.length > 0 ? (
+      {migrationNotice ? <p className="mb-4 text-sm font-bold text-[var(--mikke-primary)]">{migrationNotice}</p> : null}
+
+      {loading ? (
+        <p className="text-sm text-[var(--mikke-muted)]">Fundを読み込んでいます。</p>
+      ) : error ? (
+        <p className="text-sm font-bold text-[var(--mikke-danger)]">{error}</p>
+      ) : sorted.length > 0 ? (
         <div className="space-y-3">
           {sorted.map((project) => (
             <section key={project.id} className="border-t border-[var(--mikke-line)] py-5 first:border-t-0 first:pt-0">

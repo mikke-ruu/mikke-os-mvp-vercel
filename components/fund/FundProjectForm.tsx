@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { createFundCompletedActivity, createFundPublishedActivity } from "@/lib/fund/activity";
-import { saveFundProjectContent } from "@/lib/fund/database";
+import { notifyFundDatabaseUpdated, saveFundProjectContent } from "@/lib/fund/database";
 import { useFundProjects } from "@/lib/fund/store";
 import {
   fundCampaignTypeLabels,
@@ -54,7 +54,7 @@ function emptyPlan(index: number): FundPlanInput {
 export function FundProjectForm({ project, projectPlans = [] }: { project?: FundProject; projectPlans?: FundPlanInput[] }) {
   const router = useRouter();
   const { profile } = useAuth();
-  const { challengeRecords, prepareProject, saveProject, prepareProjectPlans, saveProjectPlans } = useFundProjects();
+  const { challengeRecords, prepareProject, saveProject, prepareProjectPlans, saveProjectPlans } = useFundProjects(profile.id);
   const { addLog, removeLog } = useUnifiedActivityLogs();
   const [title, setTitle] = useState(project?.title ?? "");
   const [shortDescription, setShortDescription] = useState(project?.shortDescription ?? "");
@@ -159,6 +159,7 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
       });
       saveProject(nextProject);
       saveProjectPlans(nextProject.id, nextPlans);
+      notifyFundDatabaseUpdated(profile.id);
       syncPublishedActivity(nextProject);
       router.replace(`/apps/fund/${nextProject.id}/edit`);
       if (project) setMessage("保存しました。");
