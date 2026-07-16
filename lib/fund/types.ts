@@ -207,7 +207,7 @@ export const fundProjectStatusLabels: Record<FundProjectStatus, string> = {
 
 export const fundVisibilityLabels: Record<FundVisibility, string> = {
   private: "非公開",
-  unlisted: "限定URL",
+  unlisted: "限定URL（準備中）",
   public: "公開"
 };
 

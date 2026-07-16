@@ -276,7 +276,7 @@ export function useFundProjects(ownerProfileId?: string) {
       id: existing?.id ?? makeId("fund_project"),
       ownerProfileId: existing?.ownerProfileId ?? ownerProfileId ?? mockOwnerProfileId,
       currentValue: existing?.currentValue ?? 0,
-      publishedAt: existing?.publishedAt ?? (input.visibility !== "private" && input.status !== "draft" ? timestamp : null),
+      publishedAt: existing?.publishedAt ?? (input.visibility === "public" && input.status !== "draft" ? timestamp : null),
       completedAt: existing?.completedAt ?? (input.status === "completed" ? timestamp : null),
       archivedAt: existing?.archivedAt ?? (input.status === "archived" ? timestamp : null),
       createdAt: existing?.createdAt ?? timestamp,
@@ -302,7 +302,7 @@ export function useFundProjects(ownerProfileId?: string) {
     const next = readProjects(ownerProfileId).map((project) => {
       if (project.id !== id) return project;
       const updated = { ...project, ...patch, updatedAt: timestamp };
-      if (!updated.publishedAt && updated.visibility !== "private" && updated.status !== "draft") updated.publishedAt = timestamp;
+      if (!updated.publishedAt && updated.visibility === "public" && updated.status !== "draft") updated.publishedAt = timestamp;
       if (!updated.completedAt && updated.status === "completed") updated.completedAt = timestamp;
       if (!updated.archivedAt && updated.status === "archived") updated.archivedAt = timestamp;
       savedProject = updated;
@@ -475,7 +475,7 @@ const fundTargetKeys: Record<FundTargetService, true> = {
 };
 
 export function canViewFundProject(project: FundProject) {
-  return project.visibility !== "private" && project.status !== "draft";
+  return project.visibility === "public" && project.status !== "draft";
 }
 
 export function summarizeFundSupports(supports: FundSupport[]): FundSupportSummary {

@@ -171,7 +171,7 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
   }
 
   function syncPublishedActivity(nextProject: FundProject) {
-    if (nextProject.visibility !== "private" && nextProject.status !== "draft") {
+    if (nextProject.visibility === "public" && nextProject.status !== "draft") {
       addLog(createFundPublishedActivity(nextProject));
       const challengeRecord = challengeRecords.find((record) => record.projectId === nextProject.id);
       if (challengeRecord && nextProject.visibility === "public") {
@@ -324,8 +324,9 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
           </Field>
           <Field label="公開範囲">
             <select value={visibility} onChange={(event) => setVisibility(event.target.value as FundVisibility)} className={inputClass}>
-              {visibilities.map((item) => <option key={item} value={item}>{fundVisibilityLabels[item]}</option>)}
+              {visibilities.map((item) => <option key={item} value={item} disabled={item === "unlisted"}>{fundVisibilityLabels[item]}</option>)}
             </select>
+            <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">限定URLは、安全な共有token方式を実装するまで選べません。共有しない場合は非公開、誰でも見られる場合だけ公開を選んでください。</p>
           </Field>
           <Field label="メイン画像URL">
             <input value={coverImageUrl} onChange={(event) => setCoverImageUrl(event.target.value)} placeholder="https://..." className={inputClass} />
@@ -337,7 +338,13 @@ export function FundProjectForm({ project, projectPlans = [] }: { project?: Fund
             <input value={externalPaymentUrl} onChange={(event) => setExternalPaymentUrl(event.target.value)} placeholder="https://..." className={inputClass} />
           </Field>
         </div>
-        <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">現在の公開URLは、この端末内で表示を確認するためのものです。別端末への共有はまだできません。</p>
+        <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">
+          {visibility === "public"
+            ? "公開すると、公開URLから別端末でも閲覧できます。"
+            : visibility === "unlisted"
+              ? "限定URLは準備中です。現在は外部から閲覧できません。"
+              : "非公開のFundはowner画面とプレビューだけで確認できます。"}
+        </p>
       </MikkeSection>
 
       {hasInvalidUrl ? <p className="mb-3 text-sm font-bold text-[var(--mikke-danger)]">外部リンクは https:// または http:// から入力してください。</p> : null}

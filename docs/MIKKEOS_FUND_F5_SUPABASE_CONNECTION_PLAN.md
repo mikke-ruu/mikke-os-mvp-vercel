@@ -4,7 +4,7 @@
 
 対象repo: `G:/Musubiプロジェクト/mikke-os-mvp`
 
-状態: F5-e検収完了・F5-f未着手
+状態: F5-a〜F5-f検収完了・Fund Supabase本接続完了
 
 ## 1. 目的
 
@@ -92,9 +92,10 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 
 ### F5-f: 運営機能の判断
 
-- 通知、通報、CSV、Webhook、削除・保全期間
-- unlistedのtoken方式
-- 必要性を再確認してから個別実装
+- 通知、通報、CSVはOS共通基盤または実運用量が整うまで後回し
+- WebhookはMVP不要
+- ownerのhard deleteを止め、状態変更で運用履歴を保全
+- unlistedは安全なtoken方式が完成するまで選択不可・公開不可
 
 ## 6. F5-a検収条件
 
@@ -110,13 +111,15 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 9. migration履歴、RLS否定test、Database Advisor、lint、buildが成功
 ```
 
-## 7. F5-e完了後も残る境界
+## 7. F5完了後も残る境界
 
 - 完成記録・次アプリ候補・完了Activity LogはDB正本
 - 公開FundとStoryはowner-private正本を直接読まず、公開専用の完成記録投影だけを読む
 - 次アプリ候補は引継ぎ意思だけを保存し、各アプリのデータを自動作成しない
-- unlistedは安全なtoken方式が決まるまで外部共有不可
-- 通知・通報・CSV・Webhook・削除保全期間はF5-fで必要性を判断してから実装する
+- unlistedは安全なtoken方式が完成するまで外部共有不可
+- 通知・通報・CSVはFund単独で作らず、OS共通基盤または実運用量の条件が整ってから再開
+- Webhookは外部連携phaseまで作らない
+- service roleによる実削除と具体的な保全日数は、運営手順・利用規約・プライバシーポリシーと合わせて後続で固定
 
 ## 8. F5-a検収結果
 
@@ -208,3 +211,22 @@ F5-aでは公開専用投影へ同期しません。単に一覧から隠すだ�
 - lint / build成功。実ブラウザーで完成記録画面と7つの次アプリ候補を表示し、console error 0件
 
 詳細は `MIKKEOS_FUND_F5_E_HANDOFF_2026-07-16.md` を参照します。F5-fにはまだ進みません。
+
+## 13. F5-f検収結果
+
+2026-07-16に実DBへ `20260716131053_fund_f5_f_retention_guard.sql` を適用しました。
+
+- F5-fの6項目を「今必要 / 後回し / MVP不要」へ分類
+- 通知、通報・問い合わせ、CSVはOS共通基盤または実運用量が整うまで後回し
+- WebhookはMVP不要と判断
+- ownerのhard deleteを `fund_projects` / `fund_supports` / `fund_updates` / `fund_challenge_records` / `fund_app_links` で停止
+- archive / private / draft / invalid / cancelled / refundedを履歴保全の正規操作に固定
+- plan集合のatomic差替えに必要な `fund_plans` のDELETE権限だけ維持
+- unlistedはowner formで選択不可。public local fallbackも `visibility=public` のみに限定
+- owner直接削除拒否、archive / invalid / draft / private保全、unlisted公開投影0件を専用SQL testで検収
+- F4-b1 / F4-b2 / F5-a / F5-b / F5-c / F5-d / F5-e回帰test成功
+- 実データはproject 1件・支援1件・Mikke ID参加1件を維持。F5-f fixture残件0件
+- F5-f由来の新しいDatabase Advisor警告0件。既存Fund項目はsecurity WARN 4件・performance INFO 5件で増加なし
+- Local / Remote migration履歴は `20260716131053` まで一致
+
+判断の詳細は `MIKKEOS_FUND_F5_F_OPERATIONS_DECISION_2026-07-16.md`、検収と次工程は `MIKKEOS_FUND_F5_F_HANDOFF_2026-07-16.md` を参照します。
