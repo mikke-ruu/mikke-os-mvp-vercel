@@ -5,7 +5,7 @@
 実装: TW-P番号を指定してcodexまたはSonnetへ依頼する前提
 
 統合更新: 2026-07-17（Codex）
-現在地: TW-P3（テンプレート版管理・案件への独立コピー）実装・検収完了。次はTW-P4。
+現在地: TW-P4（クライアント用プロジェクトポータル）実装・検収完了。次はTW-P5。
 
 このdocsは、次の2つの構想書を、現在の一本化実行ライン・既存Team Works構造・共通部品・安全規約へ落とし込んだ実装計画です。
 
@@ -426,4 +426,37 @@ migration・RLS・actor別否定テストを一体で設計する。
 - クライアント用プロジェクトポータルはTW-P4。
 - 成果物ファイルのアップロード・確認・承認はTW-P5。
 - Supabase / Activity Log / DESK / Storyへの本接続はまだ行わない。
+```
+
+## 15. TW-P4実装結果（2026-07-17）
+
+```text
+実装:
+- /apps/team-works/portal/client/projects にクライアント向け共有案件一覧を追加。
+- /apps/team-works/portal/client/projects/[projectId] に共有案件詳細を追加。
+- 一覧・詳細ともAuthGateで保護し、既存client_userのprojectClientPortal権限と
+  現在のデモ組織だけenableProjectClientPortal=trueを追加。
+- 「あなたが今やること」を最上部に置き、全体進捗・現在工程・納期・
+  対応事項・確認待ち成果物・承認済み成果物を表示。
+- 工程・タスク・成果物はclientVisible=trueの階層だけを表示し、下書き案件、
+  draft/submitted/internal_reviewの成果物はクライアント投影から除外。
+- 管理側storeを画面へ直接渡さず、許可項目だけのClientProject*型へ投影する
+  lib/team-works-client-projects.tsを追加。
+- 既存の学校ポータルへプロジェクト導線を追加し、旧指標に残っていた
+  クライアント不要の報酬予定を学校向け指標へ差し替え。
+
+検収:
+- 別クライアント案件、非公開工程・タスク・成果物、内部確認前成果物、
+  内部コメント、予算、内部メモが投影結果へ含まれない否定テストに成功。
+- 共有一覧 → 詳細、既存学校ポータルからの導線、未共有URLの拒否表示を確認。
+- クライアント画面に報酬/原価/外注単価/内部メモが表示されないことを確認。
+- 375px / 768px / 1280pxで横はみ出しなし。
+- lint成功。
+- build成功（74 static pages。新規2 routesを含む）。
+
+現在の境界:
+- clientIdとの紐付けはlocalStorage検証用の固定デモactor。Supabase本接続時に
+  client_user所属とRLSで置き換え、URLパラメータを認可根拠にしない。
+- 成果物ファイルの提出・内部確認・修正依頼・承認操作はTW-P5。
+- コメント、Supabase / Activity Log / DESK / Storyへの本接続はまだ行わない。
 ```

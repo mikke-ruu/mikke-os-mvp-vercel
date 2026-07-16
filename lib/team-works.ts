@@ -260,7 +260,7 @@ export const teamWorksTemplate: TeamWorksTemplate = {
   roleModel: {
     owner: ["all"],
     manager: ["dashboard", "clients", "participants", "sessions", "assignments", "reports", "invoices", "settings"],
-    client_user: ["clientPortal", "sessions", "participants", "attendanceRecords", "invoices", "messages"],
+    client_user: ["clientPortal", "projectClientPortal", "sessions", "participants", "attendanceRecords", "invoices", "messages"],
     worker: ["workerPortal", "sessions", "guides", "reports", "payouts", "messages"]
   },
   labelSettings: {
@@ -281,6 +281,7 @@ export const teamWorksTemplate: TeamWorksTemplate = {
     ...teamWorksProjectFeatureDefaults,
     enableProjects: true,
     enableProjectTemplates: true,
+    enableProjectClientPortal: true,
     frontSite: true,
     inquiry: true,
     scheduling: true,

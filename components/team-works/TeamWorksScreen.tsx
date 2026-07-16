@@ -1223,6 +1223,18 @@ function ClientPortalView({ state, updateState, helpers }: ScreenProps & { helpe
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_360px]">
+      {teamWorksTemplate.featureSettings.enableProjectClientPortal ? (
+        <Link href="/apps/team-works/portal/client/projects" className="tw-card flex items-center gap-3 p-4 lg:col-span-2">
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]">
+            <FolderKanban size={20} />
+          </span>
+          <span className="min-w-0">
+            <span className="tw-card-title block">プロジェクトの進み具合を見る</span>
+            <span className="tw-helper mt-1 block">現在の工程、対応事項、確認する成果物をまとめて確認できます。</span>
+          </span>
+          <ArrowRight size={17} className="ml-auto shrink-0 text-[var(--mikke-primary)]" />
+        </Link>
+      ) : null}
       <Panel title="学校ポータル" lead="学校担当者がスケジュール、生徒名簿、出席予定、連絡を確認します。">
         <div className="grid gap-3">
           {state.clients.map((client) => (
@@ -1818,6 +1830,15 @@ function createViewMetrics({
       { label: "実施回数", value: `${payoutRows.reduce((sum, row) => sum + row.count, 0)}回`, tone: "green" },
       { label: "実施時間", value: `${payoutRows.reduce((sum, row) => sum + row.hours, 0)}時間`, tone: "green" },
       { label: "報酬予定", value: `${payoutTotal.toLocaleString()}円`, tone: "green" }
+    ];
+  }
+
+  if (view === "clientPortal") {
+    return [
+      { label: "今日の授業", value: `${state.sessions.length}件`, tone: "orange" },
+      { label: "生徒", value: `${state.participants.length}名`, tone: "navy" },
+      { label: "出席未回答", value: `${state.attendanceEntries.filter((entry) => entry.status === "unset").length}件`, tone: "warn" },
+      { label: "学校向け連絡", value: `${state.messages.filter((message) => message.role === "client").length}件`, tone: "green" }
     ];
   }
 

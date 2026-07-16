@@ -315,7 +315,7 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
     {
       id: demoProjectId,
       organizationId: "org_team_works_demo",
-      clientId: "client_demo",
+      clientId: "client_sakura",
       name: "サンプル制作案件",
       description: "工程・担当・進捗の操作を確認するための、業種に依存しないデモ案件です。",
       goal: "依頼内容を整理し、制作物を確認して納品する",
@@ -547,6 +547,9 @@ export function readTeamWorksProjectStore() {
   const state = readStorage(TEAM_WORKS_PROJECTS_STORAGE_KEY, teamWorksProjectDemoState, isProjectStoreState);
   return {
     ...state,
+    projects: state.projects.map((project) => project.id === demoProjectId && project.clientId === "client_demo"
+      ? { ...project, clientId: "client_sakura" }
+      : project),
     forms: Array.isArray(state.forms) ? state.forms : []
   };
 }
