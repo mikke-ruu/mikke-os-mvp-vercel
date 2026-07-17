@@ -1,5 +1,7 @@
 import type {
   ProjectDeliverableStatus,
+  ProjectFormField,
+  ProjectFormSubmission,
   ProjectPhaseStatus,
   ProjectStatus,
   ProjectTaskStatus,
@@ -20,7 +22,7 @@ const completedTaskStatuses = new Set<ProjectTaskStatus>(["approved", "completed
 
 export type ClientProjectAction = {
   id: string;
-  kind: "project" | "task" | "deliverable";
+  kind: "project" | "task" | "deliverable" | "form";
   title: string;
   helper: string;
   dueDate: string;
@@ -80,6 +82,16 @@ export type ClientProjectResourceView = {
   memo: string;
 };
 
+export type ClientProjectFormView = {
+  id: string;
+  name: string;
+  required: boolean;
+  dueOffsetDays: number | null;
+  editableAfterSubmit: boolean;
+  fields: ProjectFormField[];
+  submission: ProjectFormSubmission | null;
+};
+
 export type ClientProjectSummary = {
   id: string;
   name: string;
@@ -102,6 +114,7 @@ export type ClientProjectDetailView = {
   tasks: ClientProjectTaskView[];
   deliverables: ClientProjectDeliverableView[];
   resources: ClientProjectResourceView[];
+  forms: ClientProjectFormView[];
   comments: ClientProjectCommentView[];
   actions: ClientProjectAction[];
   reviewDeliverables: ClientProjectDeliverableView[];
@@ -185,6 +198,23 @@ export function createTeamWorksClientProjectDetail(
       url: resource.url,
       memo: resource.memo
     }));
+  const forms = state.forms
+    .filter((form) => {
+      if (form.projectId !== projectId || !form.clientVisible) return false;
+      const inputRole = state.projectRoles.find((role) => role.id === form.inputRoleId);
+      return Boolean(inputRole?.name.includes("クライアント"));
+    })
+    .map<ClientProjectFormView>((form) => ({
+      id: form.id,
+      name: form.name,
+      required: form.required,
+      dueOffsetDays: form.dueOffsetDays,
+      editableAfterSubmit: form.editableAfterSubmit,
+      fields: form.fields.map((field) => ({ ...field, options: [...field.options] })),
+      submission: state.formSubmissions.find((submission) => submission.formId === form.id
+        && submission.submittedByActor === "client"
+        && submission.submittedById === TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID) ?? null
+    }));
 
   const comments = state.comments
     .filter((comment) =>
@@ -213,6 +243,14 @@ export function createTeamWorksClientProjectDetail(
       helper: taskActionHelper(task.status),
       dueDate: task.dueDate
     }));
+
+  forms.filter((form) => !form.submission || ["draft", "revision_requested"].includes(form.submission.status)).forEach((form) => actions.push({
+    id: form.id,
+    kind: "form",
+    title: form.name,
+    helper: form.submission?.status === "revision_requested" ? "修正内容を確認して再提出してください" : "フォームを入力して提出してください",
+    dueDate: ""
+  }));
 
   deliverables
     .filter((deliverable) => deliverable.status === "client_review")
@@ -259,6 +297,7 @@ export function createTeamWorksClientProjectDetail(
     tasks,
     deliverables,
     resources,
+    forms,
     comments,
     actions,
     reviewDeliverables,

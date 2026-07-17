@@ -1,5 +1,7 @@
 import type {
   ProjectDeliverableStatus,
+  ProjectFormField,
+  ProjectFormSubmission,
   ProjectPhaseStatus,
   ProjectStatus,
   ProjectTaskPriority,
@@ -82,6 +84,16 @@ export type WorkerProjectResourceView = {
   memo: string;
 };
 
+export type WorkerProjectFormView = {
+  id: string;
+  name: string;
+  required: boolean;
+  dueOffsetDays: number | null;
+  editableAfterSubmit: boolean;
+  fields: ProjectFormField[];
+  submission: ProjectFormSubmission | null;
+};
+
 export type WorkerProjectDetailView = {
   project: WorkerProjectSummary;
   memberId: string;
@@ -90,6 +102,7 @@ export type WorkerProjectDetailView = {
   tasks: WorkerProjectTaskView[];
   deliverables: WorkerProjectDeliverableView[];
   resources: WorkerProjectResourceView[];
+  forms: WorkerProjectFormView[];
   comments: WorkerProjectCommentView[];
 };
 
@@ -168,6 +181,19 @@ export function createTeamWorksWorkerProjectDetail(
       url: resource.url,
       memo: resource.memo
     }));
+  const forms = state.forms
+    .filter((form) => form.projectId === projectId && form.inputRoleId === member.projectRoleId)
+    .map<WorkerProjectFormView>((form) => ({
+      id: form.id,
+      name: form.name,
+      required: form.required,
+      dueOffsetDays: form.dueOffsetDays,
+      editableAfterSubmit: form.editableAfterSubmit,
+      fields: form.fields.map((field) => ({ ...field, options: [...field.options] })),
+      submission: state.formSubmissions.find((submission) => submission.formId === form.id
+        && submission.submittedByActor === "worker"
+        && submission.submittedById === member.id) ?? null
+    }));
 
   const comments = state.comments
     .filter((comment) => comment.projectId === projectId
@@ -185,6 +211,7 @@ export function createTeamWorksWorkerProjectDetail(
     }));
 
   const actionTaskCount = tasks.filter((task) => !completedTaskStatuses.has(task.status)).length;
+  const actionFormCount = forms.filter((form) => !form.submission || ["draft", "revision_requested"].includes(form.submission.status)).length;
   const actionDeliverableCount = deliverables.filter((deliverable) => ["draft", "revision_requested"].includes(deliverable.status)).length;
   const delayedTaskCount = tasks.filter((task) => isDelayedTask(task)).length;
   const currentPhase = phases.find((phase) => phase.status !== "completed") ?? phases.at(-1);
@@ -200,7 +227,7 @@ export function createTeamWorksWorkerProjectDetail(
       progressPercent: sourceProject.progressPercent,
       currentPhaseName: currentPhase?.name ?? "未設定",
       assignedTaskCount: tasks.length,
-      actionCount: actionTaskCount + actionDeliverableCount,
+      actionCount: actionTaskCount + actionDeliverableCount + actionFormCount,
       delayedTaskCount,
       updatedAt: sourceProject.updatedAt
     },
@@ -210,6 +237,7 @@ export function createTeamWorksWorkerProjectDetail(
     tasks,
     deliverables,
     resources,
+    forms,
     comments
   };
 }

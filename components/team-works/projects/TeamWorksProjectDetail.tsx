@@ -12,6 +12,7 @@ import {
   projectPhaseProgress,
   projectPhaseStatusLabels,
   projectFormFieldTypeLabels,
+  projectFormSubmissionStatusLabels,
   projectResourceAudienceLabels,
   projectStatusLabels,
   projectTaskPriorityLabels,
@@ -27,6 +28,7 @@ import {
   type ProjectTaskStatus,
   type TeamWorksProjectStoreState
 } from "@/lib/team-works-projects";
+import { transitionProjectFormSubmission } from "@/lib/team-works-project-forms";
 import { teamWorksInitialState } from "@/lib/team-works";
 import { TeamWorksProjectDeliverables } from "./TeamWorksProjectDeliverables";
 import { TeamWorksProjectCompletionReview } from "./TeamWorksProjectCompletionReview";
@@ -151,7 +153,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
       {tab === "overview" ? <OverviewTab project={project} phases={phases} tasks={tasks} formsCount={forms.length} deliverablesCount={deliverables.length} /> : null}
       {tab === "phases" ? <PhasesTab project={project} phases={phases} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "tasks" ? <TasksTab project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
-      {tab === "forms" ? <FormsAndResourcesTab forms={forms} resources={resources} roles={roles} /> : null}
+      {tab === "forms" ? <FormsAndResourcesTab projectId={project.id} reviewerId={project.leaderMemberId} forms={forms} resources={resources} roles={roles} state={projectState} save={saveProjectState} /> : null}
       {tab === "deliverables" ? <TeamWorksProjectDeliverables project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "members" ? (
         <MikkeSection title="参加メンバー">
@@ -174,16 +176,34 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
   );
 }
 
-function FormsAndResourcesTab({ forms, resources, roles }: {
+function FormsAndResourcesTab({ projectId, reviewerId, forms, resources, roles, state, save }: {
+  projectId: string;
+  reviewerId: string;
   forms: ProjectForm[];
   resources: TeamWorksProjectStoreState["resources"];
   roles: TeamWorksProjectStoreState["projectRoles"];
+  state: TeamWorksProjectStoreState;
+  save: (next: TeamWorksProjectStoreState) => void;
 }) {
+  const [reviewMemos, setReviewMemos] = useState<Record<string, string>>({});
   const roleName = (roleId: string) => roles.find((role) => role.id === roleId)?.name ?? "未設定";
+  function review(submissionId: string, nextStatus: "revision_requested" | "approved") {
+    const submission = state.formSubmissions.find((item) => item.id === submissionId && item.projectId === projectId);
+    if (!submission) return;
+    const now = new Date().toISOString();
+    const next = transitionProjectFormSubmission({ submission, nextStatus, actor: { kind: "admin", id: reviewerId, memberId: reviewerId }, reviewMemo: reviewMemos[submissionId], now });
+    save({ ...state, projects: state.projects.map((project) => project.id === projectId ? { ...project, updatedAt: now } : project), formSubmissions: state.formSubmissions.map((item) => item.id === submissionId ? next : item) });
+  }
   return <div className="grid gap-6 lg:grid-cols-2">
-    <MikkeSection title="フォーム定義">{forms.length > 0 ? <div className="space-y-3">{forms.map((form) => <article key={form.id} className="rounded-lg border border-[var(--mikke-line)] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-bold">{form.name}</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">入力 {roleName(form.inputRoleId)}・確認 {roleName(form.reviewerRoleId)}・承認 {roleName(form.approverRoleId)}</p></div><span className="text-xs font-bold text-[var(--mikke-muted)]">{form.fields.length}項目</span></div><div className="mt-3 flex flex-wrap gap-2">{form.fields.map((field) => <span key={field.id} className="rounded-full bg-[var(--mikke-bg)] px-2.5 py-1 text-xs font-bold">{field.label}・{projectFormFieldTypeLabels[field.type]}{field.required ? "・必須" : ""}</span>)}</div><p className="mt-3 text-xs text-[var(--mikke-muted)]">{form.required ? "フォーム必須" : "任意"}・{form.clientVisible ? "クライアント公開" : "内部のみ"}・{form.editableAfterSubmit ? "提出後修正可" : "提出後修正不可"}{form.dueOffsetDays === null ? "・期限なし" : `・工程開始から${form.dueOffsetDays}日`}</p></article>)}</div> : <p className="text-sm text-[var(--mikke-muted)]">フォームはありません。</p>}</MikkeSection>
+    <MikkeSection title="フォーム定義・提出確認">{forms.length > 0 ? <div className="space-y-3">{forms.map((form) => { const submissions = state.formSubmissions.filter((item) => item.formId === form.id); return <article key={form.id} className="rounded-lg border border-[var(--mikke-line)] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-bold">{form.name}</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">入力 {roleName(form.inputRoleId)}・確認 {roleName(form.reviewerRoleId)}・承認 {roleName(form.approverRoleId)}</p></div><span className="text-xs font-bold text-[var(--mikke-muted)]">{form.fields.length}項目</span></div><div className="mt-3 flex flex-wrap gap-2">{form.fields.map((field) => <span key={field.id} className="rounded-full bg-[var(--mikke-bg)] px-2.5 py-1 text-xs font-bold">{field.label}・{projectFormFieldTypeLabels[field.type]}{field.required ? "・必須" : ""}</span>)}</div><p className="mt-3 text-xs text-[var(--mikke-muted)]">{form.required ? "フォーム必須" : "任意"}・{form.clientVisible ? "クライアント公開" : "内部のみ"}・{form.editableAfterSubmit ? "提出後修正可" : "提出後修正不可"}{form.dueOffsetDays === null ? "・期限なし" : `・工程開始から${form.dueOffsetDays}日`}</p><div className="mt-4 space-y-2">{submissions.map((submission) => <div key={submission.id} className="rounded-lg bg-[var(--mikke-bg)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">{submission.submittedByActor === "client" ? "クライアント" : "担当メンバー"}からの提出</p><span className="text-xs font-bold text-[var(--mikke-muted)]">{projectFormSubmissionStatusLabels[submission.status]}</span></div><dl className="mt-2 space-y-1 text-sm">{form.fields.map((field) => <div key={field.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2"><dt className="font-bold">{field.label}</dt><dd className="break-words text-[var(--mikke-text-soft)]">{formatAnswer(submission.answers[field.id])}</dd></div>)}</dl>{submission.status === "submitted" ? <div className="mt-3 border-t border-[var(--mikke-line)] pt-3"><textarea value={reviewMemos[submission.id] ?? ""} onChange={(event) => setReviewMemos((current) => ({ ...current, [submission.id]: event.target.value }))} rows={2} className={`${teamWorksProjectInputClass} resize-y`} placeholder="修正を依頼する場合は理由を入力" /><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => review(submission.id, "approved")} className="rounded-lg bg-[var(--mikke-success)] px-3 py-2 text-xs font-bold text-white">承認する</button><button type="button" onClick={() => review(submission.id, "revision_requested")} disabled={!reviewMemos[submission.id]?.trim()} className="rounded-lg border border-[var(--mikke-danger)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-40">修正を依頼</button></div></div> : null}</div>)}{submissions.length === 0 ? <p className="text-xs text-[var(--mikke-muted)]">提出はまだありません。</p> : null}</div></article>; })}</div> : <p className="text-sm text-[var(--mikke-muted)]">フォームはありません。</p>}</MikkeSection>
     <MikkeSection title="資料ブロック（管理者表示）">{resources.length > 0 ? <div className="space-y-3">{resources.map((resource) => <article key={resource.id} className="rounded-lg border border-[var(--mikke-line)] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold">{resource.title}</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">{projectResourceAudienceLabels[resource.audience]}</p>{resource.type === "note" ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{resource.memo}</p> : null}</div>{resource.type === "url" && resource.url ? <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}</div></article>)}</div> : <p className="text-sm text-[var(--mikke-muted)]">資料はありません。</p>}</MikkeSection>
   </div>;
+}
+
+function formatAnswer(value: TeamWorksProjectStoreState["formSubmissions"][number]["answers"][string] | undefined) {
+  if (Array.isArray(value)) return value.join("、") || "未回答";
+  if (typeof value === "boolean") return value ? "はい" : "いいえ";
+  return value === undefined || value === "" ? "未回答" : String(value);
 }
 
 function OverviewTab({ project, phases, tasks, formsCount, deliverablesCount }: { project: NonNullable<ReturnType<typeof useTeamWorksProjectStore>["projectState"]["projects"][number]>; phases: ProjectPhase[]; tasks: ProjectTask[]; formsCount: number; deliverablesCount: number }) {

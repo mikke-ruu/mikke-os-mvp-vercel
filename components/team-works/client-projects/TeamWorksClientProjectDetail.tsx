@@ -11,8 +11,11 @@ import {
   TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID,
   TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID,
   type ClientProjectCommentView,
-  type ClientProjectDeliverableView
+  type ClientProjectDeliverableView,
+  type ClientProjectFormView
 } from "@/lib/team-works-client-projects";
+import { TeamWorksProjectFormResponse } from "@/components/team-works/projects/TeamWorksProjectFormResponse";
+import { saveProjectFormAnswers, transitionProjectFormSubmission } from "@/lib/team-works-project-forms";
 import { transitionProjectDeliverable } from "@/lib/team-works-project-deliverables";
 import {
   createTeamWorksProjectId,
@@ -21,6 +24,7 @@ import {
   projectStatusLabels,
   projectTaskStatusLabels,
   useTeamWorksProjectStore,
+  type ProjectFormAnswerValue,
   type ProjectDeliverableStatus
 } from "@/lib/team-works-projects";
 import { teamWorksProjectInputClass } from "@/components/team-works/projects/TeamWorksProjectsShell";
@@ -39,7 +43,14 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
     );
   }
 
-  const { project, phases, tasks, resources, comments, actions, reviewDeliverables, approvedDeliverables } = detail;
+  const { project, phases, tasks, forms, resources, comments, actions, reviewDeliverables, approvedDeliverables } = detail;
+
+  function saveForm(form: ClientProjectFormView, answers: Record<string, ProjectFormAnswerValue>, submit: boolean) {
+    const now = new Date().toISOString();
+    const saved = saveProjectFormAnswers({ submission: form.submission, projectId: project.id, formId: form.id, actor: { kind: "client", id: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID }, answers, editableAfterSubmit: form.editableAfterSubmit, now, createId: createTeamWorksProjectId });
+    const next = submit ? transitionProjectFormSubmission({ submission: saved, nextStatus: "submitted", actor: { kind: "client", id: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID }, now }) : saved;
+    saveProjectState({ ...projectState, projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item), formSubmissions: form.submission ? projectState.formSubmissions.map((item) => item.id === next.id ? next : item) : [...projectState.formSubmissions, next] });
+  }
 
   function updateDeliverable(deliverableId: string, nextStatus: ProjectDeliverableStatus, body: string) {
     const deliverable = projectState.deliverables.find((item) => item.id === deliverableId && item.projectId === project.id && item.clientVisible);
@@ -131,6 +142,8 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
       <MikkeSection title="目的・完成条件">
         <p className="text-sm leading-7 text-[var(--mikke-text-soft)]">{project.goal || "完成条件はまだ共有されていません。"}</p>
       </MikkeSection>
+
+      <MikkeSection title="提出フォーム">{forms.length > 0 ? <div className="space-y-3">{forms.map((form) => <TeamWorksProjectFormResponse key={form.id} form={form} onSave={(answers) => saveForm(form, answers, false)} onSubmit={(answers) => saveForm(form, answers, true)} />)}</div> : <p className="text-sm text-[var(--mikke-muted)]">現在提出するフォームはありません。</p>}</MikkeSection>
 
       <MikkeSection title="工程と対応内容">
         {phases.length > 0 ? (

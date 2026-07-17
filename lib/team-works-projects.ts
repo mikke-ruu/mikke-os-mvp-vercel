@@ -57,6 +57,8 @@ export type ProjectFormFieldType =
   | "approval";
 export type ProjectResourceType = "url" | "note";
 export type ProjectResourceAudience = "admin" | "members" | "client" | "all";
+export type ProjectFormSubmissionStatus = "draft" | "submitted" | "revision_requested" | "approved";
+export type ProjectFormAnswerValue = string | number | boolean | string[];
 
 export const projectFormFieldTypeLabels: Record<ProjectFormFieldType, string> = {
   short_text: "1行テキスト",
@@ -86,6 +88,13 @@ export const projectResourceAudienceLabels: Record<ProjectResourceAudience, stri
   members: "担当メンバー",
   client: "クライアント",
   all: "全参加者"
+};
+
+export const projectFormSubmissionStatusLabels: Record<ProjectFormSubmissionStatus, string> = {
+  draft: "下書き",
+  submitted: "確認待ち",
+  revision_requested: "修正依頼",
+  approved: "承認済み"
 };
 
 export const projectStatusLabels: Record<ProjectStatus, string> = {
@@ -265,6 +274,22 @@ export type ProjectResource = {
   audience: ProjectResourceAudience;
 };
 
+export type ProjectFormSubmission = {
+  id: string;
+  projectId: string;
+  formId: string;
+  submittedByActor: "client" | "worker";
+  submittedById: string;
+  answers: Record<string, ProjectFormAnswerValue>;
+  status: ProjectFormSubmissionStatus;
+  reviewMemo: string;
+  reviewedByMemberId: string;
+  approvedByMemberId: string;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProjectDeliverable = {
   id: string;
   projectId: string;
@@ -393,6 +418,7 @@ export type TeamWorksProjectStoreState = {
   tasks: ProjectTask[];
   taskCheckItems: ProjectTaskCheckItem[];
   forms: ProjectForm[];
+  formSubmissions: ProjectFormSubmission[];
   resources: ProjectResource[];
   deliverables: ProjectDeliverable[];
   comments: ProjectComment[];
@@ -446,6 +472,13 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       projectId: demoProjectId,
       name: "制作担当",
       description: "割り当てられた制作タスクを担当します。",
+      createdAt: demoCreatedAt
+    },
+    {
+      id: "project_role_demo_client",
+      projectId: demoProjectId,
+      name: "クライアント",
+      description: "案件の確認と必要情報の入力を担当します。",
       createdAt: demoCreatedAt
     }
   ],
@@ -589,7 +622,45 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
       position: 1
     }
   ],
-  forms: [],
+  forms: [
+    {
+      id: "project_form_demo_client_brief",
+      projectId: demoProjectId,
+      phaseId: "project_phase_demo_discovery",
+      taskId: null,
+      name: "ご希望の確認",
+      inputRoleId: "project_role_demo_client",
+      reviewerRoleId: "project_role_demo_leader",
+      approverRoleId: "project_role_demo_leader",
+      required: true,
+      dueOffsetDays: 3,
+      clientVisible: true,
+      editableAfterSubmit: false,
+      fields: [
+        { id: "project_form_field_demo_goal", type: "long_text", label: "完成後のご希望", description: "実現したい状態を教えてください。", placeholder: "", required: true, options: [] },
+        { id: "project_form_field_demo_priority", type: "single_select", label: "優先したいこと", description: "", placeholder: "", required: true, options: ["品質", "速さ", "予算"] }
+      ]
+    },
+    {
+      id: "project_form_demo_worker_check",
+      projectId: demoProjectId,
+      phaseId: "project_phase_demo_production",
+      taskId: "project_task_demo_draft",
+      name: "作業開始チェック",
+      inputRoleId: "project_role_demo_leader",
+      reviewerRoleId: "project_role_demo_leader",
+      approverRoleId: "project_role_demo_leader",
+      required: true,
+      dueOffsetDays: 1,
+      clientVisible: false,
+      editableAfterSubmit: true,
+      fields: [
+        { id: "project_form_field_demo_ready", type: "checkbox", label: "必要な情報を確認した", description: "", placeholder: "", required: true, options: [] },
+        { id: "project_form_field_demo_note", type: "short_text", label: "共有メモ", description: "", placeholder: "任意", required: false, options: [] }
+      ]
+    }
+  ],
+  formSubmissions: [],
   resources: [],
   deliverables: [],
   comments: []
@@ -692,6 +763,7 @@ export function readTeamWorksProjectStore() {
       ? { ...project, clientId: "client_sakura" }
       : project),
     forms: Array.isArray(state.forms) ? state.forms.map(normalizeProjectForm) : [],
+    formSubmissions: Array.isArray(state.formSubmissions) ? state.formSubmissions : [],
     resources: Array.isArray(state.resources) ? state.resources : []
   };
 }

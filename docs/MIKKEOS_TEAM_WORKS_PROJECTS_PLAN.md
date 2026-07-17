@@ -5,7 +5,7 @@
 実装: TW-P番号を指定してcodexまたはSonnetへ依頼する前提
 
 統合更新: 2026-07-17（Codex）
-現在地: TW-P7A（案件完了時のテンプレート改善ループ）実装・検収完了。次はTW-P7残範囲の着手判断。
+現在地: TW-P7C（フォーム回答・提出・確認・承認）実装・検収完了。次はSupabase本接続と報酬・請求接続の再開条件を判断。
 
 このdocsは、次の2つの構想書を、現在の一本化実行ライン・既存Team Works構造・共通部品・安全規約へ落とし込んだ実装計画です。
 
@@ -223,6 +223,8 @@ enableProjectInvoices     プロジェクト請求（既存invoicesへの接続�
 ```text
 - フォーム項目リッチ型15種（new構想フォームブロック）・資料ブロック権限
 - TW-P7A: テンプ改善ループ（案件完了時「今回の変更を元テンプレへ反映しますか」・新構想12章）→ 2026-07-17完了
+- TW-P7B: フォーム項目15種・資料ブロック権限 → 2026-07-17完了
+- TW-P7C: フォーム回答・下書き・提出・修正依頼・承認 → 2026-07-17完了
 - 報酬・請求の実接続（既存 payouts/invoices へ project_tasks から反映）
 - Manager連携（プロジェクトの納期/タスクをManagerへ derive-on-read で供給）
 - Order/Studioからの自動案件作成、Marketplace（テンプレ公開・販売）は将来構想
@@ -587,4 +589,27 @@ migration・RLS・actor別否定テストを一体で設計する。
 現在の境界:
 - フォーム回答・提出・承認ワークフロー、Storageアップロード、Supabase/RLSは未実装。
 - 報酬/請求、Manager、Order/Studio、Activity Log / Story / DESKとの接続は未実装。
+```
+
+## 20. TW-P7C実装結果（2026-07-17）
+
+```text
+実装:
+- フォーム回答を draft / submitted / revision_requested / approved で保存。
+- client / workerは自分が入力者のフォームだけを専用view型で受け取り、
+  下書き保存・提出・修正依頼後の再提出を行う。
+- adminは案件詳細で回答を確認し、理由付き修正依頼または承認を行う。
+- 必須項目未入力の提出を禁止し、提出後の編集可否設定を反映。
+- file / imageはStorageへ送らずURL入力のみ。table / repeaterはテキスト入力で検証する。
+- 旧localStorageで formSubmissions が欠ける場合は空配列で読み込む。
+
+検収:
+- 正常提出、他actorからの承認拒否、adminの修正依頼を独立状態遷移で確認。
+- client / worker / adminを375px / 768px / 1280pxで確認。ページ全体の横はみ出しなし。
+- lint成功。
+- build成功（75 static pages）。
+
+現在の境界:
+- 通知、ファイル本体、Supabase/RLS、Activity Log接続は未実装。
+- 報酬/請求実接続はSupabase本接続と一体で設計する。
 ```
