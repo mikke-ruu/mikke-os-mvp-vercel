@@ -13,6 +13,7 @@ import {
   type ProjectStatus
 } from "@/lib/team-works-projects";
 import { teamWorksInitialState } from "@/lib/team-works";
+import { TeamWorksDatabaseSyncPanel } from "./TeamWorksDatabaseSyncPanel";
 
 type ProjectFilter = "active" | "review" | "due" | "completed" | "on_hold" | "all";
 
@@ -28,7 +29,7 @@ const filters: { value: ProjectFilter; label: string }[] = [
 const actionRequiredStatuses = new Set(["client_response_pending", "internal_review_pending", "revision_requested"]);
 
 export function TeamWorksProjectsList() {
-  const { hydrated, projectState } = useTeamWorksProjectStore();
+  const { hydrated, projectState, templateState, saveProjectState } = useTeamWorksProjectStore();
   const [filter, setFilter] = useState<ProjectFilter>("active");
   const sortedProjects = useMemo(
     () => [...projectState.projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
@@ -55,6 +56,12 @@ export function TeamWorksProjectsList() {
           <Plus size={16} /> 新しいプロジェクト
         </Link>
       </div>
+
+      <TeamWorksDatabaseSyncPanel
+        projectState={projectState}
+        templateState={templateState}
+        saveProjectState={saveProjectState}
+      />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="プロジェクトの概要">
         <MetricCard label="進行中" value={`${activeCount}件`} helper="準備・納品準備を含む" tone="navy" />

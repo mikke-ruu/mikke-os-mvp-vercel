@@ -638,3 +638,28 @@ migration・RLS・actor別否定テストを一体で設計する。
 - DBの安全な接続基盤と報酬/請求レコード境界まで完了。
 - 既存localStorage UIからSupabaseへの読込・保存切替、ファイルStorage、Activity Log通知は未実装。
 ```
+
+## 22. TW-P8B実装結果（2026-07-18）
+
+```text
+実装:
+- プロジェクト一覧へ、認証済みowner専用のSupabase手動同期パネルを追加。
+- 初回同期時にauth.usersを起点とするowner組織・owner memberを安全に作成または再利用。
+- localStorageの案件・タスク・内容のあるURL/メモ資料をsource_local_idでupsertし、
+  再同期しても同じDBレコードを更新する。
+- DBからの読込はsource_local_idが一致する端末内レコードだけを更新し、
+  DBだけでは復元できない工程・フォーム・成果物を消さない。
+- client_review等の細かな状態はDBのactive/review_pendingへ縮約して保存し、
+  読込時は端末側の詳細状態を維持する。
+- getUserで現在のAuthユーザーを再確認し、service_roleをブラウザへ置かない。
+
+安全境界:
+- 自動同期にはせず「DBから更新」「この端末から同期」の明示操作に限定。
+- 実Authユーザーに未接続のデモclient/worker IDはDB memberへ偽装せず、端末内に保持。
+- 内容が空の資料はDB制約に合わせて同期対象外とし、件数を画面へ表示。
+- localStorageは引き続き完全な操作データを保持し、DBはP8A対応範囲だけを同期する。
+
+現在の境界:
+- 工程・フォーム・回答・成果物・コメント・テンプレートのDBテーブル化は未実装。
+- 実client/workerの招待・所属接続、ファイルStorage、報酬/請求画面からDBへの保存は未実装。
+```
