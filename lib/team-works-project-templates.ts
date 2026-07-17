@@ -228,6 +228,7 @@ export function instantiateTeamWorksProjectTemplate({
       phaseDates.set(phase.id, { startDate: phaseStartDate, dueDate });
       const result: ProjectPhase = {
         id,
+        sourceTemplatePhaseId: phase.id,
         projectId,
         name: phase.name,
         description: phase.description,
@@ -253,6 +254,7 @@ export function instantiateTeamWorksProjectTemplate({
     const phaseDate = phaseDates.get(task.phaseId);
     return {
       id,
+      sourceTemplateTaskId: task.id,
       projectId,
       phaseId: phaseIdByTemplateId.get(task.phaseId) ?? "",
       title: task.title,
@@ -282,6 +284,7 @@ export function instantiateTeamWorksProjectTemplate({
   );
   const forms: ProjectForm[] = source.forms.map((form) => ({
     id: createId("team_works_project_form"),
+    sourceTemplateFormId: form.id,
     projectId,
     phaseId: phaseIdByTemplateId.get(form.phaseId) ?? "",
     taskId: form.taskId ? taskIdByTemplateId.get(form.taskId) ?? null : null,
@@ -321,6 +324,7 @@ export function instantiateTeamWorksProjectTemplate({
     leaderMemberId: leader.id,
     templateId: template.id,
     templateVersionId: templateVersion.id,
+    templateMappingVersion: 1,
     progressPercent: 0,
     clientVisible: input.clientVisible && source.featureSettings.clientPortal,
     memo: input.memo,

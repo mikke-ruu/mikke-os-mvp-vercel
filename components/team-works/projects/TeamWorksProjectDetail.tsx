@@ -26,6 +26,7 @@ import {
 } from "@/lib/team-works-projects";
 import { teamWorksInitialState } from "@/lib/team-works";
 import { TeamWorksProjectDeliverables } from "./TeamWorksProjectDeliverables";
+import { TeamWorksProjectCompletionReview } from "./TeamWorksProjectCompletionReview";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 
 type ProjectTab = "overview" | "phases" | "tasks" | "deliverables" | "members";
@@ -44,8 +45,9 @@ const taskStatuses = Object.keys(projectTaskStatusLabels) as ProjectTaskStatus[]
 const taskPriorities = Object.keys(projectTaskPriorityLabels) as ProjectTaskPriority[];
 
 export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
-  const { hydrated, projectState, templateState, saveProjectState } = useTeamWorksProjectStore();
+  const { hydrated, projectState, templateState, saveProjectState, saveTemplateState } = useTeamWorksProjectStore();
   const [tab, setTab] = useState<ProjectTab>("overview");
+  const [showCompletionReview, setShowCompletionReview] = useState(false);
   const project = projectState.projects.find((item) => item.id === projectId);
 
   if (!hydrated) return <p className="text-sm text-[var(--mikke-muted)]">プロジェクトを読み込んでいます。</p>;
@@ -93,7 +95,11 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
           </div>
           <label className="w-full max-w-xs text-xs font-bold text-[var(--mikke-text)]">
             プロジェクトの状態
-            <select value={project.status} onChange={(event) => updateProject({ status: event.target.value as ProjectStatus })} className={teamWorksProjectInputClass}>
+            <select value={project.status} onChange={(event) => {
+              const nextStatus = event.target.value as ProjectStatus;
+              if (nextStatus === "completed" && project.status !== "completed") setShowCompletionReview(true);
+              else updateProject({ status: nextStatus });
+            }} className={teamWorksProjectInputClass}>
               {projectStatuses.map((status) => <option key={status} value={status}>{projectStatusLabels[status]}</option>)}
             </select>
           </label>
@@ -114,6 +120,8 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
           </div>
         </div>
       </section>
+
+      {showCompletionReview ? <TeamWorksProjectCompletionReview project={project} projectState={projectState} templateState={templateState} saveProjectState={saveProjectState} saveTemplateState={saveTemplateState} onCancel={() => setShowCompletionReview(false)} onCompleted={() => setShowCompletionReview(false)} /> : null}
 
       <div className="flex gap-2 overflow-x-auto border-b border-[var(--mikke-line)] pb-3" role="tablist" aria-label="プロジェクト詳細">
         {tabs.map((item) => {

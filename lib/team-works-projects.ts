@@ -38,6 +38,7 @@ export type ProjectDeliverableStatus =
 
 export type ProjectCommentAudience = "internal" | "client";
 export type ProjectTemplateStatus = "draft" | "active" | "archived";
+export type ProjectTemplateImprovementAction = "none" | "overwrite" | "new_version" | "duplicate";
 
 export const projectStatusLabels: Record<ProjectStatus, string> = {
   draft: "下書き",
@@ -102,9 +103,13 @@ export type Project = {
   leaderMemberId: string;
   templateId: string | null;
   templateVersionId: string | null;
+  templateMappingVersion?: 1;
   progressPercent: number;
   clientVisible: boolean;
   memo: string;
+  completedAt?: string | null;
+  completionReviewMemo?: string;
+  templateImprovementAction?: ProjectTemplateImprovementAction | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -128,6 +133,7 @@ export type ProjectMember = {
 
 export type ProjectPhase = {
   id: string;
+  sourceTemplatePhaseId?: string | null;
   projectId: string;
   name: string;
   description: string;
@@ -153,6 +159,7 @@ export type ProjectTaskCheckItem = {
 
 export type ProjectTask = {
   id: string;
+  sourceTemplateTaskId?: string | null;
   projectId: string;
   phaseId: string;
   title: string;
@@ -172,6 +179,7 @@ export type ProjectTask = {
 
 export type ProjectForm = {
   id: string;
+  sourceTemplateFormId?: string | null;
   projectId: string;
   phaseId: string;
   taskId: string | null;
