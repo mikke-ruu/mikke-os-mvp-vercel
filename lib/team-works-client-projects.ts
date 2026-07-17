@@ -121,10 +121,14 @@ export type ClientProjectDetailView = {
   approvedDeliverables: ClientProjectDeliverableView[];
 };
 
-export function createTeamWorksClientProjectList(state: TeamWorksProjectStoreState, clientId: string) {
+export type ClientPortalActor = {
+  memberships: ReadonlyMap<string, { memberId: string }>;
+};
+
+export function createTeamWorksClientProjectList(state: TeamWorksProjectStoreState, clientId: string, actor?: ClientPortalActor) {
   return state.projects
-    .filter((project) => isClientProjectVisible(project, clientId))
-    .map((project) => createTeamWorksClientProjectDetail(state, clientId, project.id))
+    .filter((project) => isClientProjectVisible(project, clientId, actor))
+    .map((project) => createTeamWorksClientProjectDetail(state, clientId, project.id, actor))
     .filter((detail): detail is ClientProjectDetailView => detail !== null)
     .sort((a, b) => b.project.updatedAt.localeCompare(a.project.updatedAt));
 }
@@ -132,10 +136,12 @@ export function createTeamWorksClientProjectList(state: TeamWorksProjectStoreSta
 export function createTeamWorksClientProjectDetail(
   state: TeamWorksProjectStoreState,
   clientId: string,
-  projectId: string
+  projectId: string,
+  actor?: ClientPortalActor
 ): ClientProjectDetailView | null {
   const sourceProject = state.projects.find((project) => project.id === projectId);
-  if (!sourceProject || !isClientProjectVisible(sourceProject, clientId)) return null;
+  if (!sourceProject || !isClientProjectVisible(sourceProject, clientId, actor)) return null;
+  const portalMemberId = actor?.memberships.get(projectId)?.memberId ?? TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID;
 
   const phases = state.phases
     .filter((phase) => phase.projectId === projectId && phase.clientVisible)
@@ -213,7 +219,7 @@ export function createTeamWorksClientProjectDetail(
       fields: form.fields.map((field) => ({ ...field, options: [...field.options] })),
       submission: state.formSubmissions.find((submission) => submission.formId === form.id
         && submission.submittedByActor === "client"
-        && submission.submittedById === TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID) ?? null
+        && submission.submittedById === portalMemberId) ?? null
     }));
 
   const comments = state.comments
@@ -229,7 +235,7 @@ export function createTeamWorksClientProjectDetail(
       phaseId: comment.phaseId,
       taskId: comment.taskId,
       deliverableId: comment.deliverableId,
-      authorLabel: comment.authorMemberId === TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID ? "あなた" : "制作チーム",
+      authorLabel: comment.authorMemberId === portalMemberId ? "あなた" : "制作チーム",
       body: comment.body,
       createdAt: comment.createdAt
     }));
@@ -305,8 +311,9 @@ export function createTeamWorksClientProjectDetail(
   };
 }
 
-function isClientProjectVisible(project: TeamWorksProjectStoreState["projects"][number], clientId: string) {
-  return project.clientId === clientId && project.clientVisible && project.status !== "draft";
+function isClientProjectVisible(project: TeamWorksProjectStoreState["projects"][number], clientId: string, actor?: ClientPortalActor) {
+  const belongsToClient = actor ? actor.memberships.has(project.id) : project.clientId === clientId;
+  return belongsToClient && project.clientVisible && project.status !== "draft";
 }
 
 function taskActionHelper(status: ProjectTaskStatus) {

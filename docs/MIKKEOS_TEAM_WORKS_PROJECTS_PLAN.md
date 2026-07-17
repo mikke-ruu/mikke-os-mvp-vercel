@@ -692,3 +692,26 @@ migration・RLS・actor別否定テストを一体で設計する。
 - フォーム回答・コメントを実Auth actorからDBへ直接保存するUI切替は未実装。
 - 成果物ファイル本体のStorage保存、報酬/請求画面のDB保存、Activity Log通知は未実装。
 ```
+
+## 24. TW-P8D実装結果（2026-07-18）
+
+```text
+実装:
+- client / workerポータルの固定デモactorを、ログイン中Authユーザーのorganization member / project member所属へ置換。
+- project source_local_idを使い、端末内の案件表示をDBで許可された案件だけに絞り込む。
+- client / workerのフォーム下書き・提出を、実project member IDでform_submissionsへupsert。
+- clientの共有コメントをproject_commentsへ保存し、成果物の承認・修正依頼をproject_deliverablesへ反映。
+- ブラウザではpublishable clientと現在のAuthセッションだけを使い、service_roleを置かない。
+- DB保存が失敗した場合は端末内状態を先に進めず、ポータル上へエラーを表示。
+
+検収:
+- client actorによるフォーム提出、成果物承認、共有コメント登録をRLSテストで確認。
+- worker actorによる担当フォーム提出と、client / worker間の可視範囲分離をRLSテストで確認。
+- 招待メール不一致、anon直接操作、非対象フォーム提出の拒否テストを継続。
+- lint / build成功（80 static pages）。Team Works由来のactionableなAdvisor指摘0件。
+
+現在の境界:
+- DBからフォーム回答・コメントを別端末のlocalStorage表示へ復元する読込統合は未実装。
+- workerへの個別タスク割当を、管理画面の実project member選択へ切り替える処理は未実装。
+- 成果物ファイル本体のStorage保存、報酬/請求画面のDB保存、Activity Log通知は未実装。
+```

@@ -2,6 +2,7 @@
 
 import { ArrowLeft, CalendarDays, CheckCircle2, ExternalLink, FileCheck2, ListChecks, MessageSquareText } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
@@ -9,27 +10,43 @@ import { createTeamWorksProjectId, projectDeliverableStatusLabels, projectPhaseS
 import { createTeamWorksWorkerProjectDetail, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID, type WorkerProjectCommentView, type WorkerProjectFormView } from "@/lib/team-works-worker-projects";
 import { TeamWorksProjectFormResponse } from "@/components/team-works/projects/TeamWorksProjectFormResponse";
 import { saveProjectFormAnswers, transitionProjectFormSubmission } from "@/lib/team-works-project-forms";
+import { useTeamWorksPortalActor } from "@/components/team-works/useTeamWorksPortalActor";
+import { saveTeamWorksPortalFormSubmission } from "@/lib/team-works-portal-database";
 
 export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string }) {
   const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
-  const detail = createTeamWorksWorkerProjectDetail(projectState, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID, projectId);
+  const actor = useTeamWorksPortalActor("worker");
+  const membership = actor.membershipBySourceProjectId.get(projectId);
+  const actorMemberships = new Map(membership ? [[projectId, { memberId: membership.memberId, memberName: membership.memberName }]] : []);
+  const detail = createTeamWorksWorkerProjectDetail(projectState, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID, projectId, { memberships: actorMemberships });
+  const [databaseError, setDatabaseError] = useState("");
 
-  if (!hydrated) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">担当内容を読み込んでいます。</p>;
+  if (!hydrated || actor.status === "loading") return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">担当内容を読み込んでいます。</p>;
+  if (actor.status === "error") return <MikkeEmptyState title="案件所属を確認できません" helper={actor.errorMessage} />;
   if (!detail) return <div className="space-y-4"><MikkeEmptyState title="このプロジェクトは表示できません" helper="担当から外れたか、閲覧できるプロジェクトではありません。" /><Link href="/apps/team-works/portal/worker/projects" className="mx-auto flex w-fit items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> 一覧へ戻る</Link></div>;
 
   const { project, memberId, phases, tasks, forms, deliverables, resources, comments } = detail;
   const actionTasks = tasks.filter((task) => !["approved", "completed"].includes(task.status));
   const actionForms = forms.filter((form) => !form.submission || ["draft", "revision_requested"].includes(form.submission.status));
 
-  function saveForm(form: WorkerProjectFormView, answers: Record<string, ProjectFormAnswerValue>, submit: boolean) {
+  async function saveForm(form: WorkerProjectFormView, answers: Record<string, ProjectFormAnswerValue>, submit: boolean) {
+    if (!membership) return;
     const now = new Date().toISOString();
     const saved = saveProjectFormAnswers({ submission: form.submission, projectId: project.id, formId: form.id, actor: { kind: "worker", id: memberId }, answers, editableAfterSubmit: form.editableAfterSubmit, now, createId: createTeamWorksProjectId });
     const next = submit ? transitionProjectFormSubmission({ submission: saved, nextStatus: "submitted", actor: { kind: "worker", id: memberId }, now }) : saved;
+    try {
+      setDatabaseError("");
+      await saveTeamWorksPortalFormSubmission({ membership, formSourceId: form.id, submissionSourceId: next.id, answers: next.answers, status: submit ? "submitted" : "draft" });
+    } catch (error) {
+      setDatabaseError(error instanceof Error ? error.message : "DBへ保存できませんでした。");
+      return;
+    }
     saveProjectState({ ...projectState, projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item), formSubmissions: form.submission ? projectState.formSubmissions.map((item) => item.id === next.id ? next : item) : [...projectState.formSubmissions, next] });
   }
 
   return (
     <div className="space-y-6">
+      {databaseError ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 px-3 py-2 text-sm font-bold text-[var(--mikke-danger)]">{databaseError}</p> : null}
       <Link href="/apps/team-works/portal/worker/projects" className="inline-flex items-center gap-2 text-xs font-bold text-[var(--mikke-primary)]"><ArrowLeft size={15} /> 担当プロジェクト一覧</Link>
       <section className="border-b border-[var(--mikke-line)] pb-5"><MikkeStatusBadge tone={project.status === "completed" ? "success" : "primary"} className="px-2 py-1">{projectStatusLabels[project.status]}</MikkeStatusBadge><h2 className="mt-3 text-2xl font-bold tracking-normal">{project.name}</h2>{project.description ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--mikke-text-soft)]">{project.description}</p> : null}</section>
       <section className="grid gap-3 sm:grid-cols-3"><SummaryCard label="全体進捗" value={`${project.progressPercent}%`} icon={CheckCircle2} /><SummaryCard label="自分の現在工程" value={project.currentPhaseName} icon={ListChecks} /><SummaryCard label="納期" value={formatDate(project.dueDate)} icon={CalendarDays} /></section>

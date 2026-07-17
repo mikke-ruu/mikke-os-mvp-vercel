@@ -106,9 +106,13 @@ export type WorkerProjectDetailView = {
   comments: WorkerProjectCommentView[];
 };
 
-export function createTeamWorksWorkerProjectList(state: TeamWorksProjectStoreState, workerId: string) {
+export type WorkerPortalActor = {
+  memberships: ReadonlyMap<string, { memberId: string; memberName: string }>;
+};
+
+export function createTeamWorksWorkerProjectList(state: TeamWorksProjectStoreState, workerId: string, actor?: WorkerPortalActor) {
   return state.projects
-    .map((project) => createTeamWorksWorkerProjectDetail(state, workerId, project.id))
+    .map((project) => createTeamWorksWorkerProjectDetail(state, workerId, project.id, actor))
     .filter((detail): detail is WorkerProjectDetailView => detail !== null)
     .sort((a, b) => b.project.updatedAt.localeCompare(a.project.updatedAt));
 }
@@ -116,12 +120,23 @@ export function createTeamWorksWorkerProjectList(state: TeamWorksProjectStoreSta
 export function createTeamWorksWorkerProjectDetail(
   state: TeamWorksProjectStoreState,
   workerId: string,
-  projectId: string
+  projectId: string,
+  actor?: WorkerPortalActor
 ): WorkerProjectDetailView | null {
   const sourceProject = state.projects.find((project) => project.id === projectId);
   if (!sourceProject || ["draft", "cancelled"].includes(sourceProject.status)) return null;
 
-  const member = state.projectMembers.find((item) => item.projectId === projectId && item.organizationMemberId === workerId);
+  const databaseMembership = actor?.memberships.get(projectId);
+  const storedMember = state.projectMembers.find((item) => item.projectId === projectId && item.organizationMemberId === workerId);
+  const workerRole = state.projectRoles.find((role) => role.projectId === projectId && role.name.includes("担当"));
+  const member = storedMember ?? (databaseMembership && workerRole ? {
+    id: databaseMembership.memberId,
+    projectId,
+    organizationMemberId: databaseMembership.memberId,
+    displayName: databaseMembership.memberName,
+    projectRoleId: workerRole.id,
+    joinedAt: ""
+  } : null);
   if (!member) return null;
 
   const tasks = state.tasks

@@ -95,8 +95,16 @@ begin
   end;
   select count(*) into v_count from public.team_works_project_deliverables where id = v_deliverable_id;
   if v_count <> 1 then raise exception 'client deliverable visibility mismatch'; end if;
+  update public.team_works_project_deliverables
+  set status = 'approved', reviewed_by_member_id = v_actor_member_id
+  where id = v_deliverable_id;
+  insert into public.team_works_project_comments(
+    project_id, task_id, deliverable_id, author_member_id, audience, body
+  ) values (
+    v_project_id, v_task_id, v_deliverable_id, v_actor_member_id, 'client', 'client portal comment'
+  );
   select count(*) into v_count from public.team_works_project_comments where project_id = v_project_id;
-  if v_count <> 1 then raise exception 'client comment visibility mismatch: %', v_count; end if;
+  if v_count <> 2 then raise exception 'client comment visibility or insert mismatch: %', v_count; end if;
 
   execute 'reset role';
   select count(*) into v_count from public.team_works_member_invites
@@ -117,8 +125,10 @@ begin
   execute 'set local role authenticated';
   select count(*) into v_count from public.team_works_project_forms where project_id = v_project_id;
   if v_count <> 1 then raise exception 'worker form visibility mismatch: %', v_count; end if;
+  insert into public.team_works_form_submissions(project_id, form_id, submitted_by_member_id, answers, status)
+  values (v_project_id, v_worker_form_id, v_actor_member_id, '{"report":"worker portal"}', 'submitted');
   select count(*) into v_count from public.team_works_project_comments where project_id = v_project_id;
-  if v_count <> 2 then raise exception 'worker comment visibility mismatch: %', v_count; end if;
+  if v_count <> 3 then raise exception 'worker comment visibility mismatch: %', v_count; end if;
 
   execute 'reset role';
   perform set_config('request.jwt.claims', '{"role":"anon"}', true);

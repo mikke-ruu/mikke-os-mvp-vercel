@@ -11,10 +11,13 @@ import {
   TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID
 } from "@/lib/team-works-client-projects";
 import { projectStatusLabels, useTeamWorksProjectStore, type ProjectStatus } from "@/lib/team-works-projects";
+import { useTeamWorksPortalActor } from "@/components/team-works/useTeamWorksPortalActor";
 
 export function TeamWorksClientProjectList() {
   const { hydrated, projectState } = useTeamWorksProjectStore();
-  const details = createTeamWorksClientProjectList(projectState, TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID);
+  const actor = useTeamWorksPortalActor("client");
+  const actorMemberships = new Map(actor.memberships.map((membership) => [membership.sourceProjectId, { memberId: membership.memberId }]));
+  const details = createTeamWorksClientProjectList(projectState, TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID, { memberships: actorMemberships });
   const actions = details.flatMap((detail) => detail.actions.map((action) => ({
     ...action,
     projectId: detail.project.id,
@@ -24,10 +27,14 @@ export function TeamWorksClientProjectList() {
   const reviewCount = details.reduce((sum, detail) => sum + detail.project.reviewDeliverableCount, 0);
   const approvedCount = details.reduce((sum, detail) => sum + detail.project.approvedDeliverableCount, 0);
 
-  if (!hydrated) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">共有プロジェクトを読み込んでいます。</p>;
+  if (!hydrated || actor.status === "loading") return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">共有プロジェクトを読み込んでいます。</p>;
+  if (actor.status === "error") return <MikkeEmptyState title="案件所属を確認できません" helper={actor.errorMessage} />;
 
   return (
     <div className="space-y-6">
+      <p className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-bg)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">
+        ログイン中の実アカウントに共有された案件だけを表示しています。
+      </p>
       <MikkeSection title="あなたが今やること">
         {actions.length > 0 ? (
           <div className="divide-y divide-[var(--mikke-line)]">

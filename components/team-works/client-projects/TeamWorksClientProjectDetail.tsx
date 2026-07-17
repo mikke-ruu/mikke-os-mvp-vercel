@@ -28,12 +28,19 @@ import {
   type ProjectDeliverableStatus
 } from "@/lib/team-works-projects";
 import { teamWorksProjectInputClass } from "@/components/team-works/projects/TeamWorksProjectsShell";
+import { useTeamWorksPortalActor } from "@/components/team-works/useTeamWorksPortalActor";
+import { reviewTeamWorksPortalDeliverable, saveTeamWorksPortalComment, saveTeamWorksPortalFormSubmission } from "@/lib/team-works-portal-database";
 
 export function TeamWorksClientProjectDetail({ projectId }: { projectId: string }) {
   const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
-  const detail = createTeamWorksClientProjectDetail(projectState, TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID, projectId);
+  const actor = useTeamWorksPortalActor("client");
+  const membership = actor.membershipBySourceProjectId.get(projectId);
+  const actorMemberships = new Map(membership ? [[projectId, { memberId: membership.memberId }]] : []);
+  const detail = createTeamWorksClientProjectDetail(projectState, TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID, projectId, { memberships: actorMemberships });
+  const [databaseError, setDatabaseError] = useState("");
 
-  if (!hydrated) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">共有プロジェクトを読み込んでいます。</p>;
+  if (!hydrated || actor.status === "loading") return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">共有プロジェクトを読み込んでいます。</p>;
+  if (actor.status === "error") return <MikkeEmptyState title="案件所属を確認できません" helper={actor.errorMessage} />;
   if (!detail) {
     return (
       <div className="space-y-4">
@@ -45,14 +52,23 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
 
   const { project, phases, tasks, forms, resources, comments, actions, reviewDeliverables, approvedDeliverables } = detail;
 
-  function saveForm(form: ClientProjectFormView, answers: Record<string, ProjectFormAnswerValue>, submit: boolean) {
+  async function saveForm(form: ClientProjectFormView, answers: Record<string, ProjectFormAnswerValue>, submit: boolean) {
+    if (!membership) return;
     const now = new Date().toISOString();
-    const saved = saveProjectFormAnswers({ submission: form.submission, projectId: project.id, formId: form.id, actor: { kind: "client", id: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID }, answers, editableAfterSubmit: form.editableAfterSubmit, now, createId: createTeamWorksProjectId });
-    const next = submit ? transitionProjectFormSubmission({ submission: saved, nextStatus: "submitted", actor: { kind: "client", id: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID }, now }) : saved;
+    const saved = saveProjectFormAnswers({ submission: form.submission, projectId: project.id, formId: form.id, actor: { kind: "client", id: membership.memberId }, answers, editableAfterSubmit: form.editableAfterSubmit, now, createId: createTeamWorksProjectId });
+    const next = submit ? transitionProjectFormSubmission({ submission: saved, nextStatus: "submitted", actor: { kind: "client", id: membership.memberId }, now }) : saved;
+    try {
+      setDatabaseError("");
+      await saveTeamWorksPortalFormSubmission({ membership, formSourceId: form.id, submissionSourceId: next.id, answers: next.answers, status: submit ? "submitted" : "draft" });
+    } catch (error) {
+      setDatabaseError(databaseErrorMessage(error));
+      return;
+    }
     saveProjectState({ ...projectState, projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item), formSubmissions: form.submission ? projectState.formSubmissions.map((item) => item.id === next.id ? next : item) : [...projectState.formSubmissions, next] });
   }
 
-  function updateDeliverable(deliverableId: string, nextStatus: ProjectDeliverableStatus, body: string) {
+  async function updateDeliverable(deliverableId: string, nextStatus: ProjectDeliverableStatus, body: string) {
+    if (!membership || (nextStatus !== "approved" && nextStatus !== "revision_requested")) return;
     const deliverable = projectState.deliverables.find((item) => item.id === deliverableId && item.projectId === project.id && item.clientVisible);
     if (!deliverable) return;
     const now = new Date().toISOString();
@@ -60,51 +76,69 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
       deliverable,
       nextStatus,
       actor: "client",
-      memberId: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID,
+      memberId: membership.memberId,
       now
     });
+    const comment = body.trim() ? {
+      id: createTeamWorksProjectId("team_works_project_comment"),
+      projectId: project.id,
+      phaseId: deliverable.phaseId,
+      taskId: deliverable.taskId,
+      deliverableId: deliverable.id,
+      authorMemberId: membership.memberId,
+      audience: "client" as const,
+      body: body.trim(),
+      createdAt: now,
+      updatedAt: now
+    } : null;
+    try {
+      setDatabaseError("");
+      await reviewTeamWorksPortalDeliverable({ membership, deliverableSourceId: deliverable.id, nextStatus });
+      if (comment) await saveTeamWorksPortalComment({ membership, commentSourceId: comment.id, taskSourceId: deliverable.taskId, deliverableSourceId: deliverable.id, audience: "client", body: comment.body });
+    } catch (error) {
+      setDatabaseError(databaseErrorMessage(error));
+      return;
+    }
     saveProjectState({
       ...projectState,
       projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item),
       deliverables: projectState.deliverables.map((item) => item.id === deliverable.id ? nextDeliverable : item),
-      comments: body.trim() ? [...projectState.comments, {
-        id: createTeamWorksProjectId("team_works_project_comment"),
-        projectId: project.id,
-        phaseId: deliverable.phaseId,
-        taskId: deliverable.taskId,
-        deliverableId: deliverable.id,
-        authorMemberId: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID,
-        audience: "client",
-        body: body.trim(),
-        createdAt: now,
-        updatedAt: now
-      }] : projectState.comments
+      comments: comment ? [...projectState.comments, comment] : projectState.comments
     });
   }
 
-  function addProjectComment(body: string) {
-    if (!body.trim()) return;
+  async function addProjectComment(body: string) {
+    if (!body.trim() || !membership) return;
     const now = new Date().toISOString();
+    const comment = {
+      id: createTeamWorksProjectId("team_works_project_comment"),
+      projectId: project.id,
+      phaseId: null,
+      taskId: null,
+      deliverableId: null,
+      authorMemberId: membership.memberId,
+      audience: "client" as const,
+      body: body.trim(),
+      createdAt: now,
+      updatedAt: now
+    };
+    try {
+      setDatabaseError("");
+      await saveTeamWorksPortalComment({ membership, commentSourceId: comment.id, audience: "client", body: comment.body });
+    } catch (error) {
+      setDatabaseError(databaseErrorMessage(error));
+      return;
+    }
     saveProjectState({
       ...projectState,
       projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item),
-      comments: [...projectState.comments, {
-        id: createTeamWorksProjectId("team_works_project_comment"),
-        projectId: project.id,
-        phaseId: null,
-        taskId: null,
-        deliverableId: null,
-        authorMemberId: TEAM_WORKS_CLIENT_PORTAL_DEMO_MEMBER_ID,
-        audience: "client",
-        body: body.trim(),
-        createdAt: now,
-        updatedAt: now
-      }]
+      comments: [...projectState.comments, comment]
     });
   }
 
   return (
     <div className="space-y-6">
+      {databaseError ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 px-3 py-2 text-sm font-bold text-[var(--mikke-danger)]">{databaseError}</p> : null}
       <Link href="/apps/team-works/portal/client/projects" className="inline-flex items-center gap-2 text-xs font-bold text-[var(--mikke-primary)]"><ArrowLeft size={15} /> プロジェクト一覧</Link>
 
       <section className="border-b border-[var(--mikke-line)] pb-5">
@@ -194,6 +228,11 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
       <SharedComments comments={comments.filter((comment) => !comment.deliverableId)} onSubmit={addProjectComment} />
     </div>
   );
+}
+
+function databaseErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  return message || "DBへ保存できませんでした。案件への招待と権限を確認してください。";
 }
 
 function SummaryCard({ label, value, icon: Icon }: { label: string; value: string; icon: typeof CheckCircle2 }) {

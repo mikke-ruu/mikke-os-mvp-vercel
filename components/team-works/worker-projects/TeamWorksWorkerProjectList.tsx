@@ -6,17 +6,24 @@ import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { projectStatusLabels, useTeamWorksProjectStore } from "@/lib/team-works-projects";
 import { createTeamWorksWorkerProjectList, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID } from "@/lib/team-works-worker-projects";
+import { useTeamWorksPortalActor } from "@/components/team-works/useTeamWorksPortalActor";
 
 export function TeamWorksWorkerProjectList() {
   const { hydrated, projectState } = useTeamWorksProjectStore();
-  const projects = createTeamWorksWorkerProjectList(projectState, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID);
+  const actor = useTeamWorksPortalActor("worker");
+  const actorMemberships = new Map(actor.memberships.map((membership) => [membership.sourceProjectId, { memberId: membership.memberId, memberName: membership.memberName }]));
+  const projects = createTeamWorksWorkerProjectList(projectState, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID, { memberships: actorMemberships });
   const taskCount = projects.reduce((sum, item) => sum + item.project.assignedTaskCount, 0);
   const actionCount = projects.reduce((sum, item) => sum + item.project.actionCount, 0);
 
-  if (!hydrated) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">担当プロジェクトを読み込んでいます。</p>;
+  if (!hydrated || actor.status === "loading") return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">担当プロジェクトを読み込んでいます。</p>;
+  if (actor.status === "error") return <MikkeEmptyState title="案件所属を確認できません" helper={actor.errorMessage} />;
 
   return (
     <div className="space-y-6">
+      <p className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-bg)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">
+        ログイン中の実アカウントに割り当てられた案件だけを表示しています。
+      </p>
       <section className="grid gap-3 sm:grid-cols-3">
         <SummaryCard label="担当プロジェクト" value={`${projects.length}件`} icon={FolderKanban} />
         <SummaryCard label="担当タスク" value={`${taskCount}件`} icon={ListChecks} />
