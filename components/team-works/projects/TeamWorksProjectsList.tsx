@@ -14,6 +14,7 @@ import {
 } from "@/lib/team-works-projects";
 import { teamWorksInitialState } from "@/lib/team-works";
 import { TeamWorksDatabaseSyncPanel } from "./TeamWorksDatabaseSyncPanel";
+import { TeamWorksMemberInvitePanel } from "./TeamWorksMemberInvitePanel";
 
 type ProjectFilter = "active" | "review" | "due" | "completed" | "on_hold" | "all";
 
@@ -62,6 +63,8 @@ export function TeamWorksProjectsList() {
         templateState={templateState}
         saveProjectState={saveProjectState}
       />
+
+      <TeamWorksMemberInvitePanel projectState={projectState} />
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="プロジェクトの概要">
         <MetricCard label="進行中" value={`${activeCount}件`} helper="準備・納品準備を含む" tone="navy" />

@@ -663,3 +663,32 @@ migration・RLS・actor別否定テストを一体で設計する。
 - 工程・フォーム・回答・成果物・コメント・テンプレートのDBテーブル化は未実装。
 - 実client/workerの招待・所属接続、ファイルStorage、報酬/請求画面からDBへの保存は未実装。
 ```
+
+## 23. TW-P8C実装結果（2026-07-18）
+
+```text
+実装:
+- 認証済みownerが、DB同期済み案件へworker / client_user / managerをメールアドレス指定で招待できる画面を追加。
+- 招待リンクは有効期限つき・1回限りとし、招待先と同じAuthメールアドレスでログインした本人だけが受諾可能。
+- 受諾時はorganization memberを登録し、DB triggerで対象project memberまで同一トランザクション内で接続。
+- project_forms / form_submissions / project_deliverables / project_commentsを追加し、
+  案件所属とactor roleに基づく閲覧・登録・状態更新RLSを設定。
+- 手動同期対象へフォーム定義と成果物メタデータを追加。source_local_idで再同期可能にした。
+- private schemaのSECURITY DEFINER helperで招待照合と案件所属判定を行い、ブラウザへservice_roleを置かない。
+
+検収:
+- 実Authユーザー2名を使い、client / workerの招待受諾、案件所属作成、フォーム・成果物・コメントの相互非表示をDBテストで確認。
+- anonからの直接操作と、招待メールが一致しないアカウントの受諾をRLSで拒否。
+- lint / build、Database Advisor、既存TW-P8A RLSテストを再実行し成功。
+- 複合外部キーの索引順とmember INSERT policyの重複を追補migrationで解消し、
+  Team Works由来のactionableなAdvisor指摘0件を確認。
+
+安全境界:
+- 既存デモactorのフォーム回答・コメントは、実Auth memberへ誤帰属させないため同期しない。
+- localStorage UIは引き続き操作元として保持し、フォーム定義と成果物だけを明示同期する。
+- 招待受諾で実DB所属は作成されるが、client / workerポータルの表示actor切替は次フェーズ。
+
+現在の境界:
+- フォーム回答・コメントを実Auth actorからDBへ直接保存するUI切替は未実装。
+- 成果物ファイル本体のStorage保存、報酬/請求画面のDB保存、Activity Log通知は未実装。
+```

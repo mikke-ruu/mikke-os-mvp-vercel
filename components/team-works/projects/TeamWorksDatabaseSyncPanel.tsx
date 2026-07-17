@@ -41,7 +41,7 @@ export function TeamWorksDatabaseSyncPanel({
       const skipped = result.skippedResources > 0 ? ` 内容が空の資料${result.skippedResources}件は除外しました。` : "";
       setSync({
         status: "success",
-        message: `案件${result.projects}件・タスク${result.tasks}件・資料${result.resources}件をDBへ同期しました。${skipped}`
+        message: `案件${result.projects}件・タスク${result.tasks}件・資料${result.resources}件・フォーム${result.forms}件・成果物${result.deliverables}件をDBへ同期しました。${skipped}`
       });
     } catch (error) {
       setSync({ status: "error", message: databaseErrorMessage(error) });

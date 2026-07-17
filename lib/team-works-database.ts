@@ -39,10 +39,34 @@ type DatabaseResourceRow = {
   memo: string | null;
 };
 
+type DatabaseFormRow = {
+  source_local_id: string | null;
+  name: string;
+  required: boolean;
+  client_visible: boolean;
+  editable_after_submit: boolean;
+  fields: TeamWorksProjectStoreState["forms"][number]["fields"];
+};
+
+type DatabaseDeliverableRow = {
+  source_local_id: string | null;
+  title: string;
+  deliverable_type: TeamWorksProjectStoreState["deliverables"][number]["type"];
+  url: string;
+  version: number;
+  status: TeamWorksProjectStoreState["deliverables"][number]["status"];
+  client_visible: boolean;
+  updated_at: string;
+};
+
+export type TeamWorksInviteRole = "manager" | "client_user" | "worker";
+
 export type TeamWorksDatabaseSyncResult = {
   projects: number;
   tasks: number;
   resources: number;
+  forms: number;
+  deliverables: number;
   skippedResources: number;
 };
 
@@ -99,6 +123,56 @@ async function findDatabaseOrganizationId() {
   return data?.id ?? null;
 }
 
+export async function createTeamWorksMemberInvite(input: {
+  displayName: string;
+  projectSourceId: string;
+  email: string;
+  role: TeamWorksInviteRole;
+}) {
+  const user = await requireCurrentUser();
+  const context = await ensureDatabaseContext(input.displayName);
+  const { data: project, error: projectError } = await supabase
+    .from("team_works_projects")
+    .select("id")
+    .eq("organization_id", context.organizationId)
+    .eq("source_local_id", input.projectSourceId)
+    .single();
+  if (projectError) throw new Error("先にこの端末の案件をDBへ同期してください。");
+
+  const { data, error } = await supabase
+    .from("team_works_member_invites")
+    .insert({
+      organization_id: context.organizationId,
+      project_id: project.id,
+      email: input.email.trim().toLowerCase(),
+      role: input.role,
+      created_by_user_id: user.id
+    })
+    .select("id,organization_id,role,expires_at")
+    .single();
+  if (error) throw error;
+  return data as { id: string; organization_id: string; role: TeamWorksInviteRole; expires_at: string };
+}
+
+export async function acceptTeamWorksMemberInvite(input: {
+  inviteId: string;
+  organizationId: string;
+  role: TeamWorksInviteRole;
+  displayName: string;
+}) {
+  const user = await requireCurrentUser();
+  const { error } = await supabase.from("team_works_organization_members").insert({
+    organization_id: input.organizationId,
+    user_id: user.id,
+    source_local_id: `invite:${input.inviteId}`,
+    display_name: input.displayName || user.email || "メンバー",
+    role: input.role,
+    status: "active",
+    invite_id: input.inviteId
+  });
+  if (error) throw error;
+}
+
 export async function syncTeamWorksProjectStateToDatabase(input: {
   displayName: string;
   projectState: TeamWorksProjectStoreState;
@@ -123,7 +197,7 @@ export async function syncTeamWorksProjectStateToDatabase(input: {
     };
   });
 
-  if (projectRows.length === 0) return { projects: 0, tasks: 0, resources: 0, skippedResources: 0 };
+  if (projectRows.length === 0) return { projects: 0, tasks: 0, resources: 0, forms: 0, deliverables: 0, skippedResources: 0 };
 
   const { data: savedProjects, error: projectError } = await supabase
     .from("team_works_projects")
@@ -202,10 +276,62 @@ export async function syncTeamWorksProjectStateToDatabase(input: {
     if (error) throw error;
   }
 
+  const roleNameById = new Map(input.projectState.projectRoles.map((role) => [role.id, role.name]));
+  const formRows = input.projectState.forms.flatMap((form) => {
+    const databaseProjectId = databaseProjectIdBySourceId.get(form.projectId);
+    if (!databaseProjectId) return [];
+    const inputRoleName = roleNameById.get(form.inputRoleId) ?? "";
+    const inputActor = inputRoleName.includes("クライアント") ? "client" : inputRoleName.includes("管理") ? "admin" : "worker";
+    return [{
+      project_id: databaseProjectId,
+      task_id: form.taskId ? databaseTaskIdBySourceId.get(form.taskId) ?? null : null,
+      source_local_id: form.id,
+      name: form.name,
+      input_actor: inputActor,
+      required: form.required,
+      client_visible: form.clientVisible,
+      editable_after_submit: form.editableAfterSubmit,
+      fields: form.fields,
+      archived_at: null
+    }];
+  });
+  if (formRows.length > 0) {
+    const { error } = await supabase
+      .from("team_works_project_forms")
+      .upsert(formRows, { onConflict: "project_id,source_local_id" });
+    if (error) throw error;
+  }
+
+  const deliverableRows = input.projectState.deliverables.flatMap((deliverable) => {
+    const databaseProjectId = databaseProjectIdBySourceId.get(deliverable.projectId);
+    const databaseTaskId = databaseTaskIdBySourceId.get(deliverable.taskId);
+    if (!databaseProjectId || !databaseTaskId) return [];
+    return [{
+      project_id: databaseProjectId,
+      task_id: databaseTaskId,
+      source_local_id: deliverable.id,
+      title: deliverable.title,
+      deliverable_type: deliverable.type,
+      url: deliverable.url,
+      version: deliverable.version,
+      status: deliverable.status,
+      client_visible: deliverable.clientVisible,
+      updated_at: deliverable.updatedAt
+    }];
+  });
+  if (deliverableRows.length > 0) {
+    const { error } = await supabase
+      .from("team_works_project_deliverables")
+      .upsert(deliverableRows, { onConflict: "project_id,source_local_id" });
+    if (error) throw error;
+  }
+
   return {
     projects: projectRows.length,
     tasks: taskRows.length,
     resources: resourceRows.length,
+    forms: formRows.length,
+    deliverables: deliverableRows.length,
     skippedResources
   };
 }
@@ -227,8 +353,10 @@ export async function readTeamWorksProjectStateFromDatabase(input: {
   const projectIds = projectRows.map((project) => project.id);
   let taskRows: DatabaseTaskRow[] = [];
   let resourceRows: DatabaseResourceRow[] = [];
+  let formRows: DatabaseFormRow[] = [];
+  let deliverableRows: DatabaseDeliverableRow[] = [];
   if (projectIds.length > 0) {
-    const [tasks, resources] = await Promise.all([
+    const [tasks, resources, forms, deliverables] = await Promise.all([
       supabase
         .from("team_works_project_tasks")
         .select("source_local_id,title,status,client_visible,updated_at")
@@ -236,17 +364,31 @@ export async function readTeamWorksProjectStateFromDatabase(input: {
       supabase
         .from("team_works_project_resources")
         .select("source_local_id,title,resource_type,audience,url,memo")
+        .in("project_id", projectIds),
+      supabase
+        .from("team_works_project_forms")
+        .select("source_local_id,name,required,client_visible,editable_after_submit,fields")
+        .in("project_id", projectIds),
+      supabase
+        .from("team_works_project_deliverables")
+        .select("source_local_id,title,deliverable_type,url,version,status,client_visible,updated_at")
         .in("project_id", projectIds)
     ]);
     if (tasks.error) throw tasks.error;
     if (resources.error) throw resources.error;
+    if (forms.error) throw forms.error;
+    if (deliverables.error) throw deliverables.error;
     taskRows = (tasks.data ?? []) as DatabaseTaskRow[];
     resourceRows = (resources.data ?? []) as DatabaseResourceRow[];
+    formRows = (forms.data ?? []) as DatabaseFormRow[];
+    deliverableRows = (deliverables.data ?? []) as DatabaseDeliverableRow[];
   }
 
   const projectBySourceId = new Map(projectRows.flatMap((row) => row.source_local_id ? [[row.source_local_id, row] as const] : []));
   const taskBySourceId = new Map(taskRows.flatMap((row) => row.source_local_id ? [[row.source_local_id, row] as const] : []));
   const resourceBySourceId = new Map(resourceRows.flatMap((row) => row.source_local_id ? [[row.source_local_id, row] as const] : []));
+  const formBySourceId = new Map(formRows.flatMap((row) => row.source_local_id ? [[row.source_local_id, row] as const] : []));
+  const deliverableBySourceId = new Map(deliverableRows.flatMap((row) => row.source_local_id ? [[row.source_local_id, row] as const] : []));
 
   const nextState: TeamWorksProjectStoreState = {
     ...input.localState,
@@ -283,6 +425,14 @@ export async function readTeamWorksProjectStateFromDatabase(input: {
         url: row.resource_type === "url" ? row.url ?? "" : "",
         memo: row.resource_type === "note" ? row.memo ?? "" : ""
       };
+    }),
+    forms: input.localState.forms.map((form) => {
+      const row = formBySourceId.get(form.id);
+      return row ? { ...form, name: row.name, required: row.required, clientVisible: row.client_visible, editableAfterSubmit: row.editable_after_submit, fields: row.fields } : form;
+    }),
+    deliverables: input.localState.deliverables.map((deliverable) => {
+      const row = deliverableBySourceId.get(deliverable.id);
+      return row ? { ...deliverable, title: row.title, type: row.deliverable_type, url: row.url, version: row.version, status: row.status, clientVisible: row.client_visible, updatedAt: row.updated_at } : deliverable;
     })
   };
 
