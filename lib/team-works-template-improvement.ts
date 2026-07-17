@@ -98,6 +98,7 @@ export function buildTemplateFromProject({
   const phases = state.phases.filter((phase) => phase.projectId === project.id).sort((a, b) => a.position - b.position);
   const tasks = state.tasks.filter((task) => task.projectId === project.id);
   const forms = state.forms.filter((form) => form.projectId === project.id);
+  const resources = state.resources.filter((resource) => resource.projectId === project.id);
   const members = state.projectMembers.filter((member) => member.projectId === project.id);
   const roles = state.projectRoles.filter((role) => role.projectId === project.id);
   const fallbackRoleName = roles[0]?.name ?? "プロジェクトメンバー";
@@ -151,8 +152,22 @@ export function buildTemplateFromProject({
     name: form.name,
     inputRoleName: roleNameForRole(form.inputRoleId, roles, fallbackRoleName),
     reviewerRoleName: roleNameForRole(form.reviewerRoleId, roles, fallbackRoleName),
+    approverRoleName: roleNameForRole(form.approverRoleId, roles, fallbackRoleName),
     required: form.required,
-    clientVisible: form.clientVisible
+    dueOffsetDays: form.dueOffsetDays,
+    clientVisible: form.clientVisible,
+    editableAfterSubmit: form.editableAfterSubmit,
+    fields: form.fields.map((field) => ({ ...field, options: [...field.options] }))
+  }));
+  const templateResources = resources.map((resource) => ({
+    id: asNewTemplate ? createId("team_works_template_resource") : resource.sourceTemplateResourceId ?? createId("team_works_template_resource"),
+    phaseId: templatePhaseIdByProjectId.get(resource.phaseId) ?? "",
+    taskId: resource.taskId ? taskIdByProjectId.get(resource.taskId) ?? null : null,
+    title: resource.title,
+    type: resource.type,
+    url: resource.url,
+    memo: resource.memo,
+    audience: resource.audience
   }));
   return {
     id: templateId,
@@ -165,6 +180,7 @@ export function buildTemplateFromProject({
     phases: templatePhases,
     tasks: templateTasks,
     forms: templateForms,
+    resources: templateResources,
     featureSettings: baseTemplate?.featureSettings ?? {
       clientPortal: project.clientVisible,
       deliverables: state.deliverables.some((item) => item.projectId === project.id),

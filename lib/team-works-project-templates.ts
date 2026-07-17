@@ -4,6 +4,7 @@ import type {
   ProjectForm,
   ProjectMember,
   ProjectPhase,
+  ProjectResource,
   ProjectRole,
   ProjectStatus,
   ProjectTask,
@@ -43,6 +44,7 @@ export type InstantiatedTeamWorksProject = {
   tasks: ProjectTask[];
   taskCheckItems: ProjectTaskCheckItem[];
   forms: ProjectForm[];
+  resources: ProjectResource[];
   deliverables: ProjectDeliverable[];
 };
 
@@ -53,7 +55,11 @@ function copyTemplateSnapshot(template: ProjectTemplate): ProjectTemplateVersion
     roleNames: [...snapshot.roleNames],
     phases: snapshot.phases.map((phase) => ({ ...phase })),
     tasks: snapshot.tasks.map((task) => ({ ...task, checklist: [...task.checklist] })),
-    forms: snapshot.forms.map((form) => ({ ...form })),
+    forms: snapshot.forms.map((form) => ({
+      ...form,
+      fields: form.fields.map((field) => ({ ...field, options: [...field.options] }))
+    })),
+    resources: snapshot.resources.map((resource) => ({ ...resource })),
     featureSettings: { ...snapshot.featureSettings }
   };
 }
@@ -131,6 +137,7 @@ export function duplicateTeamWorksProjectTemplate({
   const templateId = createId("team_works_project_template");
   const phaseIds = new Map(template.phases.map((phase) => [phase.id, createId("team_works_template_phase")]));
   const taskIds = new Map(template.tasks.map((task) => [task.id, createId("team_works_template_task")]));
+  const formIds = new Map(template.forms.map((form) => [form.id, createId("team_works_template_form")]));
   return {
     ...template,
     id: templateId,
@@ -145,9 +152,20 @@ export function duplicateTeamWorksProjectTemplate({
     })),
     forms: template.forms.map((form) => ({
       ...form,
-      id: createId("team_works_template_form"),
+      id: formIds.get(form.id) ?? form.id,
       phaseId: phaseIds.get(form.phaseId) ?? form.phaseId,
-      taskId: form.taskId ? taskIds.get(form.taskId) ?? form.taskId : null
+      taskId: form.taskId ? taskIds.get(form.taskId) ?? form.taskId : null,
+      fields: form.fields.map((field) => ({
+        ...field,
+        id: createId("team_works_template_form_field"),
+        options: [...field.options]
+      }))
+    })),
+    resources: template.resources.map((resource) => ({
+      ...resource,
+      id: createId("team_works_template_resource"),
+      phaseId: phaseIds.get(resource.phaseId) ?? resource.phaseId,
+      taskId: resource.taskId ? taskIds.get(resource.taskId) ?? resource.taskId : null
     })),
     featureSettings: { ...template.featureSettings },
     currentVersionId: null,
@@ -291,8 +309,28 @@ export function instantiateTeamWorksProjectTemplate({
     name: form.name,
     inputRoleId: roleIdByName.get(form.inputRoleName) ?? projectRoles[0].id,
     reviewerRoleId: roleIdByName.get(form.reviewerRoleName) ?? projectRoles[0].id,
+    approverRoleId: roleIdByName.get(form.approverRoleName) ?? projectRoles[0].id,
     required: form.required,
-    clientVisible: input.clientVisible && form.clientVisible
+    dueOffsetDays: form.dueOffsetDays,
+    clientVisible: input.clientVisible && form.clientVisible,
+    editableAfterSubmit: form.editableAfterSubmit,
+    fields: form.fields.map((field) => ({
+      ...field,
+      id: createId("team_works_project_form_field"),
+      options: [...field.options]
+    }))
+  }));
+  const resources: ProjectResource[] = source.resources.map((resource) => ({
+    id: createId("team_works_project_resource"),
+    sourceTemplateResourceId: resource.id,
+    projectId,
+    phaseId: phaseIdByTemplateId.get(resource.phaseId) ?? "",
+    taskId: resource.taskId ? taskIdByTemplateId.get(resource.taskId) ?? null : null,
+    title: resource.title,
+    type: resource.type,
+    url: resource.url,
+    memo: resource.memo,
+    audience: resource.audience
   }));
   const deliverables: ProjectDeliverable[] = tasks.filter((task) => task.requiresDeliverable).map((task) => ({
     id: createId("team_works_project_deliverable"),
@@ -332,5 +370,5 @@ export function instantiateTeamWorksProjectTemplate({
     updatedAt: now
   };
 
-  return { project, projectRoles, projectMembers, phases, tasks, taskCheckItems, forms, deliverables };
+  return { project, projectRoles, projectMembers, phases, tasks, taskCheckItems, forms, resources, deliverables };
 }

@@ -250,8 +250,20 @@ export function generateTeamWorksProjectTemplate(
         ? teamWorksStakeholderLabels.client
         : workerRole,
       reviewerRoleName: leaderRole,
+      approverRoleName: leaderRole,
       required: true,
-      clientVisible
+      dueOffsetDays: 1,
+      clientVisible,
+      editableAfterSubmit: false,
+      fields: [{
+        id: stableId("form_field", 0),
+        type: "long_text",
+        label: "確認内容",
+        description: "作業前に共有しておきたい内容を入力してください。",
+        placeholder: "目的や希望、注意点など",
+        required: true,
+        options: []
+      }]
     });
   }
 
@@ -263,6 +275,7 @@ export function generateTeamWorksProjectTemplate(
     phases,
     tasks,
     forms,
+    resources: [],
     featureSettings: {
       clientPortal: clientVisible,
       deliverables: answers.deliverables.enabled,

@@ -562,3 +562,29 @@ migration・RLS・actor別否定テストを一体で設計する。
 - 報酬/請求、Manager、Order/Studio、Activity Log / Story / DESKとの接続は未実装。
 - Supabase本接続とactor別RLSは別フェーズ。localStorage検証境界を維持。
 ```
+
+## 19. TW-P7B実装結果（2026-07-17）
+
+```text
+実装:
+- フォーム項目に15種（1行/複数行テキスト、数値、金額、日付、日時、
+  単一/複数選択、チェック、URL、ファイル、画像、表、繰り返し、承認）を追加。
+- フォームに入力者、確認者、承認者、必須、期限、クライアント公開、
+  提出後の修正可否を追加。
+- 資料ブロックにURL/メモと閲覧範囲（管理者のみ/担当メンバー/
+  クライアント/全参加者）を追加。ファイル本体は保存しない。
+- 保存、複製、版snapshot、完了案件からのテンプレート改善、
+  案件生成のすべてで項目と資料を深いコピーにし、子IDを独立化。
+- 管理画面は全資料、workerは members/all、clientは client/allだけを
+  専用view型へ投影。外部viewに内部role IDや他actor用設定を渡さない。
+- 旧localStorageの forms/resources/fields 欠落は空配列と安全な初期値で補完。
+
+検収:
+- lint成功。
+- build成功（75 static pages）。
+- 375px / 768px / 1280pxでテンプレート編集とadmin / worker / client詳細を確認。
+
+現在の境界:
+- フォーム回答・提出・承認ワークフロー、Storageアップロード、Supabase/RLSは未実装。
+- 報酬/請求、Manager、Order/Studio、Activity Log / Story / DESKとの接続は未実装。
+```

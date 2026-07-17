@@ -15,7 +15,7 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
   if (!hydrated) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">担当内容を読み込んでいます。</p>;
   if (!detail) return <div className="space-y-4"><MikkeEmptyState title="このプロジェクトは表示できません" helper="担当から外れたか、閲覧できるプロジェクトではありません。" /><Link href="/apps/team-works/portal/worker/projects" className="mx-auto flex w-fit items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> 一覧へ戻る</Link></div>;
 
-  const { project, phases, tasks, deliverables, comments } = detail;
+  const { project, phases, tasks, deliverables, resources, comments } = detail;
   const actionTasks = tasks.filter((task) => !["approved", "completed"].includes(task.status));
 
   return (
@@ -36,6 +36,7 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
         <MikkeSection title="担当成果物">{deliverables.length > 0 ? <div className="space-y-2">{deliverables.map((item) => <article key={item.id} className="rounded-lg border border-[var(--mikke-line)] p-3"><div className="flex items-start gap-3"><FileCheck2 size={18} className="mt-0.5 shrink-0 text-[var(--mikke-primary)]" /><div className="min-w-0 flex-1"><p className="text-sm font-bold">{item.title}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">Ver.{item.version}・{projectDeliverableStatusLabels[item.status]}・{item.clientVisible ? "クライアント共有" : "内部のみ"}</p></div>{item.type === "url" && item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}</div></article>)}</div> : <p className="text-sm text-[var(--mikke-muted)]">担当成果物はありません。</p>}</MikkeSection>
         <MikkeSection title="関連コメント"><WorkerComments comments={comments} /></MikkeSection>
       </div>
+      <MikkeSection title="担当資料">{resources.length > 0 ? <div className="space-y-2">{resources.map((resource) => <article key={resource.id} className="rounded-lg border border-[var(--mikke-line)] p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold">{resource.title}</p>{resource.type === "note" ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{resource.memo}</p> : null}</div>{resource.type === "url" && resource.url ? <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}</div></article>)}</div> : <p className="text-sm text-[var(--mikke-muted)]">担当向けの資料はありません。</p>}</MikkeSection>
     </div>
   );
 }

@@ -19,12 +19,20 @@ import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import {
   createTeamWorksProjectId,
+  projectFormFieldTypeLabels,
+  projectResourceAudienceLabels,
+  projectResourceTypeLabels,
   projectTaskPriorityLabels,
   useTeamWorksProjectStore,
   type ProjectTaskPriority,
+  type ProjectFormField,
+  type ProjectFormFieldType,
+  type ProjectResourceAudience,
+  type ProjectResourceType,
   type ProjectTemplate,
   type ProjectTemplateForm,
   type ProjectTemplatePhase,
+  type ProjectTemplateResource,
   type ProjectTemplateTask
 } from "@/lib/team-works-projects";
 import {
@@ -45,6 +53,9 @@ const templateStatusLabels: Record<ProjectTemplate["status"], string> = {
 };
 
 const priorities = Object.keys(projectTaskPriorityLabels) as ProjectTaskPriority[];
+const formFieldTypes = Object.keys(projectFormFieldTypeLabels) as ProjectFormFieldType[];
+const resourceTypes = Object.keys(projectResourceTypeLabels) as ProjectResourceType[];
+const resourceAudiences = Object.keys(projectResourceAudienceLabels) as ProjectResourceAudience[];
 
 export function TeamWorksTemplateBuilder({ templateId }: { templateId: string }) {
   const router = useRouter();
@@ -160,7 +171,8 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
       forms: draft.forms.map((form) => ({
         ...form,
         inputRoleName: form.inputRoleName === previous ? name : form.inputRoleName,
-        reviewerRoleName: form.reviewerRoleName === previous ? name : form.reviewerRoleName
+        reviewerRoleName: form.reviewerRoleName === previous ? name : form.reviewerRoleName,
+        approverRoleName: form.approverRoleName === previous ? name : form.approverRoleName
       }))
     });
   }
@@ -178,7 +190,8 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
       forms: draft.forms.map((form) => ({
         ...form,
         inputRoleName: form.inputRoleName === removed ? fallback : form.inputRoleName,
-        reviewerRoleName: form.reviewerRoleName === removed ? fallback : form.reviewerRoleName
+        reviewerRoleName: form.reviewerRoleName === removed ? fallback : form.reviewerRoleName,
+        approverRoleName: form.approverRoleName === removed ? fallback : form.approverRoleName
       }))
     });
   }
@@ -225,22 +238,36 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
     const copy: ProjectTemplatePhase = { ...source, id: copyId, name: `${source.name}（複製）`, weight: 0 };
     const phases = [...draft.phases];
     phases.splice(index + 1, 0, copy);
+    const copiedTaskIds = new Map(draft.tasks.filter((task) => task.phaseId === source.id).map((task) => [task.id, createTeamWorksProjectId("team_works_template_task")]));
     const copiedTasks = draft.tasks.filter((task) => task.phaseId === source.id).map((task) => ({
       ...task,
-      id: createTeamWorksProjectId("team_works_template_task"),
-      phaseId: copyId
+      id: copiedTaskIds.get(task.id) ?? task.id,
+      phaseId: copyId,
+      checklist: [...task.checklist]
     }));
     const copiedForms = draft.forms.filter((form) => form.phaseId === source.id).map((form) => ({
       ...form,
       id: createTeamWorksProjectId("team_works_template_form"),
       phaseId: copyId,
-      taskId: null
+      taskId: form.taskId ? copiedTaskIds.get(form.taskId) ?? null : null,
+      fields: form.fields.map((field) => ({
+        ...field,
+        id: createTeamWorksProjectId("team_works_template_form_field"),
+        options: [...field.options]
+      }))
+    }));
+    const copiedResources = draft.resources.filter((resource) => resource.phaseId === source.id).map((resource) => ({
+      ...resource,
+      id: createTeamWorksProjectId("team_works_template_resource"),
+      phaseId: copyId,
+      taskId: resource.taskId ? copiedTaskIds.get(resource.taskId) ?? null : null
     }));
     change({
       ...draft,
       phases: normalizePhases(phases),
       tasks: [...draft.tasks, ...copiedTasks],
-      forms: [...draft.forms, ...copiedForms]
+      forms: [...draft.forms, ...copiedForms],
+      resources: [...draft.resources, ...copiedResources]
     });
   }
 
@@ -249,7 +276,8 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
       ...draft,
       phases: normalizePhases(draft.phases.filter((phase) => phase.id !== phaseId)),
       tasks: draft.tasks.filter((task) => task.phaseId !== phaseId),
-      forms: draft.forms.filter((form) => form.phaseId !== phaseId)
+      forms: draft.forms.filter((form) => form.phaseId !== phaseId),
+      resources: draft.resources.filter((resource) => resource.phaseId !== phaseId)
     });
   }
 
@@ -305,7 +333,8 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
     change({
       ...draft,
       tasks: draft.tasks.filter((task) => task.id !== taskId),
-      forms: draft.forms.filter((form) => form.taskId !== taskId)
+      forms: draft.forms.filter((form) => form.taskId !== taskId),
+      resources: draft.resources.filter((resource) => resource.taskId !== taskId)
     });
   }
 
@@ -327,14 +356,55 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
       name: "新しいフォーム枠",
       inputRoleName: draft.roleNames[0] ?? "担当者",
       reviewerRoleName: draft.roleNames[0] ?? "担当者",
+      approverRoleName: draft.roleNames[0] ?? "担当者",
       required: true,
-      clientVisible: false
+      dueOffsetDays: null,
+      clientVisible: false,
+      editableAfterSubmit: false,
+      fields: []
     };
     change({ ...draft, forms: [...draft.forms, form] });
   }
 
   function updateForm(formId: string, patch: Partial<ProjectTemplateForm>) {
     change({ ...draft, forms: draft.forms.map((form) => form.id === formId ? { ...form, ...patch } : form) });
+  }
+
+  function addFormField(formId: string, type: ProjectFormFieldType) {
+    const field: ProjectFormField = {
+      id: createTeamWorksProjectId("team_works_template_form_field"),
+      type,
+      label: projectFormFieldTypeLabels[type],
+      description: "",
+      placeholder: "",
+      required: false,
+      options: ["選択肢1", "選択肢2"].filter(() => ["single_select", "multi_select"].includes(type))
+    };
+    updateForm(formId, { fields: [...(draft.forms.find((form) => form.id === formId)?.fields ?? []), field] });
+  }
+
+  function updateFormField(formId: string, fieldId: string, patch: Partial<ProjectFormField>) {
+    const form = draft.forms.find((item) => item.id === formId);
+    if (!form) return;
+    updateForm(formId, { fields: form.fields.map((field) => field.id === fieldId ? { ...field, ...patch } : field) });
+  }
+
+  function addResource(phaseId: string) {
+    const resource: ProjectTemplateResource = {
+      id: createTeamWorksProjectId("team_works_template_resource"),
+      phaseId,
+      taskId: null,
+      title: "新しい資料",
+      type: "url",
+      url: "",
+      memo: "",
+      audience: "admin"
+    };
+    change({ ...draft, resources: [...draft.resources, resource] });
+  }
+
+  function updateResource(resourceId: string, patch: Partial<ProjectTemplateResource>) {
+    change({ ...draft, resources: draft.resources.map((resource) => resource.id === resourceId ? { ...resource, ...patch } : resource) });
   }
 
   return (
@@ -417,6 +487,7 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
         ) : draft.phases.map((phase, index) => {
           const phaseTasks = draft.tasks.filter((task) => task.phaseId === phase.id).sort((a, b) => a.position - b.position);
           const phaseForms = draft.forms.filter((form) => form.phaseId === phase.id);
+          const phaseResources = draft.resources.filter((resource) => resource.phaseId === phase.id);
           return (
             <article
               key={phase.id}
@@ -499,19 +570,32 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
 
               <div className="mt-4 rounded-xl bg-[var(--mikke-bg)] p-4">
                 <div className="flex items-center justify-between gap-3">
-                  <div><h3 className="text-sm font-bold">フォーム枠</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">項目タイプの詳細は後続フェーズで追加します。</p></div>
+                  <div><h3 className="text-sm font-bold">フォーム</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">入力・確認・承認の担当と、15種の項目を設定します。</p></div>
                   <button type="button" onClick={() => addForm(phase.id)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2 text-xs font-bold"><Plus size={14} /> フォーム枠追加</button>
                 </div>
                 <div className="mt-3 space-y-2">
                   {phaseForms.map((form) => (
-                    <div key={form.id} className="grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div key={form.id} className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-3">
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <TeamWorksProjectField label="名称" className="sm:col-span-2"><input value={form.name} onChange={(event) => updateForm(form.id, { name: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
                       <TeamWorksProjectField label="入力者"><select value={form.inputRoleName} onChange={(event) => updateForm(form.id, { inputRoleName: event.target.value })} className={teamWorksProjectInputClass}>{draft.roleNames.map((role) => <option key={role} value={role}>{role}</option>)}</select></TeamWorksProjectField>
                       <TeamWorksProjectField label="確認者"><select value={form.reviewerRoleName} onChange={(event) => updateForm(form.id, { reviewerRoleName: event.target.value })} className={teamWorksProjectInputClass}>{draft.roleNames.map((role) => <option key={role} value={role}>{role}</option>)}</select></TeamWorksProjectField>
-                      <div className="flex items-end justify-between gap-2 pb-2"><CheckField label="必須" checked={form.required} onChange={(required) => updateForm(form.id, { required })} /><CheckField label="公開" checked={form.clientVisible} onChange={(clientVisible) => updateForm(form.id, { clientVisible })} /><IconButton label="フォーム枠を削除" onClick={() => change({ ...draft, forms: draft.forms.filter((item) => item.id !== form.id) })} danger><Trash2 size={15} /></IconButton></div>
+                      <TeamWorksProjectField label="承認者"><select value={form.approverRoleName} onChange={(event) => updateForm(form.id, { approverRoleName: event.target.value })} className={teamWorksProjectInputClass}>{draft.roleNames.map((role) => <option key={role} value={role}>{role}</option>)}</select></TeamWorksProjectField>
+                      <TeamWorksProjectField label="期限（工程開始からの日数）"><input value={form.dueOffsetDays ?? ""} onChange={(event) => updateForm(form.id, { dueOffsetDays: event.target.value ? Number(event.target.value.replace(/\D/g, "")) : null })} inputMode="numeric" className={teamWorksProjectInputClass} placeholder="未設定" /></TeamWorksProjectField>
+                      <div className="flex flex-wrap items-end gap-4 pb-2 sm:col-span-2"><CheckField label="必須" checked={form.required} onChange={(required) => updateForm(form.id, { required })} /><CheckField label="クライアント公開" checked={form.clientVisible} onChange={(clientVisible) => updateForm(form.id, { clientVisible })} /><CheckField label="提出後も修正可" checked={form.editableAfterSubmit} onChange={(editableAfterSubmit) => updateForm(form.id, { editableAfterSubmit })} /><IconButton label="フォームを削除" onClick={() => change({ ...draft, forms: draft.forms.filter((item) => item.id !== form.id) })} danger><Trash2 size={15} /></IconButton></div>
+                      </div>
+                      <div className="mt-3 border-t border-[var(--mikke-line)] pt-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">項目 {form.fields.length}件</p><select defaultValue="" onChange={(event) => { if (event.target.value) addFormField(form.id, event.target.value as ProjectFormFieldType); event.target.value = ""; }} className={`${teamWorksProjectInputClass} max-w-48`}><option value="">項目タイプを追加</option>{formFieldTypes.map((type) => <option key={type} value={type}>{projectFormFieldTypeLabels[type]}</option>)}</select></div>
+                        <div className="mt-2 space-y-2">{form.fields.map((field) => <div key={field.id} className="grid gap-2 rounded-lg bg-[var(--mikke-bg)] p-3 sm:grid-cols-2 lg:grid-cols-4"><TeamWorksProjectField label="タイプ"><select value={field.type} onChange={(event) => updateFormField(form.id, field.id, { type: event.target.value as ProjectFormFieldType })} className={teamWorksProjectInputClass}>{formFieldTypes.map((type) => <option key={type} value={type}>{projectFormFieldTypeLabels[type]}</option>)}</select></TeamWorksProjectField><TeamWorksProjectField label="ラベル"><input value={field.label} onChange={(event) => updateFormField(form.id, field.id, { label: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField><TeamWorksProjectField label="説明・入力例"><input value={field.description} onChange={(event) => updateFormField(form.id, field.id, { description: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField><div className="flex items-end justify-between gap-2 pb-2"><CheckField label="必須" checked={field.required} onChange={(required) => updateFormField(form.id, field.id, { required })} /><IconButton label="項目を削除" onClick={() => updateForm(form.id, { fields: form.fields.filter((item) => item.id !== field.id) })} danger><Trash2 size={14} /></IconButton></div>{["single_select", "multi_select"].includes(field.type) ? <TeamWorksProjectField label="選択肢（改行区切り）" className="sm:col-span-2 lg:col-span-4"><textarea value={field.options.join("\n")} onChange={(event) => updateFormField(form.id, field.id, { options: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} rows={2} className={`${teamWorksProjectInputClass} resize-none`} /></TeamWorksProjectField> : null}</div>)}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
+              </div>
+
+              <div className="mt-4 rounded-xl bg-[var(--mikke-bg)] p-4">
+                <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold">資料ブロック</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">URLまたはメモを、閲覧範囲を指定して共有します。</p></div><button type="button" onClick={() => addResource(phase.id)} className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2 text-xs font-bold"><Plus size={14} /> 資料追加</button></div>
+                <div className="mt-3 space-y-2">{phaseResources.map((resource) => <div key={resource.id} className="grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-3 sm:grid-cols-2 lg:grid-cols-4"><TeamWorksProjectField label="資料名"><input value={resource.title} onChange={(event) => updateResource(resource.id, { title: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField><TeamWorksProjectField label="種別"><select value={resource.type} onChange={(event) => updateResource(resource.id, { type: event.target.value as ProjectResourceType })} className={teamWorksProjectInputClass}>{resourceTypes.map((type) => <option key={type} value={type}>{projectResourceTypeLabels[type]}</option>)}</select></TeamWorksProjectField><TeamWorksProjectField label="閲覧範囲"><select value={resource.audience} onChange={(event) => updateResource(resource.id, { audience: event.target.value as ProjectResourceAudience })} className={teamWorksProjectInputClass}>{resourceAudiences.map((audience) => <option key={audience} value={audience}>{projectResourceAudienceLabels[audience]}</option>)}</select></TeamWorksProjectField><div className="flex items-end justify-end pb-2"><IconButton label="資料を削除" onClick={() => change({ ...draft, resources: draft.resources.filter((item) => item.id !== resource.id) })} danger><Trash2 size={15} /></IconButton></div>{resource.type === "url" ? <TeamWorksProjectField label="URL" className="sm:col-span-2 lg:col-span-4"><input type="url" value={resource.url} onChange={(event) => updateResource(resource.id, { url: event.target.value })} className={teamWorksProjectInputClass} placeholder="https://" /></TeamWorksProjectField> : <TeamWorksProjectField label="メモ" className="sm:col-span-2 lg:col-span-4"><textarea value={resource.memo} onChange={(event) => updateResource(resource.id, { memo: event.target.value })} rows={2} className={`${teamWorksProjectInputClass} resize-none`} /></TeamWorksProjectField>}</div>)}</div>
               </div>
             </article>
           );
@@ -525,7 +609,7 @@ export function TeamWorksTemplateBuilder({ templateId }: { templateId: string })
               <div key={version.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--mikke-line)] p-3 text-sm">
                 <div>
                   <p className="font-bold">Ver.{version.version} {version.id === draft.currentVersionId ? <span className="ml-2 text-xs text-[var(--mikke-accent)]">現在の版</span> : null}</p>
-                  <p className="mt-1 text-xs text-[var(--mikke-muted)]">工程 {version.snapshot.phases.length}件・タスク {version.snapshot.tasks.length}件・{new Date(version.createdAt).toLocaleString("ja-JP")}</p>
+                  <p className="mt-1 text-xs text-[var(--mikke-muted)]">工程 {version.snapshot.phases.length}件・タスク {version.snapshot.tasks.length}件・フォーム項目 {version.snapshot.forms.reduce((sum, form) => sum + form.fields.length, 0)}件・資料 {version.snapshot.resources.length}件・{new Date(version.createdAt).toLocaleString("ja-JP")}</p>
                 </div>
                 <span className="text-xs text-[var(--mikke-muted)]">進行中案件へは自動反映しません</span>
               </div>

@@ -39,7 +39,7 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
     );
   }
 
-  const { project, phases, tasks, comments, actions, reviewDeliverables, approvedDeliverables } = detail;
+  const { project, phases, tasks, resources, comments, actions, reviewDeliverables, approvedDeliverables } = detail;
 
   function updateDeliverable(deliverableId: string, nextStatus: ProjectDeliverableStatus, body: string) {
     const deliverable = projectState.deliverables.find((item) => item.id === deliverableId && item.projectId === project.id && item.clientVisible);
@@ -173,6 +173,10 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
         <DeliverableSection title="確認する成果物" items={reviewDeliverables} comments={comments} empty="確認待ちの成果物はありません。" onAction={updateDeliverable} />
         <DeliverableSection title="承認済み・納品済み" items={approvedDeliverables} comments={comments} empty="承認済みの成果物はまだありません。" />
       </div>
+
+      <MikkeSection title="共有資料">
+        {resources.length > 0 ? <div className="space-y-2">{resources.map((resource) => <article key={resource.id} className="rounded-lg border border-[var(--mikke-line)] p-3"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold">{resource.title}</p>{resource.type === "note" ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{resource.memo}</p> : null}</div>{resource.type === "url" && resource.url ? <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}</div></article>)}</div> : <p className="text-sm text-[var(--mikke-muted)]">共有中の資料はありません。</p>}
+      </MikkeSection>
 
       <SharedComments comments={comments.filter((comment) => !comment.deliverableId)} onSubmit={addProjectComment} />
     </div>

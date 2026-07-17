@@ -72,6 +72,16 @@ export type WorkerProjectCommentView = {
   createdAt: string;
 };
 
+export type WorkerProjectResourceView = {
+  id: string;
+  phaseId: string;
+  taskId: string | null;
+  title: string;
+  type: "url" | "note";
+  url: string;
+  memo: string;
+};
+
 export type WorkerProjectDetailView = {
   project: WorkerProjectSummary;
   memberId: string;
@@ -79,6 +89,7 @@ export type WorkerProjectDetailView = {
   phases: WorkerProjectPhaseView[];
   tasks: WorkerProjectTaskView[];
   deliverables: WorkerProjectDeliverableView[];
+  resources: WorkerProjectResourceView[];
   comments: WorkerProjectCommentView[];
 };
 
@@ -145,6 +156,18 @@ export function createTeamWorksWorkerProjectDetail(
       updatedAt: deliverable.updatedAt
     }));
   const deliverableIds = new Set(deliverables.map((deliverable) => deliverable.id));
+  const resources = state.resources
+    .filter((resource) => resource.projectId === projectId
+      && ["members", "all"].includes(resource.audience))
+    .map<WorkerProjectResourceView>((resource) => ({
+      id: resource.id,
+      phaseId: resource.phaseId,
+      taskId: resource.taskId,
+      title: resource.title,
+      type: resource.type,
+      url: resource.url,
+      memo: resource.memo
+    }));
 
   const comments = state.comments
     .filter((comment) => comment.projectId === projectId
@@ -186,6 +209,7 @@ export function createTeamWorksWorkerProjectDetail(
     phases,
     tasks,
     deliverables,
+    resources,
     comments
   };
 }

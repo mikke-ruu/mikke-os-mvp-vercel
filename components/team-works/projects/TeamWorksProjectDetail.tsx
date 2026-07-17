@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { CalendarDays, CircleUserRound, ClipboardCheck, FileCheck2, ListChecks, Plus, UsersRound } from "lucide-react";
+import { CalendarDays, CircleUserRound, ClipboardCheck, ExternalLink, FileCheck2, ListChecks, Plus, UsersRound } from "lucide-react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
@@ -11,11 +11,14 @@ import {
   createTeamWorksProjectId,
   projectPhaseProgress,
   projectPhaseStatusLabels,
+  projectFormFieldTypeLabels,
+  projectResourceAudienceLabels,
   projectStatusLabels,
   projectTaskPriorityLabels,
   projectTaskStatusLabels,
   useTeamWorksProjectStore,
   type Project,
+  type ProjectForm,
   type ProjectPhase,
   type ProjectPhaseStatus,
   type ProjectStatus,
@@ -29,12 +32,13 @@ import { TeamWorksProjectDeliverables } from "./TeamWorksProjectDeliverables";
 import { TeamWorksProjectCompletionReview } from "./TeamWorksProjectCompletionReview";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 
-type ProjectTab = "overview" | "phases" | "tasks" | "deliverables" | "members";
+type ProjectTab = "overview" | "phases" | "tasks" | "forms" | "deliverables" | "members";
 
 const tabs: { value: ProjectTab; label: string; icon: typeof ListChecks }[] = [
   { value: "overview", label: "概要", icon: ClipboardCheck },
   { value: "phases", label: "工程", icon: ListChecks },
   { value: "tasks", label: "タスク", icon: CalendarDays },
+  { value: "forms", label: "フォーム・資料", icon: ClipboardCheck },
   { value: "deliverables", label: "成果物", icon: FileCheck2 },
   { value: "members", label: "メンバー", icon: UsersRound }
 ];
@@ -57,6 +61,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
   const tasks = projectState.tasks.filter((task) => task.projectId === project.id);
   const forms = projectState.forms.filter((form) => form.projectId === project.id);
   const deliverables = projectState.deliverables.filter((item) => item.projectId === project.id);
+  const resources = projectState.resources.filter((item) => item.projectId === project.id);
   const members = projectState.projectMembers.filter((member) => member.projectId === project.id);
   const roles = projectState.projectRoles.filter((role) => role.projectId === project.id);
   const currentPhase = phases.find((phase) => phase.status !== "completed") ?? phases.at(-1);
@@ -146,6 +151,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
       {tab === "overview" ? <OverviewTab project={project} phases={phases} tasks={tasks} formsCount={forms.length} deliverablesCount={deliverables.length} /> : null}
       {tab === "phases" ? <PhasesTab project={project} phases={phases} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "tasks" ? <TasksTab project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
+      {tab === "forms" ? <FormsAndResourcesTab forms={forms} resources={resources} roles={roles} /> : null}
       {tab === "deliverables" ? <TeamWorksProjectDeliverables project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "members" ? (
         <MikkeSection title="参加メンバー">
@@ -166,6 +172,18 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
       ) : null}
     </div>
   );
+}
+
+function FormsAndResourcesTab({ forms, resources, roles }: {
+  forms: ProjectForm[];
+  resources: TeamWorksProjectStoreState["resources"];
+  roles: TeamWorksProjectStoreState["projectRoles"];
+}) {
+  const roleName = (roleId: string) => roles.find((role) => role.id === roleId)?.name ?? "未設定";
+  return <div className="grid gap-6 lg:grid-cols-2">
+    <MikkeSection title="フォーム定義">{forms.length > 0 ? <div className="space-y-3">{forms.map((form) => <article key={form.id} className="rounded-lg border border-[var(--mikke-line)] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-bold">{form.name}</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">入力 {roleName(form.inputRoleId)}・確認 {roleName(form.reviewerRoleId)}・承認 {roleName(form.approverRoleId)}</p></div><span className="text-xs font-bold text-[var(--mikke-muted)]">{form.fields.length}項目</span></div><div className="mt-3 flex flex-wrap gap-2">{form.fields.map((field) => <span key={field.id} className="rounded-full bg-[var(--mikke-bg)] px-2.5 py-1 text-xs font-bold">{field.label}・{projectFormFieldTypeLabels[field.type]}{field.required ? "・必須" : ""}</span>)}</div><p className="mt-3 text-xs text-[var(--mikke-muted)]">{form.required ? "フォーム必須" : "任意"}・{form.clientVisible ? "クライアント公開" : "内部のみ"}・{form.editableAfterSubmit ? "提出後修正可" : "提出後修正不可"}{form.dueOffsetDays === null ? "・期限なし" : `・工程開始から${form.dueOffsetDays}日`}</p></article>)}</div> : <p className="text-sm text-[var(--mikke-muted)]">フォームはありません。</p>}</MikkeSection>
+    <MikkeSection title="資料ブロック（管理者表示）">{resources.length > 0 ? <div className="space-y-3">{resources.map((resource) => <article key={resource.id} className="rounded-lg border border-[var(--mikke-line)] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold">{resource.title}</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">{projectResourceAudienceLabels[resource.audience]}</p>{resource.type === "note" ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{resource.memo}</p> : null}</div>{resource.type === "url" && resource.url ? <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}</div></article>)}</div> : <p className="text-sm text-[var(--mikke-muted)]">資料はありません。</p>}</MikkeSection>
+  </div>;
 }
 
 function OverviewTab({ project, phases, tasks, formsCount, deliverablesCount }: { project: NonNullable<ReturnType<typeof useTeamWorksProjectStore>["projectState"]["projects"][number]>; phases: ProjectPhase[]; tasks: ProjectTask[]; formsCount: number; deliverablesCount: number }) {

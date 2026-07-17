@@ -70,6 +70,16 @@ export type ClientProjectCommentView = {
   createdAt: string;
 };
 
+export type ClientProjectResourceView = {
+  id: string;
+  phaseId: string;
+  taskId: string | null;
+  title: string;
+  type: "url" | "note";
+  url: string;
+  memo: string;
+};
+
 export type ClientProjectSummary = {
   id: string;
   name: string;
@@ -91,6 +101,7 @@ export type ClientProjectDetailView = {
   phases: ClientProjectPhaseView[];
   tasks: ClientProjectTaskView[];
   deliverables: ClientProjectDeliverableView[];
+  resources: ClientProjectResourceView[];
   comments: ClientProjectCommentView[];
   actions: ClientProjectAction[];
   reviewDeliverables: ClientProjectDeliverableView[];
@@ -162,6 +173,18 @@ export function createTeamWorksClientProjectDetail(
       updatedAt: deliverable.updatedAt
     }));
   const visibleDeliverableIds = new Set(deliverables.map((deliverable) => deliverable.id));
+  const resources = state.resources
+    .filter((resource) => resource.projectId === projectId
+      && ["client", "all"].includes(resource.audience))
+    .map<ClientProjectResourceView>((resource) => ({
+      id: resource.id,
+      phaseId: resource.phaseId,
+      taskId: resource.taskId,
+      title: resource.title,
+      type: resource.type,
+      url: resource.url,
+      memo: resource.memo
+    }));
 
   const comments = state.comments
     .filter((comment) =>
@@ -235,6 +258,7 @@ export function createTeamWorksClientProjectDetail(
     phases,
     tasks,
     deliverables,
+    resources,
     comments,
     actions,
     reviewDeliverables,

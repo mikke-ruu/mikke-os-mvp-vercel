@@ -39,6 +39,54 @@ export type ProjectDeliverableStatus =
 export type ProjectCommentAudience = "internal" | "client";
 export type ProjectTemplateStatus = "draft" | "active" | "archived";
 export type ProjectTemplateImprovementAction = "none" | "overwrite" | "new_version" | "duplicate";
+export type ProjectFormFieldType =
+  | "short_text"
+  | "long_text"
+  | "number"
+  | "currency"
+  | "date"
+  | "datetime"
+  | "single_select"
+  | "multi_select"
+  | "checkbox"
+  | "url"
+  | "file"
+  | "image"
+  | "table"
+  | "repeater"
+  | "approval";
+export type ProjectResourceType = "url" | "note";
+export type ProjectResourceAudience = "admin" | "members" | "client" | "all";
+
+export const projectFormFieldTypeLabels: Record<ProjectFormFieldType, string> = {
+  short_text: "1行テキスト",
+  long_text: "複数行テキスト",
+  number: "数値",
+  currency: "金額",
+  date: "日付",
+  datetime: "日時",
+  single_select: "単一選択",
+  multi_select: "複数選択",
+  checkbox: "チェックボックス",
+  url: "URL",
+  file: "ファイル",
+  image: "画像",
+  table: "表",
+  repeater: "繰り返し",
+  approval: "承認"
+};
+
+export const projectResourceTypeLabels: Record<ProjectResourceType, string> = {
+  url: "URL",
+  note: "メモ"
+};
+
+export const projectResourceAudienceLabels: Record<ProjectResourceAudience, string> = {
+  admin: "管理者のみ",
+  members: "担当メンバー",
+  client: "クライアント",
+  all: "全参加者"
+};
 
 export const projectStatusLabels: Record<ProjectStatus, string> = {
   draft: "下書き",
@@ -186,8 +234,35 @@ export type ProjectForm = {
   name: string;
   inputRoleId: string;
   reviewerRoleId: string;
+  approverRoleId: string;
   required: boolean;
+  dueOffsetDays: number | null;
   clientVisible: boolean;
+  editableAfterSubmit: boolean;
+  fields: ProjectFormField[];
+};
+
+export type ProjectFormField = {
+  id: string;
+  type: ProjectFormFieldType;
+  label: string;
+  description: string;
+  placeholder: string;
+  required: boolean;
+  options: string[];
+};
+
+export type ProjectResource = {
+  id: string;
+  sourceTemplateResourceId?: string | null;
+  projectId: string;
+  phaseId: string;
+  taskId: string | null;
+  title: string;
+  type: ProjectResourceType;
+  url: string;
+  memo: string;
+  audience: ProjectResourceAudience;
 };
 
 export type ProjectDeliverable = {
@@ -258,8 +333,23 @@ export type ProjectTemplateForm = {
   name: string;
   inputRoleName: string;
   reviewerRoleName: string;
+  approverRoleName: string;
   required: boolean;
+  dueOffsetDays: number | null;
   clientVisible: boolean;
+  editableAfterSubmit: boolean;
+  fields: ProjectFormField[];
+};
+
+export type ProjectTemplateResource = {
+  id: string;
+  phaseId: string;
+  taskId: string | null;
+  title: string;
+  type: ProjectResourceType;
+  url: string;
+  memo: string;
+  audience: ProjectResourceAudience;
 };
 
 export type ProjectTemplate = {
@@ -273,6 +363,7 @@ export type ProjectTemplate = {
   phases: ProjectTemplatePhase[];
   tasks: ProjectTemplateTask[];
   forms: ProjectTemplateForm[];
+  resources: ProjectTemplateResource[];
   featureSettings: {
     clientPortal: boolean;
     deliverables: boolean;
@@ -302,6 +393,7 @@ export type TeamWorksProjectStoreState = {
   tasks: ProjectTask[];
   taskCheckItems: ProjectTaskCheckItem[];
   forms: ProjectForm[];
+  resources: ProjectResource[];
   deliverables: ProjectDeliverable[];
   comments: ProjectComment[];
 };
@@ -498,6 +590,7 @@ export const teamWorksProjectDemoState: TeamWorksProjectStoreState = {
     }
   ],
   forms: [],
+  resources: [],
   deliverables: [],
   comments: []
 };
@@ -531,6 +624,46 @@ function isProjectStoreState(value: unknown): value is TeamWorksProjectStoreStat
   );
 }
 
+function normalizeFormField(field: Partial<ProjectFormField>, index: number): ProjectFormField {
+  return {
+    id: field.id || `legacy_form_field_${index}`,
+    type: field.type && field.type in projectFormFieldTypeLabels ? field.type : "short_text",
+    label: field.label || `項目 ${index + 1}`,
+    description: field.description ?? "",
+    placeholder: field.placeholder ?? "",
+    required: field.required ?? false,
+    options: Array.isArray(field.options) ? field.options : []
+  };
+}
+
+function normalizeProjectForm(form: ProjectForm): ProjectForm {
+  return {
+    ...form,
+    approverRoleId: form.approverRoleId ?? form.reviewerRoleId ?? "",
+    dueOffsetDays: typeof form.dueOffsetDays === "number" ? form.dueOffsetDays : null,
+    editableAfterSubmit: form.editableAfterSubmit ?? false,
+    fields: Array.isArray(form.fields) ? form.fields.map(normalizeFormField) : []
+  };
+}
+
+function normalizeTemplateForm(form: ProjectTemplateForm): ProjectTemplateForm {
+  return {
+    ...form,
+    approverRoleName: form.approverRoleName ?? form.reviewerRoleName ?? form.inputRoleName ?? "担当者",
+    dueOffsetDays: typeof form.dueOffsetDays === "number" ? form.dueOffsetDays : null,
+    editableAfterSubmit: form.editableAfterSubmit ?? false,
+    fields: Array.isArray(form.fields) ? form.fields.map(normalizeFormField) : []
+  };
+}
+
+function normalizeTemplate(template: ProjectTemplate): ProjectTemplate {
+  return {
+    ...template,
+    forms: Array.isArray(template.forms) ? template.forms.map(normalizeTemplateForm) : [],
+    resources: Array.isArray(template.resources) ? template.resources : []
+  };
+}
+
 function isTemplateStoreState(value: unknown): value is TeamWorksProjectTemplateStoreState {
   return isRecord(value) && Array.isArray(value.templates) && Array.isArray(value.versions);
 }
@@ -558,12 +691,28 @@ export function readTeamWorksProjectStore() {
     projects: state.projects.map((project) => project.id === demoProjectId && project.clientId === "client_demo"
       ? { ...project, clientId: "client_sakura" }
       : project),
-    forms: Array.isArray(state.forms) ? state.forms : []
+    forms: Array.isArray(state.forms) ? state.forms.map(normalizeProjectForm) : [],
+    resources: Array.isArray(state.resources) ? state.resources : []
   };
 }
 
 export function readTeamWorksProjectTemplateStore() {
-  return readStorage(TEAM_WORKS_PROJECT_TEMPLATES_STORAGE_KEY, emptyTeamWorksProjectTemplateState, isTemplateStoreState);
+  const state = readStorage(TEAM_WORKS_PROJECT_TEMPLATES_STORAGE_KEY, emptyTeamWorksProjectTemplateState, isTemplateStoreState);
+  return {
+    templates: state.templates.map(normalizeTemplate),
+    versions: state.versions.map((version) => ({
+      ...version,
+      snapshot: normalizeTemplate({
+        ...version.snapshot,
+        currentVersionId: null,
+        createdAt: version.createdAt,
+        updatedAt: version.createdAt
+      })
+    })).map((version) => {
+      const { currentVersionId: _currentVersionId, createdAt: _createdAt, updatedAt: _updatedAt, ...snapshot } = version.snapshot;
+      return { ...version, snapshot };
+    })
+  };
 }
 
 export function writeTeamWorksProjectStore(state: TeamWorksProjectStoreState) {

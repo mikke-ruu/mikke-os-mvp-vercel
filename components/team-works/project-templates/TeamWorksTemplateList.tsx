@@ -39,6 +39,7 @@ export function TeamWorksTemplateList() {
       phases: [],
       tasks: [],
       forms: [],
+      resources: [],
       featureSettings: {
         clientPortal: false,
         deliverables: false,

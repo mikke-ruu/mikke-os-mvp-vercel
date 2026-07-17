@@ -131,6 +131,7 @@ export function TeamWorksProjectForm() {
         tasks: [...projectState.tasks, ...generated.tasks],
         taskCheckItems: [...projectState.taskCheckItems, ...generated.taskCheckItems],
         forms: [...projectState.forms, ...generated.forms],
+        resources: [...projectState.resources, ...generated.resources],
         deliverables: [...projectState.deliverables, ...generated.deliverables]
       });
       router.push(`/apps/team-works/projects/${generated.project.id}`);
