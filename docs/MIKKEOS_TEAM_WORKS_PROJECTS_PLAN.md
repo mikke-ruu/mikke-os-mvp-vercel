@@ -613,3 +613,28 @@ migration・RLS・actor別否定テストを一体で設計する。
 - 通知、ファイル本体、Supabase/RLS、Activity Log接続は未実装。
 - 報酬/請求実接続はSupabase本接続と一体で設計する。
 ```
+
+## 21. TW-P8A実装結果（2026-07-17）
+
+```text
+実装:
+- mikke-os-devへTeam Works専用のteam_works_*テーブル8種をmigrationで追加。
+- auth.usersを起点にorganization / organization_member / project_memberを分離し、
+  owner / manager / client_user / workerの所属・案件担当をRLSで認可する。
+- project_tasksを起点にproject_payouts / project_invoicesを接続。
+  報酬はworker担当、請求はclient担当だけを登録できる。
+- project_resourcesのadmin / members / client / allを、案件所属確認後の閲覧範囲として実装。
+- anonへの直接GRANTとauthenticatedのDELETEを禁止。archive / void状態で履歴を保持する。
+- Supabaseの新しいData API公開ルールに合わせ、RLSとは別に必要最小限のGRANTを明示。
+
+検収:
+- owner / worker / client / anonのRLS否定テストをmikke-os-dev上で実行し成功。
+- Team Works 8テーブルすべてRLS有効、anon SELECT GRANT 0、authenticated DELETE GRANT 0を確認。
+- Database AdvisorでTeam Works由来のsecurity警告0件を確認。
+- 複合外部キーの索引不足を追補migrationで解消し、actionableなperformance警告0件を確認。
+- remote migration履歴とローカルmigrationファイルのversion/nameを一致させた。
+
+現在の境界:
+- DBの安全な接続基盤と報酬/請求レコード境界まで完了。
+- 既存localStorage UIからSupabaseへの読込・保存切替、ファイルStorage、Activity Log通知は未実装。
+```
