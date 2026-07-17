@@ -17,6 +17,11 @@ export type TeamWorksDatabaseProjectMember = {
   projectRole: "owner" | "manager" | "client" | "worker";
 };
 
+export type ReviewedTeamWorksFormSubmission = {
+  reviewerMemberId: string;
+  approvedByMemberId: string;
+};
+
 export async function readTeamWorksPortalMemberships(role: TeamWorksPortalRole) {
   const user = await requireCurrentUser();
   const { data: members, error: memberError } = await supabase
@@ -117,7 +122,7 @@ export async function readTeamWorksPortalCollaborationState(
     supabase.from("team_works_project_forms").select("id,project_id,source_local_id").in("project_id", projectIds),
     supabase.from("team_works_form_submissions").select("id,project_id,form_id,submitted_by_member_id,source_local_id,answers,status,review_memo,reviewed_by_member_id,approved_by_member_id,submitted_at,created_at,updated_at").in("project_id", projectIds),
     supabase.from("team_works_project_tasks").select("id,project_id,source_local_id,assignee_member_id").in("project_id", projectIds),
-    supabase.from("team_works_project_deliverables").select("id,project_id,source_local_id,status,submitted_by_member_id,reviewed_by_member_id,updated_at").in("project_id", projectIds),
+    supabase.from("team_works_project_deliverables").select("id,project_id,source_local_id,title,deliverable_type,url,version,status,submitted_by_member_id,reviewed_by_member_id,client_visible,updated_at").in("project_id", projectIds),
     supabase.from("team_works_project_comments").select("id,project_id,task_id,deliverable_id,author_member_id,source_local_id,audience,body,created_at,updated_at").in("project_id", projectIds)
   ]);
   for (const result of [forms, submissions, tasks, deliverables, comments]) if (result.error) throw result.error;
@@ -178,7 +183,18 @@ export async function readTeamWorksPortalCollaborationState(
     tasks: localState.tasks.map((task) => taskAssigneeBySourceId.has(task.id) ? { ...task, assigneeMemberId: taskAssigneeBySourceId.get(task.id) ?? "" } : task),
     deliverables: localState.deliverables.map((deliverable) => {
       const row = deliverableBySourceId.get(deliverable.id);
-      return row ? { ...deliverable, status: row.status, submittedByMemberId: row.submitted_by_member_id ?? "", reviewedByMemberId: row.reviewed_by_member_id ?? "", updatedAt: row.updated_at } : deliverable;
+      return row ? {
+        ...deliverable,
+        title: row.title ?? deliverable.title,
+        type: row.deliverable_type ?? deliverable.type,
+        url: row.url ?? deliverable.url,
+        version: row.version ?? deliverable.version,
+        status: row.status,
+        submittedByMemberId: row.submitted_by_member_id ?? "",
+        reviewedByMemberId: row.reviewed_by_member_id ?? "",
+        clientVisible: row.client_visible,
+        updatedAt: row.updated_at
+      } : deliverable;
     }),
     formSubmissions: [
       ...localState.formSubmissions.filter((submission) => !submissionKeys.has(`${submission.formId}:${submission.submittedById}`)),
@@ -220,6 +236,75 @@ export async function saveTeamWorksPortalFormSubmission(input: {
       submitted_at: input.status === "submitted" ? now : null,
       updated_at: now
     }, { onConflict: "form_id,submitted_by_member_id" });
+  if (error) throw error;
+}
+
+export async function reviewTeamWorksPortalFormSubmission(input: {
+  projectSourceId: string;
+  formSourceId: string;
+  submittedByMemberId: string;
+  nextStatus: "revision_requested" | "approved";
+  reviewMemo: string;
+}): Promise<ReviewedTeamWorksFormSubmission> {
+  await requireCurrentUser();
+  const projectId = await findProjectIdBySource(input.projectSourceId);
+  const [formId, reviewerMemberId] = await Promise.all([
+    findSourceRowId("team_works_project_forms", projectId, input.formSourceId),
+    findCurrentStaffProjectMemberId(projectId)
+  ]);
+  const now = new Date().toISOString();
+  const approvedByMemberId = input.nextStatus === "approved" ? reviewerMemberId : null;
+  const { data, error } = await supabase
+    .from("team_works_form_submissions")
+    .update({
+      status: input.nextStatus,
+      review_memo: input.reviewMemo.trim(),
+      reviewed_by_member_id: reviewerMemberId,
+      approved_by_member_id: approvedByMemberId,
+      updated_at: now
+    })
+    .eq("project_id", projectId)
+    .eq("form_id", formId)
+    .eq("submitted_by_member_id", input.submittedByMemberId)
+    .eq("status", "submitted")
+    .select("reviewed_by_member_id,approved_by_member_id")
+    .single();
+  if (error) throw error;
+  return {
+    reviewerMemberId: data.reviewed_by_member_id ?? reviewerMemberId,
+    approvedByMemberId: data.approved_by_member_id ?? ""
+  };
+}
+
+export async function saveTeamWorksWorkerDeliverable(input: {
+  membership: TeamWorksPortalMembership;
+  taskSourceId: string;
+  deliverableSourceId: string;
+  title: string;
+  type: "url" | "file_placeholder" | "note";
+  url: string;
+  version: number;
+  status: Extract<ProjectDeliverableStatus, "draft" | "submitted">;
+  clientVisible: boolean;
+}) {
+  await requireCurrentUser();
+  const taskId = await findSourceRowId("team_works_project_tasks", input.membership.databaseProjectId, input.taskSourceId);
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("team_works_project_deliverables")
+    .upsert({
+      project_id: input.membership.databaseProjectId,
+      task_id: taskId,
+      source_local_id: input.deliverableSourceId,
+      title: input.title.trim(),
+      deliverable_type: input.type,
+      url: input.type === "url" ? input.url.trim() : input.url,
+      version: input.version,
+      status: input.status,
+      submitted_by_member_id: input.membership.memberId,
+      client_visible: input.clientVisible,
+      updated_at: now
+    }, { onConflict: "project_id,source_local_id" });
   if (error) throw error;
 }
 
@@ -265,7 +350,38 @@ export async function reviewTeamWorksPortalDeliverable(input: {
   if (error) throw error;
 }
 
-async function findSourceRowId(table: "team_works_project_tasks" | "team_works_project_deliverables", projectId: string, sourceId: string) {
+async function findProjectIdBySource(projectSourceId: string) {
+  const { data, error } = await supabase
+    .from("team_works_projects")
+    .select("id")
+    .eq("source_local_id", projectSourceId)
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+async function findCurrentStaffProjectMemberId(projectId: string) {
+  const user = await requireCurrentUser();
+  const { data: projectMembers, error: projectMemberError } = await supabase
+    .from("team_works_project_members")
+    .select("organization_member_id")
+    .eq("project_id", projectId)
+    .in("project_role", ["owner", "manager"]);
+  if (projectMemberError) throw projectMemberError;
+  const staffMemberIds = (projectMembers ?? []).map((member) => member.organization_member_id);
+  if (staffMemberIds.length === 0) throw new Error("Team Works staff member was not found.");
+  const { data: member, error: memberError } = await supabase
+    .from("team_works_organization_members")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .in("id", staffMemberIds)
+    .single();
+  if (memberError) throw memberError;
+  return member.id as string;
+}
+
+async function findSourceRowId(table: "team_works_project_tasks" | "team_works_project_deliverables" | "team_works_project_forms", projectId: string, sourceId: string) {
   const { data, error } = await supabase.from(table).select("id").eq("project_id", projectId).eq("source_local_id", sourceId).single();
   if (error) throw error;
   return data.id as string;

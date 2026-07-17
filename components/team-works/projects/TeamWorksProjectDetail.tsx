@@ -34,7 +34,7 @@ import { TeamWorksProjectDeliverables } from "./TeamWorksProjectDeliverables";
 import { TeamWorksProjectCompletionReview } from "./TeamWorksProjectCompletionReview";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 import { useTeamWorksProjectDatabaseMembers } from "./useTeamWorksProjectDatabaseMembers";
-import { saveTeamWorksTaskAssignment } from "@/lib/team-works-portal-database";
+import { reviewTeamWorksPortalFormSubmission, saveTeamWorksTaskAssignment } from "@/lib/team-works-portal-database";
 
 type ProjectTab = "overview" | "phases" | "tasks" | "forms" | "deliverables" | "members";
 
@@ -198,15 +198,37 @@ function FormsAndResourcesTab({ projectId, reviewerId, forms, resources, roles, 
   save: (next: TeamWorksProjectStoreState) => void;
 }) {
   const [reviewMemos, setReviewMemos] = useState<Record<string, string>>({});
+  const [reviewError, setReviewError] = useState("");
   const roleName = (roleId: string) => roles.find((role) => role.id === roleId)?.name ?? "未設定";
-  function review(submissionId: string, nextStatus: "revision_requested" | "approved") {
+  async function review(submissionId: string, nextStatus: "revision_requested" | "approved") {
     const submission = state.formSubmissions.find((item) => item.id === submissionId && item.projectId === projectId);
     if (!submission) return;
     const now = new Date().toISOString();
-    const next = transitionProjectFormSubmission({ submission, nextStatus, actor: { kind: "admin", id: reviewerId, memberId: reviewerId }, reviewMemo: reviewMemos[submissionId], now });
+    let reviewerMemberId = reviewerId;
+    let approvedByMemberId = nextStatus === "approved" ? reviewerId : "";
+    try {
+      setReviewError("");
+      const result = await reviewTeamWorksPortalFormSubmission({
+        projectSourceId: projectId,
+        formSourceId: submission.formId,
+        submittedByMemberId: submission.submittedById,
+        nextStatus,
+        reviewMemo: reviewMemos[submissionId] ?? ""
+      });
+      reviewerMemberId = result.reviewerMemberId;
+      approvedByMemberId = result.approvedByMemberId;
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : "DB review save failed.");
+      return;
+    }
+    const next = {
+      ...transitionProjectFormSubmission({ submission, nextStatus, actor: { kind: "admin", id: reviewerMemberId, memberId: reviewerMemberId }, reviewMemo: reviewMemos[submissionId], now }),
+      approvedByMemberId
+    };
     save({ ...state, projects: state.projects.map((project) => project.id === projectId ? { ...project, updatedAt: now } : project), formSubmissions: state.formSubmissions.map((item) => item.id === submissionId ? next : item) });
   }
   return <div className="grid gap-6 lg:grid-cols-2">
+    {reviewError ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 px-3 py-2 text-sm font-bold text-[var(--mikke-danger)] lg:col-span-2">{reviewError}</p> : null}
     <MikkeSection title="フォーム定義・提出確認">{forms.length > 0 ? <div className="space-y-3">{forms.map((form) => { const submissions = state.formSubmissions.filter((item) => item.formId === form.id); return <article key={form.id} className="rounded-lg border border-[var(--mikke-line)] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-sm font-bold">{form.name}</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">入力 {roleName(form.inputRoleId)}・確認 {roleName(form.reviewerRoleId)}・承認 {roleName(form.approverRoleId)}</p></div><span className="text-xs font-bold text-[var(--mikke-muted)]">{form.fields.length}項目</span></div><div className="mt-3 flex flex-wrap gap-2">{form.fields.map((field) => <span key={field.id} className="rounded-full bg-[var(--mikke-bg)] px-2.5 py-1 text-xs font-bold">{field.label}・{projectFormFieldTypeLabels[field.type]}{field.required ? "・必須" : ""}</span>)}</div><p className="mt-3 text-xs text-[var(--mikke-muted)]">{form.required ? "フォーム必須" : "任意"}・{form.clientVisible ? "クライアント公開" : "内部のみ"}・{form.editableAfterSubmit ? "提出後修正可" : "提出後修正不可"}{form.dueOffsetDays === null ? "・期限なし" : `・工程開始から${form.dueOffsetDays}日`}</p><div className="mt-4 space-y-2">{submissions.map((submission) => <div key={submission.id} className="rounded-lg bg-[var(--mikke-bg)] p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold">{submission.submittedByActor === "client" ? "クライアント" : "担当メンバー"}からの提出</p><span className="text-xs font-bold text-[var(--mikke-muted)]">{projectFormSubmissionStatusLabels[submission.status]}</span></div><dl className="mt-2 space-y-1 text-sm">{form.fields.map((field) => <div key={field.id} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2"><dt className="font-bold">{field.label}</dt><dd className="break-words text-[var(--mikke-text-soft)]">{formatAnswer(submission.answers[field.id])}</dd></div>)}</dl>{submission.status === "submitted" ? <div className="mt-3 border-t border-[var(--mikke-line)] pt-3"><textarea value={reviewMemos[submission.id] ?? ""} onChange={(event) => setReviewMemos((current) => ({ ...current, [submission.id]: event.target.value }))} rows={2} className={`${teamWorksProjectInputClass} resize-y`} placeholder="修正を依頼する場合は理由を入力" /><div className="mt-2 flex flex-wrap gap-2"><button type="button" onClick={() => review(submission.id, "approved")} className="rounded-lg bg-[var(--mikke-success)] px-3 py-2 text-xs font-bold text-white">承認する</button><button type="button" onClick={() => review(submission.id, "revision_requested")} disabled={!reviewMemos[submission.id]?.trim()} className="rounded-lg border border-[var(--mikke-danger)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-40">修正を依頼</button></div></div> : null}</div>)}{submissions.length === 0 ? <p className="text-xs text-[var(--mikke-muted)]">提出はまだありません。</p> : null}</div></article>; })}</div> : <p className="text-sm text-[var(--mikke-muted)]">フォームはありません。</p>}</MikkeSection>
     <MikkeSection title="資料ブロック（管理者表示）">{resources.length > 0 ? <div className="space-y-3">{resources.map((resource) => <article key={resource.id} className="rounded-lg border border-[var(--mikke-line)] p-4"><div className="flex items-start justify-between gap-3"><div><h3 className="text-sm font-bold">{resource.title}</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">{projectResourceAudienceLabels[resource.audience]}</p>{resource.type === "note" ? <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{resource.memo}</p> : null}</div>{resource.type === "url" && resource.url ? <a href={resource.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}</div></article>)}</div> : <p className="text-sm text-[var(--mikke-muted)]">資料はありません。</p>}</MikkeSection>
   </div>;

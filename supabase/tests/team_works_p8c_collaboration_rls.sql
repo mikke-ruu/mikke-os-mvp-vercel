@@ -14,11 +14,13 @@ declare
   v_wrong_member_id uuid := gen_random_uuid();
   v_project_id uuid := gen_random_uuid();
   v_task_id uuid := gen_random_uuid();
+  v_unassigned_task_id uuid := gen_random_uuid();
   v_invite_id uuid := gen_random_uuid();
   v_wrong_invite_id uuid := gen_random_uuid();
   v_client_form_id uuid := gen_random_uuid();
   v_worker_form_id uuid := gen_random_uuid();
   v_deliverable_id uuid := gen_random_uuid();
+  v_worker_deliverable_id uuid := gen_random_uuid();
   v_count integer;
 begin
   if has_table_privilege('anon', 'public.team_works_member_invites', 'select')
@@ -47,6 +49,8 @@ begin
   values (v_project_id, v_organization_id, v_owner_member_id, 'owner');
   insert into public.team_works_project_tasks(id, project_id, title, status, client_visible)
   values (v_task_id, v_project_id, 'P8-c task', 'in_progress', true);
+  insert into public.team_works_project_tasks(id, project_id, title, status, client_visible)
+  values (v_unassigned_task_id, v_project_id, 'P8-f unassigned task', 'in_progress', false);
   insert into public.team_works_member_invites(id, organization_id, project_id, email, role, created_by_user_id)
   values
     (v_invite_id, v_organization_id, v_project_id, v_actor_email, 'client_user', v_owner_user_id),
@@ -57,6 +61,8 @@ begin
     (v_worker_form_id, v_project_id, v_task_id, 'Worker form', 'worker', false, '[{"id":"report","type":"long_text"}]');
   insert into public.team_works_project_deliverables(id, project_id, task_id, title, deliverable_type, status, client_visible)
   values (v_deliverable_id, v_project_id, v_task_id, 'Client review', 'url', 'client_review', true);
+  insert into public.team_works_project_deliverables(id, project_id, task_id, title, deliverable_type, status, client_visible)
+  values (v_worker_deliverable_id, v_project_id, v_task_id, 'Worker draft', 'url', 'draft', false);
   insert into public.team_works_project_comments(project_id, task_id, deliverable_id, author_member_id, audience, body)
   values
     (v_project_id, v_task_id, null, v_owner_member_id, 'internal', 'internal comment'),
@@ -114,6 +120,20 @@ begin
   where project_id = v_project_id and organization_member_id = v_actor_member_id and project_role = 'client';
   if v_count <> 1 then raise exception 'invite did not create client project membership'; end if;
 
+  perform set_config('request.jwt.claims', json_build_object('sub', v_owner_user_id, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_owner_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  update public.team_works_form_submissions
+  set status = 'revision_requested',
+    review_memo = 'Please revise',
+    reviewed_by_member_id = v_owner_member_id
+  where project_id = v_project_id and form_id = v_client_form_id and submitted_by_member_id = v_actor_member_id;
+  select count(*) into v_count from public.team_works_form_submissions
+  where project_id = v_project_id and form_id = v_client_form_id and status = 'revision_requested' and reviewed_by_member_id = v_owner_member_id;
+  if v_count <> 1 then raise exception 'staff form review update mismatch'; end if;
+  execute 'reset role';
+
   update public.team_works_organization_members set role = 'worker' where id = v_actor_member_id;
   update public.team_works_project_members set project_role = 'worker'
   where project_id = v_project_id and organization_member_id = v_actor_member_id;
@@ -136,6 +156,44 @@ begin
   if v_count <> 1 then raise exception 'worker could not restore assigned task'; end if;
   insert into public.team_works_form_submissions(project_id, form_id, submitted_by_member_id, answers, status)
   values (v_project_id, v_worker_form_id, v_actor_member_id, '{"report":"worker portal"}', 'submitted');
+  update public.team_works_project_deliverables
+  set url = 'https://example.com/worker-draft', status = 'submitted', submitted_by_member_id = v_actor_member_id
+  where id = v_worker_deliverable_id;
+  select count(*) into v_count from public.team_works_project_deliverables
+  where id = v_worker_deliverable_id and status = 'submitted' and submitted_by_member_id = v_actor_member_id;
+  if v_count <> 1 then raise exception 'worker deliverable submit mismatch'; end if;
+  execute 'reset role';
+  update public.team_works_project_deliverables
+  set status = 'revision_requested'
+  where id = v_worker_deliverable_id;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_actor_user_id, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_actor_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  update public.team_works_project_deliverables
+  set url = 'https://example.com/worker-resubmit', version = version + 1, status = 'submitted'
+  where id = v_worker_deliverable_id;
+  begin
+    insert into public.team_works_project_deliverables(project_id, task_id, title, deliverable_type, url, status, submitted_by_member_id, client_visible)
+    values (v_project_id, v_unassigned_task_id, 'Unassigned upload', 'url', 'https://example.com/nope', 'submitted', v_actor_member_id, false);
+    raise exception 'worker submitted deliverable for unassigned task';
+  exception when insufficient_privilege then null;
+  end;
+  execute 'reset role';
+  update public.team_works_project_deliverables
+  set status = 'revision_requested'
+  where id = v_worker_deliverable_id;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_actor_user_id, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_actor_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  begin
+    update public.team_works_project_deliverables
+    set title = 'Changed by worker'
+    where id = v_worker_deliverable_id;
+    raise exception 'worker changed managed deliverable fields';
+  exception when raise_exception then null;
+  end;
   select count(*) into v_count from public.team_works_project_comments where project_id = v_project_id;
   if v_count <> 3 then raise exception 'worker comment visibility mismatch: %', v_count; end if;
 

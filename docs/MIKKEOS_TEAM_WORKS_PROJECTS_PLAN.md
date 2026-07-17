@@ -742,3 +742,26 @@ migration・RLS・actor別否定テストを一体で設計する。
 - workerによる成果物の新規提出・再提出をDBへ保存する接続は未実装。
 - 成果物ファイル本体のStorage保存、報酬/請求画面のDB保存、Activity Log通知は未実装。
 ```
+
+## 26. TW-P8F implementation result (2026-07-18)
+```text
+Implemented:
+- Persisted admin form review actions to team_works_form_submissions.
+- Resolved the current owner / manager project member and writes reviewed_by_member_id / approved_by_member_id with the real DB member ID.
+- Added worker portal deliverable URL submission for draft and revision_requested deliverables.
+- Allows a worker to create a missing deliverable slot from an assigned task when submitting.
+- Restores deliverable url / version / title / type / client_visible from DB into the local state bridge.
+- Extended deliverable RLS so only the assigned worker can submit or resubmit their own assigned task deliverable.
+- Added a trigger guard to reject worker changes to managed fields such as title, task_id, client_visible, and reviewed_by_member_id.
+
+Verified:
+- Applied Supabase migration 20260717234401_team_works_p8f_review_deliverable_portals to mikke-os-dev.
+- RLS verification covered staff form review, worker submit/resubmit, unassigned task rejection, and managed-field mutation rejection.
+- lint passed.
+- build passed (80 static pages).
+- Supabase Advisors checked; no new actionable Team Works finding from this slice.
+
+Current boundary:
+- Storage file body is still not implemented; deliverables submit URL only.
+- Payout/invoice DB UI, Activity Log notifications, and Manager integration remain later phases.
+```

@@ -1,6 +1,6 @@
 import type { ProjectDeliverable, ProjectDeliverableStatus } from "./team-works-projects";
 
-export type ProjectDeliverableActor = "internal" | "client";
+export type ProjectDeliverableActor = "internal" | "client" | "worker";
 
 export type ProjectDeliverableTransition = {
   status: ProjectDeliverableStatus;
@@ -20,6 +20,11 @@ const clientTransitions: Partial<Record<ProjectDeliverableStatus, ProjectDeliver
   client_review: ["revision_requested", "approved"]
 };
 
+const workerTransitions: Partial<Record<ProjectDeliverableStatus, ProjectDeliverableStatus[]>> = {
+  draft: ["submitted"],
+  revision_requested: ["submitted"]
+};
+
 const transitionLabels: Record<ProjectDeliverableStatus, string> = {
   draft: "下書きへ戻す",
   submitted: "提出する",
@@ -35,7 +40,7 @@ export function canTransitionProjectDeliverable(
   nextStatus: ProjectDeliverableStatus,
   actor: ProjectDeliverableActor
 ) {
-  const transitions = actor === "client" ? clientTransitions : internalTransitions;
+  const transitions = actor === "client" ? clientTransitions : actor === "worker" ? workerTransitions : internalTransitions;
   if (!(transitions[deliverable.status] ?? []).includes(nextStatus)) return false;
   if (nextStatus === "client_review" && !deliverable.clientVisible) return false;
   return true;
@@ -45,7 +50,7 @@ export function getProjectDeliverableTransitions(
   deliverable: ProjectDeliverable,
   actor: ProjectDeliverableActor
 ): ProjectDeliverableTransition[] {
-  const transitions = actor === "client" ? clientTransitions : internalTransitions;
+  const transitions = actor === "client" ? clientTransitions : actor === "worker" ? workerTransitions : internalTransitions;
   return (transitions[deliverable.status] ?? [])
     .filter((status) => canTransitionProjectDeliverable(deliverable, status, actor))
     .map((status) => ({
