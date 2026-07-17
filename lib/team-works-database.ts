@@ -27,6 +27,7 @@ type DatabaseTaskRow = {
   title: string;
   status: "not_started" | "in_progress" | "review_pending" | "revising" | "completed" | "on_hold" | "cancelled" | "archived";
   client_visible: boolean;
+  assignee_member_id: string | null;
   updated_at: string;
 };
 
@@ -220,6 +221,12 @@ export async function syncTeamWorksProjectStateToDatabase(input: {
       .upsert(ownerProjectMemberRows, { onConflict: "project_id,organization_member_id" });
     if (error) throw error;
   }
+  const { data: databaseProjectMembers, error: projectMemberError } = await supabase
+    .from("team_works_project_members")
+    .select("project_id,organization_member_id")
+    .in("project_id", [...databaseProjectIdBySourceId.values()]);
+  if (projectMemberError) throw projectMemberError;
+  const databaseProjectMemberKeys = new Set((databaseProjectMembers ?? []).map((member) => `${member.project_id}:${member.organization_member_id}`));
   const taskRows = input.projectState.tasks.flatMap((task) => {
     const databaseProjectId = databaseProjectIdBySourceId.get(task.projectId);
     if (!databaseProjectId) return [];
@@ -230,7 +237,8 @@ export async function syncTeamWorksProjectStateToDatabase(input: {
       status: toDatabaseTaskStatus(task.status),
       client_visible: task.clientVisible,
       archived_at: null,
-      updated_at: task.updatedAt
+      updated_at: task.updatedAt,
+      ...(databaseProjectMemberKeys.has(`${databaseProjectId}:${task.assigneeMemberId}`) ? { assignee_member_id: task.assigneeMemberId } : {})
     }];
   });
 
@@ -359,7 +367,7 @@ export async function readTeamWorksProjectStateFromDatabase(input: {
     const [tasks, resources, forms, deliverables] = await Promise.all([
       supabase
         .from("team_works_project_tasks")
-        .select("source_local_id,title,status,client_visible,updated_at")
+        .select("source_local_id,title,status,client_visible,assignee_member_id,updated_at")
         .in("project_id", projectIds),
       supabase
         .from("team_works_project_resources")
@@ -411,6 +419,7 @@ export async function readTeamWorksProjectStateFromDatabase(input: {
         title: row.title,
         status: fromDatabaseTaskStatus(row.status, task.status),
         clientVisible: row.client_visible,
+        assigneeMemberId: row.assignee_member_id ?? task.assigneeMemberId,
         updatedAt: row.updated_at
       };
     }),

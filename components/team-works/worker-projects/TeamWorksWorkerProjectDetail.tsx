@@ -15,7 +15,7 @@ import { saveTeamWorksPortalFormSubmission } from "@/lib/team-works-portal-datab
 
 export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string }) {
   const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
-  const actor = useTeamWorksPortalActor("worker");
+  const actor = useTeamWorksPortalActor("worker", { projectState, saveProjectState });
   const membership = actor.membershipBySourceProjectId.get(projectId);
   const actorMemberships = new Map(membership ? [[projectId, { memberId: membership.memberId, memberName: membership.memberName }]] : []);
   const detail = createTeamWorksWorkerProjectDetail(projectState, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID, projectId, { memberships: actorMemberships });

@@ -9,8 +9,8 @@ import { createTeamWorksWorkerProjectList, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_
 import { useTeamWorksPortalActor } from "@/components/team-works/useTeamWorksPortalActor";
 
 export function TeamWorksWorkerProjectList() {
-  const { hydrated, projectState } = useTeamWorksProjectStore();
-  const actor = useTeamWorksPortalActor("worker");
+  const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
+  const actor = useTeamWorksPortalActor("worker", { projectState, saveProjectState });
   const actorMemberships = new Map(actor.memberships.map((membership) => [membership.sourceProjectId, { memberId: membership.memberId, memberName: membership.memberName }]));
   const projects = createTeamWorksWorkerProjectList(projectState, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID, { memberships: actorMemberships });
   const taskCount = projects.reduce((sum, item) => sum + item.project.assignedTaskCount, 0);

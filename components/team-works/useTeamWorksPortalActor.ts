@@ -1,18 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { readTeamWorksPortalMemberships, type TeamWorksPortalMembership, type TeamWorksPortalRole } from "@/lib/team-works-portal-database";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { readTeamWorksPortalCollaborationState, readTeamWorksPortalMemberships, type TeamWorksPortalMembership, type TeamWorksPortalRole } from "@/lib/team-works-portal-database";
+import type { TeamWorksProjectStoreState } from "@/lib/team-works-projects";
 
-export function useTeamWorksPortalActor(role: TeamWorksPortalRole) {
+export function useTeamWorksPortalActor(role: TeamWorksPortalRole, stateBridge?: {
+  projectState: TeamWorksProjectStoreState;
+  saveProjectState: (next: TeamWorksProjectStoreState) => void;
+}) {
   const [memberships, setMemberships] = useState<TeamWorksPortalMembership[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const bridgeRef = useRef(stateBridge);
+  bridgeRef.current = stateBridge;
 
   const refresh = useCallback(async () => {
     setStatus("loading");
     setErrorMessage("");
     try {
-      setMemberships(await readTeamWorksPortalMemberships(role));
+      const nextMemberships = await readTeamWorksPortalMemberships(role);
+      setMemberships(nextMemberships);
+      const bridge = bridgeRef.current;
+      if (bridge) bridge.saveProjectState(await readTeamWorksPortalCollaborationState(nextMemberships, bridge.projectState));
       setStatus("ready");
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "案件所属を確認できませんでした。");

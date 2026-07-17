@@ -14,8 +14,8 @@ import { projectStatusLabels, useTeamWorksProjectStore, type ProjectStatus } fro
 import { useTeamWorksPortalActor } from "@/components/team-works/useTeamWorksPortalActor";
 
 export function TeamWorksClientProjectList() {
-  const { hydrated, projectState } = useTeamWorksProjectStore();
-  const actor = useTeamWorksPortalActor("client");
+  const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
+  const actor = useTeamWorksPortalActor("client", { projectState, saveProjectState });
   const actorMemberships = new Map(actor.memberships.map((membership) => [membership.sourceProjectId, { memberId: membership.memberId }]));
   const details = createTeamWorksClientProjectList(projectState, TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID, { memberships: actorMemberships });
   const actions = details.flatMap((detail) => detail.actions.map((action) => ({

@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import type { ProjectDeliverableStatus, ProjectFormAnswerValue } from "@/lib/team-works-projects";
+import type { ProjectDeliverableStatus, ProjectFormAnswerValue, TeamWorksProjectStoreState } from "@/lib/team-works-projects";
 
 export type TeamWorksPortalRole = "client" | "worker";
 
@@ -9,6 +9,12 @@ export type TeamWorksPortalMembership = {
   memberId: string;
   memberName: string;
   role: TeamWorksPortalRole;
+};
+
+export type TeamWorksDatabaseProjectMember = {
+  memberId: string;
+  memberName: string;
+  projectRole: "owner" | "manager" | "client" | "worker";
 };
 
 export async function readTeamWorksPortalMemberships(role: TeamWorksPortalRole) {
@@ -49,6 +55,140 @@ export async function readTeamWorksPortalMemberships(role: TeamWorksPortalRole) 
       role
     }];
   });
+}
+
+export async function readTeamWorksProjectDatabaseMembers(projectSourceId: string) {
+  await requireCurrentUser();
+  const { data: project, error: projectError } = await supabase
+    .from("team_works_projects")
+    .select("id")
+    .eq("source_local_id", projectSourceId)
+    .single();
+  if (projectError) throw projectError;
+  const { data: projectMembers, error: projectMemberError } = await supabase
+    .from("team_works_project_members")
+    .select("organization_member_id,project_role")
+    .eq("project_id", project.id);
+  if (projectMemberError) throw projectMemberError;
+  if (!projectMembers?.length) return [];
+  const { data: members, error: memberError } = await supabase
+    .from("team_works_organization_members")
+    .select("id,display_name")
+    .in("id", projectMembers.map((member) => member.organization_member_id));
+  if (memberError) throw memberError;
+  const memberNameById = new Map((members ?? []).map((member) => [member.id, member.display_name]));
+  return projectMembers.map<TeamWorksDatabaseProjectMember>((member) => ({
+    memberId: member.organization_member_id,
+    memberName: memberNameById.get(member.organization_member_id) ?? "メンバー",
+    projectRole: member.project_role
+  }));
+}
+
+export async function saveTeamWorksTaskAssignment(input: {
+  projectSourceId: string;
+  taskSourceId: string;
+  assigneeMemberId: string | null;
+}) {
+  await requireCurrentUser();
+  const { data: project, error: projectError } = await supabase
+    .from("team_works_projects")
+    .select("id")
+    .eq("source_local_id", input.projectSourceId)
+    .single();
+  if (projectError) throw new Error("先にこの案件をDBへ同期してください。");
+  const { error } = await supabase
+    .from("team_works_project_tasks")
+    .update({ assignee_member_id: input.assigneeMemberId, updated_at: new Date().toISOString() })
+    .eq("project_id", project.id)
+    .eq("source_local_id", input.taskSourceId)
+    .select("id")
+    .single();
+  if (error) throw new Error("タスクをDBへ同期してから、実メンバーを割り当ててください。");
+}
+
+export async function readTeamWorksPortalCollaborationState(
+  memberships: TeamWorksPortalMembership[],
+  localState: TeamWorksProjectStoreState
+) {
+  if (memberships.length === 0) return localState;
+  await requireCurrentUser();
+  const projectIds = memberships.map((membership) => membership.databaseProjectId);
+  const [forms, submissions, tasks, deliverables, comments] = await Promise.all([
+    supabase.from("team_works_project_forms").select("id,project_id,source_local_id").in("project_id", projectIds),
+    supabase.from("team_works_form_submissions").select("id,project_id,form_id,submitted_by_member_id,source_local_id,answers,status,review_memo,reviewed_by_member_id,approved_by_member_id,submitted_at,created_at,updated_at").in("project_id", projectIds),
+    supabase.from("team_works_project_tasks").select("id,project_id,source_local_id,assignee_member_id").in("project_id", projectIds),
+    supabase.from("team_works_project_deliverables").select("id,project_id,source_local_id,status,submitted_by_member_id,reviewed_by_member_id,updated_at").in("project_id", projectIds),
+    supabase.from("team_works_project_comments").select("id,project_id,task_id,deliverable_id,author_member_id,source_local_id,audience,body,created_at,updated_at").in("project_id", projectIds)
+  ]);
+  for (const result of [forms, submissions, tasks, deliverables, comments]) if (result.error) throw result.error;
+
+  const membershipByDatabaseProjectId = new Map(memberships.map((membership) => [membership.databaseProjectId, membership]));
+  const formSourceById = new Map((forms.data ?? []).flatMap((row) => row.source_local_id ? [[row.id, row.source_local_id] as const] : []));
+  const taskSourceById = new Map((tasks.data ?? []).flatMap((row) => row.source_local_id ? [[row.id, row.source_local_id] as const] : []));
+  const deliverableSourceById = new Map((deliverables.data ?? []).flatMap((row) => row.source_local_id ? [[row.id, row.source_local_id] as const] : []));
+
+  const databaseSubmissions = (submissions.data ?? []).flatMap((row) => {
+    const membership = membershipByDatabaseProjectId.get(row.project_id);
+    const formId = formSourceById.get(row.form_id);
+    if (!membership || !formId) return [];
+    return [{
+      id: row.source_local_id ?? row.id,
+      projectId: membership.sourceProjectId,
+      formId,
+      submittedByActor: membership.role,
+      submittedById: row.submitted_by_member_id,
+      answers: row.answers as Record<string, ProjectFormAnswerValue>,
+      status: row.status,
+      reviewMemo: row.review_memo,
+      reviewedByMemberId: row.reviewed_by_member_id ?? "",
+      approvedByMemberId: row.approved_by_member_id ?? "",
+      submittedAt: row.submitted_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }];
+  });
+  const submissionKeys = new Set(databaseSubmissions.map((submission) => `${submission.formId}:${submission.submittedById}`));
+
+  const databaseComments = (comments.data ?? []).flatMap((row) => {
+    const membership = membershipByDatabaseProjectId.get(row.project_id);
+    if (!membership) return [];
+    const taskId = row.task_id ? taskSourceById.get(row.task_id) ?? null : null;
+    const deliverableId = row.deliverable_id ? deliverableSourceById.get(row.deliverable_id) ?? null : null;
+    const localTask = taskId ? localState.tasks.find((task) => task.id === taskId) : null;
+    const localDeliverable = deliverableId ? localState.deliverables.find((deliverable) => deliverable.id === deliverableId) : null;
+    return [{
+      id: row.source_local_id ?? row.id,
+      projectId: membership.sourceProjectId,
+      phaseId: localTask?.phaseId ?? localDeliverable?.phaseId ?? null,
+      taskId,
+      deliverableId,
+      authorMemberId: row.author_member_id,
+      audience: row.audience,
+      body: row.body,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    }];
+  });
+  const databaseCommentIds = new Set(databaseComments.map((comment) => comment.id));
+  const taskAssigneeBySourceId = new Map((tasks.data ?? []).flatMap((row) => row.source_local_id ? [[row.source_local_id, row.assignee_member_id ?? ""] as const] : []));
+  const deliverableBySourceId = new Map((deliverables.data ?? []).flatMap((row) => row.source_local_id ? [[row.source_local_id, row] as const] : []));
+
+  return {
+    ...localState,
+    tasks: localState.tasks.map((task) => taskAssigneeBySourceId.has(task.id) ? { ...task, assigneeMemberId: taskAssigneeBySourceId.get(task.id) ?? "" } : task),
+    deliverables: localState.deliverables.map((deliverable) => {
+      const row = deliverableBySourceId.get(deliverable.id);
+      return row ? { ...deliverable, status: row.status, submittedByMemberId: row.submitted_by_member_id ?? "", reviewedByMemberId: row.reviewed_by_member_id ?? "", updatedAt: row.updated_at } : deliverable;
+    }),
+    formSubmissions: [
+      ...localState.formSubmissions.filter((submission) => !submissionKeys.has(`${submission.formId}:${submission.submittedById}`)),
+      ...databaseSubmissions
+    ],
+    comments: [
+      ...localState.comments.filter((comment) => !databaseCommentIds.has(comment.id)),
+      ...databaseComments
+    ]
+  } satisfies TeamWorksProjectStoreState;
 }
 
 export async function saveTeamWorksPortalFormSubmission(input: {

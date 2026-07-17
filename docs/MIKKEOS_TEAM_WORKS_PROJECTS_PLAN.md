@@ -715,3 +715,30 @@ migration・RLS・actor別否定テストを一体で設計する。
 - workerへの個別タスク割当を、管理画面の実project member選択へ切り替える処理は未実装。
 - 成果物ファイル本体のStorage保存、報酬/請求画面のDB保存、Activity Log通知は未実装。
 ```
+
+## 25. TW-P8E実装結果（2026-07-18）
+
+```text
+実装:
+- client / workerポータル起動時に、RLSで許可されたフォーム回答・コメント・成果物状態・タスク割当をDBから読込。
+- source_local_idで端末内データへ統合し、同一回答・コメントを重複させず別端末でも共同作業状態を復元。
+- 管理画面の案件詳細で、DBへ参加済みのworker / client / managerを実ユーザーとして表示。
+- タスク担当者で実workerを選ぶと、project_tasks.assignee_member_idをDBへ保存してから端末状態を更新。
+- 手動案件同期でも、実project memberと一致する担当者だけを安全にtask assignmentへ反映。
+- DB上の実worker割当を管理画面のDB読込とworkerポータル読込の両方へ反映。
+
+検収:
+- owner Auth actorによる実workerタスク割当と、worker側での担当タスク復元をRLSテストで確認。
+- client / workerのフォーム回答、コメント、成果物状態の既存RLSテストを継続。
+- lint / build成功（80 static pages）。Team Works由来のactionableなAdvisor指摘0件。
+
+安全境界:
+- localStorage固有の工程・表示設定は保持し、DB側に存在する共同作業項目だけを上書き統合。
+- DB未同期のタスクへ実ユーザーを割り当てた場合は、端末状態を変更せず同期案内を表示。
+- デモ担当者IDはDBへ送らず、実project member UUIDだけをassignee_member_idへ保存。
+
+現在の境界:
+- 管理画面からのフォーム修正依頼・承認をDBへ保存する接続は未実装。
+- workerによる成果物の新規提出・再提出をDBへ保存する接続は未実装。
+- 成果物ファイル本体のStorage保存、報酬/請求画面のDB保存、Activity Log通知は未実装。
+```

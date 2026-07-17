@@ -33,6 +33,8 @@ import { teamWorksInitialState } from "@/lib/team-works";
 import { TeamWorksProjectDeliverables } from "./TeamWorksProjectDeliverables";
 import { TeamWorksProjectCompletionReview } from "./TeamWorksProjectCompletionReview";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
+import { useTeamWorksProjectDatabaseMembers } from "./useTeamWorksProjectDatabaseMembers";
+import { saveTeamWorksTaskAssignment } from "@/lib/team-works-portal-database";
 
 type ProjectTab = "overview" | "phases" | "tasks" | "forms" | "deliverables" | "members";
 
@@ -54,6 +56,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
   const { hydrated, projectState, templateState, saveProjectState, saveTemplateState } = useTeamWorksProjectStore();
   const [tab, setTab] = useState<ProjectTab>("overview");
   const [showCompletionReview, setShowCompletionReview] = useState(false);
+  const databaseMemberState = useTeamWorksProjectDatabaseMembers(projectId);
   const project = projectState.projects.find((item) => item.id === projectId);
 
   if (!hydrated) return <p className="text-sm text-[var(--mikke-muted)]">プロジェクトを読み込んでいます。</p>;
@@ -64,8 +67,17 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
   const forms = projectState.forms.filter((form) => form.projectId === project.id);
   const deliverables = projectState.deliverables.filter((item) => item.projectId === project.id);
   const resources = projectState.resources.filter((item) => item.projectId === project.id);
-  const members = projectState.projectMembers.filter((member) => member.projectId === project.id);
   const roles = projectState.projectRoles.filter((role) => role.projectId === project.id);
+  const localMembers = projectState.projectMembers.filter((member) => member.projectId === project.id);
+  const databaseMembers = databaseMemberState.members.flatMap((member) => {
+    const role = roles.find((item) => member.projectRole === "worker" ? item.name.includes("担当") : member.projectRole === "client" ? item.name.includes("クライアント") : item.name.includes("管理"));
+    if (!role) return [];
+    return [{ id: member.memberId, projectId: project.id, organizationMemberId: member.memberId, displayName: member.memberName, projectRoleId: role.id, joinedAt: "" }];
+  });
+  const databaseMemberIds = new Set(databaseMembers.map((member) => member.id));
+  const databaseWorkerIds = new Set(databaseMemberState.members.filter((member) => member.projectRole === "worker").map((member) => member.memberId));
+  const members = [...localMembers.filter((member) => !databaseMemberIds.has(member.id)), ...databaseMembers];
+  const taskMembers = members.filter((member) => !databaseMemberIds.has(member.id) || databaseWorkerIds.has(member.id));
   const currentPhase = phases.find((phase) => phase.status !== "completed") ?? phases.at(-1);
   const waitingTaskCount = tasks.filter((task) => ["client_response_pending", "internal_review_pending", "revision_requested"].includes(task.status)).length;
   const delayedTaskCount = tasks.filter((task) => isDelayedTask(task)).length;
@@ -152,7 +164,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
 
       {tab === "overview" ? <OverviewTab project={project} phases={phases} tasks={tasks} formsCount={forms.length} deliverablesCount={deliverables.length} /> : null}
       {tab === "phases" ? <PhasesTab project={project} phases={phases} members={members} state={projectState} save={saveProjectState} /> : null}
-      {tab === "tasks" ? <TasksTab project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
+      {tab === "tasks" ? <TasksTab project={project} phases={phases} tasks={tasks} members={taskMembers} databaseMemberIds={databaseWorkerIds} state={projectState} save={saveProjectState} /> : null}
       {tab === "forms" ? <FormsAndResourcesTab projectId={project.id} reviewerId={project.leaderMemberId} forms={forms} resources={resources} roles={roles} state={projectState} save={saveProjectState} /> : null}
       {tab === "deliverables" ? <TeamWorksProjectDeliverables project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
       {tab === "members" ? (
@@ -359,6 +371,7 @@ function TasksTab({
   phases,
   tasks,
   members,
+  databaseMemberIds,
   state,
   save
 }: {
@@ -366,6 +379,7 @@ function TasksTab({
   phases: ProjectPhase[];
   tasks: ProjectTask[];
   members: TeamWorksProjectStoreState["projectMembers"];
+  databaseMemberIds: ReadonlySet<string>;
   state: TeamWorksProjectStoreState;
   save: (next: TeamWorksProjectStoreState) => void;
 }) {
@@ -374,6 +388,7 @@ function TasksTab({
   const [assigneeMemberId, setAssigneeMemberId] = useState(members[0]?.id ?? "");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<ProjectTaskPriority>("normal");
+  const [assignmentError, setAssignmentError] = useState("");
 
   function updateTask(taskId: string, patch: Partial<ProjectTask>) {
     const now = new Date().toISOString();
@@ -387,6 +402,19 @@ function TasksTab({
       } : task),
       projects: state.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item)
     });
+  }
+
+  async function assignTask(taskId: string, memberId: string) {
+    if (memberId === "" || databaseMemberIds.has(memberId)) {
+      try {
+        setAssignmentError("");
+        await saveTeamWorksTaskAssignment({ projectSourceId: project.id, taskSourceId: taskId, assigneeMemberId: memberId || null });
+      } catch (error) {
+        setAssignmentError(error instanceof Error ? error.message : "実メンバーを割り当てられませんでした。");
+        return;
+      }
+    }
+    updateTask(taskId, { assigneeMemberId: memberId });
   }
 
   function addTask(event: FormEvent<HTMLFormElement>) {
@@ -418,6 +446,7 @@ function TasksTab({
 
   return (
     <div className="space-y-6">
+      {assignmentError ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 px-3 py-2 text-sm font-bold text-[var(--mikke-danger)]">{assignmentError}</p> : null}
       <MikkeSection title="タスク一覧">
         {tasks.length > 0 ? (
           <div className="space-y-3">
@@ -439,9 +468,9 @@ function TasksTab({
                     </select>
                   </TeamWorksProjectField>
                   <TeamWorksProjectField label="担当者">
-                    <select value={task.assigneeMemberId} onChange={(event) => updateTask(task.id, { assigneeMemberId: event.target.value })} className={teamWorksProjectInputClass}>
+                    <select value={task.assigneeMemberId} onChange={(event) => { void assignTask(task.id, event.target.value); }} className={teamWorksProjectInputClass}>
                       <option value="">未設定</option>
-                      {members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}
+                      {members.map((member) => <option key={member.id} value={member.id}>{member.displayName}{databaseMemberIds.has(member.id) ? "（実ユーザー）" : ""}</option>)}
                     </select>
                   </TeamWorksProjectField>
                   <TeamWorksProjectField label="優先度">
@@ -475,7 +504,7 @@ function TasksTab({
             <TeamWorksProjectField label="担当者">
               <select value={assigneeMemberId} onChange={(event) => setAssigneeMemberId(event.target.value)} className={teamWorksProjectInputClass}>
                 <option value="">未設定</option>
-                {members.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}
+                {members.map((member) => <option key={member.id} value={member.id}>{member.displayName}{databaseMemberIds.has(member.id) ? "（実ユーザー）" : ""}</option>)}
               </select>
             </TeamWorksProjectField>
             <TeamWorksProjectField label="優先度">

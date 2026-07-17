@@ -33,7 +33,7 @@ import { reviewTeamWorksPortalDeliverable, saveTeamWorksPortalComment, saveTeamW
 
 export function TeamWorksClientProjectDetail({ projectId }: { projectId: string }) {
   const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
-  const actor = useTeamWorksPortalActor("client");
+  const actor = useTeamWorksPortalActor("client", { projectState, saveProjectState });
   const membership = actor.membershipBySourceProjectId.get(projectId);
   const actorMemberships = new Map(membership ? [[projectId, { memberId: membership.memberId }]] : []);
   const detail = createTeamWorksClientProjectDetail(projectState, TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID, projectId, { memberships: actorMemberships });

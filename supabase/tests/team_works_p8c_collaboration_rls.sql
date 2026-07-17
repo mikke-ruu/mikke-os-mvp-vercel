@@ -117,7 +117,13 @@ begin
   update public.team_works_organization_members set role = 'worker' where id = v_actor_member_id;
   update public.team_works_project_members set project_role = 'worker'
   where project_id = v_project_id and organization_member_id = v_actor_member_id;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', v_owner_user_id, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_owner_user_id::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
   update public.team_works_project_tasks set assignee_member_id = v_actor_member_id where id = v_task_id;
+  execute 'reset role';
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_actor_user_id, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', v_actor_user_id::text, true);
@@ -125,6 +131,9 @@ begin
   execute 'set local role authenticated';
   select count(*) into v_count from public.team_works_project_forms where project_id = v_project_id;
   if v_count <> 1 then raise exception 'worker form visibility mismatch: %', v_count; end if;
+  select count(*) into v_count from public.team_works_project_tasks
+  where id = v_task_id and assignee_member_id = v_actor_member_id;
+  if v_count <> 1 then raise exception 'worker could not restore assigned task'; end if;
   insert into public.team_works_form_submissions(project_id, form_id, submitted_by_member_id, answers, status)
   values (v_project_id, v_worker_form_id, v_actor_member_id, '{"report":"worker portal"}', 'submitted');
   select count(*) into v_count from public.team_works_project_comments where project_id = v_project_id;
