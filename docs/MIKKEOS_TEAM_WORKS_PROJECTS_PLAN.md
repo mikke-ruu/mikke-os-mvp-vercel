@@ -869,3 +869,23 @@ Current boundary:
 - Runtime verification requires a logged-in user, an existing Mikke ID profile, and successful project/member/task sync.
 - Payment execution, invoice document generation, and Manager integration remain later phases.
 ```
+
+## 32. TW-P8L implementation result (2026-07-18)
+```text
+Implemented:
+- Added a Team Works Manager bridge adapter that derives Manager-ready items from Team Works project state.
+- Exposes read-only schedule items, task items, and progress summaries for future Manager adapters.
+- Uses sourceGroupId shaped as team_works_project:<project_id> so future Manager grouping can keep project-level context without copying source data.
+- Keeps Manager-facing payloads limited to project/task title, due date, status, progress, priority, assignee display name, and source href.
+- Excludes payouts, invoices, internal memo, form answers, resource contents, deliverable contents, and comments from the Manager bridge.
+- Does not import or modify Manager files; Manager's existing uncommitted line remains separate.
+
+Verified:
+- lint passed.
+- build passed (80 static pages).
+
+Current boundary:
+- Team Works can now provide derive-on-read Manager data, but Manager UI is not wired to it yet.
+- Manager localStorage stores, routes, inbox, notification, and navigation changes remain in the Manager line.
+- Payment execution and invoice document generation remain later phases.
+```
