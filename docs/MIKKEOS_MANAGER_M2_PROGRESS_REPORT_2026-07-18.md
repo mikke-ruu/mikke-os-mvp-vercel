@@ -111,3 +111,34 @@ Activity Log / Story / DESK 経路への変更なし。
 ```
 
 アプリファースト方針により、Managerを `/` やログイン直後の唯一の入口にする変更は引き続き行わない。
+
+## M2-c: ボトムナビ再設計
+
+完了。
+
+```text
+更新: components/mikkeos/MikkeAppShell.tsx
+```
+
+変更内容:
+
+```text
+旧: OS / Story / DESK / Apps / 現在のアプリ
+新: 現在のアプリ / Manager / Apps
+```
+
+意図:
+
+```text
+入口は個々のアプリに置く。
+Managerは作業開始の巨大な玄関ではなく、予定・次にやること・他アプリの動きを見る横断面として置く。
+Story / DESK は常設ナビから外し、OwnerMenu側の「使っているアプリ」に残す。
+```
+
+未実施:
+
+```text
+アプリ所有判定による動的ナビ
+Story / DESK の利用状況に応じた表示制御
+/os /log の処遇変更
+```

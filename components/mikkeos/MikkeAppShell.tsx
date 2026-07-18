@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindow, BookOpenText, Grid3X3, Home, ListChecks, Menu, type LucideIcon } from "lucide-react";
+import { AppWindow, BriefcaseBusiness, Grid3X3, Menu, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -26,10 +26,8 @@ type MikkeAppShellProps = {
   children: React.ReactNode;
 };
 
-const baseNavItems = [
-  { href: "/os", label: "OS", icon: Home },
-  { href: "/story", label: "Story", icon: BookOpenText },
-  { href: "/desk", label: "DESK", icon: ListChecks },
+const supportNavItems = [
+  { href: "/manager", label: "Manager", icon: BriefcaseBusiness },
   { href: "/apps", label: "Apps", icon: AppWindow }
 ];
 
@@ -50,7 +48,9 @@ export function MikkeAppShell({
   const [menuOpen, setMenuOpen] = useState(false);
   const current = currentApp ?? { label: appName, href: pathname || "/apps", icon: Grid3X3 };
   const CurrentIcon = current.icon ?? Grid3X3;
-  const mobileNavItems = baseNavItems.some((item) => item.href === current.href) ? baseNavItems : [...baseNavItems, current];
+  const navItems = [current, ...supportNavItems].filter(
+    (item, index, items) => items.findIndex((candidate) => candidate.href === item.href) === index
+  );
 
   return (
     <main className="min-h-screen bg-white text-[var(--mikke-text)]">
@@ -86,8 +86,8 @@ export function MikkeAppShell({
 
           <div className="flex items-center gap-2">
             <nav className="hidden items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-white p-1 shadow-sm md:flex">
-              {baseNavItems.map((item) => {
-                const Icon = item.icon;
+              {navItems.map((item) => {
+                const Icon = item === current ? CurrentIcon : item.icon ?? Grid3X3;
                 const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link
@@ -123,8 +123,8 @@ export function MikkeAppShell({
       </footer>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--mikke-line)] bg-white/95 px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
-          {mobileNavItems.map((item) => {
+        <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
+          {navItems.map((item) => {
             const Icon = item === current ? CurrentIcon : item.icon ?? Grid3X3;
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
