@@ -91,6 +91,13 @@ PG-1-c: /apps/page/[siteId] のページ一覧・編集導線
 PG-1-d: /apps/page/[siteId]/[pageId] の積み上げ式ブロック編集
 ```
 
+検収:
+
+```text
+npm.cmd run lint: 成功
+npm.cmd run build: 成功（89 static pages、/apps/page/[siteId] 追加確認）
+```
+
 ## PG-1-b: Page新規作成
 
 完了。
@@ -131,4 +138,37 @@ PG-1-c: /apps/page/[siteId] のページ一覧・編集導線
 ```text
 npm.cmd run lint: 成功
 npm.cmd run build: 成功（89 static pages、/apps/page/new 追加確認）
+```
+
+## PG-1-c: サイト内ページ管理
+
+完了。
+
+```text
+追加: app/apps/page/[siteId]/page.tsx
+追加: components/page/PageSiteEditor.tsx
+更新: components/page/PageDashboard.tsx
+更新: lib/page/store.ts
+```
+
+実装内容:
+
+```text
+/apps/page/[siteId] をAuthGate配下で追加。
+サイト内のページ一覧、ページ追加、削除、上下並び替えをlocalStorageで実装。
+最低1ページを残し、同一サイト内のページslug重複を拒否。
+Page入口からサイト管理、各ページからブロック編集ルートへの導線を追加。
+```
+
+境界:
+
+```text
+ページの公開、CMS selectors、他者掲載依頼、Manager受信箱、決済、独自ドメインは未実装。
+既存アプリとAI OFFICEの保存処理・作業中差分は変更なし。
+```
+
+次:
+
+```text
+PG-1-d: /apps/page/[siteId]/[pageId] の積み上げ式ブロック編集
 ```

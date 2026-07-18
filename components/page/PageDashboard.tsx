@@ -86,6 +86,11 @@ export function PageDashboard() {
                 </div>
               ))}
             </div>
+            <div className="mt-4 flex justify-end">
+              <Link href={`/apps/page/${site.id}`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">
+                ページを管理する <ArrowRight size={15} />
+              </Link>
+            </div>
           </article>
         ))}
       </section>
@@ -98,7 +103,7 @@ export function PageDashboard() {
           <div>
             <h2 className="text-lg font-bold tracking-normal">次に作るところ</h2>
             <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
-              PG-1-cで、サイトごとのページ一覧と編集導線を追加します。
+              PG-1-dで、見出し・文章・画像・ボタン・区切りの積み上げ式編集を追加します。
             </p>
             <Link href="/manager" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[var(--mikke-accent)]">
               Managerで他アプリの動きを見る <ArrowRight size={15} />
