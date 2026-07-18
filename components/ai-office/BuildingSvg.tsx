@@ -355,8 +355,15 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
         {/* 電話 */}
         <rect x={76} y={190} width={18} height={10} fill="#39404f" />
         <rect x={80} y={186} width={10} height={4} fill="#39404f" />
+        {/* 受付ベル（金色） */}
+        <rect x={112} y={192} width={10} height={4} fill="#d9a441" />
+        <rect x={115} y={188} width={4} height={4} fill="#e8c04c" />
         <PaperStack x={140} y={178} s={4} />
+        <PaperStack x={166} y={184} s={4} />
+        {/* 案内マット（カウンター前） */}
+        <rect x={80} y={252} width={90} height={26} fill="#f2e6c8" opacity={0.9} />
         <Plant x={430} y={100} s={6} />
+        <Plant x={20} y={90} s={5} />
       </g>
 
       {/* 顧問室：ソファ / 丸テーブル / ティーカップ / 本棚 / 猫 / 紫ラグ */}
@@ -368,6 +375,16 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
         <rect x={624} y={184} width={48} height={20} fill="#aa7850" />
         <rect x={636} y={166} width={10} height={8} fill="#f5efe4" />
         <rect x={646} y={168} width={3} height={4} fill="#f5efe4" />
+        {/* ティーポット */}
+        <rect x={654} y={164} width={12} height={10} fill="#9c8ab8" />
+        <rect x={666} y={166} width={4} height={4} fill="#9c8ab8" />
+        <rect x={658} y={160} width={4} height={4} fill="#7d6b91" />
+        {/* ソファのクッション */}
+        <rect x={530} y={106} width={14} height={12} fill="#e4dcf2" />
+        <rect x={560} y={106} width={14} height={12} fill="#d9a441" />
+        {/* 壁の小さな絵 */}
+        <rect x={540} y={32} width={26} height={18} fill="#b08d3e" />
+        <rect x={544} y={36} width={18} height={10} fill="#e4dcf2" />
         <Shelf x={700} y={40} s={6} />
         <Cat x={724} y={238} s={5} />
       </g>
@@ -398,6 +415,16 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
         <rect x={816} y={130} width={4} height={70} fill="#39404f" />
         <rect x={808} y={118} width={20} height={14} fill="#f5efe4" />
         <rect x={806} y={196} width={24} height={6} fill="#39404f" />
+        {/* 撮影カメラ（三脚） */}
+        <rect x={844} y={216} width={22} height={14} fill="#39404f" />
+        <rect x={866} y={220} width={6} height={6} fill="#2b3140" />
+        <rect x={848} y={230} width={3} height={16} fill="#5b6270" />
+        <rect x={858} y={230} width={3} height={16} fill="#5b6270" />
+        {/* 教材ノートの山 */}
+        <rect x={1060} y={224} width={30} height={6} fill="#3f7cac" />
+        <rect x={1064} y={218} width={30} height={6} fill="#e58f65" />
+        <rect x={1060} y={212} width={30} height={6} fill="#5a9367" />
+        <PaperStack x={936} y={116} s={3} />
       </g>
 
       {/* 編集室：大きな本棚 / 原稿の山 / 赤ペン / PC / ピンクラグ */}
@@ -408,8 +435,17 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
         <Monitor x={1434} y={90} s={5} on={on("editing")} />
         <PaperStack x={1350} y={222} s={4} />
         <PaperStack x={1386} y={236} s={4} />
+        <PaperStack x={1322} y={240} s={4} />
         {/* 赤ペン */}
         <rect x={1418} y={112} width={16} height={4} fill="#c93f2d" />
+        {/* 校正紙（赤入れの跡） */}
+        <rect x={1524} y={200} width={40} height={30} fill="#fbf6ec" />
+        <rect x={1530} y={206} width={26} height={3} fill="#c9b896" />
+        <rect x={1530} y={213} width={20} height={3} fill="#c93f2d" />
+        <rect x={1530} y={220} width={28} height={3} fill="#c9b896" />
+        {/* 原稿の束（紐かけ） */}
+        <rect x={1460} y={236} width={36} height={18} fill="#f0e6d2" />
+        <rect x={1474} y={236} width={4} height={18} fill="#a9744f" />
       </g>
 
       {/* デザイン室：液タブ / カラーチャート / ポスター / モニター / 観葉植物 / コーラルラグ */}
@@ -429,6 +465,17 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
         <rect x={136} y={474} width={32} height={6} fill="#c8cede" />
         <Monitor x={250} y={470} s={5} on={on("design")} />
         <Plant x={330} y={452} s={6} />
+        {/* 画像パネル（ムードボード） */}
+        {["#e58f65", "#9fdce8", "#c76b98", "#5a9367", "#d9a441", "#7d6b91"].map((c, i) => (
+          <rect key={c} x={236 + (i % 3) * 18} y={388 + Math.floor(i / 3) * 16} width={15} height={13} fill={c} opacity={0.85} />
+        ))}
+        {/* 絵の具・ペン立て */}
+        <rect x={228} y={472} width={4} height={8} fill="#c93f2d" />
+        <rect x={233} y={470} width={4} height={10} fill="#3f7cac" />
+        <rect x={238} y={473} width={4} height={7} fill="#5a9367" />
+        {/* 丸めたポスター */}
+        <rect x={40} y={600} width={8} height={34} fill="#f0e6d2" />
+        <rect x={52} y={606} width={8} height={28} fill="#f6dbe4" />
       </g>
 
       {/* 実装室：複数モニター / サーバーラック / 工具箱（床は少し暗め） */}
@@ -449,6 +496,17 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
           </g>
         ))}
         <Toolbox x={410} y={600} s={5} />
+        {/* コード画面（壁のダッシュボード） */}
+        <rect x={470} y={386} width={70} height={30} fill="#2b3140" />
+        <rect x={476} y={392} width={34} height={3} fill="#7fe08a" />
+        <rect x={476} y={398} width={48} height={3} fill="#9fdce8" />
+        <rect x={476} y={404} width={26} height={3} fill="#e58f65" />
+        {/* ケーブル（床を這う） */}
+        <rect x={540} y={520} width={150} height={3} fill="#39404f" opacity={0.7} />
+        <rect x={688} y={492} width={3} height={30} fill="#39404f" opacity={0.7} />
+        {/* 予備の機材箱 */}
+        <rect x={660} y={606} width={34} height={22} fill="#5b6270" />
+        <rect x={664} y={610} width={26} height={4} fill="#39404f" />
       </g>
 
       {/* 会議室：大テーブル / 椅子 / プロジェクター / 進捗ボード / 飲み物 */}
@@ -481,6 +539,13 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
         <Chair x={1040} y={462} />
         <Chair x={900} y={566} />
         <Chair x={1020} y={566} />
+        {/* 会議資料 */}
+        <rect x={950} y={520} width={26} height={16} fill="#fbf6ec" />
+        <rect x={954} y={524} width={18} height={2} fill="#c9b896" />
+        <rect x={954} y={529} width={14} height={2} fill="#c9b896" />
+        {/* 議題メモ（付箋） */}
+        <rect x={1140} y={392} width={11} height={11} fill="#f5d76e" />
+        <rect x={1156} y={396} width={11} height={11} fill="#8fd0a0" />
       </g>
 
       {/* 休憩室：コーヒーマシン（湯気） / 冷蔵庫 / ソファ / お菓子 / 小テーブル / ミントラグ */}
@@ -498,6 +563,14 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
         <rect x={1432} y={516} width={40} height={16} fill="#aa7850" />
         <rect x={1438} y={500} width={10} height={8} fill="#e07a9a" />
         <rect x={1454} y={500} width={10} height={8} fill="#f5d76e" />
+        {/* 雑誌ラック */}
+        <rect x={1310} y={556} width={30} height={36} fill="#6b4a2f" />
+        <rect x={1314} y={560} width={9} height={22} fill="#c76b98" />
+        <rect x={1326} y={560} width={9} height={22} fill="#3f7cac" />
+        {/* お菓子のかご */}
+        <rect x={1490} y={516} width={26} height={12} fill="#a9744f" />
+        <rect x={1494} y={510} width={7} height={6} fill="#e58f65" />
+        <rect x={1504} y={510} width={7} height={6} fill="#8fd0a0" />
       </g>
 
       {/* ==== みっけテラス：花壇 / ベンチ / 小テーブル / 植木 / 鳥 ==== */}
@@ -513,6 +586,19 @@ export function BuildingSvg({ activeRooms }: { activeRooms: Set<RoomId> }) {
         <Plant x={60} y={676} s={7} />
         <Plant x={1500} y={680} s={7} />
         <Bird x={1220} y={738} s={4} />
+        {/* 下段（奥行きが増えた分）：飛び石・眠る猫・花壇 */}
+        <rect x={300} y={784} width={26} height={12} fill="#d9c8a6" />
+        <rect x={360} y={792} width={26} height={12} fill="#d9c8a6" />
+        <rect x={420} y={786} width={26} height={12} fill="#d9c8a6" />
+        <Px
+          rows={[".M.M......", "MMMMMMMM..", "MMMMMMMMMM", ".MMMMMMMM."]}
+          colors={{ M: "#b58a55" }}
+          x={700}
+          y={780}
+          s={4}
+        />
+        <FlowerBed x={1050} y={780} s={4} />
+        <Plant x={200} y={768} s={5} />
       </g>
     </svg>
   );

@@ -6,7 +6,7 @@
 // 社員の位置は roomForEmployee() で決まり、CSS transition で部屋間を移動して見える。
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FileText, Sparkles } from "lucide-react";
+import { CheckCircle2, FileText, Sparkles } from "lucide-react";
 import { employeeById, employees, roomForCase, rooms, statusLabels } from "@/lib/ai-office/data";
 import type { OfficeCase, RoomId } from "@/lib/ai-office/types";
 import { BuildingSvg } from "./BuildingSvg";
@@ -18,7 +18,7 @@ import {
   getEmployeeState,
   roomForEmployee
 } from "./office-helpers";
-import { WorkerSprite } from "./pixel-sprites";
+import { CoffeeMugMini, WorkerSprite } from "./pixel-sprites";
 
 const statusChipStyle: Record<string, string> = {
   reception: "bg-[#eef4ff] text-[#2554c7]",
@@ -30,7 +30,9 @@ const statusChipStyle: Record<string, string> = {
 export function OfficeFloor({ cases, hydrated }: { cases: OfficeCase[]; hydrated: boolean }) {
   const [openRoom, setOpenRoom] = useState<RoomId | null>(null);
   const [sparkleMap, setSparkleMap] = useState<Record<string, number>>({});
+  const [checkMap, setCheckMap] = useState<Record<string, number>>({});
   const prevCounts = useRef<Record<string, number> | null>(null);
+  const prevDoneCounts = useRef<Record<string, number> | null>(null);
   const sparkleSeq = useRef(0);
 
   // 部屋ごとの未完了案件
@@ -71,6 +73,35 @@ export function OfficeFloor({ cases, hydrated }: { cases: OfficeCase[]; hydrated
     }, 1200);
     return () => clearTimeout(timer);
   }, [casesByRoom, hydrated]);
+
+  // 案件が完了になった社員の頭上に小さなチェックを出す
+  useEffect(() => {
+    if (!hydrated) return;
+    const next: Record<string, number> = {};
+    for (const emp of employees) {
+      next[emp.id] = cases.filter((c) => c.assigneeId === emp.id && c.status === "done").length;
+    }
+    const prev = prevDoneCounts.current;
+    prevDoneCounts.current = next;
+    if (!prev) return;
+    const celebrated = Object.keys(next).filter((id) => next[id] > (prev[id] ?? 0));
+    if (celebrated.length === 0) return;
+    sparkleSeq.current += 1;
+    const seq = sparkleSeq.current;
+    setCheckMap((m) => {
+      const copy = { ...m };
+      for (const id of celebrated) copy[id] = seq;
+      return copy;
+    });
+    const timer = setTimeout(() => {
+      setCheckMap((m) => {
+        const copy = { ...m };
+        for (const id of celebrated) if (copy[id] === seq) delete copy[id];
+        return copy;
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [cases, hydrated]);
 
   // ポップオーバーは外側クリックで閉じる
   useEffect(() => {
@@ -195,7 +226,19 @@ export function OfficeFloor({ cases, hydrated }: { cases: OfficeCase[]; hydrated
                     {bubbleForEmployee(emp.id)}
                   </span>
                 )}
-                <div className={`flex flex-col items-center ${state === "idle" ? "ai-office-sway" : ""}`}>
+                {/* 案件を完了した瞬間の小さなチェック */}
+                {checkMap[emp.id] !== undefined && (
+                  <span className="ai-office-sparkle pointer-events-none absolute -top-5 left-1/2 -translate-x-1/2 text-[#4caf6e]">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </span>
+                )}
+                <div className={`relative flex flex-col items-center ${state === "idle" ? "ai-office-sway" : ""}`}>
+                  {/* 休憩中はコーヒーを持つ */}
+                  {state === "break" && (
+                    <span className="absolute -right-3 bottom-7">
+                      <CoffeeMugMini pixel={3} />
+                    </span>
+                  )}
                   <WorkerSprite employee={emp} pixel={3} />
                   <div className="mt-0.5 flex items-center gap-1 rounded-full bg-white/90 px-1.5 py-0.5 shadow-sm">
                     <span

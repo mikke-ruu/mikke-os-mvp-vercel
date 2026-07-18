@@ -135,27 +135,60 @@ const HEADS: Record<HeadKey, string[]> = {
   prof: HEAD_PROF
 };
 
-/** 社員ごとの見た目バリエーション（data.tsは変更せず、id別にここで定義） */
-const LOOKS: Record<string, { head: HeadKey; hair: string }> = {
-  miketa: { head: "tuft", hair: "#3a2c22" }, // 社長：ちょんまげ風
-  hakase: { head: "prof", hair: "#e8e4da" }, // 顧問AI：白髪＋メガネ
-  aoi: { head: "long", hair: "#2f3e5c" }, // 講座AI：紺のロング
-  momoko: { head: "long", hair: "#6b4632" }, // 編集：茶のロング
-  rin: { head: "short", hair: "#b8552f" }, // デザインAI：赤茶ショート
-  coder: { head: "short", hair: "#31473a" }, // 実装AI：深緑ショート
-  yu: { head: "short", hair: "#22314f" }, // ファシリ：黒ショート
-  fuku: { head: "short", hair: "#9a938d" } // サポート：グレーヘア
+type Look = {
+  head: HeadKey;
+  hair: string;
+  /** ネクタイ・スカーフの色（胸元2×2） */
+  tie?: string;
+  /** エプロンの色（胴の中央ブロック） */
+  apron?: string;
+  /** ズボンの色（未指定はネイビー） */
+  pants?: string;
 };
+
+/** 社員ごとの見た目バリエーション（data.tsは変更せず、id別にここで定義） */
+const LOOKS: Record<string, Look> = {
+  miketa: { head: "tuft", hair: "#3a2c22", tie: "#c93f2d" }, // 社長：ちょんまげ＋赤ネクタイ
+  hakase: { head: "prof", hair: "#e8e4da", pants: "#5c5346" }, // 顧問AI：白髪＋メガネ
+  aoi: { head: "long", hair: "#2f3e5c", tie: "#f5d76e" }, // 講座AI：紺ロング＋黄スカーフ
+  momoko: { head: "long", hair: "#6b4632", apron: "#f6e7ec" }, // 編集：茶ロング＋エプロン
+  rin: { head: "short", hair: "#b8552f", pants: "#7d6b91" }, // デザインAI：赤茶ショート
+  coder: { head: "short", hair: "#31473a", pants: "#39404f" }, // 実装AI：深緑ショート
+  yu: { head: "short", hair: "#22314f", tie: "#5a9367" }, // ファシリ：黒ショート＋緑ネクタイ
+  fuku: { head: "short", hair: "#9a938d", apron: "#e0f2ea" } // サポート：グレーヘア＋ミントエプロン
+};
+
+const DEFAULT_LOOK: Look = { head: "short", hair: "#3a2c22" };
 
 const ANTENNA_ROWS = [".......AA.......", ".......PP......."];
 
-function buildWorkerRows(employee: Employee): string[] {
-  const look = LOOKS[employee.id] ?? { head: "short" as HeadKey, hair: "#3a2c22" };
+function setChar(row: string, index: number, ch: string): string {
+  return row.slice(0, index) + ch + row.slice(index + 1);
+}
+
+function buildWorkerRows(employee: Employee, look: Look): string[] {
   const rows = [...HEADS[look.head], ...BODY_ROWS];
-  // AI社員は頭上にアンテナ（先端が光る）。上2行が空いているテンプレートのみ
-  if (employee.kind === "ai" && rows[0].indexOf("H") === -1) {
-    rows[0] = ANTENNA_ROWS[0];
-    rows[1] = ANTENNA_ROWS[1];
+  if (employee.kind === "ai") {
+    // 頭上にアンテナ（先端が光る）。上2行が空いているテンプレートのみ
+    if (rows[0].indexOf("H") === -1) {
+      rows[0] = ANTENNA_ROWS[0];
+      rows[1] = ANTENNA_ROWS[1];
+    }
+    // 耳元に小さなイヤーデバイス（目の行の両端）
+    rows[7] = setChar(setChar(rows[7], 2, "P"), 13, "P");
+  }
+  // ネクタイ・スカーフ（胸元の2×2）
+  if (look.tie) {
+    rows[11] = setChar(setChar(rows[11], 7, "T"), 8, "T");
+    rows[12] = setChar(setChar(rows[12], 7, "T"), 8, "T");
+  }
+  // エプロン（胴の中央ブロック）
+  if (look.apron) {
+    for (const y of [12, 13, 14]) {
+      for (let x = 5; x <= 10; x++) {
+        if (rows[y][x] === "C") rows[y] = setChar(rows[y], x, "W");
+      }
+    }
   }
   return rows;
 }
@@ -165,8 +198,8 @@ function buildWorkerRows(employee: Employee): string[] {
  * 目は .px-eye（たまに瞬き）、AIのアンテナ先端は .px-glow（ゆっくり点滅）。
  */
 export function WorkerSprite({ employee, pixel = 3 }: { employee: Employee; pixel?: number }) {
-  const look = LOOKS[employee.id] ?? { head: "short" as HeadKey, hair: "#3a2c22" };
-  const rows = buildWorkerRows(employee);
+  const look = LOOKS[employee.id] ?? DEFAULT_LOOK;
+  const rows = buildWorkerRows(employee, look);
   const colors: Record<string, string> = {
     H: look.hair,
     S: "#f2c9a0",
@@ -174,10 +207,12 @@ export function WorkerSprite({ employee, pixel = 3 }: { employee: Employee; pixe
     K: "#efa8a1",
     G: "#3a3a44",
     C: employee.color,
-    D: "#2a3350",
+    D: look.pants ?? "#2a3350",
     B: "#463227",
     A: "#ffd66e",
-    P: "#8a97a8"
+    P: "#8a97a8",
+    T: look.tie ?? "#c93f2d",
+    W: look.apron ?? "#f5efe4"
   };
   return (
     <svg
@@ -204,6 +239,36 @@ export function WorkerSprite({ employee, pixel = 3 }: { employee: Employee; pixe
             return <rect key={`${x}-${y}`} className="px-glow" x={x} y={y} width={1} height={1} fill={fill} />;
           }
           return <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />;
+        })
+      )}
+    </svg>
+  );
+}
+
+// ---- 休憩中の社員が持つ小さなコーヒーマグ（湯気つき） ----
+
+const MUG_ROWS = ["s....", ".s...", "CCC.h", "CCCCh", "CCC.."];
+
+export function CoffeeMugMini({ pixel = 3 }: { pixel?: number }) {
+  return (
+    <svg
+      viewBox="0 0 5 5"
+      width={5 * pixel}
+      height={5 * pixel}
+      shapeRendering="crispEdges"
+      style={{ display: "block", flexShrink: 0 }}
+    >
+      {MUG_ROWS.map((row, y) =>
+        row.split("").map((ch, x) => {
+          if (ch === ".") return null;
+          if (ch === "s") {
+            return (
+              <rect key={`${x}-${y}`} className="ai-office-steam" x={x} y={y} width={1} height={1} fill="#ffffff" opacity={0.85} />
+            );
+          }
+          return (
+            <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={ch === "h" ? "#c9a06a" : "#e58f65"} />
+          );
         })
       )}
     </svg>
