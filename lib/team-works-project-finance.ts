@@ -215,7 +215,7 @@ export async function saveTeamWorksProjectPayout(input: {
   const taskId = await findTaskIdBySource(project.id, input.taskSourceId);
   await enableProjectFinance(project.id, "payouts");
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("team_works_project_payouts")
     .upsert({
       project_id: project.id,
@@ -231,6 +231,7 @@ export async function saveTeamWorksProjectPayout(input: {
     .select("id")
     .single();
   if (error) throw error;
+  return { id: data.id as string };
 }
 
 export async function saveTeamWorksProjectInvoice(input: {
@@ -247,7 +248,7 @@ export async function saveTeamWorksProjectInvoice(input: {
   const taskId = await findTaskIdBySource(project.id, input.taskSourceId);
   await enableProjectFinance(project.id, "invoices");
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("team_works_project_invoices")
     .upsert({
       project_id: project.id,
@@ -264,6 +265,7 @@ export async function saveTeamWorksProjectInvoice(input: {
     .select("id")
     .single();
   if (error) throw error;
+  return { id: data.id as string };
 }
 
 async function requireCurrentUser() {

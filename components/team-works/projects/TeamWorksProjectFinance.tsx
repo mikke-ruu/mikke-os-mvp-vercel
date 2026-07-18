@@ -4,6 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
+import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
+import { createTeamWorksInvoiceActivity, createTeamWorksPayoutActivity } from "@/lib/team-works-project-activity";
 import {
   readTeamWorksProjectFinanceState,
   saveTeamWorksProjectInvoice,
@@ -41,6 +43,7 @@ const emptyFinanceState: TeamWorksProjectFinanceState = {
 };
 
 export function TeamWorksProjectFinance({ project, localTasks }: { project: Project; localTasks: ProjectTask[] }) {
+  const { addLog } = useUnifiedActivityLogs();
   const [financeState, setFinanceState] = useState<TeamWorksProjectFinanceState>(emptyFinanceState);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -104,7 +107,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
     setSaving("payout");
     setErrorMessage("");
     try {
-      await saveTeamWorksProjectPayout({
+      const saved = await saveTeamWorksProjectPayout({
         projectSourceId: project.id,
         taskSourceId: payoutForm.taskSourceId,
         payeeMemberId: payoutForm.payeeMemberId,
@@ -113,6 +116,17 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
         dueOn: payoutForm.dueOn,
         note: payoutForm.note
       });
+      const task = financeState.tasks.find((item) => item.sourceId === payoutForm.taskSourceId);
+      const payee = workerMembers.find((member) => member.id === payoutForm.payeeMemberId);
+      addLog(createTeamWorksPayoutActivity({
+        project,
+        sourceId: saved.id,
+        taskTitle: task?.title ?? "同期済みタスク",
+        payeeName: payee?.displayName ?? "担当者",
+        amount: Number(payoutForm.amount) || 0,
+        status: payoutForm.status,
+        dueOn: payoutForm.dueOn
+      }));
       setPayoutForm((current) => ({ ...current, amount: "", note: "" }));
       await refreshFinance();
     } catch (error) {
@@ -128,7 +142,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
     setSaving("invoice");
     setErrorMessage("");
     try {
-      await saveTeamWorksProjectInvoice({
+      const saved = await saveTeamWorksProjectInvoice({
         projectSourceId: project.id,
         taskSourceId: invoiceForm.taskSourceId,
         billedMemberId: invoiceForm.billedMemberId,
@@ -137,6 +151,17 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
         dueOn: invoiceForm.dueOn,
         note: invoiceForm.note
       });
+      const task = financeState.tasks.find((item) => item.sourceId === invoiceForm.taskSourceId);
+      const billed = clientMembers.find((member) => member.id === invoiceForm.billedMemberId);
+      addLog(createTeamWorksInvoiceActivity({
+        project,
+        sourceId: saved.id,
+        taskTitle: task?.title ?? "同期済みタスク",
+        billedName: billed?.displayName ?? "請求先",
+        amount: Number(invoiceForm.amount) || 0,
+        status: invoiceForm.status,
+        dueOn: invoiceForm.dueOn
+      }));
       setInvoiceForm((current) => ({ ...current, amount: "", note: "" }));
       await refreshFinance();
     } catch (error) {

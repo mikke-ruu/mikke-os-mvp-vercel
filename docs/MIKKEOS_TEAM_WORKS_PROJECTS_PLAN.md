@@ -832,3 +832,21 @@ Current boundary:
 - Overall /apps/team-works/payouts and /apps/team-works/invoices still show the legacy operational aggregate view.
 - Activity Log / DESK conversion, payment execution, invoice document generation, and Manager integration remain later phases.
 ```
+
+## 30. TW-P8J implementation result (2026-07-18)
+```text
+Implemented:
+- Added Team Works finance Activity Log factories for project payout and invoice records.
+- Converts worker payout saves into private DESK expense logs with event_type team_works_partner_reward_recorded.
+- Converts client invoice saves into private DESK income logs with event_type team_works_invoice_created or team_works_invoice_paid.
+- Keeps all Team Works finance logs Story-disabled and countsTowardSummary=false so private money records do not become public achievements.
+- Uses saved DB record IDs as Activity Log source IDs, preserving the existing app + sourceId + eventType replacement rule.
+
+Verified:
+- lint passed.
+- build passed (80 static pages).
+
+Current boundary:
+- Activity Log / DESK conversion is connected on successful project-detail payout/invoice save.
+- Supabase activity_logs write, payment execution, invoice document generation, and Manager integration remain later phases.
+```
