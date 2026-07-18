@@ -5,11 +5,13 @@ import { useMikkeEvents } from "@/lib/event/store";
 import { useFundProjects } from "@/lib/fund/store";
 import { useOrderMenus } from "@/lib/order/store";
 import { useSessionMenus } from "@/lib/session/store";
+import { useTeamWorksProjectStore } from "@/lib/team-works-projects";
 import { collectEventManagerBridge } from "./adapters/event";
 import { collectFundManagerBridge } from "./adapters/fund";
 import { useMarketNoteManagerBridge } from "./adapters/marketnote";
 import { collectOrderManagerBridge } from "./adapters/order";
 import { collectSessionManagerBridge } from "./adapters/session";
+import { collectTeamWorksManagerBridgeForManager } from "./adapters/team-works";
 import { compareManagerDue, compareManagerItems } from "./adapters/utils";
 import { personalEventsToManagerSchedules, useManagerPersonalEvents, useManagerPreferences } from "./store";
 import type { ManagerBridge, ManagerItem, ManagerProgress, ManagerSnapshot } from "./types";
@@ -21,6 +23,7 @@ export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
   const { menus: sessionMenus, bookings: sessionBookings } = useSessionMenus();
   const { events, applications: eventApplications } = useMikkeEvents();
   const { projects: fundProjects, plans: fundPlans, supports: fundSupports } = useFundProjects(ownerProfileId);
+  const { projectState: teamWorksProjectState } = useTeamWorksProjectStore();
   const marketNoteBridge = useMarketNoteManagerBridge(ownerProfileId);
 
   return useMemo(() => {
@@ -35,7 +38,8 @@ export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
       collectSessionManagerBridge(sessionMenus, sessionBookings, now),
       marketNoteBridge,
       collectEventManagerBridge(events, eventApplications, now),
-      collectFundManagerBridge(fundProjects, fundPlans, fundSupports, now)
+      collectFundManagerBridge(fundProjects, fundPlans, fundSupports, now),
+      collectTeamWorksManagerBridgeForManager(teamWorksProjectState, now)
     ];
 
     return {
@@ -65,6 +69,7 @@ export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
     fundProjects,
     fundPlans,
     fundSupports,
+    teamWorksProjectState,
     marketNoteBridge
   ]);
 }
