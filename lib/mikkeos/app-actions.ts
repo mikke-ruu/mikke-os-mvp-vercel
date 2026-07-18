@@ -223,7 +223,8 @@ export const appActionPresets: Record<AppKey, ActivityActionPreset[]> = {
     }
   ],
   team_works: [],
-  fund: []
+  fund: [],
+  page: []
 };
 
 export function createActivityFromPreset(preset: ActivityActionPreset): UnifiedActivityLog {

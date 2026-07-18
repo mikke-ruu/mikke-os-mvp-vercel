@@ -99,6 +99,17 @@ export const mikkeApps: MikkeAppDefinition[] = [
     storyOutputs: ["プロジェクト実績", "支援募集ページ", "活動報告"],
     deskOutputs: ["支援金", "リターン原価", "プロジェクト収支"],
     accent: "violet"
+  },
+  {
+    key: "page",
+    name: "Page",
+    shortName: "Page",
+    role: "会社・団体・ブランドのページを作り、既存アプリの活動を束ねて見せる入口。",
+    status: "planned",
+    activityExamples: ["ページ構成を作成", "CMSブロックを配置", "公開設定を準備", "掲載内容を見直し"],
+    storyOutputs: ["団体ホームページ", "サービス紹介", "活動一覧"],
+    deskOutputs: ["公開ページ別の反応", "申込導線", "後続フェーズでの成果確認"],
+    accent: "slate"
   }
 ];
 
