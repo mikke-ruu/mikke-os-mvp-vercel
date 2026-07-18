@@ -3,6 +3,8 @@ export type ManagerItemKind = "schedule" | "task" | "progress" | "history";
 export type ManagerUrgency = "overdue" | "today" | "week" | "later" | "unscheduled";
 export type ManagerProgressStatus = "not_started" | "active" | "waiting" | "completed" | "on_hold" | "cancelled";
 export type ManagerSourceType = "personal_event" | "event" | "application" | "booking" | "project" | "plan" | "support" | "task" | "log" | "course" | "instructor" | "kit_order" | "item" | "channel" | "sale";
+export type ManagerInboxStatus = "pending" | "accepted" | "declined" | "expired";
+export type ManagerInboxRequestKind = "page_listing_request" | "select_shop_delegation";
 
 export type ManagerSource = {
   appKey: ManagerAppKey;
@@ -62,6 +64,21 @@ export type ManagerPersonalEvent = {
 export type ManagerPreferences = {
   defaultView: "dashboard" | "calendar" | "tasks" | "progress" | "history";
   showCompleted: boolean;
+};
+
+export type ManagerInboxItem = {
+  id: string;
+  requestKind: ManagerInboxRequestKind;
+  title: string;
+  description: string;
+  requesterLabel: string;
+  receivedAt: string;
+  status: ManagerInboxStatus;
+  source: ManagerSource;
+  primaryActionLabel: string;
+  secondaryActionLabel: string;
+  consentSummary: string;
+  expiresAt?: string | null;
 };
 
 export type ManagerBridge = {
