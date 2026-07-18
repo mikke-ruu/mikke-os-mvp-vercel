@@ -182,6 +182,39 @@ npm.cmd run lint: 成功
 npm.cmd run build: 成功（90 static pages）
 ```
 
+## PG-2-a: CMS選択・フィルタ
+
+完了。
+
+```text
+更新: lib/page/types.ts
+更新: lib/page/cms-selectors.ts
+更新: components/page/PageDocumentEditor.tsx
+更新: components/page/PageDashboard.tsx
+```
+
+実装内容:
+
+```text
+CMSブロックごとに表示候補を個別選択可能にした。
+未選択時は参照元の公開候補をすべて表示する。
+今月のみ、承認済みのみのフィルタを追加。
+Pageには候補IDと条件だけを保存し、元データをコピーしない。
+```
+
+次:
+
+```text
+PG-2-b: Connect / PartnersをPage内CMSコンテンツとして追加
+```
+
+検収:
+
+```text
+npm.cmd run lint: 成功
+npm.cmd run build: 成功（90 static pages）
+```
+
 ## PG-1-b: Page新規作成
 
 完了。

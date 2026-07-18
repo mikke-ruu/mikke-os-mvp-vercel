@@ -15,6 +15,8 @@ export type PageCmsItem = {
   summary: string;
   imageUrl: string;
   meta: string;
+  occurredAt: string;
+  approved: boolean;
 };
 
 export function usePageCmsContent() {
@@ -31,7 +33,9 @@ export function usePageCmsContent() {
         title: mockProfile.brandName || mockProfile.displayName,
         summary: mockProfile.bio,
         imageUrl: mockProfile.iconUrl ?? "",
-        meta: [mockProfile.area, `@${mockProfile.handle}`].filter(Boolean).join(" / ")
+        meta: [mockProfile.area, `@${mockProfile.handle}`].filter(Boolean).join(" / "),
+        occurredAt: mockProfile.createdAt,
+        approved: true
       }
     ],
     item_studio: items
@@ -42,7 +46,9 @@ export function usePageCmsContent() {
         title: item.title,
         summary: item.description,
         imageUrl: item.photoUrl,
-        meta: [item.category, item.price === null ? "" : `${item.price.toLocaleString("ja-JP")}円`].filter(Boolean).join(" / ")
+        meta: [item.category, item.price === null ? "" : `${item.price.toLocaleString("ja-JP")}円`].filter(Boolean).join(" / "),
+        occurredAt: item.createdAt,
+        approved: true
       })),
     event: events
       .filter((event) => event.status === "published")
@@ -52,7 +58,9 @@ export function usePageCmsContent() {
         title: event.title,
         summary: event.summary,
         imageUrl: event.coverImageUrl,
-        meta: [event.eventDate, event.venueName].filter(Boolean).join(" / ")
+        meta: [event.eventDate, event.venueName].filter(Boolean).join(" / "),
+        occurredAt: event.eventDate,
+        approved: true
       })),
     academy: logs
       .filter((log) => log.appKey === "academy" && log.visibility === "public" && log.storyEnabled)
@@ -62,7 +70,9 @@ export function usePageCmsContent() {
         title: log.title,
         summary: log.description ?? "",
         imageUrl: "",
-        meta: log.metadata?.sourceLabel ?? "Academy"
+        meta: log.metadata?.sourceLabel ?? "Academy",
+        occurredAt: log.occurredAt,
+        approved: true
       })),
     session: menus
       .filter((menu) => menu.published)
@@ -72,7 +82,9 @@ export function usePageCmsContent() {
         title: menu.title,
         summary: menu.summary,
         imageUrl: "",
-        meta: [menu.durationLabel, menu.price === null ? "" : `${menu.price.toLocaleString("ja-JP")}円`].filter(Boolean).join(" / ")
+        meta: [menu.durationLabel, menu.price === null ? "" : `${menu.price.toLocaleString("ja-JP")}円`].filter(Boolean).join(" / "),
+        occurredAt: menu.createdAt,
+        approved: true
       }))
   }), [events, items, logs, menus]);
 }

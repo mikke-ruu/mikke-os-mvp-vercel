@@ -56,6 +56,7 @@ export type PageCmsBlock = PageBlockBase & {
     featuredOnly?: boolean;
     thisMonthOnly?: boolean;
     approvedOnly?: boolean;
+    selectedItemIds?: string[];
   };
 };
 

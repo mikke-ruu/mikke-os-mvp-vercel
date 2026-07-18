@@ -168,6 +168,7 @@ export function PageDocumentEditor() {
                     onChange={(update) => updateBlock(block.id, update)}
                     onMove={(direction) => moveBlock(index, direction)}
                     onDelete={() => setBlocks((current) => current.filter((item) => item.id !== block.id))}
+                    cmsContent={cmsContent}
                   />
                 ))}
               </section>
@@ -190,7 +191,7 @@ export function PageDocumentEditor() {
   );
 }
 
-function BlockEditor({ block, index, total, onChange, onMove, onDelete }: { block: PageBlock; index: number; total: number; onChange: (update: (block: PageBlock) => PageBlock) => void; onMove: (direction: -1 | 1) => void; onDelete: () => void }) {
+function BlockEditor({ block, index, total, onChange, onMove, onDelete, cmsContent }: { block: PageBlock; index: number; total: number; onChange: (update: (block: PageBlock) => PageBlock) => void; onMove: (direction: -1 | 1) => void; onDelete: () => void; cmsContent: Record<PageCmsSource, PageCmsItem[]> }) {
   const label = blockChoices.find((choice) => choice.type === block.type)?.label ?? "ブロック";
   return (
     <article className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
@@ -202,19 +203,23 @@ function BlockEditor({ block, index, total, onChange, onMove, onDelete }: { bloc
           <button type="button" onClick={onDelete} aria-label="削除" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-danger)]"><Trash2 size={14} /></button>
         </div>
       </div>
-      <div className="mt-3"><BlockFields block={block} onChange={onChange} /></div>
+      <div className="mt-3"><BlockFields block={block} onChange={onChange} cmsContent={cmsContent} /></div>
     </article>
   );
 }
 
-function BlockFields({ block, onChange }: { block: PageBlock; onChange: (update: (block: PageBlock) => PageBlock) => void }) {
+function BlockFields({ block, onChange, cmsContent }: { block: PageBlock; onChange: (update: (block: PageBlock) => PageBlock) => void; cmsContent: Record<PageCmsSource, PageCmsItem[]> }) {
   if (block.type === "heading") return <div className="grid gap-3 sm:grid-cols-[120px_1fr]"><label className="block"><span className="text-xs font-bold">大きさ</span><select value={block.level} onChange={(event) => onChange((current) => current.type === "heading" ? { ...current, level: Number(event.target.value) as 1 | 2 | 3 } : current)} className={inputClass}><option value={1}>大</option><option value={2}>中</option><option value={3}>小</option></select></label><label className="block"><span className="text-xs font-bold">見出し</span><input value={block.text} onChange={(event) => onChange((current) => current.type === "heading" ? { ...current, text: event.target.value } : current)} className={inputClass} /></label></div>;
   if (block.type === "text") return <label className="block"><span className="text-xs font-bold">文章</span><textarea value={block.text} onChange={(event) => onChange((current) => current.type === "text" ? { ...current, text: event.target.value } : current)} rows={5} className={`${inputClass} resize-y`} /></label>;
   if (block.type === "image") return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">画像URL</span><input value={block.imageUrl} onChange={(event) => onChange((current) => current.type === "image" ? { ...current, imageUrl: event.target.value } : current)} className={inputClass} placeholder="https:// または /image.jpg" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">代替テキスト</span><input value={block.alt} onChange={(event) => onChange((current) => current.type === "image" ? { ...current, alt: event.target.value } : current)} className={inputClass} /></label><label className="block"><span className="text-xs font-bold">キャプション</span><input value={block.caption ?? ""} onChange={(event) => onChange((current) => current.type === "image" ? { ...current, caption: event.target.value } : current)} className={inputClass} /></label></div></div>;
   if (block.type === "button") return <div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">ラベル</span><input value={block.label} onChange={(event) => onChange((current) => current.type === "button" ? { ...current, label: event.target.value } : current)} className={inputClass} /></label><label className="block"><span className="text-xs font-bold">リンク先</span><input value={block.href} onChange={(event) => onChange((current) => current.type === "button" ? { ...current, href: event.target.value } : current)} className={inputClass} placeholder="https:// または #section" /></label></div>;
   if (block.type === "form") return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">タイトル</span><input value={block.title} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, title: event.target.value } : current)} className={inputClass} /></label><label className="block"><span className="text-xs font-bold">説明</span><textarea value={block.description} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, description: event.target.value } : current)} rows={2} className={`${inputClass} resize-y`} /></label><label className="block"><span className="text-xs font-bold">ボタン表示</span><input value={block.buttonLabel} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, buttonLabel: event.target.value } : current)} className={inputClass} /></label><p className="text-xs text-[var(--mikke-muted)]">送信処理はPG-5以降で設計します。</p></div>;
   if (block.type === "divider") return <p className="text-xs text-[var(--mikke-muted)]">横線で内容を区切ります。</p>;
-  if (block.type === "cms") return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">見出し</span><input value={block.title} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, title: event.target.value } : current)} className={inputClass} /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">参照元</span><select value={block.source} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, source: event.target.value as PageCmsSource } : current)} className={inputClass}>{Object.entries(cmsSourceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block"><span className="text-xs font-bold">表示</span><select value={block.displayMode} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, displayMode: event.target.value as "list" | "cards" | "featured" } : current)} className={inputClass}><option value="list">リスト</option><option value="cards">カード</option><option value="featured">注目表示</option></select></label></div><p className="text-xs leading-5 text-[var(--mikke-muted)]">公開状態の自組織データだけを読み取ります。選択・絞り込みはPG-2で追加します。</p></div>;
+  if (block.type === "cms") {
+    const candidates = cmsContent[block.source];
+    const selectedItemIds = block.filters.selectedItemIds ?? [];
+    return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">見出し</span><input value={block.title} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, title: event.target.value } : current)} className={inputClass} /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">参照元</span><select value={block.source} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, source: event.target.value as PageCmsSource, filters: { ...current.filters, selectedItemIds: [] } } : current)} className={inputClass}>{Object.entries(cmsSourceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block"><span className="text-xs font-bold">表示</span><select value={block.displayMode} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, displayMode: event.target.value as "list" | "cards" | "featured" } : current)} className={inputClass}><option value="list">リスト</option><option value="cards">カード</option><option value="featured">注目表示</option></select></label></div><div className="flex flex-wrap gap-2"><label className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><input type="checkbox" checked={block.filters.thisMonthOnly ?? false} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, filters: { ...current.filters, thisMonthOnly: event.target.checked } } : current)} /> 今月のみ</label><label className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><input type="checkbox" checked={block.filters.approvedOnly ?? false} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, filters: { ...current.filters, approvedOnly: event.target.checked } } : current)} /> 承認済みのみ</label></div><fieldset className="rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-3"><legend className="px-1 text-xs font-bold">表示する項目（未選択ならすべて）</legend>{candidates.length === 0 ? <p className="text-xs text-[var(--mikke-muted)]">選択できる公開候補はありません。</p> : <div className="grid gap-2 sm:grid-cols-2">{candidates.map((item) => <label key={item.id} className="flex items-start gap-2 rounded-lg bg-white p-2 text-xs"><input type="checkbox" checked={selectedItemIds.includes(item.id)} onChange={(event) => onChange((current) => { if (current.type !== "cms") return current; const selected = current.filters.selectedItemIds ?? []; return { ...current, filters: { ...current.filters, selectedItemIds: event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id) } }; })} className="mt-0.5" /><span><span className="block font-bold">{item.title}</span>{item.meta ? <span className="mt-0.5 block text-[var(--mikke-muted)]">{item.meta}</span> : null}</span></label>)}</div>}</fieldset><p className="text-xs leading-5 text-[var(--mikke-muted)]">Pageには選択IDと絞り込み条件だけを保存し、元データはコピーしません。</p></div>;
+  }
   return null;
 }
 
@@ -236,7 +241,15 @@ function PageBlockPreview({ blocks, cmsContent }: { blocks: PageBlock[]; cmsCont
 }
 
 function CmsBlockPreview({ block, items }: { block: Extract<PageBlock, { type: "cms" }>; items: PageCmsItem[] }) {
-  const visibleItems = block.displayMode === "featured" ? items.slice(0, 1) : items.slice(0, 6);
+  const selectedItemIds = block.filters.selectedItemIds ?? [];
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const filteredItems = items.filter((item) => {
+    if (selectedItemIds.length > 0 && !selectedItemIds.includes(item.id)) return false;
+    if (block.filters.thisMonthOnly && !item.occurredAt.startsWith(currentMonth)) return false;
+    if (block.filters.approvedOnly && !item.approved) return false;
+    return true;
+  });
+  const visibleItems = block.displayMode === "featured" ? filteredItems.slice(0, 1) : filteredItems.slice(0, 6);
   return (
     <section>
       <div className="flex items-center justify-between gap-2"><h3 className="text-lg font-bold tracking-normal">{block.title || cmsSourceLabels[block.source]}</h3><span className="text-[10px] font-bold text-[var(--mikke-muted)]">{cmsSourceLabels[block.source]}</span></div>
