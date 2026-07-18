@@ -3,6 +3,13 @@ import type { PageDocument, PageSite, PageStoreState } from "./types";
 
 export const PAGE_STORAGE_KEY = "mikke.page.v1";
 
+export type CreatePageSiteInput = {
+  ownerProfileId: string;
+  name: string;
+  description: string;
+  slug: string;
+};
+
 function clonePageState(state: PageStoreState): PageStoreState {
   return JSON.parse(JSON.stringify(state)) as PageStoreState;
 }
@@ -68,4 +75,63 @@ export function getPageSite(siteId: string) {
 
 export function getPageDocument(siteId: string, pageId: string) {
   return getPageSite(siteId)?.documents.find((page) => page.id === pageId) ?? null;
+}
+
+function createPageId(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function normalizePageSiteSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function createPageSite(input: CreatePageSiteInput) {
+  const name = input.name.trim();
+  const description = input.description.trim();
+  const slug = normalizePageSiteSlug(input.slug);
+  if (!name) throw new Error("サイト名を入力してください。");
+  if (!input.ownerProfileId) throw new Error("所有者を確認できませんでした。");
+  if (!slug) throw new Error("下書きslugを半角英数字で入力してください。");
+
+  const state = loadPageStore();
+  if (state.sites.some((site) => site.publication.slug === slug)) {
+    throw new Error("この下書きslugはすでに使われています。");
+  }
+
+  const now = new Date().toISOString();
+  const siteId = createPageId("page_site");
+  const site: PageSite = {
+    id: siteId,
+    ownerProfileId: input.ownerProfileId,
+    name,
+    description,
+    status: "draft",
+    publication: {
+      slug,
+      isPublic: false,
+      searchIndexEnabled: false
+    },
+    documents: [
+      {
+        id: createPageId("page_doc"),
+        siteId,
+        title: "ホーム",
+        slug: "home",
+        status: "draft",
+        blocks: [],
+        createdAt: now,
+        updatedAt: now
+      }
+    ],
+    createdAt: now,
+    updatedAt: now
+  };
+
+  savePageStore({ ...state, sites: [site, ...state.sites] });
+  return site;
 }

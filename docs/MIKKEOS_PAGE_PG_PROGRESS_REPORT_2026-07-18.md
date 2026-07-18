@@ -90,3 +90,45 @@ PG-1-b: /apps/page/new とサイト作成
 PG-1-c: /apps/page/[siteId] のページ一覧・編集導線
 PG-1-d: /apps/page/[siteId]/[pageId] の積み上げ式ブロック編集
 ```
+
+## PG-1-b: Page新規作成
+
+完了。
+
+```text
+追加: app/apps/page/new/page.tsx
+追加: components/page/PageNewSiteForm.tsx
+更新: components/page/PageDashboard.tsx
+更新: lib/page/store.ts
+```
+
+実装内容:
+
+```text
+/apps/page/new をAuthGate配下で追加。
+サイト名・説明・下書きslugを入力し、ログイン中プロフィールを所有者としてlocalStorageへ保存。
+作成時に空の「ホーム」下書きを1ページ追加。
+slugを半角英小文字・数字・ハイフンへ正規化し、既存サイトとの重複を拒否。
+Page入口から「新しいPageを作る」導線を追加し、保存後は一覧へ戻る。
+```
+
+境界:
+
+```text
+保存するのはPageサイト情報・空のホームページ・公開設定の下書きだけ。
+外部公開、CMS selectors、他者掲載依頼、Manager受信箱、販売委託、決済、独自ドメインは未実装。
+既存アプリとAI OFFICEの保存処理・作業中差分は変更なし。
+```
+
+次:
+
+```text
+PG-1-c: /apps/page/[siteId] のページ一覧・編集導線
+```
+
+検収:
+
+```text
+npm.cmd run lint: 成功
+npm.cmd run build: 成功（89 static pages、/apps/page/new 追加確認）
+```

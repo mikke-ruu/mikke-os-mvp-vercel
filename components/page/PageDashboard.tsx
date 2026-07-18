@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, FileText, Globe2, Layers3 } from "lucide-react";
+import { ArrowRight, FileText, Globe2, Layers3, Plus } from "lucide-react";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { MetricCard } from "@/components/mikkeos/MetricCard";
 import { pageDemoState } from "@/lib/page/demo";
@@ -50,6 +50,15 @@ export function PageDashboard() {
         </div>
       </section>
 
+      <div className="mt-6 flex justify-end">
+        <Link
+          href="/apps/page/new"
+          className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white"
+        >
+          <Plus size={17} /> 新しいPageを作る
+        </Link>
+      </div>
+
       <section className="mt-6 grid gap-4">
         {sites.map((site) => (
           <article key={site.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
@@ -89,7 +98,7 @@ export function PageDashboard() {
           <div>
             <h2 className="text-lg font-bold tracking-normal">次に作るところ</h2>
             <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
-              PG-1-bで、新規作成・サイト編集・ページ編集・ブロック追加の導線を順に足します。
+              PG-1-cで、サイトごとのページ一覧と編集導線を追加します。
             </p>
             <Link href="/manager" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[var(--mikke-accent)]">
               Managerで他アプリの動きを見る <ArrowRight size={15} />
