@@ -889,3 +889,22 @@ Current boundary:
 - Manager localStorage stores, routes, inbox, notification, and navigation changes remain in the Manager line.
 - Payment execution and invoice document generation remain later phases.
 ```
+
+## 33. TW-P8M implementation result (2026-07-18)
+```text
+Implemented:
+- Audited the TW-P8I to TW-P8L connection chain: finance DB UI, local Activity Log / DESK conversion, Supabase activity_logs bridge, and Manager derive-on-read bridge.
+- Corrected invoice Activity Log source IDs to use one mutable record-scoped key, invoice:<record_id>, because the current UI updates invoice status rather than appending separate payment events.
+- Kept payout Activity Log source IDs as payout:<record_id>.
+- Prevents void payout/invoice records from remaining DESK financial rows by turning void logs into private non-financial Activity Logs.
+- Clears the previous Supabase Activity Log sync message before a new payout/invoice save starts.
+
+Verified:
+- lint passed.
+- build passed (80 static pages).
+
+Current boundary:
+- Separate invoice_created / invoice_paid append-only history still requires a future payment event model; the current project finance UI intentionally represents the latest record state.
+- Supabase runtime verification still requires a logged-in user, Mikke ID profile, and synced project/member/task data.
+- Manager UI wiring, payment execution, and invoice document generation remain later phases.
+```

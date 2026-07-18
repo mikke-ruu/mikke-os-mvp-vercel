@@ -17,6 +17,7 @@ export function createTeamWorksPayoutActivity(input: TeamWorksFinanceActivityBas
 }): UnifiedActivityLog {
   const now = input.occurredAt ?? new Date().toISOString();
   const sourceId = `payout:${input.sourceId}`;
+  const active = input.status !== "void";
   return {
     id: `team-works-${sourceId}`,
     profileId: "profile-ayumi",
@@ -25,12 +26,12 @@ export function createTeamWorksPayoutActivity(input: TeamWorksFinanceActivityBas
     title: `${input.project.name}の報酬を記録`,
     description: `${input.taskTitle} / 支払先: ${input.payeeName}`,
     occurredAt: now,
-    amount: input.amount,
-    amountType: "expense",
+    amount: active ? input.amount : undefined,
+    amountType: active ? "expense" : "none",
     sourceId,
     visibility: "private",
     storyEnabled: false,
-    deskEnabled: true,
+    deskEnabled: active,
     countsTowardSummary: false,
     metadata: {
       category: "other",
@@ -49,7 +50,8 @@ export function createTeamWorksInvoiceActivity(input: TeamWorksFinanceActivityBa
 }): UnifiedActivityLog {
   const now = input.occurredAt ?? new Date().toISOString();
   const paid = input.status === "paid";
-  const sourceId = `${paid ? "invoice_paid" : "invoice_created"}:${input.sourceId}`;
+  const active = input.status !== "void";
+  const sourceId = `invoice:${input.sourceId}`;
   return {
     id: `team-works-${sourceId}`,
     profileId: "profile-ayumi",
@@ -58,12 +60,12 @@ export function createTeamWorksInvoiceActivity(input: TeamWorksFinanceActivityBa
     title: paid ? `${input.project.name}の入金を確認` : `${input.project.name}の請求を記録`,
     description: `${input.taskTitle} / 請求先: ${input.billedName}`,
     occurredAt: now,
-    amount: input.amount,
-    amountType: "income",
+    amount: active ? input.amount : undefined,
+    amountType: active ? "income" : "none",
     sourceId,
     visibility: "private",
     storyEnabled: false,
-    deskEnabled: true,
+    deskEnabled: active,
     countsTowardSummary: false,
     metadata: {
       category: "other",

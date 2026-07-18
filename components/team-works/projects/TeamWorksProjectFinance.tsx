@@ -121,6 +121,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
     if (!payoutForm.taskSourceId || !payoutForm.payeeMemberId) return;
     setSaving("payout");
     setErrorMessage("");
+    setActivitySyncMessage("");
     try {
       const saved = await saveTeamWorksProjectPayout({
         projectSourceId: project.id,
@@ -156,6 +157,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
     if (!invoiceForm.taskSourceId || !invoiceForm.billedMemberId) return;
     setSaving("invoice");
     setErrorMessage("");
+    setActivitySyncMessage("");
     try {
       const saved = await saveTeamWorksProjectInvoice({
         projectSourceId: project.id,
