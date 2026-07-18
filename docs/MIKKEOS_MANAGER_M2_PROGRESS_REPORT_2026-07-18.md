@@ -63,3 +63,19 @@ Item Studioは既存localStorage hookから読み取りのみ。
 ManagerからAcademy / Item Studioへの書き込みなし。
 Activity Log / Story / DESK 経路への変更なし。
 ```
+
+## M2-b: 旧ルート監査
+
+監査のみ完了。実装判断は保留。
+
+```text
+追加: docs/MIKKEOS_MANAGER_M2_ROUTE_AUDIT_2026-07-18.md
+```
+
+要点:
+
+```text
+/home は /marketnote へリダイレクト候補。
+/marketnote は現時点の実運用入口なので、すぐ /apps/market-note へ寄せると機能入口を失う。
+/os /log は通常入口ではなく、内部確認扱いへ寄せる判断が必要。
+```
