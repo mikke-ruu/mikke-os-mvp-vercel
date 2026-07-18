@@ -42,6 +42,20 @@ export type Employee = {
   color: string;
 };
 
+/** 実行ジョブの状態（案件のワークフローstatusとは別軸） */
+export type ExecutionStatus = "idle" | "queued" | "running" | "waiting_review" | "completed" | "failed";
+
+/** 成果物の種類。将来のmikkeOSビルド連携（layout / build-json）を見据えた枠 */
+export type ArtifactType = "text" | "html" | "layout" | "build-json" | "image-brief" | "notes";
+
+export type Artifact = {
+  id: string;
+  type: ArtifactType;
+  title: string;
+  content: string;
+  createdAt: string; // ISO
+};
+
 export type OfficeCase = {
   id: string;
   title: string;
@@ -56,6 +70,22 @@ export type OfficeCase = {
   dueDate?: string;
   createdAt: string; // ISO
   updatedAt: string; // ISO
+
+  // ---- 実行レイヤー（フェーズ3で追加。旧データ互換のためすべて任意） ----
+  /** この案件の実行モード。未設定は mock 扱い */
+  executionMode?: ExecutionMode;
+  /** 作業フォルダ（任意。codex本接続時に使用予定。今はまだ使わない） */
+  workDirectory?: string;
+  /** 実行用の指示文 */
+  instruction?: string;
+  /** 成果物一覧 */
+  artifacts?: Artifact[];
+  /** 実行ジョブの状態。未設定は idle 扱い */
+  executionStatus?: ExecutionStatus;
+  lastRunAt?: string; // ISO
+  lastRunSummary?: string;
+  /** 完了前に人のレビューを必須にするか */
+  reviewRequired?: boolean;
 };
 
 export type ActivityLogEntry = {
@@ -80,7 +110,9 @@ export type OfficeState = {
   logs: ActivityLogEntry[];
 };
 
-// ---- エージェント実行レイヤー（今回はmockのみ実装） ----
+// ---- エージェント実行レイヤー ----
+// mock: ダミー返答（デモ用） / manual: 人が外部作業して成果物を手入力
+// codex: 将来Claude Code接続。今は疑似実行 / api: 将来のAPI接続。今は未接続stub
 
 export type ExecutionMode = "mock" | "manual" | "codex" | "api";
 
@@ -94,4 +126,20 @@ export type AgentTaskResult = {
   ok: boolean;
   mode: ExecutionMode;
   message: string;
+  /** 実行が成果物を生んだ場合（codex疑似実行など） */
+  artifact?: Omit<Artifact, "id" | "createdAt">;
+};
+
+/**
+ * 将来Claude Code CLI / SDK / runnerへ渡す想定の実行リクエスト。
+ * 本接続時はこの型のまま外部ランナーへ引き渡せる形にしておく。
+ */
+export type CodexTaskRequest = {
+  caseId: string;
+  caseTitle: string;
+  instruction: string;
+  workDirectory?: string;
+  agentName: string;
+  jobType: JobType;
+  expectedArtifactType: ArtifactType;
 };

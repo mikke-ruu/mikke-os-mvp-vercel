@@ -110,6 +110,40 @@ export const priorityLabels: Record<Priority, string> = {
   high: "高"
 };
 
+// ---- 実行レイヤーの表示ラベル ----
+
+export const executionModeLabels: Record<import("./types").ExecutionMode, string> = {
+  mock: "デモ（mock）",
+  manual: "手動（manual）",
+  codex: "Claude Code（codex）",
+  api: "API（未接続）"
+};
+
+export const executionModeDescriptions: Record<import("./types").ExecutionMode, string> = {
+  mock: "ダミー返答のみのデモ用モードです",
+  manual: "外部で作業した結果を手動で登録するモードです",
+  codex: "これは将来Claude Code接続用のモードです（今は疑似実行のみ）",
+  api: "今後のAPI接続用の枠です。まだ接続されていません"
+};
+
+export const executionStatusLabels: Record<import("./types").ExecutionStatus, string> = {
+  idle: "未実行",
+  queued: "キュー待ち",
+  running: "実行中",
+  waiting_review: "レビュー待ち",
+  completed: "実行完了",
+  failed: "失敗"
+};
+
+export const artifactTypeLabels: Record<import("./types").ArtifactType, string> = {
+  text: "テキスト",
+  html: "HTML下書き",
+  layout: "レイアウト案",
+  "build-json": "ビルドJSON",
+  "image-brief": "画像生成指示",
+  notes: "メモ"
+};
+
 // ---- 初期ダミー案件・ログ ----
 
 function iso(minutesAgo: number): string {
