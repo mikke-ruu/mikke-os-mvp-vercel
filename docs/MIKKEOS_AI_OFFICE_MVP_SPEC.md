@@ -222,3 +222,80 @@ AI社員と人間が一緒に働く「バーチャルオフィス」を可視化
 5. バッジクリックで部屋の案件ポップオーバーが開く
 6. 案件操作・localStorage・ログ等の既存機能が壊れていない（lib/とpage.tsxは無変更）
 7. `npx tsc --noEmit` エラー0、`npm run build` 成功
+
+---
+
+# フェーズ3 — UI仕上げ＋Claude Code接続の土台（2026-07-18）
+
+2本立て: A) UI/世界観の仕上げ、B) 実行レイヤー（Claude Code接続土台）。
+**Bのロジック（型・ストア・ランタイム・配線）はFable側で実装済み。**
+Sonnetの担当は A の全部と、B のUI仕上げ（CaseDetailPanelの見た目）。
+
+## Fable実装済み（変更しないで使う）
+
+- `types.ts` — `ExecutionStatus` / `ArtifactType` / `Artifact` / `CodexTaskRequest`、
+  `OfficeCase` に executionMode / workDirectory / instruction / artifacts /
+  executionStatus / lastRunAt / lastRunSummary / reviewRequired（すべて任意＝旧データ互換）
+- `store.ts` — 旧データマイグレーション（normalizeCase）、`updateCaseExecution()` /
+  `addArtifact()` / `startCaseRun()`（queued → running → waiting_review の疑似実行フロー、
+  ログ自動追加、成果物登録、案件は確認待ちへ）
+- `agent-runtime.ts` — `executeAgentTask(input, mode)` 4モード対応。
+  `runCodexTask(request)` が将来のClaude Code接続の実行ポイント（1箇所集約）。
+  apiモードは未接続stub（ok:false）
+- `data.ts` — executionModeLabels / executionModeDescriptions / executionStatusLabels / artifactTypeLabels
+- `page.tsx` — selectedCase状態とCaseDetailPanel配線済み
+- `CaseBoard.tsx` — カードタイトルクリックで `onSelectCase(caseId)`（見た目はSonnetが調整可）
+- `CaseDetailPanel.tsx` — **機能配線済みのスタブ**。UIを仕上げるのがSonnetの仕事
+
+## Sonnet A: UI・世界観の仕上げ
+
+### A-1. フロアの密度アップ（部屋ごとに小物を2〜4個追加）
+
+- 受付・社長室: 受付カウンター感を強く。書類・電話・受付ベル。社長席と受付の役割が分かるように
+- 顧問室: ソファ・テーブル・本棚・ラグの個性を強く。猫などの遊びを1つ
+- 講座制作室: 付箋・教材・ノート・ホワイトボード・撮影小物で「講座を作ってる感」
+- 編集室: 本棚・原稿の束・校正紙・赤ペンで「文章仕事の部屋」
+- デザイン室: カラーパレット・ポスター・液タブ・画像パネル。一番「作ってる感」を出してよい
+- 実装室: モニター・コード画面・機材ラック・サーバー・ケーブル感
+- 会議室: 会議机・モニター・議題ボード・資料。確認待ち案件が集まる場所として目立たせる
+- 休憩室: コーヒー・冷蔵庫・お菓子・ソファ・雑誌
+- みっけテラス: ベンチ・花壇・植木・鳥や猫（主役にしすぎない）
+
+### A-2. キャラの個性アップ
+
+- 髪型・服色の差分をもう少し増やす
+- AI社員: アンテナ・小さな光・イヤーデバイスなど軽い差分（ロボットすぎない）
+- 状態表現: 稼働中=小さな作業吹き出し / 待機中=静止orごく軽い動作 /
+  確認待ち=会議室へ / 完了=小さなチェックやキラキラ / 休憩中=コーヒーや着席
+
+### A-3. レイアウト調整（フロアを主役に）
+
+- フロアの縦占有率を今より少し上げる
+- 案件ボードの高さを少し抑える: **各列は最新2〜3件だけ表示＋「すべて見る」トグルで全件**
+- ログは最近数件だけ→「すべて見る」は現状の仕組みでOK
+- 専用ページは増やさない。1画面の完成度優先
+
+## Sonnet B: CaseDetailPanel のUI仕上げ
+
+スタブの機能・propsはそのまま、見た目を実装:
+
+- 右からのスライドオーバー（transitionでスライドイン）、ヘッダーに案件名＋ステータスバッジ
+- 実行モードselect＋説明文（executionModeDescriptions）。
+  **codex選択時は「これは将来Claude Code接続用のモードです」の注意書きを目立たせる**
+- **apiモードは「未接続」表示＋実行ボタンdisabled**（配線済み）
+- 実行前確認ダイアログ（スタブのインライン確認を、ちゃんとしたダイアログ風に）
+- 実行状態バッジ: idle/queued/running/waiting_review/completed/failed を色分け
+  （runningはスピナーかパルス）
+- 成果物リスト: typeバッジ（artifactTypeLabels）＋タイトル＋内容。かわいく読みやすく
+- 案件カード側にも実行状態の小さなバッジを表示（idle以外のとき）
+
+## フェーズ3完了条件
+
+1. フロアの密度・キャラ個性が上がり「仲間と働く場所」に見える
+2. 案件ボードが省スペース化され、フロアが主役
+3. 案件クリック→詳細パネルが開き、実行モード・指示・作業フォルダを編集できる
+4. codexモードで「作業を開始」→確認→queued→running→waiting_review が見え、
+   ログが流れ、成果物が登録され、案件が確認待ちへ移動する
+5. apiモードは未接続表示で実行できない
+6. 旧localStorageデータがあっても落ちない（マイグレーション済み）
+7. `npx tsc --noEmit` エラー0、`npm run build` 成功
