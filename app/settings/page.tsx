@@ -9,6 +9,7 @@ import {
   ClipboardCheck,
   Database,
   ExternalLink,
+  GraduationCap,
   LogOut,
   Settings as SettingsIcon,
   Tag,
@@ -72,6 +73,12 @@ const osItems: SettingsItem[] = [
     description: "使っているアプリと、これから繋げられるアプリを確認します。",
     href: "/apps",
     icon: SettingsIcon
+  },
+  {
+    title: "認定講座サイト管理",
+    description: "nintei-koza-siteの問い合わせ・紹介コード・成約を管理します。",
+    href: "/nintei-koza-admin",
+    icon: GraduationCap
   }
 ];
 

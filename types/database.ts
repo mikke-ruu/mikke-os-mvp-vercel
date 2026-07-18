@@ -338,3 +338,52 @@ export type ActivityLog = {
   created_at: string;
   updated_at: string;
 };
+
+// =========================================================
+// 認定講座構築サイト(nintei-koza-site) 問い合わせ・紹介・成約
+// =========================================================
+
+export type NinteiKozaTopic = "kobetsu" | "academy" | "community" | "textbook" | "other";
+export type NinteiKozaInquiryStatus = "new" | "in_progress" | "won" | "lost" | "closed";
+
+export type NinteiKozaInquiry = {
+  id: string;
+  created_at: string;
+  name: string;
+  email: string;
+  instagram: string | null;
+  topic: NinteiKozaTopic;
+  genre: string | null;
+  prep_status: string | null;
+  fund_interest: "yes" | "no" | "unknown" | null;
+  message: string | null;
+  source: string | null;
+  referral: string | null;
+  status: string;
+};
+
+export type NinteiKozaReferrer = {
+  code: string;
+  name: string;
+  kind: "member" | "buyer" | "other";
+  active: boolean;
+  reward_textbook: boolean;
+  reward_kobetsu: boolean;
+  created_at: string;
+  note: string | null;
+};
+
+export type NinteiKozaProduct = "textbook" | "kobetsu" | "academy" | "community";
+
+export type NinteiKozaConversion = {
+  id: string;
+  created_at: string;
+  inquiry_id: string | null;
+  product: NinteiKozaProduct;
+  amount: number | null;
+  referral: string | null;
+  reward_due: boolean;
+  reward_done: boolean;
+  reward_note: string | null;
+  note: string | null;
+};
