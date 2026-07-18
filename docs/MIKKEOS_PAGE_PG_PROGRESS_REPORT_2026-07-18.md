@@ -57,3 +57,36 @@ PG-1で初めて `/apps/page` 配下の管理画面を作る。
 ```
 
 PG-1ではAuthGate必須、積み上げ式ブロック編集、自組織CMSブロック、OS内プレビューまでを対象にする。
+
+## PG-1-a: Page入口・デモ閲覧
+
+完了。
+
+```text
+追加: app/apps/page/page.tsx
+追加: components/page/PageDashboard.tsx
+```
+
+実装内容:
+
+```text
+/apps/page をAuthGate配下で追加。
+PG-0のlocalStorage storeからPageサイト一覧を読み取り。
+サンプル団体のページ数・ブロック数・下書きslugを表示。
+公開、編集、他者掲載依頼、決済、フォーム送信は未実装のまま明記。
+```
+
+検収:
+
+```text
+npm.cmd run lint: 成功
+npm.cmd run build: 成功（88 static pages、/apps/page 追加確認）
+```
+
+次:
+
+```text
+PG-1-b: /apps/page/new とサイト作成
+PG-1-c: /apps/page/[siteId] のページ一覧・編集導線
+PG-1-d: /apps/page/[siteId]/[pageId] の積み上げ式ブロック編集
+```
