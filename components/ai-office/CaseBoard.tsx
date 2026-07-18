@@ -23,18 +23,26 @@ const priorityStyle: Record<Priority, string> = {
 function CaseCard({
   c,
   onStatusChange,
-  onAssigneeChange
+  onAssigneeChange,
+  onSelectCase
 }: {
   c: OfficeCase;
   onStatusChange: (caseId: string, status: CaseStatus) => void;
   onAssigneeChange: (caseId: string, assigneeId: string) => void;
+  onSelectCase: (caseId: string) => void;
 }) {
   const assignee = employeeById[c.assigneeId];
   const idx = statusOrder.indexOf(c.status);
 
   return (
     <div className="rounded-xl border border-[#e3e6f0] bg-white p-2.5 shadow-sm">
-      <p className="text-xs font-bold leading-snug text-[#1e2a4a]">{c.title}</p>
+      <button
+        type="button"
+        onClick={() => onSelectCase(c.id)}
+        className="w-full text-left text-xs font-bold leading-snug text-[#1e2a4a] hover:text-[#e58f65]"
+      >
+        {c.title}
+      </button>
 
       <div className="mt-1.5 flex items-center justify-between gap-1">
         <div className="flex min-w-0 items-center gap-1.5">
@@ -105,12 +113,14 @@ export function CaseBoard({
   cases,
   onStatusChange,
   onAssigneeChange,
-  onNewCase
+  onNewCase,
+  onSelectCase
 }: {
   cases: OfficeCase[];
   onStatusChange: (caseId: string, status: CaseStatus) => void;
   onAssigneeChange: (caseId: string, assigneeId: string) => void;
   onNewCase: () => void;
+  onSelectCase: (caseId: string) => void;
 }) {
   return (
     <section className="rounded-2xl border border-[#e3e6f0] bg-white p-4">
@@ -151,7 +161,13 @@ export function CaseBoard({
                   <p className="px-1 text-[10px] text-[#9aa3b2]">案件なし</p>
                 ) : (
                   columnCases.map((c) => (
-                    <CaseCard key={c.id} c={c} onStatusChange={onStatusChange} onAssigneeChange={onAssigneeChange} />
+                    <CaseCard
+                      key={c.id}
+                      c={c}
+                      onStatusChange={onStatusChange}
+                      onAssigneeChange={onAssigneeChange}
+                      onSelectCase={onSelectCase}
+                    />
                   ))
                 )}
               </div>
