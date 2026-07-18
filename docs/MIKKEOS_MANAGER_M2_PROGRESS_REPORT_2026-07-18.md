@@ -100,6 +100,31 @@ Activity Log / Story / DESK 経路への変更なし。
 /os /log の処遇変更
 ```
 
+## M2-d: 文脈案内の拡張
+
+完了。
+
+```text
+更新: lib/manager/app-suggestions.ts
+```
+
+追加した提案:
+
+```text
+Item Studio → Order
+Event → Team Works
+Academy → Team Works
+Team Works → Event
+```
+
+方針:
+
+```text
+課金壁・ポップアップは作らない。
+状況ベースの静かな提案にする。
+団体アプリの提案は「仲間を巻き込む作業が増えた時」の文脈に限定する。
+```
+
 ## M2-b: 判断待ち
 
 ここから先はFable判断待ち。

@@ -81,6 +81,46 @@ export function collectManagerAppSuggestions(snapshot: ManagerSnapshot): Manager
     });
   }
 
+  if (activeAppKeys.has("item_studio") && !activeAppKeys.has("order")) {
+    suggestions.push({
+      id: "item-studio-to-order",
+      title: "Orderも使えます",
+      helper: "作品を見た人から、制作依頼やオーダー相談を受けたい時に使えます。",
+      href: "/apps/order",
+      reason: "Item Studioの作品が動いています"
+    });
+  }
+
+  if (activeAppKeys.has("event") && !activeAppKeys.has("team_works")) {
+    suggestions.push({
+      id: "event-to-team-works",
+      title: "Team Worksも候補です",
+      helper: "主催準備をスタッフや出店者と分担したい時に使えます。",
+      href: "/apps/team-works",
+      reason: "Eventの準備が動いています"
+    });
+  }
+
+  if (activeAppKeys.has("academy") && !activeAppKeys.has("team_works")) {
+    suggestions.push({
+      id: "academy-to-team-works",
+      title: "Team Worksも候補です",
+      helper: "教材制作や講師との分担を、チームの仕事として進めたい時に使えます。",
+      href: "/apps/team-works",
+      reason: "Academyの運営が動いています"
+    });
+  }
+
+  if (activeAppKeys.has("team_works") && !activeAppKeys.has("event")) {
+    suggestions.push({
+      id: "team-works-to-event",
+      title: "Eventも使えます",
+      helper: "チームで準備した企画を、募集や申込受付につなげたい時に使えます。",
+      href: "/apps/event",
+      reason: "Team Worksの案件が動いています"
+    });
+  }
+
   if (suggestions.length === 0) {
     suggestions.push({
       id: "apps-start",
