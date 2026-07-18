@@ -7,6 +7,7 @@ import { useOrderMenus } from "@/lib/order/store";
 import { useSessionMenus } from "@/lib/session/store";
 import { collectEventManagerBridge } from "./adapters/event";
 import { collectFundManagerBridge } from "./adapters/fund";
+import { useMarketNoteManagerBridge } from "./adapters/marketnote";
 import { collectOrderManagerBridge } from "./adapters/order";
 import { collectSessionManagerBridge } from "./adapters/session";
 import { compareManagerDue, compareManagerItems } from "./adapters/utils";
@@ -19,6 +20,7 @@ export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
   const { menus: sessionMenus, bookings: sessionBookings } = useSessionMenus();
   const { events, applications: eventApplications } = useMikkeEvents();
   const { projects: fundProjects, plans: fundPlans, supports: fundSupports } = useFundProjects(ownerProfileId);
+  const marketNoteBridge = useMarketNoteManagerBridge(ownerProfileId);
 
   return useMemo(() => {
     const now = new Date();
@@ -30,6 +32,7 @@ export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
       },
       collectOrderManagerBridge(orderMenus, orderApplications, now),
       collectSessionManagerBridge(sessionMenus, sessionBookings, now),
+      marketNoteBridge,
       collectEventManagerBridge(events, eventApplications, now),
       collectFundManagerBridge(fundProjects, fundPlans, fundSupports, now)
     ];
@@ -50,7 +53,7 @@ export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
     eventApplications,
     fundProjects,
     fundPlans,
-    fundSupports
+    fundSupports,
+    marketNoteBridge
   ]);
 }
-
