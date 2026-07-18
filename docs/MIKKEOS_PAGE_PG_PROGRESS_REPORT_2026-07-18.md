@@ -182,6 +182,50 @@ npm.cmd run lint: 成功
 npm.cmd run build: 成功（90 static pages）
 ```
 
+## PG-2-b: Connect / Partners
+
+完了。
+
+```text
+追加: components/page/PageDirectoryManager.tsx
+更新: lib/page/types.ts
+更新: lib/page/store.ts
+更新: lib/page/demo.ts
+更新: lib/page/cms-selectors.ts
+更新: components/page/PageSiteEditor.tsx
+更新: components/page/PageDocumentEditor.tsx
+更新: components/page/PageDashboard.tsx
+```
+
+実装内容:
+
+```text
+Connect（加盟・提携）とPartners（スポンサー・協力）をPage内CMSコンテンツとして追加。
+サイト管理画面で項目を追加・削除し、CMSブロックの参照元として選択可能にした。
+既存の保存済みPageには読み込み時に空のdirectoryItemsを補い、localStorage互換性を維持。
+```
+
+境界:
+
+```text
+Connect / Partnersは独立アプリにしない。
+他者掲載依頼や承認フローとは接続しない。
+外部公開、Manager受信箱、販売委託、決済、独自ドメインは未実装。
+```
+
+次:
+
+```text
+PG-3は公開方式（サーバ保存か静的書き出しか）の事前判断が必要。
+```
+
+検収:
+
+```text
+npm.cmd run lint: 成功
+npm.cmd run build: 成功（90 static pages）
+```
+
 ## PG-2-a: CMS選択・フィルタ
 
 完了。

@@ -3,7 +3,7 @@ import type { AppKey } from "@/lib/mikkeos/types";
 export type PageSiteStatus = "draft" | "paused";
 export type PageDocumentStatus = "draft" | "hidden";
 export type PageBlockType = "heading" | "text" | "image" | "button" | "form" | "divider" | "cms";
-export type PageCmsSource = "story" | Extract<AppKey, "item_studio" | "event" | "academy" | "session">;
+export type PageCmsSource = "story" | "connect" | "partners" | Extract<AppKey, "item_studio" | "event" | "academy" | "session">;
 export type PageCmsDisplayMode = "list" | "cards" | "featured";
 
 export type PageBlockBase = {
@@ -86,6 +86,21 @@ export type PagePublicationDraft = {
   searchIndexEnabled: false;
 };
 
+export type PageDirectoryKind = "connect" | "partners";
+
+export type PageDirectoryItem = {
+  id: string;
+  siteId: string;
+  kind: PageDirectoryKind;
+  name: string;
+  category: string;
+  description: string;
+  imageUrl: string;
+  linkUrl: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PageSite = {
   id: string;
   ownerProfileId: string;
@@ -94,6 +109,7 @@ export type PageSite = {
   status: PageSiteStatus;
   publication: PagePublicationDraft;
   documents: PageDocument[];
+  directoryItems: PageDirectoryItem[];
   createdAt: string;
   updatedAt: string;
 };

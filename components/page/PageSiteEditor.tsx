@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowDown, ArrowLeft, ArrowUp, FileText, Pencil, Plus, Trash2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import { PageDirectoryManager } from "@/components/page/PageDirectoryManager";
 import {
   createPageDocument,
   deletePageDocument,
@@ -142,6 +143,7 @@ export function PageSiteEditor() {
               <button type="submit" disabled={!title.trim() || !slug} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40"><Plus size={16} /> ページを追加</button>
             </div>
           </form>
+          <PageDirectoryManager site={site} onChange={refresh} />
         </>
       )}
     </MikkeAppShell>

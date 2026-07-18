@@ -39,6 +39,8 @@ const blockChoices: { type: PageBlockType; label: string; icon: typeof Heading }
 
 const cmsSourceLabels: Record<PageCmsSource, string> = {
   story: "Story",
+  connect: "Connect",
+  partners: "Partners",
   item_studio: "Item Studio",
   event: "Event",
   academy: "Academy",
@@ -69,7 +71,7 @@ export function PageDocumentEditor() {
   const [slug, setSlug] = useState("");
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [message, setMessage] = useState("");
-  const cmsContent = usePageCmsContent();
+  const cmsContent = usePageCmsContent(site?.directoryItems ?? []);
 
   useEffect(() => {
     const nextSite = getPageSite(params.siteId);
@@ -258,7 +260,7 @@ function CmsBlockPreview({ block, items }: { block: Extract<PageBlock, { type: "
           {visibleItems.map((item) => (
             <article key={item.id} className="overflow-hidden rounded-xl border border-[var(--mikke-line-soft)] bg-white">
               {item.imageUrl && block.displayMode !== "list" ? <img src={item.imageUrl} alt="" className="h-28 w-full object-cover" /> : null}
-              <div className="p-3"><p className="text-sm font-bold">{item.title}</p>{item.summary ? <p className="mt-1 line-clamp-3 text-xs leading-5 text-[var(--mikke-muted)]">{item.summary}</p> : null}{item.meta ? <p className="mt-2 text-[10px] font-bold text-[var(--mikke-accent)]">{item.meta}</p> : null}</div>
+              <div className="p-3"><p className="text-sm font-bold">{item.title}</p>{item.summary ? <p className="mt-1 line-clamp-3 text-xs leading-5 text-[var(--mikke-muted)]">{item.summary}</p> : null}{item.meta ? <p className="mt-2 text-[10px] font-bold text-[var(--mikke-accent)]">{item.meta}</p> : null}{item.href ? <a href={item.href} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-[10px] font-bold text-[var(--mikke-primary)]">リンクを開く</a> : null}</div>
             </article>
           ))}
         </div>

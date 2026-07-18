@@ -7,6 +7,7 @@ import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 import { mockProfile } from "@/lib/mikkeos/mock-data";
 import { useSessionMenus } from "@/lib/session/store";
 import type { PageCmsSource } from "./types";
+import type { PageDirectoryItem } from "./types";
 
 export type PageCmsItem = {
   id: string;
@@ -17,9 +18,10 @@ export type PageCmsItem = {
   meta: string;
   occurredAt: string;
   approved: boolean;
+  href?: string;
 };
 
-export function usePageCmsContent() {
+export function usePageCmsContent(directoryItems: PageDirectoryItem[] = []) {
   const { items } = useItemStudio();
   const { events } = useMikkeEvents();
   const { menus } = useSessionMenus();
@@ -85,6 +87,12 @@ export function usePageCmsContent() {
         meta: [menu.durationLabel, menu.price === null ? "" : `${menu.price.toLocaleString("ja-JP")}円`].filter(Boolean).join(" / "),
         occurredAt: menu.createdAt,
         approved: true
-      }))
-  }), [events, items, logs, menus]);
+      })),
+    connect: directoryItems
+      .filter((item) => item.kind === "connect")
+      .map((item) => ({ id: item.id, source: "connect", title: item.name, summary: item.description, imageUrl: item.imageUrl, meta: item.category, occurredAt: item.createdAt, approved: true, href: item.linkUrl })),
+    partners: directoryItems
+      .filter((item) => item.kind === "partners")
+      .map((item) => ({ id: item.id, source: "partners", title: item.name, summary: item.description, imageUrl: item.imageUrl, meta: item.category, occurredAt: item.createdAt, approved: true, href: item.linkUrl }))
+  }), [directoryItems, events, items, logs, menus]);
 }
