@@ -4,7 +4,7 @@
 import type { RoomId } from "@/lib/ai-office/types";
 
 export const FLOOR_W = 1600;
-export const FLOOR_H = 780;
+export const FLOOR_H = 820;
 
 export type FloorRect = { x: number; y: number; w: number; h: number };
 
@@ -22,7 +22,7 @@ export const roomRects: Record<RoomId, FloorRect> = {
   coding: { x: 390, y: 380, w: 370, h: 268 },
   meeting: { x: 770, y: 380, w: 460, h: 268 },
   break: { x: 1300, y: 380, w: 290, h: 268 },
-  terrace: { x: 0, y: 668, w: 1600, h: 112 }
+  terrace: { x: 0, y: 668, w: 1600, h: 152 }
 };
 
 /** 廊下（横方向）。左端がエントランス、右寄りの縦通路からテラスへ抜ける */
@@ -70,8 +70,8 @@ export const roomSpots: Record<RoomId, Array<[number, number]>> = {
     [1500, 602]
   ],
   terrace: [
-    [520, 762],
-    [880, 756]
+    [520, 776],
+    [880, 770]
   ]
 };
 
