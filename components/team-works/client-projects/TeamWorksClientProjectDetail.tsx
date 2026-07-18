@@ -29,7 +29,7 @@ import {
 } from "@/lib/team-works-projects";
 import { teamWorksProjectInputClass } from "@/components/team-works/projects/TeamWorksProjectsShell";
 import { useTeamWorksPortalActor } from "@/components/team-works/useTeamWorksPortalActor";
-import { reviewTeamWorksPortalDeliverable, saveTeamWorksPortalComment, saveTeamWorksPortalFormSubmission } from "@/lib/team-works-portal-database";
+import { reviewTeamWorksPortalDeliverable, saveTeamWorksPortalComment, saveTeamWorksPortalFormSubmission, uploadTeamWorksPortalFormAttachment } from "@/lib/team-works-portal-database";
 
 export function TeamWorksClientProjectDetail({ projectId }: { projectId: string }) {
   const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
@@ -38,6 +38,7 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
   const actorMemberships = new Map(membership ? [[projectId, { memberId: membership.memberId }]] : []);
   const detail = createTeamWorksClientProjectDetail(projectState, TEAM_WORKS_CLIENT_PORTAL_DEMO_CLIENT_ID, projectId, { memberships: actorMemberships });
   const [databaseError, setDatabaseError] = useState("");
+  const [submissionSourceIds, setSubmissionSourceIds] = useState<Record<string, string>>({});
 
   if (!hydrated || actor.status === "loading") return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">共有プロジェクトを読み込んでいます。</p>;
   if (actor.status === "error") return <MikkeEmptyState title="案件所属を確認できません" helper={actor.errorMessage} />;
@@ -55,7 +56,9 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
   async function saveForm(form: ClientProjectFormView, answers: Record<string, ProjectFormAnswerValue>, submit: boolean) {
     if (!membership) return;
     const now = new Date().toISOString();
-    const saved = saveProjectFormAnswers({ submission: form.submission, projectId: project.id, formId: form.id, actor: { kind: "client", id: membership.memberId }, answers, editableAfterSubmit: form.editableAfterSubmit, now, createId: createTeamWorksProjectId });
+    const submissionSourceId = form.submission?.id ?? submissionSourceIds[form.id] ?? createTeamWorksProjectId("team_works_project_form_submission");
+    setSubmissionSourceIds((current) => current[form.id] ? current : { ...current, [form.id]: submissionSourceId });
+    const saved = saveProjectFormAnswers({ submission: form.submission, projectId: project.id, formId: form.id, actor: { kind: "client", id: membership.memberId }, answers, editableAfterSubmit: form.editableAfterSubmit, now, createId: () => submissionSourceId });
     const next = submit ? transitionProjectFormSubmission({ submission: saved, nextStatus: "submitted", actor: { kind: "client", id: membership.memberId }, now }) : saved;
     try {
       setDatabaseError("");
@@ -65,6 +68,19 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
       return;
     }
     saveProjectState({ ...projectState, projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item), formSubmissions: form.submission ? projectState.formSubmissions.map((item) => item.id === next.id ? next : item) : [...projectState.formSubmissions, next] });
+  }
+
+  async function uploadFormAttachment(form: ClientProjectFormView, fieldId: string, file: File) {
+    if (!membership) throw new Error("Team Worksポータルの所属を確認できません。");
+    const submissionSourceId = form.submission?.id ?? submissionSourceIds[form.id] ?? createTeamWorksProjectId("team_works_project_form_submission");
+    setSubmissionSourceIds((current) => current[form.id] ? current : { ...current, [form.id]: submissionSourceId });
+    return uploadTeamWorksPortalFormAttachment({
+      membership,
+      formSourceId: form.id,
+      submissionSourceId,
+      fieldId,
+      file
+    });
   }
 
   async function updateDeliverable(deliverableId: string, nextStatus: ProjectDeliverableStatus, body: string) {
@@ -177,7 +193,7 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
         <p className="text-sm leading-7 text-[var(--mikke-text-soft)]">{project.goal || "完成条件はまだ共有されていません。"}</p>
       </MikkeSection>
 
-      <MikkeSection title="提出フォーム">{forms.length > 0 ? <div className="space-y-3">{forms.map((form) => <TeamWorksProjectFormResponse key={form.id} form={form} onSave={(answers) => saveForm(form, answers, false)} onSubmit={(answers) => saveForm(form, answers, true)} />)}</div> : <p className="text-sm text-[var(--mikke-muted)]">現在提出するフォームはありません。</p>}</MikkeSection>
+      <MikkeSection title="提出フォーム">{forms.length > 0 ? <div className="space-y-3">{forms.map((form) => <TeamWorksProjectFormResponse key={form.id} form={form} onSave={(answers) => saveForm(form, answers, false)} onSubmit={(answers) => saveForm(form, answers, true)} onUploadAttachment={(field, file) => uploadFormAttachment(form, field.id, file)} />)}</div> : <p className="text-sm text-[var(--mikke-muted)]">現在提出するフォームはありません。</p>}</MikkeSection>
 
       <MikkeSection title="工程と対応内容">
         {phases.length > 0 ? (

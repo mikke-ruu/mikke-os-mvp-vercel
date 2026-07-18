@@ -29,7 +29,7 @@ import {
   type WorkerProjectFormView,
   type WorkerProjectTaskView
 } from "@/lib/team-works-worker-projects";
-import { saveTeamWorksPortalFormSubmission, saveTeamWorksWorkerDeliverable, uploadTeamWorksWorkerDeliverableFile } from "@/lib/team-works-portal-database";
+import { saveTeamWorksPortalFormSubmission, saveTeamWorksWorkerDeliverable, uploadTeamWorksPortalFormAttachment, uploadTeamWorksWorkerDeliverableFile } from "@/lib/team-works-portal-database";
 
 export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string }) {
   const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
@@ -38,6 +38,7 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
   const actorMemberships = new Map(membership ? [[projectId, { memberId: membership.memberId, memberName: membership.memberName }]] : []);
   const detail = createTeamWorksWorkerProjectDetail(projectState, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID, projectId, { memberships: actorMemberships });
   const [databaseError, setDatabaseError] = useState("");
+  const [submissionSourceIds, setSubmissionSourceIds] = useState<Record<string, string>>({});
 
   if (!hydrated || actor.status === "loading") return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">担当内容を読み込んでいます。</p>;
   if (actor.status === "error") return <MikkeEmptyState title="案件所属を確認できません" helper={actor.errorMessage} />;
@@ -61,7 +62,9 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
   async function saveForm(form: WorkerProjectFormView, answers: Record<string, ProjectFormAnswerValue>, submit: boolean) {
     if (!membership) return;
     const now = new Date().toISOString();
-    const saved = saveProjectFormAnswers({ submission: form.submission, projectId: project.id, formId: form.id, actor: { kind: "worker", id: memberId }, answers, editableAfterSubmit: form.editableAfterSubmit, now, createId: createTeamWorksProjectId });
+    const submissionSourceId = form.submission?.id ?? submissionSourceIds[form.id] ?? createTeamWorksProjectId("team_works_project_form_submission");
+    setSubmissionSourceIds((current) => current[form.id] ? current : { ...current, [form.id]: submissionSourceId });
+    const saved = saveProjectFormAnswers({ submission: form.submission, projectId: project.id, formId: form.id, actor: { kind: "worker", id: memberId }, answers, editableAfterSubmit: form.editableAfterSubmit, now, createId: () => submissionSourceId });
     const next = submit ? transitionProjectFormSubmission({ submission: saved, nextStatus: "submitted", actor: { kind: "worker", id: memberId }, now }) : saved;
     try {
       setDatabaseError("");
@@ -74,6 +77,19 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
       ...projectState,
       projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item),
       formSubmissions: form.submission ? projectState.formSubmissions.map((item) => item.id === next.id ? next : item) : [...projectState.formSubmissions, next]
+    });
+  }
+
+  async function uploadFormAttachment(form: WorkerProjectFormView, fieldId: string, file: File) {
+    if (!membership) throw new Error("Team Worksポータルの所属を確認できません。");
+    const submissionSourceId = form.submission?.id ?? submissionSourceIds[form.id] ?? createTeamWorksProjectId("team_works_project_form_submission");
+    setSubmissionSourceIds((current) => current[form.id] ? current : { ...current, [form.id]: submissionSourceId });
+    return uploadTeamWorksPortalFormAttachment({
+      membership,
+      formSourceId: form.id,
+      submissionSourceId,
+      fieldId,
+      file
     });
   }
 
@@ -258,7 +274,7 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
       </MikkeSection>
 
       <MikkeSection title="担当フォーム">
-        {forms.length > 0 ? <div className="space-y-3">{forms.map((form) => <TeamWorksProjectFormResponse key={form.id} form={form} onSave={(answers) => saveForm(form, answers, false)} onSubmit={(answers) => saveForm(form, answers, true)} />)}</div> : <p className="text-sm text-[var(--mikke-muted)]">担当フォームはありません。</p>}
+        {forms.length > 0 ? <div className="space-y-3">{forms.map((form) => <TeamWorksProjectFormResponse key={form.id} form={form} onSave={(answers) => saveForm(form, answers, false)} onSubmit={(answers) => saveForm(form, answers, true)} onUploadAttachment={(field, file) => uploadFormAttachment(form, field.id, file)} />)}</div> : <p className="text-sm text-[var(--mikke-muted)]">担当フォームはありません。</p>}
       </MikkeSection>
 
       <div className="grid gap-6 lg:grid-cols-2">

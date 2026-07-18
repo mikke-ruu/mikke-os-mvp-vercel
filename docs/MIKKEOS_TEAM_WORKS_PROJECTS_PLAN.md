@@ -788,3 +788,27 @@ Current boundary:
 - Storage upload is implemented for worker deliverables; rich form file/image fields still use URL/text values until a later form-field Storage slice.
 - Payout/invoice DB UI, Activity Log notifications, and Manager integration remain later phases.
 ```
+
+## 28. TW-P8H implementation result (2026-07-18)
+```text
+Implemented:
+- Added private Supabase Storage bucket team-works-form-attachments for Team Works form file/image answers.
+- Added Storage RLS helpers and object policies for form attachment paths shaped as project/form/submission/field/file.
+- Allows the current client/worker form actor to upload only to file/image fields on forms they are allowed to submit.
+- Rejects Storage object writes to non-file fields.
+- Added client and worker portal upload handling for file/image form fields.
+- Stores form attachment metadata in answers while keeping file bodies in private Storage.
+- Removes signed URLs before DB save and restores fresh signed URLs when portal collaboration state is read.
+- Displays form attachment answers as links in portal forms and admin submission review.
+
+Verified:
+- Applied Supabase migration 20260718003633_team_works_p8h_form_attachment_storage to mikke-os-dev.
+- RLS verification covered private form attachment bucket existence, worker file-field object insert, and non-file field object insert rejection.
+- lint passed.
+- build passed (80 static pages).
+- Supabase Advisors checked; no new actionable Team Works form attachment Storage finding from this slice.
+
+Current boundary:
+- Form file/image upload is implemented for portal submissions; deleting/replacing old orphaned objects is not yet automated.
+- Payout/invoice DB UI, Activity Log notifications, and Manager integration remain later phases.
+```

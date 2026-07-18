@@ -15,9 +15,14 @@ export function requiredProjectFormFieldsComplete(form: Pick<ProjectForm, "field
   return form.fields.filter((field) => field.required).every((field) => {
     const value = answers[field.id];
     if (Array.isArray(value)) return value.length > 0;
+    if (isProjectFormAttachmentAnswer(value)) return value.storagePath.trim().length > 0;
     if (typeof value === "boolean") return value;
     return value !== undefined && value !== null && String(value).trim().length > 0;
   });
+}
+
+export function isProjectFormAttachmentAnswer(value: ProjectFormAnswerValue | undefined): value is Extract<ProjectFormAnswerValue, { kind: "storage_attachment" }> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && "kind" in value && value.kind === "storage_attachment" && "storagePath" in value);
 }
 
 export function canEditProjectFormSubmission(submission: ProjectFormSubmission | null, editableAfterSubmit: boolean) {

@@ -28,7 +28,7 @@ import {
   type ProjectTaskStatus,
   type TeamWorksProjectStoreState
 } from "@/lib/team-works-projects";
-import { transitionProjectFormSubmission } from "@/lib/team-works-project-forms";
+import { isProjectFormAttachmentAnswer, transitionProjectFormSubmission } from "@/lib/team-works-project-forms";
 import { teamWorksInitialState } from "@/lib/team-works";
 import { TeamWorksProjectDeliverables } from "./TeamWorksProjectDeliverables";
 import { TeamWorksProjectCompletionReview } from "./TeamWorksProjectCompletionReview";
@@ -235,6 +235,7 @@ function FormsAndResourcesTab({ projectId, reviewerId, forms, resources, roles, 
 }
 
 function formatAnswer(value: TeamWorksProjectStoreState["formSubmissions"][number]["answers"][string] | undefined) {
+  if (isProjectFormAttachmentAnswer(value)) return <a href={value.signedUrl ?? value.storagePath} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">{value.fileName || "添付ファイル"} <ExternalLink size={13} /></a>;
   if (Array.isArray(value)) return value.join("、") || "未回答";
   if (typeof value === "boolean") return value ? "はい" : "いいえ";
   return value === undefined || value === "" ? "未回答" : String(value);

@@ -22,6 +22,7 @@ declare
   v_deliverable_id uuid := gen_random_uuid();
   v_worker_deliverable_id uuid := gen_random_uuid();
   v_storage_object_name text;
+  v_form_attachment_name text;
   v_count integer;
 begin
   if has_table_privilege('anon', 'public.team_works_member_invites', 'select')
@@ -34,6 +35,10 @@ begin
   from storage.buckets
   where id = 'team-works-deliverables' and public = false;
   if v_count <> 1 then raise exception 'Team Works deliverable bucket is not private'; end if;
+  select count(*) into v_count
+  from storage.buckets
+  where id = 'team-works-form-attachments' and public = false;
+  if v_count <> 1 then raise exception 'Team Works form attachment bucket is not private'; end if;
 
   select p.user_id into v_owner_user_id from public.profiles p order by p.created_at, p.id limit 1;
   select p.user_id, u.email into v_actor_user_id, v_actor_email
@@ -60,10 +65,10 @@ begin
   values
     (v_invite_id, v_organization_id, v_project_id, v_actor_email, 'client_user', v_owner_user_id),
     (v_wrong_invite_id, v_organization_id, v_project_id, 'not-' || v_actor_email, 'client_user', v_owner_user_id);
-  insert into public.team_works_project_forms(id, project_id, task_id, name, input_actor, client_visible, fields)
+  insert into public.team_works_project_forms(id, project_id, task_id, source_local_id, name, input_actor, client_visible, fields)
   values
-    (v_client_form_id, v_project_id, v_task_id, 'Client form', 'client', true, '[{"id":"answer","type":"short_text"}]'),
-    (v_worker_form_id, v_project_id, v_task_id, 'Worker form', 'worker', false, '[{"id":"report","type":"long_text"}]');
+    (v_client_form_id, v_project_id, v_task_id, 'client-form-source', 'Client form', 'client', true, '[{"id":"answer","type":"short_text"}]'),
+    (v_worker_form_id, v_project_id, v_task_id, 'worker-form-source', 'Worker form', 'worker', false, '[{"id":"report","type":"long_text"},{"id":"worker_file","type":"file"}]');
   insert into public.team_works_project_deliverables(id, project_id, task_id, title, deliverable_type, status, client_visible)
   values (v_deliverable_id, v_project_id, v_task_id, 'Client review', 'url', 'client_review', true);
   insert into public.team_works_project_deliverables(id, project_id, task_id, title, deliverable_type, status, client_visible)
@@ -96,8 +101,8 @@ begin
   );
   select count(*) into v_count from public.team_works_project_forms where project_id = v_project_id;
   if v_count <> 1 then raise exception 'client form visibility mismatch: %', v_count; end if;
-  insert into public.team_works_form_submissions(project_id, form_id, submitted_by_member_id, answers, status)
-  values (v_project_id, v_client_form_id, v_actor_member_id, '{"answer":"accepted"}', 'submitted');
+  insert into public.team_works_form_submissions(project_id, form_id, submitted_by_member_id, source_local_id, answers, status)
+  values (v_project_id, v_client_form_id, v_actor_member_id, 'client-submission-source', '{"answer":"accepted"}', 'submitted');
   begin
     insert into public.team_works_form_submissions(project_id, form_id, submitted_by_member_id, answers)
     values (v_project_id, v_worker_form_id, v_actor_member_id, '{"report":"forbidden"}');
@@ -159,8 +164,20 @@ begin
   select count(*) into v_count from public.team_works_project_tasks
   where id = v_task_id and assignee_member_id = v_actor_member_id;
   if v_count <> 1 then raise exception 'worker could not restore assigned task'; end if;
-  insert into public.team_works_form_submissions(project_id, form_id, submitted_by_member_id, answers, status)
-  values (v_project_id, v_worker_form_id, v_actor_member_id, '{"report":"worker portal"}', 'submitted');
+  insert into public.team_works_form_submissions(project_id, form_id, submitted_by_member_id, source_local_id, answers, status)
+  values (v_project_id, v_worker_form_id, v_actor_member_id, 'worker-submission-source', '{"report":"worker portal"}', 'submitted');
+  v_form_attachment_name := v_project_id::text || '/worker-form-source/worker-submission-source/worker_file/worker-proof.txt';
+  insert into storage.objects(id, bucket_id, name, owner, metadata)
+  values (gen_random_uuid(), 'team-works-form-attachments', v_form_attachment_name, v_actor_user_id, '{"size":12,"mimetype":"text/plain"}');
+  select count(*) into v_count from storage.objects
+  where bucket_id = 'team-works-form-attachments' and name = v_form_attachment_name;
+  if v_count <> 1 then raise exception 'worker form attachment insert mismatch'; end if;
+  begin
+    insert into storage.objects(id, bucket_id, name, owner, metadata)
+    values (gen_random_uuid(), 'team-works-form-attachments', v_project_id::text || '/worker-form-source/worker-submission-source/report/blocked.txt', v_actor_user_id, '{"size":7}');
+    raise exception 'worker inserted form attachment for non-file field';
+  exception when insufficient_privilege then null;
+  end;
   update public.team_works_project_deliverables
   set url = 'https://example.com/worker-draft', status = 'submitted', submitted_by_member_id = v_actor_member_id
   where id = v_worker_deliverable_id;

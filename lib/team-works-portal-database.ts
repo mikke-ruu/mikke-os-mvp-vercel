@@ -1,7 +1,8 @@
 import { supabase } from "@/lib/supabase/client";
-import type { ProjectDeliverableStatus, ProjectFormAnswerValue, TeamWorksProjectStoreState } from "@/lib/team-works-projects";
+import type { ProjectDeliverableStatus, ProjectFormAnswerValue, ProjectFormAttachmentAnswer, TeamWorksProjectStoreState } from "@/lib/team-works-projects";
 
 const teamWorksDeliverableBucket = "team-works-deliverables";
+const teamWorksFormAttachmentBucket = "team-works-form-attachments";
 
 export type TeamWorksPortalRole = "client" | "worker";
 
@@ -28,6 +29,8 @@ export type UploadedTeamWorksDeliverableFile = {
   storagePath: string;
   signedUrl: string;
 };
+
+export type UploadedTeamWorksFormAttachment = ProjectFormAttachmentAnswer;
 
 export async function readTeamWorksPortalMemberships(role: TeamWorksPortalRole) {
   const user = await requireCurrentUser();
@@ -139,6 +142,9 @@ export async function readTeamWorksPortalCollaborationState(
   const taskSourceById = new Map((tasks.data ?? []).flatMap((row) => row.source_local_id ? [[row.id, row.source_local_id] as const] : []));
   const deliverableSourceById = new Map((deliverables.data ?? []).flatMap((row) => row.source_local_id ? [[row.id, row.source_local_id] as const] : []));
 
+  const formAttachmentPaths = (submissions.data ?? []).flatMap((row) => collectFormAttachmentStoragePaths(row.answers as Record<string, ProjectFormAnswerValue>));
+  const signedFormAttachmentUrlByStoragePath = await createSignedUrlByStoragePath(teamWorksFormAttachmentBucket, formAttachmentPaths);
+
   const databaseSubmissions = (submissions.data ?? []).flatMap((row) => {
     const membership = membershipByDatabaseProjectId.get(row.project_id);
     const formId = formSourceById.get(row.form_id);
@@ -149,7 +155,7 @@ export async function readTeamWorksPortalCollaborationState(
       formId,
       submittedByActor: membership.role,
       submittedById: row.submitted_by_member_id,
-      answers: row.answers as Record<string, ProjectFormAnswerValue>,
+      answers: restoreFormAttachmentSignedUrls(row.answers as Record<string, ProjectFormAnswerValue>, signedFormAttachmentUrlByStoragePath),
       status: row.status,
       reviewMemo: row.review_memo,
       reviewedByMemberId: row.reviewed_by_member_id ?? "",
@@ -184,7 +190,7 @@ export async function readTeamWorksPortalCollaborationState(
   const databaseCommentIds = new Set(databaseComments.map((comment) => comment.id));
   const taskAssigneeBySourceId = new Map((tasks.data ?? []).flatMap((row) => row.source_local_id ? [[row.source_local_id, row.assignee_member_id ?? ""] as const] : []));
   const deliverableBySourceId = new Map((deliverables.data ?? []).flatMap((row) => row.source_local_id ? [[row.source_local_id, row] as const] : []));
-  const signedUrlByStoragePath = await createSignedUrlByStoragePath(
+  const signedUrlByStoragePath = await createSignedUrlByStoragePath(teamWorksDeliverableBucket,
     (deliverables.data ?? []).map((row) => row.storage_path).filter((path): path is string => Boolean(path))
   );
 
@@ -242,12 +248,51 @@ export async function saveTeamWorksPortalFormSubmission(input: {
       form_id: form.id,
       submitted_by_member_id: input.membership.memberId,
       source_local_id: input.submissionSourceId,
-      answers: input.answers,
+      answers: sanitizeFormAttachmentAnswers(input.answers),
       status: input.status,
       submitted_at: input.status === "submitted" ? now : null,
       updated_at: now
     }, { onConflict: "form_id,submitted_by_member_id" });
   if (error) throw error;
+}
+
+export async function uploadTeamWorksPortalFormAttachment(input: {
+  membership: TeamWorksPortalMembership;
+  formSourceId: string;
+  submissionSourceId: string;
+  fieldId: string;
+  file: File;
+}): Promise<UploadedTeamWorksFormAttachment> {
+  await requireCurrentUser();
+  const path = [
+    input.membership.databaseProjectId,
+    input.formSourceId,
+    input.submissionSourceId,
+    input.fieldId,
+    `${Date.now()}-${crypto.randomUUID()}-${safeStorageFileName(input.file.name)}`
+  ].join("/");
+  const { data, error } = await supabase.storage
+    .from(teamWorksFormAttachmentBucket)
+    .upload(path, input.file, {
+      cacheControl: "3600",
+      contentType: input.file.type || undefined,
+      upsert: true
+    });
+  if (error) throw error;
+  const storagePath = data.path;
+  const { data: signed, error: signedError } = await supabase.storage
+    .from(teamWorksFormAttachmentBucket)
+    .createSignedUrl(storagePath, 60 * 60);
+  if (signedError) throw signedError;
+  return {
+    kind: "storage_attachment",
+    fileName: input.file.name,
+    storagePath,
+    signedUrl: signed.signedUrl,
+    contentType: input.file.type || undefined,
+    size: input.file.size,
+    uploadedAt: new Date().toISOString()
+  };
 }
 
 export async function reviewTeamWorksPortalFormSubmission(input: {
@@ -429,13 +474,44 @@ async function findSourceRowId(table: "team_works_project_tasks" | "team_works_p
   return data.id as string;
 }
 
-async function createSignedUrlByStoragePath(paths: string[]) {
+async function createSignedUrlByStoragePath(bucket: string, paths: string[]) {
   const uniquePaths = [...new Set(paths)];
   const entries = await Promise.all(uniquePaths.map(async (path) => {
-    const { data, error } = await supabase.storage.from(teamWorksDeliverableBucket).createSignedUrl(path, 60 * 60);
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60 * 60);
     return error || !data ? null : [path, data.signedUrl] as const;
   }));
   return new Map(entries.filter((entry): entry is readonly [string, string] => entry !== null));
+}
+
+function collectFormAttachmentStoragePaths(answers: Record<string, ProjectFormAnswerValue>) {
+  return Object.values(answers).flatMap((value) => isFormAttachmentAnswer(value) ? [value.storagePath] : []);
+}
+
+function restoreFormAttachmentSignedUrls(
+  answers: Record<string, ProjectFormAnswerValue>,
+  signedUrlByStoragePath: Map<string, string>
+): Record<string, ProjectFormAnswerValue> {
+  return Object.fromEntries(Object.entries(answers).map(([fieldId, value]) => [
+    fieldId,
+    isFormAttachmentAnswer(value) ? { ...value, signedUrl: signedUrlByStoragePath.get(value.storagePath) ?? value.signedUrl } : value
+  ]));
+}
+
+function sanitizeFormAttachmentAnswers(answers: Record<string, ProjectFormAnswerValue>): Record<string, ProjectFormAnswerValue> {
+  return Object.fromEntries(Object.entries(answers).map(([fieldId, value]) => [
+    fieldId,
+    isFormAttachmentAnswer(value) ? withoutSignedUrl(value) : value
+  ]));
+}
+
+function isFormAttachmentAnswer(value: ProjectFormAnswerValue | undefined): value is ProjectFormAttachmentAnswer {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && "kind" in value && value.kind === "storage_attachment" && "storagePath" in value);
+}
+
+function withoutSignedUrl(value: ProjectFormAttachmentAnswer): ProjectFormAttachmentAnswer {
+  const answer: ProjectFormAttachmentAnswer = { ...value };
+  delete answer.signedUrl;
+  return answer;
 }
 
 function safeStorageFileName(name: string) {

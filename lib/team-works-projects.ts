@@ -58,7 +58,16 @@ export type ProjectFormFieldType =
 export type ProjectResourceType = "url" | "note";
 export type ProjectResourceAudience = "admin" | "members" | "client" | "all";
 export type ProjectFormSubmissionStatus = "draft" | "submitted" | "revision_requested" | "approved";
-export type ProjectFormAnswerValue = string | number | boolean | string[];
+export type ProjectFormAttachmentAnswer = {
+  kind: "storage_attachment";
+  fileName: string;
+  storagePath: string;
+  signedUrl?: string;
+  contentType?: string;
+  size?: number;
+  uploadedAt: string;
+};
+export type ProjectFormAnswerValue = string | number | boolean | string[] | ProjectFormAttachmentAnswer;
 
 export const projectFormFieldTypeLabels: Record<ProjectFormFieldType, string> = {
   short_text: "1行テキスト",
