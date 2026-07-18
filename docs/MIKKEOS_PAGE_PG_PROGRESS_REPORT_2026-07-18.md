@@ -98,6 +98,48 @@ npm.cmd run lint: 成功
 npm.cmd run build: 成功（89 static pages、/apps/page/[siteId] 追加確認）
 ```
 
+## PG-1-d: 積み上げ式ブロック編集
+
+完了。
+
+```text
+追加: app/apps/page/[siteId]/[pageId]/page.tsx
+追加: components/page/PageDocumentEditor.tsx
+更新: lib/page/types.ts
+更新: lib/page/store.ts
+更新: components/page/PageDashboard.tsx
+```
+
+実装内容:
+
+```text
+見出し、文章、画像、ボタン、フォーム枠、区切りの追加・編集・削除・上下移動を実装。
+ページ名・ページslug・ブロック構成を明示保存。
+編集画面内にOS内下書きプレビューを追加。
+フォーム枠は見た目だけで、送信処理は実装しない。
+```
+
+境界:
+
+```text
+Studio的な自由配置は作らず、縦方向の積み上げ式だけ。
+CMS selectors、外部公開、フォーム送信、他者掲載依頼、Manager受信箱、決済、独自ドメインは未実装。
+既存アプリとAI OFFICEの保存処理・作業中差分は変更なし。
+```
+
+次:
+
+```text
+PG-1-e: 自組織CMSブロックの読み取り接続
+```
+
+検収:
+
+```text
+npm.cmd run lint: 成功
+npm.cmd run build: 成功（90 static pages、/apps/page/[siteId]/[pageId] 追加確認）
+```
+
 ## PG-1-b: Page新規作成
 
 完了。

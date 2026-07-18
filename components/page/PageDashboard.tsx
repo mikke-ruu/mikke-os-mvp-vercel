@@ -103,7 +103,7 @@ export function PageDashboard() {
           <div>
             <h2 className="text-lg font-bold tracking-normal">次に作るところ</h2>
             <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
-              PG-1-dで、見出し・文章・画像・ボタン・区切りの積み上げ式編集を追加します。
+              次は自組織CMSブロックを既存アプリの読み取り専用データへ接続します。
             </p>
             <Link href="/manager" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[var(--mikke-accent)]">
               Managerで他アプリの動きを見る <ArrowRight size={15} />

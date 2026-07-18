@@ -1,5 +1,5 @@
 import { pageDemoState } from "./demo";
-import type { PageDocument, PageSite, PageStoreState } from "./types";
+import type { PageBlock, PageDocument, PageSite, PageStoreState } from "./types";
 
 export const PAGE_STORAGE_KEY = "mikke.page.v1";
 
@@ -13,6 +13,12 @@ export type CreatePageSiteInput = {
 export type CreatePageDocumentInput = {
   title: string;
   slug: string;
+};
+
+export type SavePageDocumentInput = {
+  title: string;
+  slug: string;
+  blocks: PageBlock[];
 };
 
 function clonePageState(state: PageStoreState): PageStoreState {
@@ -209,4 +215,34 @@ export function movePageDocument(siteId: string, pageId: string, direction: -1 |
     [documents[currentIndex], documents[nextIndex]] = [documents[nextIndex], documents[currentIndex]];
     return { ...site, documents, updatedAt: new Date().toISOString() };
   });
+}
+
+export function savePageDocument(siteId: string, pageId: string, input: SavePageDocumentInput) {
+  const title = input.title.trim();
+  const slug = normalizePageSiteSlug(input.slug);
+  if (!title) throw new Error("ページ名を入力してください。");
+  if (!slug) throw new Error("ページslugを半角英数字で入力してください。");
+
+  let savedDocument: PageDocument | null = null;
+  updatePageSite(siteId, (site) => {
+    const currentDocument = site.documents.find((document) => document.id === pageId);
+    if (!currentDocument) throw new Error("編集するページが見つかりませんでした。");
+    if (site.documents.some((document) => document.id !== pageId && document.slug === slug)) {
+      throw new Error("このページslugはすでに使われています。");
+    }
+    const now = new Date().toISOString();
+    savedDocument = {
+      ...currentDocument,
+      title,
+      slug,
+      blocks: input.blocks.map((block, index) => ({ ...block, order: index + 1 })),
+      updatedAt: now
+    };
+    return {
+      ...site,
+      documents: site.documents.map((document) => (document.id === pageId ? savedDocument as PageDocument : document)),
+      updatedAt: now
+    };
+  });
+  return savedDocument as PageDocument | null;
 }

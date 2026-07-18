@@ -2,7 +2,7 @@ import type { AppKey } from "@/lib/mikkeos/types";
 
 export type PageSiteStatus = "draft" | "paused";
 export type PageDocumentStatus = "draft" | "hidden";
-export type PageBlockType = "heading" | "text" | "image" | "button" | "divider" | "cms";
+export type PageBlockType = "heading" | "text" | "image" | "button" | "form" | "divider" | "cms";
 export type PageCmsSource = "story" | Extract<AppKey, "item_studio" | "event" | "academy" | "session">;
 export type PageCmsDisplayMode = "list" | "cards" | "featured";
 
@@ -36,6 +36,13 @@ export type PageButtonBlock = PageBlockBase & {
   href: string;
 };
 
+export type PageFormBlock = PageBlockBase & {
+  type: "form";
+  title: string;
+  description: string;
+  buttonLabel: string;
+};
+
 export type PageDividerBlock = PageBlockBase & {
   type: "divider";
 };
@@ -57,6 +64,7 @@ export type PageBlock =
   | PageTextBlock
   | PageImageBlock
   | PageButtonBlock
+  | PageFormBlock
   | PageDividerBlock
   | PageCmsBlock;
 
