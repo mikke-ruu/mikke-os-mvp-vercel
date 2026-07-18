@@ -1,8 +1,8 @@
-export type ManagerAppKey = "manager" | "marketnote" | "order" | "session" | "event" | "fund" | "team_works";
+export type ManagerAppKey = "manager" | "marketnote" | "order" | "session" | "event" | "fund" | "team_works" | "academy" | "item_studio";
 export type ManagerItemKind = "schedule" | "task" | "progress" | "history";
 export type ManagerUrgency = "overdue" | "today" | "week" | "later" | "unscheduled";
 export type ManagerProgressStatus = "not_started" | "active" | "waiting" | "completed" | "on_hold" | "cancelled";
-export type ManagerSourceType = "personal_event" | "event" | "application" | "booking" | "project" | "plan" | "support" | "task" | "log";
+export type ManagerSourceType = "personal_event" | "event" | "application" | "booking" | "project" | "plan" | "support" | "task" | "log" | "course" | "instructor" | "kit_order" | "item" | "channel" | "sale";
 
 export type ManagerSource = {
   appKey: ManagerAppKey;
@@ -81,5 +81,7 @@ export const managerAppLabels: Record<ManagerAppKey, string> = {
   session: "Session",
   event: "Event",
   fund: "Fund",
-  team_works: "Team Works"
+  team_works: "Team Works",
+  academy: "Academy",
+  item_studio: "Item Studio"
 };

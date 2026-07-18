@@ -7,7 +7,7 @@ import { ManagerShell } from "./ManagerShell";
 
 export function ManagerTaskList() {
   const { profile } = useAuth();
-  const snapshot = useManagerSnapshot(profile.id);
+  const snapshot = useManagerSnapshot(profile.id, profile.user_id);
 
   return (
     <ManagerShell title="タスク" subtitle="申込対応・予約確認・提供対応など、未完了の作業をまとめます。">
@@ -17,4 +17,3 @@ export function ManagerTaskList() {
     </ManagerShell>
   );
 }
-

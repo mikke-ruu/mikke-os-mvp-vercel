@@ -9,7 +9,7 @@ import { ManagerShell } from "./ManagerShell";
 
 export function ManagerDashboard() {
   const { profile } = useAuth();
-  const snapshot = useManagerSnapshot(profile.id);
+  const snapshot = useManagerSnapshot(profile.id, profile.user_id);
   const todayItems = snapshot.schedules.filter((item) => item.urgency === "today" || item.urgency === "overdue");
   const urgentTasks = snapshot.tasks.filter((task) => task.urgency === "today" || task.urgency === "overdue" || task.priority === "high");
   const suggestions = collectManagerAppSuggestions(snapshot);

@@ -10,7 +10,7 @@ import type { ManagerPersonalEvent } from "@/lib/manager/types";
 
 export function ManagerCalendarView() {
   const { profile } = useAuth();
-  const snapshot = useManagerSnapshot(profile.id);
+  const snapshot = useManagerSnapshot(profile.id, profile.user_id);
   const { personalEvents, createPersonalEvent, updatePersonalEvent, removePersonalEvent, togglePersonalEventCompleted } = useManagerPersonalEvents();
   const [title, setTitle] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));

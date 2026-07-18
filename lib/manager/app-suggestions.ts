@@ -14,7 +14,9 @@ const appHrefByKey: Partial<Record<ManagerAppKey, string>> = {
   session: "/apps/session",
   event: "/apps/event",
   fund: "/apps/fund",
-  team_works: "/apps/team-works"
+  team_works: "/apps/team-works",
+  academy: "/apps/academy",
+  item_studio: "/apps/item-studio"
 };
 
 const appNameByKey: Partial<Record<ManagerAppKey, string>> = {
@@ -23,7 +25,9 @@ const appNameByKey: Partial<Record<ManagerAppKey, string>> = {
   session: "Session",
   event: "Event",
   fund: "Fund",
-  team_works: "Team Works"
+  team_works: "Team Works",
+  academy: "Academy",
+  item_studio: "Item Studio"
 };
 
 export function collectManagerAppSuggestions(snapshot: ManagerSnapshot): ManagerAppSuggestion[] {

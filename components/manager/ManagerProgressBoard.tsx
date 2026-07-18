@@ -7,7 +7,7 @@ import { ManagerShell } from "./ManagerShell";
 
 export function ManagerProgressBoard() {
   const { profile } = useAuth();
-  const snapshot = useManagerSnapshot(profile.id);
+  const snapshot = useManagerSnapshot(profile.id, profile.user_id);
 
   return (
     <ManagerShell title="進行" subtitle="イベントやFundなど、動いているものの進み具合を見ます。">
@@ -17,4 +17,3 @@ export function ManagerProgressBoard() {
     </ManagerShell>
   );
 }
-
