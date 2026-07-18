@@ -1,8 +1,114 @@
 # mikkeOS UI Docs Index
 
-更新日: 2026-07-14
+更新日: 2026-07-18
 
 mikkeOSのUI方針は、以下のdocsを参照します。
+
+**新しいセッション・別モデルはまず `docs/MIKKEOS_NEXT_PHASE_PLAN_2026-07-18.md` と `docs/MIKKEOS_SESSION_HANDOFF_2026-07-14.md` を読む。** 全体の現在地・体制・次のアクションがまとまっている。
+
+## 2026-07-18 追加（次フェーズ計画）
+
+### `docs/MIKKEOS_NEXT_PHASE_PLAN_2026-07-18.md`
+
+Manager M1E時点の監査結果と、次の実行計画（N0〜N4）。
+
+- Managerの体験方針は「入口は個々のアプリ、Managerは横断参照・次にやること・控えめなアプリ提案」。
+- `/` やlogin後を単純に `/manager` へ変える案は撤回済み。
+- N0: docs / 認定講座admin / AI OFFICEを分離コミットして整地。
+- N1: Manager M1正式検収。
+- N2: Manager M2（残アプリアダプタ、旧ルート処遇、ナビ再設計、文脈案内、受信箱）。
+- N3: Page PG-0〜PG-2。
+- N4: セレクトショップ着手条件の調査・解消。
+
+## 2026-07-16 追加（セレクトショップ／提携モデル）
+
+### `docs/MIKKEOS_SELECT_SHOP_MODEL.md`
+
+Page所有事業者が提携店舗の商品・サービスを掲載し、販売・発送・報酬まで回すモデル
+（Fable設計・複数アプリ横断のため独立docs）。セレクトショップ／占い／ワークショップ／
+商店街が同一構造で回る。
+
+- **Team Worksのラベル替えで成立**（clients→お客様、workers→提携店舗、payouts→報酬）。新アプリを作らない。
+- **販売は確認型**（在庫確認→確定→決済）。オーバーセルを業務プロセスで回避し、実装も軽くなる。
+- 在庫切れの自動掲載停止は「参照型＝コピーしない」原則の効果で実装不要。
+- 提携条件は「提示→承認」の一方向。Manager受信箱で掲載依頼＋販売委託を1つの承認に統合。
+- レビューは2設問式（商品→提供店舗のStory／店舗→Page所有者のStory）。星は付けない。
+- **着手条件: worker portalのアクセス制御をRLSで担保**（発送先＝個人情報。既知debtを格上げ）。
+  やり方はFund F5-aのRLS否定testと同じパターン。
+- 成長ループ（提携店舗が無料で参加→仕事体験→Storyが育つ→自分もPageを持つ）が戦略的価値。
+- **決定: 招かれたworker（提携店舗）は無料**（料金正典1.5章「オーナー1人課金」原則）。
+- 未決: 上乗せ時のブランド価格保護／レビュー公開可否／即時決済の要否／受け皿の一本化。
+
+## 2026-07-16 追加（収益化・料金の正典）
+
+### `docs/MIKKEOS_MONETIZATION_AND_PRICING.md`
+
+散在していた料金方針（原典 `Mikke OS/アオイ回答_収益化提携成長方針_2026-06-19.md`
+＋各アプリ構想書＋2026-07-16確定）を1枚に集約。
+
+- **関与しない原則**: mikkeは場所・ツールを提供するだけ。利用事業者の事業運営に一切関与しない。全部任意。
+- お金は2層のみ: ①mikke利用料（唯一の収益）／②利用事業者のお金（mikkeは関与しない・手数料0%）。
+  旧「③マッチング手数料層」は2026-07-16に解消（Partners/Connectはmikkeが1事業者としてPageで作るもの）。
+- ティア: 個人Free/Plus ＋ 団体は**アプリごとに個別課金**（1ヶ月無料トライアル・請求は1本化可）。
+- 課金軸は「誰を巻き込むか」。個人が1人で使う分（MarketNote→ログ→Story→DESKの1周）は無料。
+- Academy: 他アプリと同じ位置づけ。初期設定料金+月会費・トライアルなし（教科書は必須ではない）。
+- **成約手数料機能はPageの有料機能**として全事業者へ提供（Plus案件・条件=事業者のStripe契約）。
+  Pageで広告業・紹介業ができる＝他HPシステムとの差別化・離脱低減。実装方法は未決。
+- 独自ドメインは持ち込み式（mikkeは取得・解約しない）。製品紹介HPはPageで構築（ドッグフーディング）。
+- 解約は自由・引き止めない。mikkeが用意するのはアナウンスと動線のみ。
+- アップセルはManager M2の文脈案内に相乗り（課金壁・ポップアップは作らない）。
+- Stripe契約済み（OJAS）。①課金レール確保。②をmikke経由にはしない。
+- 未決: 成約手数料機能の実装方法／具体的金額（触ってから）／解約アナウンスの具体設計。
+- 課金機能の実装は各アプリのSupabase本接続フェーズ＋ドッグフーディング後。このdocsはポリシー確定のみ。
+
+## 2026-07-15 動線監査（Fable実施）
+
+アプリのラインナップはこれ以上増やさないことをユーザーが確定。全docsと実装コードの
+動線整合を監査し、結果を `MIKKEOS_MANAGER_INTEGRATION_PLAN.md` へ反映済み:
+
+- 2.1章追記: ルート / のリダイレクト（app/page.tsx）もloginと合わせて扱う
+  （※当初の「両方を/managerへ変更」案は2026-07-18に撤回。入口はアプリファースト）
+- 2.4章新設: 旧ルート /home・/marketnote の残置を凍結、処遇はM2で判断
+- 2.5章新設: Manager受信箱（Page掲載依頼の承認/辞退）の設計席。実装はF4基盤後・PG-4と同時
+- M2追記: ボトムナビ痩身（使っているアプリだけ見せる）をOS枠置き換えと同時判断
+
+監査結論: データ動線（アプリ→Activity Log→Story/DESK、アプリ→derive-on-read→
+Manager/Page）は全docsで一貫。依存順序 Fund F4 → Manager → Page PG-4 も正しい。
+
+## 2026-07-15 追加（Page 新規アプリ構想）
+
+### `docs/MIKKEOS_PAGE_IMPLEMENTATION_PLAN.md`
+
+`Mikke OS/Page 正式構想書.md` を一本化ラインへ落とし込んだ計画（Fable設計・PG-0〜PG-5）。
+
+- Page = 団体・ブランド・企業のホームページ。Storyの上位互換ではない（Story=個人名刺、Page=団体HP）。
+- 核はCMSブロック: 各アプリをコピーせず参照（derive-on-read）。既存selectorsの再利用で建つ。
+- 難易度が2層: 自組織CMS（localStorage・依存なし）は先、他者掲載依頼はFund F4基盤＋Manager受信箱依存、独自ドメイン公開はSupabase本接続で最終。
+- ユーザー確定: 独自ドメイン対応を最終ゴールに含める／急がない・最適順／codex一本化中のためキュー最後尾・並行させない。
+
+## 2026-07-15 追加（Team Worksプロジェクト管理拡張）
+
+### `docs/MIKKEOS_TEAM_WORKS_PROJECTS_PLAN.md`
+
+`Mikke OS/Team Works 新構想.md`＋`Team Works 追加機能ブリーフ.md` を一本化ラインへ落とし込んだ計画（Fable設計・TW-P0〜P7）。
+
+- 継続業務モード（既存）はそのまま、プロジェクトモードを新規ファイルで追加。
+- **ユーザー確定: ジェネレーター案。業種テンプレはrepo同梱しない**（業務フロー露出回避）。質問→工程生成が主。
+- 既存の1902行TeamWorksScreen.tsxへ直接足さない。FeatureSettingsにenable系フラグ追加（デフォルトOFF）。
+- 実装は1機能=1実装者。codexはFund進行中のため手が空いた実装者へ渡すキュー項目。
+
+## 2026-07-14 追加（Manager統合計画）
+
+### `docs/MIKKEOS_MANAGER_INTEGRATION_PLAN.md`
+
+`Mikke OS/Manager機能 正式構想書.md` を一本化実行ラインへ落とし込んだ計画（Fable設計・M0〜M5）。
+
+- Managerはアプリではなく共通機能。予定・進行・履歴のナビゲーション。
+- アプリ由来の予定は保存せずderive-on-read。保存は個人予定と表示設定のみ。
+- M0（設計報告・docsのみ）は今すぐ依頼可。M1はFund F4承認待ちの間に実施可。
+- 既存/osとの矛盾は/os凍結で対応（「M1完了後にloginを/managerへ」案は
+  2026-07-18に撤回。入口は個々のアプリ、Managerは横断参照の場所）。
+- ボトムナビOS枠の扱いは単純なManager置き換えにせず、M2で再設計。
 
 ## 2026-07-14 追加（Fund正式構想の一本化）
 
@@ -201,8 +307,16 @@ MIKKEOS_PRIMITIVES_WP3.md
 ## 3. 次の作業候補
 
 ```text
-1. Fund F4-b1: fund_projects + fund_supportsの最小DB基盤とRLS（別承認待ち）
-2. Fund F4-b2以降: claim / participation / 公開投影 / 招待・同意実装（b1検収後）
-3. Community: Academy会員モデル確定後に仕様化
-4. Event portal / MarketNote連携: 既存後続計画の優先順位判断待ち
+1. N0: 整地
+   → docs / 認定講座admin / AI OFFICEを分離コミット。handoffとindexを2026-07-18版へ更新。
+2. N1: Manager M1正式検収
+   → docs/MIKKEOS_ACCEPTANCE_CHECKLIST.md 1〜5章 + Manager計画7章 + M0レポート6章。
+3. N2: Manager M2
+   → Team Works / Academy / Item Studioアダプタ、旧ルート処遇、ボトムナビ再設計、文脈案内、受信箱設計。
+4. N3: Page PG-0〜PG-2
+   → docs/MIKKEOS_PAGE_IMPLEMENTATION_PLAN.md。localStorage・依存なし層から開始。
+5. N4: セレクトショップ着手条件の解消
+   → worker portalのアクセス制御/RLS担保を調査し、必要ならFund F5-a型の否定テストで補強。
+6. Community: Academy会員モデル確定後に仕様化。
+7. Event portal / MarketNote連携: 優先順位判断待ち。
 ```

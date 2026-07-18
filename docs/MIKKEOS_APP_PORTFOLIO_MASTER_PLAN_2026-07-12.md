@@ -374,3 +374,53 @@ Communityの詳細設計              → Academy会員モデル確定後
 Event MVP第1パス（BP-2-b）完了後の計画として、イベントポータルとMarketNote自動連携を
 `docs/MIKKEOS_EVENT_PORTAL_AND_MARKETNOTE_LINK_PLAN.md` に記録済み（設計のみ・実装未着手）。
 Phase E1（Supabase移行）〜E5（MarketNote自動登録）の5段階。着手は別途指示を受けてから。
+
+## 9. 共通機能: Manager（2026-07-14追記）
+
+`G:/Musubiプロジェクト/Mikke OS/Manager機能 正式構想書.md` を受け、共通機能Managerを実行ラインへ組み込んだ。
+実装計画の正典は `docs/MIKKEOS_MANAGER_INTEGRATION_PLAN.md`（M0〜M5）。
+
+```text
+- Managerはアプリではなく共通機能。BP番号ではなくM番号で管理。
+- M0（設計報告・docsのみ）は今すぐ依頼可（2.0章の例外に該当）。
+- M1（localStorage MVP）はFund F4の承認待ち・検収待ちの間に実施可
+  （触るファイルが重ならないことを確認済み）。実装は同時に1人。
+- アプリ由来の予定は保存せず読み取り時に導出（derive-on-read）。
+  Managerが保存するのは個人予定と表示設定のみ。
+- 「OSホームは作らない」方針と既存/osの矛盾は、/os凍結で対応する。
+  当初あった「M1完了後にloginリダイレクトを/managerへ変更」案は
+  2026-07-18に撤回（Manager計画1.1章）。入口は個々のアプリ、
+  Managerは横断参照・控えめな提案の場所とする（アプリファースト）。
+```
+
+## 10. Team Worksプロジェクト管理拡張（2026-07-15追記）
+
+`Mikke OS/Team Works 新構想.md`＋`Team Works 追加機能ブリーフ.md`を受け、Team Worksへ
+プロジェクト管理モードを追加する計画。正典は `docs/MIKKEOS_TEAM_WORKS_PROJECTS_PLAN.md`（TW-P0〜P7）。
+
+```text
+- ユーザー確定（2026-07-15）: ジェネレーター案。業種テンプレ（認定講座構築等）は
+  repoへ同梱しない（他業種への業務フロー露出を避ける）。質問→工程生成が主。
+- 継続業務モード（既存）は壊さず、プロジェクトモードを新規ファイルで追加。
+  既存FeatureSettingsに enable系フラグを追加（デフォルトOFF）。
+- 1902行のTeamWorksScreen.tsxへ直接足さない。lib/team-works-projects.ts +
+  新規ルートで実装。
+- 実装は1機能=1実装者。codexはFund進行中のため、Team Worksは手が空いた
+  実装者へ渡すキュー項目。ファイルは重ならないので並行可。
+```
+
+## 11. Page 新規アプリ（2026-07-15追記）
+
+`Mikke OS/Page 正式構想書.md`を受け、団体・ブランド・企業向けホームページアプリPageを
+実行ラインへ追加。正典は `docs/MIKKEOS_PAGE_IMPLEMENTATION_PLAN.md`（PG-0〜PG-5）。
+
+```text
+- Page = 団体・ブランド・企業のHP。Story（個人名刺）の上位互換ではない別レイヤー。
+- 核はCMSブロック: 各アプリをコピーせず参照する（derive-on-read）。Pageは活動データを
+  持たず、既存selectorsを読むだけ。Item Studio/Event/Academy/Session/Story/Communityを参照。
+- ユーザー確定（2026-07-15）: 独自ドメイン対応を最終ゴールに含める。急がない・最適順。
+  codex一本化作業中のためキュー最後尾・並行させない（1機能=1実装者）。
+- 難易度2層: 自組織CMS（PG-0〜2・localStorage・依存なし）を先に。他者掲載依頼（PG-4）は
+  Fund F4の本人同定・同意基盤＋Manager受信箱に依存。独自ドメイン公開（PG-5）はSupabase本接続。
+- AppKeyに "page" 追加、apps.tsにPage定義追加（PG-0で実施）。
+```
