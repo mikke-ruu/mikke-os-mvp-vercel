@@ -112,3 +112,10 @@ Supabaseサーバ保存か静的書き出しか、公開ルート名、公開デ
 他者掲載依頼、Manager受信箱接続、販売委託、決済、独自ドメイン、フォーム送信はまだ作らないでください。
 AI OFFICE関連の未コミット変更は触らず、そのまま保持してください。
 ```
+## 2026-07-19 訂正: Connect / Partners
+
+旧PG-2-bで入れた Connect / Partners 専用のPage内CMS項目管理は、構想解釈が違っていたため撤回。
+Connect / Partners は、あゆみがPageのCMSブロックを使って構築・運営していくページ構想であり、Pageアプリの組み込み機能ではない。
+
+修正後のPage CMSは、mikkeIDを軸に Story / Item Studio / Event / Academy / Session の公開候補を選び、表示できる内容と公開条件を画面上で明確にする。
+Pageには選択IDと絞り込み条件だけを保存し、元データや専用Connect/Partnersデータは保存しない。

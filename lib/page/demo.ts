@@ -86,7 +86,6 @@ export const pageDemoState: PageStoreState = {
           ]
         }
       ],
-      directoryItems: [],
       createdAt: now,
       updatedAt: now
     }

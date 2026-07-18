@@ -333,3 +333,10 @@ Page入口からサイト管理、各ページからブロック編集ルート�
 ```text
 PG-1-d: /apps/page/[siteId]/[pageId] の積み上げ式ブロック編集
 ```
+## 2026-07-19 訂正: PG-2-b Connect / Partners
+
+旧PG-2-bの「Connect / PartnersをPage内CMS項目として追加」は撤回。
+Connect / Partners は、あゆみがPageのCMSブロックを使って構築・運営していく構想であり、Pageアプリの専用機能・専用管理画面ではない。
+
+修正後は、Page CMSの参照元を Story / Item Studio / Event / Academy / Session に戻し、各参照元について「mikkeID接続」「表示できる内容」「表示条件」を編集画面に表示する。
+Connect / Partners は、この汎用CMSで構築できるかを検証する対象として扱う。

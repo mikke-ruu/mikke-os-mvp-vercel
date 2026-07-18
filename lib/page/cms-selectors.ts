@@ -7,7 +7,6 @@ import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 import { mockProfile } from "@/lib/mikkeos/mock-data";
 import { useSessionMenus } from "@/lib/session/store";
 import type { PageCmsSource } from "./types";
-import type { PageDirectoryItem } from "./types";
 
 export type PageCmsItem = {
   id: string;
@@ -21,7 +20,53 @@ export type PageCmsItem = {
   href?: string;
 };
 
-export function usePageCmsContent(directoryItems: PageDirectoryItem[] = []) {
+export type PageCmsSourceInfo = {
+  source: PageCmsSource;
+  label: string;
+  connection: string;
+  visibleFields: string;
+  visibilityRule: string;
+};
+
+export const pageCmsSourceInfo: Record<PageCmsSource, PageCmsSourceInfo> = {
+  story: {
+    source: "story",
+    label: "Story",
+    connection: "mikkeIDの公開プロフィール",
+    visibleFields: "表示名、ブランド名、自己紹介、エリア、ハンドル、アイコン",
+    visibilityRule: "公開プロフィールとして見せてよい情報だけ"
+  },
+  item_studio: {
+    source: "item_studio",
+    label: "Item Studio",
+    connection: "mikkeIDに紐づく作品・商品",
+    visibleFields: "作品名、説明、写真、カテゴリ、価格",
+    visibilityRule: "公開中の作品・商品のみ"
+  },
+  event: {
+    source: "event",
+    label: "Event",
+    connection: "mikkeIDに紐づく主催・参加イベント",
+    visibleFields: "イベント名、概要、開催日、会場、カバー画像",
+    visibilityRule: "公開中のイベントのみ"
+  },
+  academy: {
+    source: "academy",
+    label: "Academy",
+    connection: "mikkeIDに紐づく講座・学びの活動",
+    visibleFields: "公開活動名、説明、種別、発生日",
+    visibilityRule: "公開かつStory表示対象の活動ログのみ"
+  },
+  session: {
+    source: "session",
+    label: "Session",
+    connection: "mikkeIDに紐づく予約・相談・講座メニュー",
+    visibleFields: "メニュー名、概要、所要時間、価格",
+    visibilityRule: "公開中のメニューのみ"
+  }
+};
+
+export function usePageCmsContent() {
   const { items } = useItemStudio();
   const { events } = useMikkeEvents();
   const { menus } = useSessionMenus();
@@ -87,12 +132,6 @@ export function usePageCmsContent(directoryItems: PageDirectoryItem[] = []) {
         meta: [menu.durationLabel, menu.price === null ? "" : `${menu.price.toLocaleString("ja-JP")}円`].filter(Boolean).join(" / "),
         occurredAt: menu.createdAt,
         approved: true
-      })),
-    connect: directoryItems
-      .filter((item) => item.kind === "connect")
-      .map((item) => ({ id: item.id, source: "connect", title: item.name, summary: item.description, imageUrl: item.imageUrl, meta: item.category, occurredAt: item.createdAt, approved: true, href: item.linkUrl })),
-    partners: directoryItems
-      .filter((item) => item.kind === "partners")
-      .map((item) => ({ id: item.id, source: "partners", title: item.name, summary: item.description, imageUrl: item.imageUrl, meta: item.category, occurredAt: item.createdAt, approved: true, href: item.linkUrl }))
-  }), [directoryItems, events, items, logs, menus]);
+      }))
+  }), [events, items, logs, menus]);
 }

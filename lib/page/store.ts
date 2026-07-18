@@ -1,5 +1,5 @@
 import { pageDemoState } from "./demo";
-import type { PageBlock, PageDirectoryItem, PageDirectoryKind, PageDocument, PageSite, PageStoreState } from "./types";
+import type { PageBlock, PageDocument, PageSite, PageStoreState } from "./types";
 
 export const PAGE_STORAGE_KEY = "mikke.page.v1";
 
@@ -21,15 +21,6 @@ export type SavePageDocumentInput = {
   blocks: PageBlock[];
 };
 
-export type CreatePageDirectoryItemInput = {
-  kind: PageDirectoryKind;
-  name: string;
-  category: string;
-  description: string;
-  imageUrl: string;
-  linkUrl: string;
-};
-
 function clonePageState(state: PageStoreState): PageStoreState {
   return JSON.parse(JSON.stringify(state)) as PageStoreState;
 }
@@ -37,7 +28,11 @@ function clonePageState(state: PageStoreState): PageStoreState {
 function normalizePageState(state: PageStoreState): PageStoreState {
   return {
     ...state,
-    sites: state.sites.map((site) => ({ ...site, directoryItems: Array.isArray(site.directoryItems) ? site.directoryItems : [] }))
+    sites: state.sites.map((site) => {
+      const normalizedSite = { ...site } as PageSite & { directoryItems?: unknown };
+      delete normalizedSite.directoryItems;
+      return normalizedSite;
+    })
   };
 }
 
@@ -155,7 +150,6 @@ export function createPageSite(input: CreatePageSiteInput) {
         updatedAt: now
       }
     ],
-    directoryItems: [],
     createdAt: now,
     updatedAt: now
   };
@@ -262,35 +256,4 @@ export function savePageDocument(siteId: string, pageId: string, input: SavePage
     };
   });
   return savedDocument as PageDocument | null;
-}
-
-export function createPageDirectoryItem(siteId: string, input: CreatePageDirectoryItemInput) {
-  const name = input.name.trim();
-  if (!name) throw new Error("掲載名を入力してください。");
-  let createdItem: PageDirectoryItem | null = null;
-  updatePageSite(siteId, (site) => {
-    const now = new Date().toISOString();
-    createdItem = {
-      id: createPageId(`page_${input.kind}`),
-      siteId,
-      kind: input.kind,
-      name,
-      category: input.category.trim(),
-      description: input.description.trim(),
-      imageUrl: input.imageUrl.trim(),
-      linkUrl: input.linkUrl.trim(),
-      createdAt: now,
-      updatedAt: now
-    };
-    return { ...site, directoryItems: [...site.directoryItems, createdItem as PageDirectoryItem], updatedAt: now };
-  });
-  return createdItem;
-}
-
-export function deletePageDirectoryItem(siteId: string, itemId: string) {
-  return updatePageSite(siteId, (site) => ({
-    ...site,
-    directoryItems: site.directoryItems.filter((item) => item.id !== itemId),
-    updatedAt: new Date().toISOString()
-  }));
 }

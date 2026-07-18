@@ -258,3 +258,12 @@ PG-5  独自ドメイン・ホスティング        Supabase本接続 + DNS/SSL
 - お問い合わせフォームの実送信・決済の実処理 → 本接続フェーズ。
 - Community CMSブロックの詳細 → Community本体の会員モデル確定後。
 ```
+## 2026-07-19 訂正: Connect / Partners と Page CMS の解釈
+
+Connect / Partners は、Pageアプリに組み込む専用機能・専用管理画面ではない。
+あゆみが、PageのCMSブロックを使って自分で構築・運営していくページ構想である。
+
+Page CMSで重要なのは、mikkeIDを軸に「どのmikkeOSアプリの何を参照できるか」「Pageに何を表示できるか」「どの公開条件なら表示してよいか」を明確にすること。
+現時点のCMS参照元は Story / Item Studio / Event / Academy / Session とし、Connect / Partners はこれらを組み合わせて作れるかを検証する構築対象として扱う。
+
+そのため、Page側に Connect / Partners 専用の保存型・追加フォーム・管理画面・独立アプリ導線を作らない。
