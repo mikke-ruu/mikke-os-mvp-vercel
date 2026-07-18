@@ -27,7 +27,7 @@ function readPersonalEvents(): ManagerPersonalEvent[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as ManagerPersonalEvent[];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.map(normalizePersonalEvent) : [];
   } catch {
     return [];
   }
@@ -71,11 +71,12 @@ export function useManagerPersonalEvents() {
     };
   }, []);
 
-  function createPersonalEvent(input: Omit<ManagerPersonalEvent, "id" | "createdAt" | "updatedAt">) {
+  function createPersonalEvent(input: Omit<ManagerPersonalEvent, "id" | "completedAt" | "createdAt" | "updatedAt">) {
     const timestamp = nowIso();
     const event: ManagerPersonalEvent = {
       ...input,
       id: makeId("manager_event"),
+      completedAt: null,
       createdAt: timestamp,
       updatedAt: timestamp
     };
@@ -99,7 +100,11 @@ export function useManagerPersonalEvents() {
     setPersonalEvents(next);
   }
 
-  return { personalEvents, createPersonalEvent, updatePersonalEvent, removePersonalEvent };
+  function togglePersonalEventCompleted(id: string, completed: boolean) {
+    updatePersonalEvent(id, { completedAt: completed ? nowIso() : null });
+  }
+
+  return { personalEvents, createPersonalEvent, updatePersonalEvent, removePersonalEvent, togglePersonalEventCompleted };
 }
 
 export function useManagerPreferences() {
@@ -136,7 +141,7 @@ export function personalEventsToManagerSchedules(personalEvents: ManagerPersonal
       description: event.note || "個人予定",
       dueAt: event.date,
       urgency: classifyManagerDueDate(event.date, now),
-      status: "active" as const,
+      status: event.completedAt ? "completed" as const : "active" as const,
       startTime: event.startTime,
       endTime: event.endTime,
       source: {
@@ -149,3 +154,9 @@ export function personalEventsToManagerSchedules(personalEvents: ManagerPersonal
     .sort((a, b) => compareManagerItems(a, b, now));
 }
 
+function normalizePersonalEvent(event: ManagerPersonalEvent): ManagerPersonalEvent {
+  return {
+    ...event,
+    completedAt: event.completedAt ?? null
+  };
+}

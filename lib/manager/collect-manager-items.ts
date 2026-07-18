@@ -11,11 +11,12 @@ import { useMarketNoteManagerBridge } from "./adapters/marketnote";
 import { collectOrderManagerBridge } from "./adapters/order";
 import { collectSessionManagerBridge } from "./adapters/session";
 import { compareManagerDue, compareManagerItems } from "./adapters/utils";
-import { personalEventsToManagerSchedules, useManagerPersonalEvents } from "./store";
-import type { ManagerBridge, ManagerSnapshot } from "./types";
+import { personalEventsToManagerSchedules, useManagerPersonalEvents, useManagerPreferences } from "./store";
+import type { ManagerBridge, ManagerItem, ManagerProgress, ManagerSnapshot } from "./types";
 
 export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
   const { personalEvents } = useManagerPersonalEvents();
+  const { preferences } = useManagerPreferences();
   const { menus: orderMenus, applications: orderApplications } = useOrderMenus();
   const { menus: sessionMenus, bookings: sessionBookings } = useSessionMenus();
   const { events, applications: eventApplications } = useMikkeEvents();
@@ -39,12 +40,22 @@ export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
 
     return {
       personalEvents,
-      schedules: bridges.flatMap((bridge) => bridge.schedules).sort((a, b) => compareManagerItems(a, b, now)),
-      tasks: bridges.flatMap((bridge) => bridge.tasks).sort((a, b) => compareManagerItems(a, b, now)),
-      progress: bridges.flatMap((bridge) => bridge.progress).sort((a, b) => compareManagerDue(a.dueAt, b.dueAt, now))
+      schedules: bridges
+        .flatMap((bridge) => bridge.schedules)
+        .filter((item) => preferences.showCompleted || isVisibleManagerItem(item))
+        .sort((a, b) => compareManagerItems(a, b, now)),
+      tasks: bridges
+        .flatMap((bridge) => bridge.tasks)
+        .filter((item) => preferences.showCompleted || isVisibleManagerItem(item))
+        .sort((a, b) => compareManagerItems(a, b, now)),
+      progress: bridges
+        .flatMap((bridge) => bridge.progress)
+        .filter((item) => preferences.showCompleted || isVisibleManagerProgress(item))
+        .sort((a, b) => compareManagerDue(a.dueAt, b.dueAt, now))
     };
   }, [
     personalEvents,
+    preferences.showCompleted,
     orderMenus,
     orderApplications,
     sessionMenus,
@@ -56,4 +67,12 @@ export function useManagerSnapshot(ownerProfileId?: string): ManagerSnapshot {
     fundSupports,
     marketNoteBridge
   ]);
+}
+
+function isVisibleManagerItem(item: ManagerItem) {
+  return item.status !== "completed" && item.status !== "cancelled";
+}
+
+function isVisibleManagerProgress(item: ManagerProgress) {
+  return item.status !== "completed" && item.status !== "cancelled";
 }

@@ -39,7 +39,7 @@ export function ManagerSettingsPanel() {
           <label className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
             <span>
               <span className="block text-sm font-bold text-[var(--mikke-text)]">完了済みも表示する</span>
-              <span className="mt-1 block text-xs font-semibold text-[var(--mikke-muted)]">今後の絞り込みUIで使う準備設定です。</span>
+              <span className="mt-1 block text-xs font-semibold text-[var(--mikke-muted)]">完了・キャンセル済みの予定や進行もManager一覧に残します。</span>
             </span>
             <input
               type="checkbox"
@@ -53,4 +53,3 @@ export function ManagerSettingsPanel() {
     </ManagerShell>
   );
 }
-

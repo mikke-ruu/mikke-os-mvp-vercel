@@ -54,6 +54,7 @@ export type ManagerPersonalEvent = {
   date: string;
   startTime: string;
   endTime: string;
+  completedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
