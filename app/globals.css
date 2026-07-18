@@ -511,6 +511,35 @@ button {
   animation: ai-office-sparkle 1.1s ease-out forwards;
 }
 
+/* 案件詳細パネルのスライドイン */
+@keyframes ai-office-slidein {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.ai-office-slidein {
+  animation: ai-office-slidein 0.22s ease-out;
+}
+
+@keyframes ai-office-fadein {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ai-office-fadein {
+  animation: ai-office-fadein 0.2s ease-out;
+}
+
 /* テラスの鳥がたまにぴょんと跳ねる */
 @keyframes ai-office-hop {
   0%,

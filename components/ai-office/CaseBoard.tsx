@@ -1,11 +1,22 @@
 "use client";
 
 // mikke AI OFFICE — 案件ボード：受付 / 作業中 / 確認待ち / 完了 の4列カンバン。
+// フェーズ3: フロアを主役にするため各列は最新3件のみ＋「すべて見る」トグルで全件表示。
 
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { employeeById, employees, priorityLabels, statusLabels, statusOrder } from "@/lib/ai-office/data";
+import { useState } from "react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Plus } from "lucide-react";
+import {
+  employeeById,
+  employees,
+  executionStatusLabels,
+  priorityLabels,
+  statusLabels,
+  statusOrder
+} from "@/lib/ai-office/data";
 import type { CaseStatus, OfficeCase, Priority } from "@/lib/ai-office/types";
-import { formatTime } from "./office-helpers";
+import { executionBadgeClass, formatTime } from "./office-helpers";
+
+const PREVIEW_PER_COLUMN = 3;
 
 const columnStyle: Record<CaseStatus, { bg: string; border: string; text: string; dot: string }> = {
   reception: { bg: "#eef4ff", border: "#c7d7fb", text: "#2554c7", dot: "#4d7cf2" },
@@ -33,16 +44,25 @@ function CaseCard({
 }) {
   const assignee = employeeById[c.assigneeId];
   const idx = statusOrder.indexOf(c.status);
+  const execStatus = c.executionStatus ?? "idle";
 
   return (
     <div className="rounded-xl border border-[#e3e6f0] bg-white p-2.5 shadow-sm">
       <button
         type="button"
         onClick={() => onSelectCase(c.id)}
-        className="w-full text-left text-xs font-bold leading-snug text-[#1e2a4a] hover:text-[#e58f65]"
+        className="w-full text-left text-xs font-bold leading-snug text-[#1e2a4a] underline-offset-2 transition-colors hover:text-[#e58f65] hover:underline"
+        title="クリックで詳細・実行設定を開く"
       >
         {c.title}
       </button>
+
+      {/* 実行状態の小バッジ（idle以外のとき） */}
+      {execStatus !== "idle" && (
+        <span className={`mt-1 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${executionBadgeClass[execStatus]}`}>
+          {executionStatusLabels[execStatus]}
+        </span>
+      )}
 
       <div className="mt-1.5 flex items-center justify-between gap-1">
         <div className="flex min-w-0 items-center gap-1.5">
@@ -122,24 +142,55 @@ export function CaseBoard({
   onNewCase: () => void;
   onSelectCase: (caseId: string) => void;
 }) {
+  const [showAll, setShowAll] = useState(false);
+  const hiddenCount = statusOrder.reduce((sum, status) => {
+    const n = cases.filter((c) => c.status === status).length;
+    return sum + Math.max(0, n - PREVIEW_PER_COLUMN);
+  }, 0);
+
   return (
     <section className="rounded-2xl border border-[#e3e6f0] bg-white p-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-bold text-[#1e2a4a]">案件ボード</h2>
-        <button
-          type="button"
-          onClick={onNewCase}
-          className="flex items-center gap-1 rounded-full bg-[#e58f65] px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-transform hover:scale-[1.03]"
-        >
-          <Plus className="h-3.5 w-3.5" />
-          新規案件
-        </button>
+        <div className="flex items-center gap-2">
+          {(hiddenCount > 0 || showAll) && (
+            <button
+              type="button"
+              onClick={() => setShowAll((v) => !v)}
+              className="flex items-center gap-0.5 text-[11px] font-semibold text-[#e58f65] hover:underline"
+            >
+              {showAll ? (
+                <>
+                  たたむ
+                  <ChevronUp className="h-3 w-3" />
+                </>
+              ) : (
+                <>
+                  すべて見る（+{hiddenCount}）
+                  <ChevronDown className="h-3 w-3" />
+                </>
+              )}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onNewCase}
+            className="flex items-center gap-1 rounded-full bg-[#e58f65] px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-transform hover:scale-[1.03]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            新規案件
+          </button>
+        </div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2.5 xl:grid-cols-4">
         {statusOrder.map((status) => {
           const style = columnStyle[status];
-          const columnCases = cases.filter((c) => c.status === status);
+          const columnCases = cases
+            .filter((c) => c.status === status)
+            .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+          const visible = showAll ? columnCases : columnCases.slice(0, PREVIEW_PER_COLUMN);
+          const hidden = columnCases.length - visible.length;
           return (
             <div key={status} className="rounded-xl border p-2" style={{ background: style.bg, borderColor: style.border }}>
               <div className="mb-2 flex items-center justify-between px-0.5">
@@ -160,7 +211,7 @@ export function CaseBoard({
                 {columnCases.length === 0 ? (
                   <p className="px-1 text-[10px] text-[#9aa3b2]">案件なし</p>
                 ) : (
-                  columnCases.map((c) => (
+                  visible.map((c) => (
                     <CaseCard
                       key={c.id}
                       c={c}
@@ -169,6 +220,15 @@ export function CaseBoard({
                       onSelectCase={onSelectCase}
                     />
                   ))
+                )}
+                {hidden > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAll(true)}
+                    className="rounded-lg border border-dashed border-[#c9cede] py-1 text-[10px] font-semibold text-[#6b7280] hover:bg-white/60"
+                  >
+                    他 {hidden} 件を見る
+                  </button>
                 )}
               </div>
             </div>

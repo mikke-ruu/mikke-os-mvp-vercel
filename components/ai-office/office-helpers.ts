@@ -1,7 +1,17 @@
 // mikke AI OFFICE — UI側の共通ロジック（表示専用。状態管理は lib/ai-office/store.ts）
 
 import { roomForCase } from "@/lib/ai-office/data";
-import type { Employee, OfficeCase, RoomId } from "@/lib/ai-office/types";
+import type { Employee, ExecutionStatus, OfficeCase, RoomId } from "@/lib/ai-office/types";
+
+/** 実行状態バッジの色分け（CaseBoard / CaseDetailPanel 共通） */
+export const executionBadgeClass: Record<ExecutionStatus, string> = {
+  idle: "bg-[#f2f3f7] text-[#6b7280]",
+  queued: "bg-[#eef4ff] text-[#2554c7]",
+  running: "bg-[#fff3ea] text-[#c06a2e] animate-pulse",
+  waiting_review: "bg-[#fffbe8] text-[#9c7d1a]",
+  completed: "bg-[#eefbf1] text-[#227a44]",
+  failed: "bg-[#fdeceb] text-[#c93f2d]"
+};
 
 export type EmployeeState = "working" | "break" | "idle";
 

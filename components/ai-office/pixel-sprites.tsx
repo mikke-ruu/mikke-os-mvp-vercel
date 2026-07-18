@@ -174,8 +174,9 @@ function buildWorkerRows(employee: Employee, look: Look): string[] {
       rows[0] = ANTENNA_ROWS[0];
       rows[1] = ANTENNA_ROWS[1];
     }
-    // 耳元に小さなイヤーデバイス（目の行の両端）
-    rows[7] = setChar(setChar(rows[7], 2, "P"), 13, "P");
+    // 耳元に小さなイヤーデバイス（頭の輪郭に重ねる。髪型によって位置を調整）
+    const [earL, earR] = rows[7][2] === "H" ? [2, 13] : [3, 12];
+    rows[7] = setChar(setChar(rows[7], earL, "P"), earR, "P");
   }
   // ネクタイ・スカーフ（胸元の2×2）
   if (look.tie) {
