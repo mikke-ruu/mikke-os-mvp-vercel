@@ -2,6 +2,7 @@
 
 import {
   Activity,
+  BriefcaseBusiness,
   BookOpenText,
   ChevronRight,
   Grid3X3,
@@ -42,6 +43,7 @@ const defaultEditItems: MikkeOwnerMenuItem[] = [
 ];
 
 const defaultOwnedApps: MikkeOwnerMenuItem[] = [
+  { title: "Manager", helper: "予定・タスク・進行をまとめて見る", href: "/manager", icon: BriefcaseBusiness },
   { title: "Story", helper: "公開プロフィールを見る", href: "/story", icon: BookOpenText },
   { title: "DESK", helper: "売上・経費を確認する", href: "/desk", icon: Grid3X3 },
   { title: "Apps", helper: "アプリ一覧へ戻る", href: "/apps", icon: Grid3X3 }
