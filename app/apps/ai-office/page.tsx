@@ -1,11 +1,12 @@
 "use client";
 
-// mikke AI OFFICE — AI社員と人が一緒に働くバーチャルオフィス（MVP）
+// mikke AI OFFICE — AI社員と人が一緒に働くバーチャルオフィス
 // API接続なし・localStorage保存。実行レイヤーは lib/ai-office/agent-runtime.ts に分離。
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityLogPanel } from "@/components/ai-office/ActivityLogPanel";
 import { CaseBoard } from "@/components/ai-office/CaseBoard";
+import { CaseDetailPanel } from "@/components/ai-office/CaseDetailPanel";
 import { NewCaseModal } from "@/components/ai-office/NewCaseModal";
 import { OfficeFloor } from "@/components/ai-office/OfficeFloor";
 import { OfficeSidebar } from "@/components/ai-office/OfficeSidebar";
@@ -17,16 +18,31 @@ import { useOfficeStore, type NewCaseInput } from "@/lib/ai-office/store";
 
 export default function AiOfficePage() {
   const store = useOfficeStore();
-  const { state, hydrated, addCase, setCaseStatus, setCaseAssignee, appendLog } = store;
+  const {
+    state,
+    hydrated,
+    addCase,
+    setCaseStatus,
+    setCaseAssignee,
+    updateCaseExecution,
+    startCaseRun,
+    appendLog
+  } = store;
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+
+  const selectedCase = useMemo(
+    () => state.cases.find((c) => c.id === selectedCaseId) ?? null,
+    [state.cases, selectedCaseId]
+  );
 
   async function handleNewCase(input: NewCaseInput) {
     const created = addCase(input);
     setModalOpen(false);
-    // AI社員に仕事を振る（今はmock：返事だけログに流れる）
+    // AI社員に仕事を振る（mock：返事だけログに流れる）
     const employee = employeeById[input.assigneeId];
     if (employee) {
-      const result = await executeAgentTask({ case: created, employee });
+      const result = await executeAgentTask({ case: created, employee }, "mock");
       if (result.ok) appendLog(employee.id, result.message);
     }
   }
@@ -55,6 +71,7 @@ export default function AiOfficePage() {
             onStatusChange={setCaseStatus}
             onAssigneeChange={setCaseAssignee}
             onNewCase={() => setModalOpen(true)}
+            onSelectCase={setSelectedCaseId}
           />
           <WorkloadMonitor cases={state.cases} />
           <ActivityLogPanel logs={state.logs} />
@@ -68,6 +85,14 @@ export default function AiOfficePage() {
       </main>
 
       <NewCaseModal open={modalOpen} onClose={() => setModalOpen(false)} onSubmit={handleNewCase} />
+
+      <CaseDetailPanel
+        c={selectedCase}
+        onClose={() => setSelectedCaseId(null)}
+        onUpdateExecution={updateCaseExecution}
+        onStartRun={startCaseRun}
+        onStatusChange={setCaseStatus}
+      />
     </div>
   );
 }
