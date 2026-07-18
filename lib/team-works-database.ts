@@ -54,6 +54,7 @@ type DatabaseDeliverableRow = {
   title: string;
   deliverable_type: TeamWorksProjectStoreState["deliverables"][number]["type"];
   url: string;
+  storage_path: string | null;
   version: number;
   status: TeamWorksProjectStoreState["deliverables"][number]["status"];
   client_visible: boolean;
@@ -320,7 +321,8 @@ export async function syncTeamWorksProjectStateToDatabase(input: {
       source_local_id: deliverable.id,
       title: deliverable.title,
       deliverable_type: deliverable.type,
-      url: deliverable.url,
+      url: deliverable.type === "url" ? deliverable.url : "",
+      storage_path: deliverable.storagePath ?? null,
       version: deliverable.version,
       status: deliverable.status,
       client_visible: deliverable.clientVisible,
@@ -379,7 +381,7 @@ export async function readTeamWorksProjectStateFromDatabase(input: {
         .in("project_id", projectIds),
       supabase
         .from("team_works_project_deliverables")
-        .select("source_local_id,title,deliverable_type,url,version,status,client_visible,updated_at")
+        .select("source_local_id,title,deliverable_type,url,storage_path,version,status,client_visible,updated_at")
         .in("project_id", projectIds)
     ]);
     if (tasks.error) throw tasks.error;
@@ -441,7 +443,7 @@ export async function readTeamWorksProjectStateFromDatabase(input: {
     }),
     deliverables: input.localState.deliverables.map((deliverable) => {
       const row = deliverableBySourceId.get(deliverable.id);
-      return row ? { ...deliverable, title: row.title, type: row.deliverable_type, url: row.url, version: row.version, status: row.status, clientVisible: row.client_visible, updatedAt: row.updated_at } : deliverable;
+      return row ? { ...deliverable, title: row.title, type: row.deliverable_type, url: row.url, storagePath: row.storage_path ?? "", version: row.version, status: row.status, clientVisible: row.client_visible, updatedAt: row.updated_at } : deliverable;
     })
   };
 

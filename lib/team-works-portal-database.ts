@@ -1,6 +1,8 @@
 import { supabase } from "@/lib/supabase/client";
 import type { ProjectDeliverableStatus, ProjectFormAnswerValue, TeamWorksProjectStoreState } from "@/lib/team-works-projects";
 
+const teamWorksDeliverableBucket = "team-works-deliverables";
+
 export type TeamWorksPortalRole = "client" | "worker";
 
 export type TeamWorksPortalMembership = {
@@ -20,6 +22,11 @@ export type TeamWorksDatabaseProjectMember = {
 export type ReviewedTeamWorksFormSubmission = {
   reviewerMemberId: string;
   approvedByMemberId: string;
+};
+
+export type UploadedTeamWorksDeliverableFile = {
+  storagePath: string;
+  signedUrl: string;
 };
 
 export async function readTeamWorksPortalMemberships(role: TeamWorksPortalRole) {
@@ -122,7 +129,7 @@ export async function readTeamWorksPortalCollaborationState(
     supabase.from("team_works_project_forms").select("id,project_id,source_local_id").in("project_id", projectIds),
     supabase.from("team_works_form_submissions").select("id,project_id,form_id,submitted_by_member_id,source_local_id,answers,status,review_memo,reviewed_by_member_id,approved_by_member_id,submitted_at,created_at,updated_at").in("project_id", projectIds),
     supabase.from("team_works_project_tasks").select("id,project_id,source_local_id,assignee_member_id").in("project_id", projectIds),
-    supabase.from("team_works_project_deliverables").select("id,project_id,source_local_id,title,deliverable_type,url,version,status,submitted_by_member_id,reviewed_by_member_id,client_visible,updated_at").in("project_id", projectIds),
+    supabase.from("team_works_project_deliverables").select("id,project_id,source_local_id,title,deliverable_type,url,storage_path,version,status,submitted_by_member_id,reviewed_by_member_id,client_visible,updated_at").in("project_id", projectIds),
     supabase.from("team_works_project_comments").select("id,project_id,task_id,deliverable_id,author_member_id,source_local_id,audience,body,created_at,updated_at").in("project_id", projectIds)
   ]);
   for (const result of [forms, submissions, tasks, deliverables, comments]) if (result.error) throw result.error;
@@ -177,6 +184,9 @@ export async function readTeamWorksPortalCollaborationState(
   const databaseCommentIds = new Set(databaseComments.map((comment) => comment.id));
   const taskAssigneeBySourceId = new Map((tasks.data ?? []).flatMap((row) => row.source_local_id ? [[row.source_local_id, row.assignee_member_id ?? ""] as const] : []));
   const deliverableBySourceId = new Map((deliverables.data ?? []).flatMap((row) => row.source_local_id ? [[row.source_local_id, row] as const] : []));
+  const signedUrlByStoragePath = await createSignedUrlByStoragePath(
+    (deliverables.data ?? []).map((row) => row.storage_path).filter((path): path is string => Boolean(path))
+  );
 
   return {
     ...localState,
@@ -187,7 +197,8 @@ export async function readTeamWorksPortalCollaborationState(
         ...deliverable,
         title: row.title ?? deliverable.title,
         type: row.deliverable_type ?? deliverable.type,
-        url: row.url ?? deliverable.url,
+        url: row.storage_path ? signedUrlByStoragePath.get(row.storage_path) ?? deliverable.url : row.url ?? deliverable.url,
+        storagePath: row.storage_path ?? deliverable.storagePath ?? "",
         version: row.version ?? deliverable.version,
         status: row.status,
         submittedByMemberId: row.submitted_by_member_id ?? "",
@@ -283,6 +294,7 @@ export async function saveTeamWorksWorkerDeliverable(input: {
   title: string;
   type: "url" | "file_placeholder" | "note";
   url: string;
+  storagePath?: string;
   version: number;
   status: Extract<ProjectDeliverableStatus, "draft" | "submitted">;
   clientVisible: boolean;
@@ -298,7 +310,8 @@ export async function saveTeamWorksWorkerDeliverable(input: {
       source_local_id: input.deliverableSourceId,
       title: input.title.trim(),
       deliverable_type: input.type,
-      url: input.type === "url" ? input.url.trim() : input.url,
+      url: input.type === "url" ? input.url.trim() : "",
+      storage_path: input.storagePath ?? null,
       version: input.version,
       status: input.status,
       submitted_by_member_id: input.membership.memberId,
@@ -306,6 +319,35 @@ export async function saveTeamWorksWorkerDeliverable(input: {
       updated_at: now
     }, { onConflict: "project_id,source_local_id" });
   if (error) throw error;
+}
+
+export async function uploadTeamWorksWorkerDeliverableFile(input: {
+  membership: TeamWorksPortalMembership;
+  taskSourceId: string;
+  deliverableSourceId: string;
+  file: File;
+}): Promise<UploadedTeamWorksDeliverableFile> {
+  await requireCurrentUser();
+  const path = [
+    input.membership.databaseProjectId,
+    input.taskSourceId,
+    input.deliverableSourceId,
+    `${Date.now()}-${crypto.randomUUID()}-${safeStorageFileName(input.file.name)}`
+  ].join("/");
+  const { data, error } = await supabase.storage
+    .from(teamWorksDeliverableBucket)
+    .upload(path, input.file, {
+      cacheControl: "3600",
+      contentType: input.file.type || undefined,
+      upsert: true
+    });
+  if (error) throw error;
+  const storagePath = data.path;
+  const { data: signed, error: signedError } = await supabase.storage
+    .from(teamWorksDeliverableBucket)
+    .createSignedUrl(storagePath, 60 * 60);
+  if (signedError) throw signedError;
+  return { storagePath, signedUrl: signed.signedUrl };
 }
 
 export async function saveTeamWorksPortalComment(input: {
@@ -385,6 +427,20 @@ async function findSourceRowId(table: "team_works_project_tasks" | "team_works_p
   const { data, error } = await supabase.from(table).select("id").eq("project_id", projectId).eq("source_local_id", sourceId).single();
   if (error) throw error;
   return data.id as string;
+}
+
+async function createSignedUrlByStoragePath(paths: string[]) {
+  const uniquePaths = [...new Set(paths)];
+  const entries = await Promise.all(uniquePaths.map(async (path) => {
+    const { data, error } = await supabase.storage.from(teamWorksDeliverableBucket).createSignedUrl(path, 60 * 60);
+    return error || !data ? null : [path, data.signedUrl] as const;
+  }));
+  return new Map(entries.filter((entry): entry is readonly [string, string] => entry !== null));
+}
+
+function safeStorageFileName(name: string) {
+  const cleaned = name.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  return cleaned || "deliverable-file";
 }
 
 async function requireCurrentUser() {

@@ -765,3 +765,26 @@ Current boundary:
 - Storage file body is still not implemented; deliverables submit URL only.
 - Payout/invoice DB UI, Activity Log notifications, and Manager integration remain later phases.
 ```
+
+## 27. TW-P8G implementation result (2026-07-18)
+```text
+Implemented:
+- Added private Supabase Storage bucket team-works-deliverables for Team Works deliverable file bodies.
+- Added storage_path to team_works_project_deliverables and kept URL deliverables storing only url while file deliverables store only object path.
+- Added Storage RLS helpers and object policies so assigned workers can upload files for their assigned task.
+- Allows project staff to read deliverable files, assigned workers to read their own deliverable files, and clients to read only client-visible review/approved/delivered files.
+- Added worker portal file upload next to the existing URL submit flow, including missing deliverable slot creation from assigned tasks.
+- Restores stored file deliverables as signed URLs when reading portal collaboration state.
+- Keeps signed URLs ephemeral and does not make deliverable files public.
+
+Verified:
+- Applied Supabase migration 20260718001256_team_works_p8g_deliverable_storage to mikke-os-dev.
+- RLS verification covered private bucket existence, assigned worker object insert/read, and unassigned task object insert rejection.
+- lint passed.
+- build passed (80 static pages).
+- Supabase Advisors checked; no new actionable Team Works Storage finding from this slice.
+
+Current boundary:
+- Storage upload is implemented for worker deliverables; rich form file/image fields still use URL/text values until a later form-field Storage slice.
+- Payout/invoice DB UI, Activity Log notifications, and Manager integration remain later phases.
+```

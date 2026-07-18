@@ -29,7 +29,7 @@ import {
   type WorkerProjectFormView,
   type WorkerProjectTaskView
 } from "@/lib/team-works-worker-projects";
-import { saveTeamWorksPortalFormSubmission, saveTeamWorksWorkerDeliverable } from "@/lib/team-works-portal-database";
+import { saveTeamWorksPortalFormSubmission, saveTeamWorksWorkerDeliverable, uploadTeamWorksWorkerDeliverableFile } from "@/lib/team-works-portal-database";
 
 export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string }) {
   const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
@@ -91,6 +91,7 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
       title: sourceTask.title,
       type: "url",
       url: "",
+      storagePath: "",
       version: 1,
       status: "draft",
       submittedByMemberId: memberId,
@@ -99,7 +100,7 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
       createdAt: now,
       updatedAt: now
     };
-    const ready = { ...base, url: input.url.trim(), submittedByMemberId: memberId, updatedAt: now };
+    const ready = { ...base, type: "url" as const, url: input.url.trim(), storagePath: "", submittedByMemberId: memberId, updatedAt: now };
     const next = transitionProjectDeliverable({ deliverable: ready, nextStatus: "submitted", actor: "worker", memberId, now });
     try {
       setDatabaseError("");
@@ -110,12 +111,78 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
         title: next.title,
         type: next.type,
         url: next.url,
+        storagePath: "",
         version: next.version,
         status: "submitted",
         clientVisible: next.clientVisible
       });
     } catch (error) {
       setDatabaseError(error instanceof Error ? error.message : "DBへ成果物を保存できませんでした。");
+      return;
+    }
+    saveProjectState({
+      ...projectState,
+      projects: projectState.projects.map((item) => item.id === project.id ? { ...item, updatedAt: now } : item),
+      deliverables: existing
+        ? projectState.deliverables.map((item) => item.id === next.id ? next : item)
+        : [...projectState.deliverables, next]
+    });
+  }
+
+  async function submitDeliverableFile(input: { deliverable?: WorkerProjectDeliverableView; task?: WorkerProjectTaskView; file: File }) {
+    if (!membership) return;
+    const sourceTask = input.task ?? tasks.find((task) => task.id === input.deliverable?.taskId);
+    if (!sourceTask) return;
+    const existing = input.deliverable ? projectState.deliverables.find((item) => item.id === input.deliverable?.id) : null;
+    const now = new Date().toISOString();
+    const deliverableId = existing?.id ?? createTeamWorksProjectId("team_works_project_deliverable");
+    let uploaded: { storagePath: string; signedUrl: string };
+    try {
+      setDatabaseError("");
+      uploaded = await uploadTeamWorksWorkerDeliverableFile({
+        membership,
+        taskSourceId: sourceTask.id,
+        deliverableSourceId: deliverableId,
+        file: input.file
+      });
+    } catch (error) {
+      setDatabaseError(error instanceof Error ? error.message : "Storage upload failed.");
+      return;
+    }
+    const base: ProjectDeliverable = existing ?? {
+      id: deliverableId,
+      projectId: project.id,
+      phaseId: sourceTask.phaseId,
+      taskId: sourceTask.id,
+      title: sourceTask.title,
+      type: "file_placeholder",
+      url: "",
+      storagePath: "",
+      version: 1,
+      status: "draft",
+      submittedByMemberId: memberId,
+      reviewedByMemberId: "",
+      clientVisible: false,
+      createdAt: now,
+      updatedAt: now
+    };
+    const ready = { ...base, type: "file_placeholder" as const, url: uploaded.signedUrl, storagePath: uploaded.storagePath, submittedByMemberId: memberId, updatedAt: now };
+    const next = transitionProjectDeliverable({ deliverable: ready, nextStatus: "submitted", actor: "worker", memberId, now });
+    try {
+      await saveTeamWorksWorkerDeliverable({
+        membership,
+        taskSourceId: sourceTask.id,
+        deliverableSourceId: next.id,
+        title: next.title,
+        type: next.type,
+        url: "",
+        storagePath: next.storagePath ?? "",
+        version: next.version,
+        status: "submitted",
+        clientVisible: next.clientVisible
+      });
+    } catch (error) {
+      setDatabaseError(error instanceof Error ? error.message : "DB deliverable save failed.");
       return;
     }
     saveProjectState({
@@ -198,8 +265,8 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
         <MikkeSection title="担当成果物">
           {deliverables.length + missingDeliverableTasks.length > 0 ? (
             <div className="space-y-2">
-              {deliverables.map((item) => <WorkerDeliverableCard key={item.id} item={item} onSubmit={(url) => submitDeliverable({ deliverable: item, url })} />)}
-              {missingDeliverableTasks.map((task) => <WorkerDeliverableCard key={task.id} task={task} onSubmit={(url) => submitDeliverable({ task, url })} />)}
+              {deliverables.map((item) => <WorkerDeliverableCard key={item.id} item={item} onSubmit={(url) => submitDeliverable({ deliverable: item, url })} onSubmitFile={(file) => submitDeliverableFile({ deliverable: item, file })} />)}
+              {missingDeliverableTasks.map((task) => <WorkerDeliverableCard key={task.id} task={task} onSubmit={(url) => submitDeliverable({ task, url })} onSubmitFile={(file) => submitDeliverableFile({ task, file })} />)}
             </div>
           ) : <p className="text-sm text-[var(--mikke-muted)]">担当成果物はありません。</p>}
         </MikkeSection>
@@ -213,12 +280,19 @@ export function TeamWorksWorkerProjectDetail({ projectId }: { projectId: string 
   );
 }
 
-function WorkerDeliverableCard({ item, task, onSubmit }: { item?: WorkerProjectDeliverableView; task?: WorkerProjectTaskView; onSubmit: (url: string) => void }) {
+function WorkerDeliverableCard({ item, task, onSubmit, onSubmitFile }: { item?: WorkerProjectDeliverableView; task?: WorkerProjectTaskView; onSubmit: (url: string) => void; onSubmitFile: (file: File) => void }) {
   const editable = !item || ["draft", "revision_requested"].includes(item.status);
+  const [mode, setMode] = useState<"url" | "file">(item?.type === "file_placeholder" ? "file" : "url");
   const [url, setUrl] = useState(item?.url ?? "");
+  const [file, setFile] = useState<File | null>(null);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mode === "file") {
+      if (!file) return;
+      onSubmitFile(file);
+      return;
+    }
     if (!url.trim()) return;
     onSubmit(url);
   }
@@ -233,12 +307,26 @@ function WorkerDeliverableCard({ item, task, onSubmit }: { item?: WorkerProjectD
             {item ? `Ver.${item.version}・${projectDeliverableStatusLabels[item.status]}・${item.clientVisible ? "クライアント共有" : "内部のみ"}` : "新規提出"}
           </p>
         </div>
-        {item?.type === "url" && item.url ? <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}
+        {item?.url ? <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">開く <ExternalLink size={13} /></a> : null}
       </div>
       {editable ? (
-        <form onSubmit={submit} className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} className="min-h-10 flex-1 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--mikke-primary)]" placeholder="https://" required />
-          <button type="submit" className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white">{item?.status === "revision_requested" ? "再提出する" : "提出する"}</button>
+        <form onSubmit={submit} className="mt-3 space-y-2">
+          <div className="flex flex-wrap gap-2 text-xs font-bold">
+            <label className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2">
+              <input type="radio" checked={mode === "url"} onChange={() => setMode("url")} /> URL
+            </label>
+            <label className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2">
+              <input type="radio" checked={mode === "file"} onChange={() => setMode("file")} /> File
+            </label>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {mode === "url" ? (
+              <input type="url" value={url} onChange={(event) => setUrl(event.target.value)} className="min-h-10 flex-1 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--mikke-primary)]" placeholder="https://" required />
+            ) : (
+              <input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="min-h-10 flex-1 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--mikke-primary)]" required />
+            )}
+            <button type="submit" className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white">{item?.status === "revision_requested" ? "再提出する" : "提出する"}</button>
+          </div>
         </form>
       ) : null}
     </article>

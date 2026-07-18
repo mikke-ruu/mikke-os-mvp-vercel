@@ -21,6 +21,7 @@ declare
   v_worker_form_id uuid := gen_random_uuid();
   v_deliverable_id uuid := gen_random_uuid();
   v_worker_deliverable_id uuid := gen_random_uuid();
+  v_storage_object_name text;
   v_count integer;
 begin
   if has_table_privilege('anon', 'public.team_works_member_invites', 'select')
@@ -29,6 +30,10 @@ begin
     or has_table_privilege('authenticated', 'public.team_works_project_comments', 'delete') then
     raise exception 'P8-c grants are broader than intended';
   end if;
+  select count(*) into v_count
+  from storage.buckets
+  where id = 'team-works-deliverables' and public = false;
+  if v_count <> 1 then raise exception 'Team Works deliverable bucket is not private'; end if;
 
   select p.user_id into v_owner_user_id from public.profiles p order by p.created_at, p.id limit 1;
   select p.user_id, u.email into v_actor_user_id, v_actor_email
@@ -47,10 +52,10 @@ begin
   values (v_project_id, v_organization_id, 'P8-c project', 'active', true);
   insert into public.team_works_project_members(project_id, organization_id, organization_member_id, project_role)
   values (v_project_id, v_organization_id, v_owner_member_id, 'owner');
-  insert into public.team_works_project_tasks(id, project_id, title, status, client_visible)
-  values (v_task_id, v_project_id, 'P8-c task', 'in_progress', true);
-  insert into public.team_works_project_tasks(id, project_id, title, status, client_visible)
-  values (v_unassigned_task_id, v_project_id, 'P8-f unassigned task', 'in_progress', false);
+  insert into public.team_works_project_tasks(id, project_id, source_local_id, title, status, client_visible)
+  values (v_task_id, v_project_id, 'task-source-for-storage', 'P8-c task', 'in_progress', true);
+  insert into public.team_works_project_tasks(id, project_id, source_local_id, title, status, client_visible)
+  values (v_unassigned_task_id, v_project_id, 'unassigned-task', 'P8-f unassigned task', 'in_progress', false);
   insert into public.team_works_member_invites(id, organization_id, project_id, email, role, created_by_user_id)
   values
     (v_invite_id, v_organization_id, v_project_id, v_actor_email, 'client_user', v_owner_user_id),
@@ -162,7 +167,22 @@ begin
   select count(*) into v_count from public.team_works_project_deliverables
   where id = v_worker_deliverable_id and status = 'submitted' and submitted_by_member_id = v_actor_member_id;
   if v_count <> 1 then raise exception 'worker deliverable submit mismatch'; end if;
+  v_storage_object_name := v_project_id::text || '/task-source-for-storage/' || v_worker_deliverable_id::text || '/worker-proof.txt';
+  insert into storage.objects(id, bucket_id, name, owner, metadata)
+  values (gen_random_uuid(), 'team-works-deliverables', v_storage_object_name, v_actor_user_id, '{"size":12,"mimetype":"text/plain"}');
+  select count(*) into v_count from storage.objects
+  where bucket_id = 'team-works-deliverables' and name = v_storage_object_name;
+  if v_count <> 1 then raise exception 'worker storage object insert mismatch'; end if;
+  begin
+    insert into storage.objects(id, bucket_id, name, owner, metadata)
+    values (gen_random_uuid(), 'team-works-deliverables', v_project_id::text || '/unassigned-task/' || v_worker_deliverable_id::text || '/blocked.txt', v_actor_user_id, '{"size":7}');
+    raise exception 'worker inserted storage object for unassigned task';
+  exception when insufficient_privilege then null;
+  end;
   execute 'reset role';
+  select count(*) into v_count from storage.objects
+  where bucket_id = 'team-works-deliverables' and name = v_storage_object_name;
+  if v_count <> 1 then raise exception 'staff could not read worker storage object'; end if;
   update public.team_works_project_deliverables
   set status = 'revision_requested'
   where id = v_worker_deliverable_id;

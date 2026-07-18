@@ -57,6 +57,7 @@ export type ClientProjectDeliverableView = {
   title: string;
   type: "url" | "file_placeholder" | "note";
   url: string;
+  storagePath: string;
   version: number;
   status: ProjectDeliverableStatus;
   updatedAt: string;
@@ -187,6 +188,7 @@ export function createTeamWorksClientProjectDetail(
       title: deliverable.title,
       type: deliverable.type,
       url: deliverable.url,
+      storagePath: deliverable.storagePath ?? "",
       version: deliverable.version,
       status: deliverable.status,
       updatedAt: deliverable.updatedAt

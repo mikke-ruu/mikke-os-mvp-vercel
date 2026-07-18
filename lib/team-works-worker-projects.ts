@@ -58,6 +58,7 @@ export type WorkerProjectDeliverableView = {
   title: string;
   type: "url" | "file_placeholder" | "note";
   url: string;
+  storagePath: string;
   version: number;
   status: ProjectDeliverableStatus;
   clientVisible: boolean;
@@ -178,6 +179,7 @@ export function createTeamWorksWorkerProjectDetail(
       title: deliverable.title,
       type: deliverable.type,
       url: deliverable.url,
+      storagePath: deliverable.storagePath ?? "",
       version: deliverable.version,
       status: deliverable.status,
       clientVisible: deliverable.clientVisible,

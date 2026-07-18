@@ -298,6 +298,7 @@ export type ProjectDeliverable = {
   title: string;
   type: "url" | "file_placeholder" | "note";
   url: string;
+  storagePath?: string;
   version: number;
   status: ProjectDeliverableStatus;
   submittedByMemberId: string;
