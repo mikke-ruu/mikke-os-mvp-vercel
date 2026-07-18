@@ -14,7 +14,7 @@ export function ManagerHistoryList() {
   const recentLogs = logs.slice(0, 30);
 
   return (
-    <ManagerShell title="最近の動き" subtitle="各アプリで起きたことを、管理しやすい履歴として確認します。">
+    <ManagerShell title="最近の動き" subtitle="各アプリで起きたことを、見返しやすい履歴として確認します。">
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
         {recentLogs.length === 0 ? (
           <MikkeEmptyState title="最近の動きはまだありません" helper="各アプリの登録や更新がここに並びます。" />
@@ -43,4 +43,3 @@ export function ManagerHistoryList() {
     </ManagerShell>
   );
 }
-

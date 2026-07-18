@@ -51,7 +51,7 @@ export function collectManagerAppSuggestions(snapshot: ManagerSnapshot): Manager
     suggestions.push({
       id: "marketnote-to-event",
       title: "Eventも使えます",
-      helper: "出店だけでなく、主催・募集・申込管理をしたい時の入口です。",
+      helper: "出店だけでなく、主催・募集・申込対応をしたい時の入口です。",
       href: "/apps/event",
       reason: "MarketNoteの予定が動いています"
     });
@@ -98,4 +98,3 @@ function uniqueSuggestions(suggestions: ManagerAppSuggestion[]) {
     return true;
   });
 }
-

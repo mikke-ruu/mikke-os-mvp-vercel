@@ -51,7 +51,7 @@ const defaultOwnedApps: MikkeOwnerMenuItem[] = [
 
 const defaultSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
   { name: "Order", helper: "依頼受付をつなげますか", href: "/apps/order" },
-  { name: "Community", helper: "会員・投稿管理をつなげますか", href: "/apps/community" }
+  { name: "Community", helper: "会員・投稿対応をつなげますか", href: "/apps/community" }
 ];
 
 export function MikkeOwnerMenu({
