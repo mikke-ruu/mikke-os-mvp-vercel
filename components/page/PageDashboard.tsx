@@ -103,7 +103,7 @@ export function PageDashboard() {
           <div>
             <h2 className="text-lg font-bold tracking-normal">次に作るところ</h2>
             <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
-              次は自組織CMSブロックを既存アプリの読み取り専用データへ接続します。
+              次はCMSブロックの選択・絞り込みとConnect / Partnersへ進みます。
             </p>
             <Link href="/manager" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[var(--mikke-accent)]">
               Managerで他アプリの動きを見る <ArrowRight size={15} />

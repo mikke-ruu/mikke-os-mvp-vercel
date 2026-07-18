@@ -6,6 +6,7 @@ import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
+  Database,
   Eye,
   FormInput,
   Heading,
@@ -19,32 +20,43 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import { type PageCmsItem, usePageCmsContent } from "@/lib/page/cms-selectors";
 import { getPageDocument, getPageSite, normalizePageSiteSlug, savePageDocument } from "@/lib/page/store";
-import type { PageBlock, PageBlockType, PageDocument, PageSite } from "@/lib/page/types";
+import type { PageBlock, PageBlockType, PageCmsSource, PageDocument, PageSite } from "@/lib/page/types";
 
 const inputClass =
   "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
 
-const blockChoices: { type: Exclude<PageBlockType, "cms">; label: string; icon: typeof Heading }[] = [
+const blockChoices: { type: PageBlockType; label: string; icon: typeof Heading }[] = [
   { type: "heading", label: "見出し", icon: Heading },
   { type: "text", label: "文章", icon: Type },
   { type: "image", label: "画像", icon: ImageIcon },
   { type: "button", label: "ボタン", icon: Link2 },
   { type: "form", label: "フォーム枠", icon: FormInput },
-  { type: "divider", label: "区切り", icon: Minus }
+  { type: "divider", label: "区切り", icon: Minus },
+  { type: "cms", label: "自組織CMS", icon: Database }
 ];
+
+const cmsSourceLabels: Record<PageCmsSource, string> = {
+  story: "Story",
+  item_studio: "Item Studio",
+  event: "Event",
+  academy: "Academy",
+  session: "Session"
+};
 
 function createBlockId() {
   return `page_block_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function createEmptyBlock(type: Exclude<PageBlockType, "cms">, order: number): PageBlock {
+function createEmptyBlock(type: PageBlockType, order: number): PageBlock {
   const base = { id: createBlockId(), order };
   if (type === "heading") return { ...base, type, level: 2, text: "新しい見出し" };
   if (type === "text") return { ...base, type, text: "ここに文章を入力します。" };
   if (type === "image") return { ...base, type, imageUrl: "", alt: "", caption: "" };
   if (type === "button") return { ...base, type, label: "詳しく見る", href: "#" };
   if (type === "form") return { ...base, type, title: "お問い合わせ", description: "フォーム送信はまだ利用できません。", buttonLabel: "送信する" };
+  if (type === "cms") return { ...base, type, source: "story", displayMode: "cards", title: "活動を見る", filters: {} };
   return { ...base, type: "divider" };
 }
 
@@ -57,6 +69,7 @@ export function PageDocumentEditor() {
   const [slug, setSlug] = useState("");
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
   const [message, setMessage] = useState("");
+  const cmsContent = usePageCmsContent();
 
   useEffect(() => {
     const nextSite = getPageSite(params.siteId);
@@ -166,7 +179,7 @@ export function PageDocumentEditor() {
                 <div className="flex items-center gap-2"><Eye size={17} className="text-[var(--mikke-accent)]" /><h2 className="text-sm font-bold">OS内プレビュー</h2></div>
                 <p className="mt-1 text-xs text-[var(--mikke-muted)]">編集者だけが見る下書き表示です。</p>
                 <div className="mt-4 min-h-80 overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-                  <PageBlockPreview blocks={blocks} />
+                  <PageBlockPreview blocks={blocks} cmsContent={cmsContent} />
                 </div>
               </div>
             </aside>
@@ -201,10 +214,11 @@ function BlockFields({ block, onChange }: { block: PageBlock; onChange: (update:
   if (block.type === "button") return <div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">ラベル</span><input value={block.label} onChange={(event) => onChange((current) => current.type === "button" ? { ...current, label: event.target.value } : current)} className={inputClass} /></label><label className="block"><span className="text-xs font-bold">リンク先</span><input value={block.href} onChange={(event) => onChange((current) => current.type === "button" ? { ...current, href: event.target.value } : current)} className={inputClass} placeholder="https:// または #section" /></label></div>;
   if (block.type === "form") return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">タイトル</span><input value={block.title} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, title: event.target.value } : current)} className={inputClass} /></label><label className="block"><span className="text-xs font-bold">説明</span><textarea value={block.description} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, description: event.target.value } : current)} rows={2} className={`${inputClass} resize-y`} /></label><label className="block"><span className="text-xs font-bold">ボタン表示</span><input value={block.buttonLabel} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, buttonLabel: event.target.value } : current)} className={inputClass} /></label><p className="text-xs text-[var(--mikke-muted)]">送信処理はPG-5以降で設計します。</p></div>;
   if (block.type === "divider") return <p className="text-xs text-[var(--mikke-muted)]">横線で内容を区切ります。</p>;
-  return <p className="text-xs text-[var(--mikke-muted)]">CMSブロックは次の工程で編集します。</p>;
+  if (block.type === "cms") return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">見出し</span><input value={block.title} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, title: event.target.value } : current)} className={inputClass} /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">参照元</span><select value={block.source} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, source: event.target.value as PageCmsSource } : current)} className={inputClass}>{Object.entries(cmsSourceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block"><span className="text-xs font-bold">表示</span><select value={block.displayMode} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, displayMode: event.target.value as "list" | "cards" | "featured" } : current)} className={inputClass}><option value="list">リスト</option><option value="cards">カード</option><option value="featured">注目表示</option></select></label></div><p className="text-xs leading-5 text-[var(--mikke-muted)]">公開状態の自組織データだけを読み取ります。選択・絞り込みはPG-2で追加します。</p></div>;
+  return null;
 }
 
-function PageBlockPreview({ blocks }: { blocks: PageBlock[] }) {
+function PageBlockPreview({ blocks, cmsContent }: { blocks: PageBlock[]; cmsContent: Record<PageCmsSource, PageCmsItem[]> }) {
   if (blocks.length === 0) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">ブロックを追加すると、ここに表示されます。</p>;
   return <div className="space-y-5">{blocks.map((block) => {
     if (block.type === "heading") {
@@ -216,6 +230,26 @@ function PageBlockPreview({ blocks }: { blocks: PageBlock[] }) {
     if (block.type === "button") return <span key={block.id} className="inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">{block.label || "ボタン"}</span>;
     if (block.type === "form") return <div key={block.id} className="rounded-2xl border border-[var(--mikke-line)] p-4"><p className="font-bold">{block.title}</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{block.description}</p><div className="mt-3 h-10 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" /><button type="button" disabled className="mt-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white opacity-60">{block.buttonLabel}</button></div>;
     if (block.type === "divider") return <hr key={block.id} className="border-[var(--mikke-line)]" />;
-    return <div key={block.id} className="rounded-xl bg-[var(--mikke-surface-soft)] p-4 text-xs text-[var(--mikke-muted)]">CMSブロック</div>;
+    if (block.type === "cms") return <CmsBlockPreview key={block.id} block={block} items={cmsContent[block.source]} />;
+    return null;
   })}</div>;
+}
+
+function CmsBlockPreview({ block, items }: { block: Extract<PageBlock, { type: "cms" }>; items: PageCmsItem[] }) {
+  const visibleItems = block.displayMode === "featured" ? items.slice(0, 1) : items.slice(0, 6);
+  return (
+    <section>
+      <div className="flex items-center justify-between gap-2"><h3 className="text-lg font-bold tracking-normal">{block.title || cmsSourceLabels[block.source]}</h3><span className="text-[10px] font-bold text-[var(--mikke-muted)]">{cmsSourceLabels[block.source]}</span></div>
+      {visibleItems.length === 0 ? <p className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] p-4 text-xs text-[var(--mikke-muted)]">公開中の表示候補はありません。</p> : (
+        <div className={block.displayMode === "list" ? "mt-3 space-y-2" : "mt-3 grid gap-3 sm:grid-cols-2"}>
+          {visibleItems.map((item) => (
+            <article key={item.id} className="overflow-hidden rounded-xl border border-[var(--mikke-line-soft)] bg-white">
+              {item.imageUrl && block.displayMode !== "list" ? <img src={item.imageUrl} alt="" className="h-28 w-full object-cover" /> : null}
+              <div className="p-3"><p className="text-sm font-bold">{item.title}</p>{item.summary ? <p className="mt-1 line-clamp-3 text-xs leading-5 text-[var(--mikke-muted)]">{item.summary}</p> : null}{item.meta ? <p className="mt-2 text-[10px] font-bold text-[var(--mikke-accent)]">{item.meta}</p> : null}</div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }

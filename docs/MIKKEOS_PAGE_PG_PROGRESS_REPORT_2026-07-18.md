@@ -140,6 +140,48 @@ npm.cmd run lint: 成功
 npm.cmd run build: 成功（90 static pages、/apps/page/[siteId]/[pageId] 追加確認）
 ```
 
+## PG-1-e: 自組織CMSブロック
+
+完了。
+
+```text
+追加: lib/page/cms-selectors.ts
+更新: components/page/PageDocumentEditor.tsx
+更新: components/page/PageDashboard.tsx
+```
+
+実装内容:
+
+```text
+自組織CMSブロックを追加し、Story / Item Studio / Event / Academy / Sessionを選択可能にした。
+Item Studio・Event・Sessionは既存のクライアントstoreフックから公開状態のデータだけを読み取る。
+Storyはプロフィール参照、Academyは公開かつStory表示対象のActivity Log候補を読み取る。
+リスト・カード・注目表示をOS内プレビューへ反映。
+原価、内部メモ、申込者情報、予約情報はPage共通表示へ渡さない。
+```
+
+境界:
+
+```text
+既存アプリへ書き込まず、Pageには参照元と表示方法だけを保存する。
+個別選択・詳細フィルタはPG-2へ残す。
+外部公開、他者掲載依頼、Manager受信箱、決済、独自ドメインは未実装。
+AI OFFICEの保存処理・作業中差分は変更なし。
+```
+
+次:
+
+```text
+PG-2-a: CMSブロックの選択・フィルタ
+```
+
+検収:
+
+```text
+npm.cmd run lint: 成功
+npm.cmd run build: 成功（90 static pages）
+```
+
 ## PG-1-b: Page新規作成
 
 完了。
