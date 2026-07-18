@@ -1,7 +1,9 @@
 "use client";
 
 import { useAuth } from "@/components/AuthGate";
+import { collectManagerAppSuggestions } from "@/lib/manager/app-suggestions";
 import { useManagerSnapshot } from "@/lib/manager/collect-manager-items";
+import { ManagerAppSuggestions } from "./ManagerAppSuggestions";
 import { ManagerMetricCard, ManagerProgressList, ManagerScheduleList, ManagerTaskListRows } from "./ManagerCards";
 import { ManagerShell } from "./ManagerShell";
 
@@ -10,9 +12,10 @@ export function ManagerDashboard() {
   const snapshot = useManagerSnapshot(profile.id);
   const todayItems = snapshot.schedules.filter((item) => item.urgency === "today" || item.urgency === "overdue");
   const urgentTasks = snapshot.tasks.filter((task) => task.urgency === "today" || task.urgency === "overdue" || task.priority === "high");
+  const suggestions = collectManagerAppSuggestions(snapshot);
 
   return (
-    <ManagerShell title="今日のManager" subtitle="予定・タスク・進行を、アプリ横断で見渡します。">
+    <ManagerShell title="今日のManager" subtitle="入口は各アプリ。Managerでは、次に見ることと他アプリの動きを横断で参照します。">
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <ManagerMetricCard label="今日まで" value={`${todayItems.length}件`} helper="期限超過と今日の予定" />
         <ManagerMetricCard label="タスク" value={`${snapshot.tasks.length}件`} helper="未完了の対応" />
@@ -34,6 +37,12 @@ export function ManagerDashboard() {
           <ManagerProgressList progress={snapshot.progress.slice(0, 5)} />
         </Panel>
       </section>
+
+      <section className="mt-6">
+        <Panel title="次に使えそうなアプリ" helper="今の動きに合わせて、押しつけずに候補だけ出します。">
+          <ManagerAppSuggestions suggestions={suggestions} />
+        </Panel>
+      </section>
     </ManagerShell>
   );
 }
@@ -49,4 +58,3 @@ function Panel({ title, helper, children }: { title: string; helper: string; chi
     </section>
   );
 }
-

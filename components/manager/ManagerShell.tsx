@@ -23,6 +23,7 @@ export function ManagerShell({ title, subtitle, children }: { title: string; sub
       title={title}
       subtitle={subtitle}
       currentApp={{ label: "Manager", href: "/manager", icon: LayoutDashboard }}
+      menuDescription="Managerは作業入口ではなく、各アプリの予定・タスク・進行を横断で見る場所です。"
       footerLabel="Manager by mikke"
     >
       <nav className="mb-5 flex gap-2 overflow-x-auto pb-1">
@@ -49,4 +50,3 @@ export function ManagerShell({ title, subtitle, children }: { title: string; sub
     </MikkeAppShell>
   );
 }
-
