@@ -812,3 +812,23 @@ Current boundary:
 - Form file/image upload is implemented for portal submissions; deleting/replacing old orphaned objects is not yet automated.
 - Payout/invoice DB UI, Activity Log notifications, and Manager integration remain later phases.
 ```
+
+## 29. TW-P8I implementation result (2026-07-18)
+```text
+Implemented:
+- Added a project-detail finance tab for task-linked payout and invoice records.
+- Reads team_works_project_payouts / team_works_project_invoices with synced project tasks and project members.
+- Saves worker payout records by task + worker member, using the existing P8A unique boundary.
+- Saves client invoice records by task + client member, using the existing P8A unique boundary.
+- Keeps payout/invoice creation tied to real DB project members; local demo member IDs are not sent as payee or billed members.
+- Enables the relevant project finance flag on first save so the existing P8A RLS insert/update policies remain the authority.
+
+Verified:
+- lint passed.
+- build passed (80 static pages).
+
+Current boundary:
+- Project-detail DB UI is connected for payout/invoice records.
+- Overall /apps/team-works/payouts and /apps/team-works/invoices still show the legacy operational aggregate view.
+- Activity Log / DESK conversion, payment execution, invoice document generation, and Manager integration remain later phases.
+```

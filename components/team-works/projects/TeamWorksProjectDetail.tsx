@@ -32,11 +32,12 @@ import { isProjectFormAttachmentAnswer, transitionProjectFormSubmission } from "
 import { teamWorksInitialState } from "@/lib/team-works";
 import { TeamWorksProjectDeliverables } from "./TeamWorksProjectDeliverables";
 import { TeamWorksProjectCompletionReview } from "./TeamWorksProjectCompletionReview";
+import { TeamWorksProjectFinance } from "./TeamWorksProjectFinance";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 import { useTeamWorksProjectDatabaseMembers } from "./useTeamWorksProjectDatabaseMembers";
 import { reviewTeamWorksPortalFormSubmission, saveTeamWorksTaskAssignment } from "@/lib/team-works-portal-database";
 
-type ProjectTab = "overview" | "phases" | "tasks" | "forms" | "deliverables" | "members";
+type ProjectTab = "overview" | "phases" | "tasks" | "forms" | "deliverables" | "finance" | "members";
 
 const tabs: { value: ProjectTab; label: string; icon: typeof ListChecks }[] = [
   { value: "overview", label: "概要", icon: ClipboardCheck },
@@ -44,6 +45,7 @@ const tabs: { value: ProjectTab; label: string; icon: typeof ListChecks }[] = [
   { value: "tasks", label: "タスク", icon: CalendarDays },
   { value: "forms", label: "フォーム・資料", icon: ClipboardCheck },
   { value: "deliverables", label: "成果物", icon: FileCheck2 },
+  { value: "finance", label: "報酬・請求", icon: ClipboardCheck },
   { value: "members", label: "メンバー", icon: UsersRound }
 ];
 
@@ -167,6 +169,7 @@ export function TeamWorksProjectDetail({ projectId }: { projectId: string }) {
       {tab === "tasks" ? <TasksTab project={project} phases={phases} tasks={tasks} members={taskMembers} databaseMemberIds={databaseWorkerIds} state={projectState} save={saveProjectState} /> : null}
       {tab === "forms" ? <FormsAndResourcesTab projectId={project.id} reviewerId={project.leaderMemberId} forms={forms} resources={resources} roles={roles} state={projectState} save={saveProjectState} /> : null}
       {tab === "deliverables" ? <TeamWorksProjectDeliverables project={project} phases={phases} tasks={tasks} members={members} state={projectState} save={saveProjectState} /> : null}
+      {tab === "finance" ? <TeamWorksProjectFinance project={project} localTasks={tasks} /> : null}
       {tab === "members" ? (
         <MikkeSection title="参加メンバー">
           {members.length > 0 ? (
