@@ -1,6 +1,5 @@
-import { AppMiniPage } from "@/components/mikkeos/AppMiniPage";
+import { redirect } from "next/navigation";
 
-export default function MarketNoteMiniPage() {
-  return <AppMiniPage appKey="market_note" />;
+export default function MarketNoteAppPage() {
+  redirect("/marketnote");
 }
-

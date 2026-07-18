@@ -79,3 +79,23 @@ Activity Log / Story / DESK 経路への変更なし。
 /marketnote は現時点の実運用入口なので、すぐ /apps/market-note へ寄せると機能入口を失う。
 /os /log は通常入口ではなく、内部確認扱いへ寄せる判断が必要。
 ```
+
+## M2-b: MarketNote入口整理
+
+完了。
+
+```text
+更新: app/apps/market-note/page.tsx
+```
+
+`/apps/market-note` は簡易説明ページだったため、現時点の実運用入口である `/marketnote` へリダイレクトする形にした。
+
+これにより、Apps側からMarketNoteを開いても、実際に使えるMarketNote画面へ到達する。
+
+未実施:
+
+```text
+/marketnote 自体の廃止または正規化
+/marketnote/[id] など詳細ルートの移動
+/os /log の処遇変更
+```
