@@ -16,8 +16,9 @@ export function createTeamWorksPayoutActivity(input: TeamWorksFinanceActivityBas
   status: TeamWorksProjectPayoutStatus;
 }): UnifiedActivityLog {
   const now = input.occurredAt ?? new Date().toISOString();
+  const sourceId = `payout:${input.sourceId}`;
   return {
-    id: `team-works-payout-${input.sourceId}`,
+    id: `team-works-${sourceId}`,
     profileId: "profile-ayumi",
     appKey: "team_works",
     eventType: "team_works_partner_reward_recorded",
@@ -26,7 +27,7 @@ export function createTeamWorksPayoutActivity(input: TeamWorksFinanceActivityBas
     occurredAt: now,
     amount: input.amount,
     amountType: "expense",
-    sourceId: input.sourceId,
+    sourceId,
     visibility: "private",
     storyEnabled: false,
     deskEnabled: true,
@@ -48,8 +49,9 @@ export function createTeamWorksInvoiceActivity(input: TeamWorksFinanceActivityBa
 }): UnifiedActivityLog {
   const now = input.occurredAt ?? new Date().toISOString();
   const paid = input.status === "paid";
+  const sourceId = `${paid ? "invoice_paid" : "invoice_created"}:${input.sourceId}`;
   return {
-    id: `team-works-invoice-${paid ? "paid" : "created"}-${input.sourceId}`,
+    id: `team-works-${sourceId}`,
     profileId: "profile-ayumi",
     appKey: "team_works",
     eventType: paid ? "team_works_invoice_paid" : "team_works_invoice_created",
@@ -58,7 +60,7 @@ export function createTeamWorksInvoiceActivity(input: TeamWorksFinanceActivityBa
     occurredAt: now,
     amount: input.amount,
     amountType: "income",
-    sourceId: input.sourceId,
+    sourceId,
     visibility: "private",
     storyEnabled: false,
     deskEnabled: true,

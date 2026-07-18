@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
+import { saveUnifiedActivityLogToSupabase } from "@/lib/mikkeos/supabase-activity-log";
 import { createTeamWorksInvoiceActivity, createTeamWorksPayoutActivity } from "@/lib/team-works-project-activity";
 import {
   readTeamWorksProjectFinanceState,
@@ -15,6 +16,7 @@ import {
   type TeamWorksProjectPayoutStatus
 } from "@/lib/team-works-project-finance";
 import type { Project, ProjectTask } from "@/lib/team-works-projects";
+import type { UnifiedActivityLog } from "@/lib/mikkeos/types";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 
 const payoutStatusLabels: Record<TeamWorksProjectPayoutStatus, string> = {
@@ -47,6 +49,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
   const [financeState, setFinanceState] = useState<TeamWorksProjectFinanceState>(emptyFinanceState);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [activitySyncMessage, setActivitySyncMessage] = useState("");
   const [saving, setSaving] = useState<"payout" | "invoice" | "">("");
   const [payoutForm, setPayoutForm] = useState({
     taskSourceId: "",
@@ -101,6 +104,18 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
     }
   }
 
+  async function addAndSyncActivityLog(log: UnifiedActivityLog) {
+    addLog(log);
+    try {
+      const saved = await saveUnifiedActivityLogToSupabase(log);
+      setActivitySyncMessage(`Supabase Activity Logへ保存しました: ${saved.activityType}`);
+    } catch (error) {
+      setActivitySyncMessage(error instanceof Error
+        ? `ローカルActivity Logには反映済みです。Supabase保存は未完了: ${error.message}`
+        : "ローカルActivity Logには反映済みです。Supabase保存は未完了です。");
+    }
+  }
+
   async function submitPayout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!payoutForm.taskSourceId || !payoutForm.payeeMemberId) return;
@@ -118,7 +133,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
       });
       const task = financeState.tasks.find((item) => item.sourceId === payoutForm.taskSourceId);
       const payee = workerMembers.find((member) => member.id === payoutForm.payeeMemberId);
-      addLog(createTeamWorksPayoutActivity({
+      await addAndSyncActivityLog(createTeamWorksPayoutActivity({
         project,
         sourceId: saved.id,
         taskTitle: task?.title ?? "同期済みタスク",
@@ -153,7 +168,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
       });
       const task = financeState.tasks.find((item) => item.sourceId === invoiceForm.taskSourceId);
       const billed = clientMembers.find((member) => member.id === invoiceForm.billedMemberId);
-      addLog(createTeamWorksInvoiceActivity({
+      await addAndSyncActivityLog(createTeamWorksInvoiceActivity({
         project,
         sourceId: saved.id,
         taskTitle: task?.title ?? "同期済みタスク",
@@ -190,6 +205,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
   return (
     <div className="space-y-6">
       {errorMessage ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 px-3 py-2 text-sm font-bold text-[var(--mikke-danger)]">{errorMessage}</p> : null}
+      {activitySyncMessage ? <p className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-bg)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">{activitySyncMessage}</p> : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <FinanceSummary title="報酬予定" amount={payoutTotal} helper={`${financeState.payouts.length}件・${financeState.payoutsEnabled ? "DB保存有効" : "初回保存で有効化"}`} />

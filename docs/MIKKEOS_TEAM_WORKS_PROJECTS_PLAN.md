@@ -850,3 +850,22 @@ Current boundary:
 - Activity Log / DESK conversion is connected on successful project-detail payout/invoice save.
 - Supabase activity_logs write, payment execution, invoice document generation, and Manager integration remain later phases.
 ```
+
+## 31. TW-P8K implementation result (2026-07-18)
+```text
+Implemented:
+- Added a reusable Supabase Activity Log save bridge for UnifiedActivityLog payloads.
+- Reuses toSupabaseActivityLogInsert so Team Works follows the same Activity Log adapter contract as the existing Item Studio test path.
+- Saves Team Works payout/invoice Activity Logs to Supabase activity_logs after successful project-detail finance saves.
+- Keeps local Activity Log insertion as the primary UI feedback path; Supabase save failures are reported without undoing the DB finance record.
+- Refined Team Works finance source IDs to be event-scoped, e.g. payout:<record_id>, invoice_created:<record_id>, invoice_paid:<record_id>, matching the current profile_id + source_service + source_record_id unique constraint.
+
+Verified:
+- lint passed.
+- build passed (80 static pages).
+
+Current boundary:
+- Supabase activity_logs write bridge is connected for Team Works project finance saves.
+- Runtime verification requires a logged-in user, an existing Mikke ID profile, and successful project/member/task sync.
+- Payment execution, invoice document generation, and Manager integration remain later phases.
+```
