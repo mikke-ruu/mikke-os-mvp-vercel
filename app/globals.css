@@ -369,6 +369,170 @@ button {
   }
 }
 
+/* mikke AI OFFICE（components/ai-office/*）専用アニメーション */
+@keyframes ai-office-blink {
+  0%,
+  78%,
+  100% {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  85%,
+  95% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ai-office-bubble {
+  animation: ai-office-blink 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes ai-office-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.25);
+  }
+}
+
+.ai-office-pulse {
+  animation: ai-office-pulse 1.6s ease-in-out infinite;
+}
+
+/* 待機中：たまに小さく揺れる（常時ぴょこぴょこは廃止） */
+@keyframes ai-office-sway {
+  0%,
+  90%,
+  100% {
+    transform: translateY(0);
+  }
+  93%,
+  96% {
+    transform: translateY(-1px);
+  }
+}
+
+.ai-office-sway {
+  animation: ai-office-sway 6s ease-in-out infinite;
+}
+
+/* 目の瞬き（キャラの目のrectに付与） */
+@keyframes ai-office-eyeblink {
+  0%,
+  91%,
+  100% {
+    opacity: 1;
+  }
+  93%,
+  96% {
+    opacity: 0;
+  }
+}
+
+.px-eye {
+  animation: ai-office-eyeblink 5.5s steps(1) infinite;
+}
+
+/* AIのアンテナ先端・サーバーランプのゆっくり点滅 */
+@keyframes ai-office-glow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.px-glow {
+  animation: ai-office-glow 2.2s ease-in-out infinite;
+}
+
+/* 作業中の部屋のモニター画面のちらつき */
+@keyframes ai-office-screenflicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  46% {
+    opacity: 0.72;
+  }
+  92% {
+    opacity: 0.9;
+  }
+}
+
+.ai-office-screen {
+  animation: ai-office-screenflicker 2.4s ease-in-out infinite;
+}
+
+/* コーヒーの湯気（上昇して消える） */
+@keyframes ai-office-steam {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+.ai-office-steam {
+  animation: ai-office-steam 2.6s ease-out infinite;
+}
+
+/* 案件バッジ変化時のキラキラ */
+@keyframes ai-office-sparkle {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  30% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+
+.ai-office-sparkle {
+  animation: ai-office-sparkle 1.1s ease-out forwards;
+}
+
+/* テラスの鳥がたまにぴょんと跳ねる */
+@keyframes ai-office-hop {
+  0%,
+  86%,
+  100% {
+    transform: translate(0, 0);
+  }
+  89% {
+    transform: translate(3px, -4px);
+  }
+  92% {
+    transform: translate(6px, 0);
+  }
+  95% {
+    transform: translate(3px, -3px);
+  }
+}
+
+.ai-office-hop {
+  animation: ai-office-hop 7s ease-in-out infinite;
+}
+
 @media (min-width: 1024px) {
   .tw-workspace {
     grid-template-columns: 232px minmax(0, 1fr);
