@@ -172,6 +172,8 @@ export async function updateInstructor(
     business_name: string | null;
     area: string | null;
     memo: string | null;
+    photo_url: string | null;
+    self_intro: string | null;
   }>
 ) {
   const { data, error } = await supabase

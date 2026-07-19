@@ -217,3 +217,37 @@ Wave A → Wave B（MM-3/4と同時） → Wave C → Wave D
 Wave A/Bは依存なし・すぐ着手可。Wave Cは中規模（新ブロック型追加）。
 Wave Dは業務フロー再設計のため、次回セッション冒頭でのデータモデル確認と
 1点の確認事項（送り先の決め方）を経てから着手する。
+
+## 8. Wave A実装メモ（2026-07-20 Sonnet実装）
+
+AC-1〜AC-5実装済み。詳細は各ACの実装コミット参照。特記事項:
+
+- AC-5の「自由記述欄（bio）」は新規カラムを追加せず、既存の `academy_instructors.self_intro`
+  （もともと講師本人が編集する自己紹介欄で、`/academy/i/[id]` の公開ページに既に表示されている）
+  を本部側編集画面からも編集できるようにする形で実装した。列レベル保護トリガ
+  （`guard_academy_instructor_columns`）は「本部オーナー以外がUPDATEした場合に本部管理列を
+  戻す」方向の保護のみで、本部が営業列（self_intro含む）を書くこと自体は元々許可されている
+  ため、この使い方はスキーマ上安全。新規カラムを増やさずに要望を満たせるため、こちらを採用した。
+- 講師写真は既存カラムが無いため `photo_url` を新規追加（下記「要SQL投入」参照）。
+
+## 9. 要SQL投入（あゆみ本人がSupabase側で実行）
+
+Wave A (AC-5) の講師写真欄のために、`academy_instructors` に列を1つ追加する必要がある。
+コード側（`types/database.ts` の `AcademyInstructor` 型、`lib/academy/instructors.ts` の
+`updateInstructor` patch型、`app/academy/instructors/[id]/page.tsx` のUI）は実装済み。
+以下のSQLをSupabase側で実行するまでは、写真欄の保存が失敗する（DBに列が無いため）。
+
+```sql
+-- academy_instructors.photo_url 追加（Wave A / AC-5: 本部側・講師写真欄）
+alter table public.academy_instructors
+  add column if not exists photo_url text;
+
+comment on column public.academy_instructors.photo_url is
+  '講師写真の公開URL（Mikke Media）。本部が講師詳細編集画面から設定。将来的に講師本人が
+   ポータルから編集する可能性あり（Wave D想定・今回は本部専用として実装）。';
+```
+
+備考: `photo_url` は既存の「本部管理列保護トリガ」（`guard_academy_instructor_columns`）の
+保護対象リストに含めていない。今回は本部側からのみ書き込む実装だが、将来Wave Dで講師本人が
+自分の写真を編集できるようにする場合も、このトリガ定義の変更は不要（保護対象に追加したい場合は
+別途トリガ関数の更新が必要）。

@@ -23,16 +23,18 @@ function StatCard({
   label,
   value,
   sub,
+  detail,
   alert
 }: {
   icon: typeof BookOpen;
   label: string;
   value: number;
   sub?: string;
+  detail?: string;
   alert?: boolean;
 }) {
   return (
-    <div className={`rounded-2xl border p-4 ${alert ? "border-[var(--mikke-accent)]/40 bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
+    <div className={`rounded-2xl border p-3.5 md:p-4 ${alert ? "border-[var(--mikke-accent)]/40 bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
       <div className="flex items-center gap-2">
         <span className={`flex h-8 w-8 items-center justify-center rounded-full ${alert ? "bg-white text-[var(--mikke-accent)]" : "bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]"}`}>
           <Icon size={16} />
@@ -43,6 +45,7 @@ function StatCard({
         {value}
         <span className="ml-1 text-xs font-bold text-[var(--mikke-muted-light)]">{sub}</span>
       </p>
+      {detail ? <p className="mt-1 truncate text-[11px] text-[var(--mikke-muted)]">{detail}</p> : null}
     </div>
   );
 }
@@ -106,19 +109,35 @@ function DashboardContent() {
   const courseMap = Object.fromEntries(courses.map((c) => [c.id, c]));
   const renewalAlerts = getRenewalAlerts(instructors);
 
+  const publishedCourses = courses.filter((c) => c.is_published).length;
+  const activeInstructors = instructors.filter((i) => i.is_active).length;
+  const honbuIntake = monthApps.filter((a) => a.intake_source !== "koushi").length;
+  const koushiIntake = monthApps.filter((a) => a.intake_source === "koushi").length;
+  const oldestPendingApp = pendingApps[pendingApps.length - 1];
+  const oldestPendingDays = oldestPendingApp
+    ? Math.max(0, Math.floor((Date.now() - new Date(oldestPendingApp.created_at).getTime()) / 86400000))
+    : 0;
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-5 md:space-y-6">
       <div>
         <p className="text-sm text-[var(--mikke-muted)]">
           {hq.name} — こんにちは、{profile.display_name}さん
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard icon={BookOpen} label="講座数" value={courses.length} sub="件" />
-        <StatCard icon={Users} label="認定講師" value={instructors.length} sub="名" />
-        <StatCard icon={ClipboardList} label="今月の申込" value={monthApps.length} sub="件" />
-        <StatCard icon={ClipboardList} label="未対応の申込" value={pendingApps.length} sub="件" alert={pendingApps.length > 0} />
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">
+        <StatCard icon={BookOpen} label="講座数" value={courses.length} sub="件" detail={`公開中 ${publishedCourses}件`} />
+        <StatCard icon={Users} label="認定講師" value={instructors.length} sub="名" detail={`活動中 ${activeInstructors}名`} />
+        <StatCard icon={ClipboardList} label="今月の申込" value={monthApps.length} sub="件" detail={`本部${honbuIntake}・講師${koushiIntake}`} />
+        <StatCard
+          icon={ClipboardList}
+          label="未対応の申込"
+          value={pendingApps.length}
+          sub="件"
+          detail={pendingApps.length > 0 ? `最古の申込: ${oldestPendingDays}日前` : "対応待ちなし"}
+          alert={pendingApps.length > 0}
+        />
       </div>
 
       {renewalAlerts.length > 0 ? (

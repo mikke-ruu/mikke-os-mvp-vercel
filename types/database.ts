@@ -176,6 +176,7 @@ export type AcademyInstructor = {
   is_active: boolean;
   status: "active" | "dormant" | "suspended" | "reapplying";
   memo: string | null;
+  photo_url: string | null;
   business_name: string | null;
   area: string | null;
   online_available: boolean;

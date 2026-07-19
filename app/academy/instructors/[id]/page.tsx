@@ -6,6 +6,7 @@ import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { RotateCw } from "lucide-react";
 import { QrCode } from "@/components/academy/QrCode";
+import { MikkeMediaPicker } from "@/components/media/MikkeMediaPicker";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import { INSTRUCTOR_STATUS_LABELS, getInstructor, renewInstructor, updateInstructor } from "@/lib/academy/instructors";
@@ -170,6 +171,32 @@ function DetailContent({ instructorId }: { instructorId: string }) {
             className={`${inputClass} min-h-16`}
             defaultValue={ins.memo ?? ""}
             onBlur={(e) => e.target.value !== (ins.memo ?? "") && apply({ memo: e.target.value || null })}
+          />
+        </div>
+        <p className="text-[11px] text-[var(--mikke-muted)]">入力欄はフォーカスを外すと自動保存されます。</p>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <p className="text-xs font-bold text-[var(--mikke-accent)]">掲載情報（写真・紹介文）</p>
+        <p className="text-[11px] text-[var(--mikke-muted)]">
+          講師ページや講師一覧など公開ページに表示されます。講師本人も講師ポータルから編集できます。
+        </p>
+        <div>
+          <label className={labelClass}>講師写真</label>
+          <div className="mt-1">
+            <MikkeMediaPicker
+              sourceApp="academy"
+              currentUrl={ins.photo_url ?? undefined}
+              onSelect={(asset) => apply({ photo_url: asset.publicUrl })}
+            />
+          </div>
+        </div>
+        <div>
+          <label className={labelClass}>紹介文（自由記述）</label>
+          <textarea
+            className={`${inputClass} min-h-24`}
+            defaultValue={ins.self_intro ?? ""}
+            onBlur={(e) => e.target.value !== (ins.self_intro ?? "") && apply({ self_intro: e.target.value || null })}
           />
         </div>
         <p className="text-[11px] text-[var(--mikke-muted)]">入力欄はフォーカスを外すと自動保存されます。</p>
