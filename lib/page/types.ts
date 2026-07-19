@@ -18,7 +18,8 @@ export type PageBlockType =
   | "gallery"
   | "slideshow"
   | "embed"
-  | "html";
+  | "html"
+  | "nav";
 
 export type PageTextAlign = "left" | "center" | "right";
 export type PageSpacing = "compact" | "normal" | "spacious";
@@ -114,11 +115,24 @@ export type PageButtonBlock = PageBlockBase & {
   variant?: "solid" | "outline" | "soft";
 };
 
+export type PageFormFieldType = "text" | "email" | "tel" | "textarea" | "select";
+
+export type PageFormField = {
+  id: string;
+  label: string;
+  type: PageFormFieldType;
+  required: boolean;
+  /** type="select"の時の選択肢 */
+  options?: string[];
+};
+
 export type PageFormBlock = PageBlockBase & {
   type: "form";
   title: string;
   description: string;
   buttonLabel: string;
+  /** 未指定の既存データはデフォルト3項目（お名前/メールアドレス/お問い合わせ内容）にフォールバックして描画する */
+  fields?: PageFormField[];
 };
 
 export type PageDividerBlock = PageBlockBase & {
@@ -202,6 +216,10 @@ export type PageHtmlBlock = PageBlockBase & {
   height: number;
 };
 
+export type PageNavBlock = PageBlockBase & {
+  type: "nav";
+};
+
 export type PageBlock =
   | PageHeadingBlock
   | PageTextBlock
@@ -215,7 +233,8 @@ export type PageBlock =
   | PageGalleryBlock
   | PageSlideshowBlock
   | PageEmbedBlock
-  | PageHtmlBlock;
+  | PageHtmlBlock
+  | PageNavBlock;
 
 export type PageHtmlDocument = {
   html: string;

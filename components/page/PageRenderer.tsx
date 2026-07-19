@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
 import type { PageCmsItem } from "@/lib/page/cms-selectors";
+import { createDefaultPageFormFields } from "./PageBlockEditor";
 import { buildSandboxedHtmlDocument, normalizePageEmbedUrl } from "@/lib/page/html";
 import { buildPageFontFamily, resolvePageThemeFonts } from "@/lib/page/fonts";
 import type {
@@ -10,7 +11,9 @@ import type {
   PageCmsBlock,
   PageCmsSource,
   PageDocument,
+  PageFormField,
   PageMediaItem,
+  PageNavBlock,
   PageSiteTheme
 } from "@/lib/page/types";
 import { PageFontLoader } from "./PageFontLoader";
@@ -61,7 +64,9 @@ function imageSource(item: Pick<PageMediaItem, "asset" | "imageUrl">) {
   return item.asset?.publicUrl || item.imageUrl;
 }
 
-export function PageRenderer({ document, theme, cmsContent, compact = false, editor, viewport, decorative = false }: {
+export type PageSiteNavPage = { id: string; title: string; slug: string };
+
+export function PageRenderer({ document, theme, cmsContent, compact = false, editor, viewport, decorative = false, sitePages = [], activeDocumentId }: {
   document: Pick<PageDocument, "mode" | "blocks" | "htmlDocument">;
   theme: PageSiteTheme;
   cmsContent: Record<PageCmsSource, PageCmsItem[]>;
@@ -73,6 +78,10 @@ export function PageRenderer({ document, theme, cmsContent, compact = false, edi
   };
   /** サムネイル・カードプレビューなど、外側が既に<Link>（<a>）の時に使う。ブロック内のa要素をspanへ差し替え、a-in-aの入れ子を防ぐ。 */
   decorative?: boolean;
+  /** navブロックが列挙するサイト内ページ一覧（省略時は空配列扱い） */
+  sitePages?: PageSiteNavPage[];
+  /** navブロックで現在表示中のページをハイライトするためのid（省略時はハイライトなし） */
+  activeDocumentId?: string;
 }) {
   if (document.mode === "html") {
     const srcDoc = buildSandboxedHtmlDocument(document.htmlDocument);
@@ -107,7 +116,7 @@ export function PageRenderer({ document, theme, cmsContent, compact = false, edi
             style={blockShellStyle(block, theme)}
           >
             {editor ? <span className={`pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-[var(--mikke-primary)] px-2 py-1 text-[10px] font-bold text-white shadow-sm ${editor.selectedBlockId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>クリックして編集</span> : null}
-            <RenderedBlock block={block} cmsContent={cmsContent} theme={theme} compact={compact} viewport={viewport} decorative={decorative} />
+            <RenderedBlock block={block} cmsContent={cmsContent} theme={theme} compact={compact} viewport={viewport} decorative={decorative} sitePages={sitePages} activeDocumentId={activeDocumentId} />
           </div>
         ))}
       </div>
@@ -115,7 +124,7 @@ export function PageRenderer({ document, theme, cmsContent, compact = false, edi
   );
 }
 
-function RenderedBlock({ block, cmsContent, theme, compact, viewport, decorative }: { block: PageBlock; cmsContent: Record<PageCmsSource, PageCmsItem[]>; theme: PageSiteTheme; compact: boolean; viewport?: "desktop" | "tablet" | "mobile"; decorative: boolean }) {
+function RenderedBlock({ block, cmsContent, theme, compact, viewport, decorative, sitePages, activeDocumentId }: { block: PageBlock; cmsContent: Record<PageCmsSource, PageCmsItem[]>; theme: PageSiteTheme; compact: boolean; viewport?: "desktop" | "tablet" | "mobile"; decorative: boolean; sitePages: PageSiteNavPage[]; activeDocumentId?: string }) {
   if (block.type === "heading") {
     const size = block.level === 1 ? (compact || viewport === "mobile" ? "text-3xl" : viewport === "tablet" ? "text-5xl" : "text-4xl sm:text-6xl") : block.level === 2 ? (compact || viewport === "mobile" ? "text-2xl" : "text-3xl sm:text-4xl") : "text-xl sm:text-2xl";
     return <h2 className={`${size} font-extrabold leading-tight tracking-tight`} style={{ fontFamily: "var(--page-heading-font)" }}>{block.text || "見出し"}</h2>;
@@ -137,12 +146,15 @@ function RenderedBlock({ block, cmsContent, theme, compact, viewport, decorative
       ? <span className={buttonClassName} style={style}>{block.label || "ボタン"}</span>
       : <a href={block.href || "#"} className={buttonClassName} style={style}>{block.label || "ボタン"}</a>;
   }
-  if (block.type === "form") return <section className="mx-auto max-w-xl rounded-2xl border border-black/10 bg-white/80 p-5 text-left"><h3 className="text-lg font-bold">{block.title}</h3><p className="mt-2 text-sm leading-6 opacity-70">{block.description}</p><div className="mt-4 h-11 rounded-xl border border-black/10 bg-white" /><button type="button" disabled className="mt-3 rounded-xl px-5 py-3 text-sm font-bold text-white opacity-60" style={{ backgroundColor: "var(--page-primary)" }}>{block.buttonLabel}</button></section>;
+  if (block.type === "form") {
+    const fields = block.fields?.length ? block.fields : createDefaultPageFormFields();
+    return <section className="mx-auto max-w-xl rounded-2xl border border-black/10 bg-white/80 p-5 text-left"><h3 className="text-lg font-bold">{block.title}</h3><p className="mt-2 text-sm leading-6 opacity-70">{block.description}</p><div className="mt-4 grid gap-3">{fields.map((field) => <FormFieldPreview key={field.id} field={field} />)}</div><button type="button" disabled className="mt-4 rounded-xl px-5 py-3 text-sm font-bold text-white opacity-60" style={{ backgroundColor: "var(--page-primary)" }}>{block.buttonLabel}</button></section>;
+  }
   if (block.type === "divider") return <hr className="border-black/10" />;
   if (block.type === "company") return <section><h2 className="mb-5 text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title}</h2><dl className="divide-y divide-black/10 border-y border-black/10">{block.rows.map((row) => <div key={row.id} className="grid gap-1 py-4 sm:grid-cols-[160px_1fr]"><dt className="text-sm font-bold opacity-60">{row.label}</dt><dd className="whitespace-pre-wrap text-sm leading-7">{row.value || "—"}</dd></div>)}</dl></section>;
   if (block.type === "columns") {
     const grid = viewport === "mobile" ? "grid-cols-1" : viewport ? (block.ratio === "three" ? "grid-cols-3" : block.ratio === "1-2" ? "grid-cols-[1fr_2fr]" : block.ratio === "2-1" ? "grid-cols-[2fr_1fr]" : "grid-cols-2") : block.ratio === "three" ? "md:grid-cols-3" : block.ratio === "1-2" ? "md:grid-cols-[1fr_2fr]" : block.ratio === "2-1" ? "md:grid-cols-[2fr_1fr]" : "md:grid-cols-2";
-    return <section>{block.title ? <h2 className="mb-6 text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title}</h2> : null}<div className={`grid gap-5 ${grid}`}>{block.columns.map((column) => <article key={column.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white/70">{column.asset?.publicUrl || column.imageUrl ? <img src={column.asset?.publicUrl || column.imageUrl} alt={column.imageAlt || ""} loading="lazy" className="h-52 w-full object-cover" /> : null}<div className="p-5">{column.eyebrow ? <p className="text-xs font-bold tracking-[.15em]" style={{ color: "var(--page-accent)" }}>{column.eyebrow}</p> : null}<h3 className="mt-1 text-xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{column.title}</h3><p className="mt-3 whitespace-pre-wrap text-sm leading-7 opacity-75">{column.text}</p>{column.buttonLabel ? (decorative ? <span className="mt-4 inline-flex text-sm font-bold" style={{ color: "var(--page-primary)" }}>{column.buttonLabel} →</span> : <a href={column.href || "#"} className="mt-4 inline-flex text-sm font-bold" style={{ color: "var(--page-primary)" }}>{column.buttonLabel} →</a>) : null}</div></article>)}</div></section>;
+    return <section>{block.title ? <h2 className="mb-6 text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title}</h2> : null}<div className={`grid gap-5 ${grid}`}>{block.columns.map((column) => { const hasText = Boolean(column.eyebrow || column.title || column.text || column.buttonLabel); return <article key={column.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white/70">{column.asset?.publicUrl || column.imageUrl ? <img src={column.asset?.publicUrl || column.imageUrl} alt={column.imageAlt || ""} loading="lazy" className="h-52 w-full object-cover" /> : null}{hasText ? <div className="p-5">{column.eyebrow ? <p className="text-xs font-bold tracking-[.15em]" style={{ color: "var(--page-accent)" }}>{column.eyebrow}</p> : null}<h3 className="mt-1 text-xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{column.title}</h3><p className="mt-3 whitespace-pre-wrap text-sm leading-7 opacity-75">{column.text}</p>{column.buttonLabel ? (decorative ? <span className="mt-4 inline-flex text-sm font-bold" style={{ color: "var(--page-primary)" }}>{column.buttonLabel} →</span> : <a href={column.href || "#"} className="mt-4 inline-flex text-sm font-bold" style={{ color: "var(--page-primary)" }}>{column.buttonLabel} →</a>) : null}</div> : null}</article>; })}</div></section>;
   }
   if (block.type === "gallery") return <section><h2 className="mb-5 text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title}</h2>{block.images.length ? <div className={`grid gap-3 ${viewport === "mobile" ? "grid-cols-2" : viewport ? (block.columns === 4 ? "grid-cols-4" : block.columns === 3 ? "grid-cols-3" : "grid-cols-2") : block.columns === 2 ? "grid-cols-2" : block.columns === 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2 md:grid-cols-3"}`}>{block.images.map((item) => <figure key={item.id}><img src={imageSource(item)} alt={item.alt} loading="lazy" className="aspect-square w-full rounded-xl object-cover" />{item.caption ? <figcaption className="mt-1 text-xs opacity-60">{item.caption}</figcaption> : null}</figure>)}</div> : <ImagePlaceholder label="画像を追加するとグリッド表示されます" />}</section>;
   if (block.type === "slideshow") return <Slideshow block={block} />;
@@ -154,7 +166,20 @@ function RenderedBlock({ block, cmsContent, theme, compact, viewport, decorative
     const srcDoc = buildSandboxedHtmlDocument(block);
     return <section>{block.title ? <h2 className="mb-4 text-xl font-bold">{block.title}</h2> : null}<iframe title={block.title || "HTMLブロック"} srcDoc={srcDoc} sandbox={block.allowScripts ? "allow-scripts allow-forms allow-popups" : ""} style={{ height: Math.max(180, Math.min(1200, block.height)) }} className="w-full rounded-2xl border border-black/10 bg-white" /></section>;
   }
+  if (block.type === "nav") return <NavBlock block={block} sitePages={sitePages} activeDocumentId={activeDocumentId} decorative={decorative} />;
   return <CmsBlock block={block} items={cmsContent[block.source]} decorative={decorative} />;
+}
+
+function FormFieldPreview({ field }: { field: PageFormField }) {
+  const label = <span className="mb-1 block text-xs font-bold opacity-70">{field.label || "項目"}{field.required ? <span className="ml-0.5 text-[var(--page-accent)]">*</span> : null}</span>;
+  if (field.type === "textarea") return <label className="block">{label}<textarea disabled rows={3} className="w-full resize-none rounded-xl border border-black/10 bg-white px-3 py-2 text-sm" /></label>;
+  if (field.type === "select") return <label className="block">{label}<select disabled className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm"><option>{field.options?.[0] ?? "選択してください"}</option></select></label>;
+  return <label className="block">{label}<input type={field.type === "email" ? "email" : field.type === "tel" ? "tel" : "text"} disabled className="h-11 w-full rounded-xl border border-black/10 bg-white px-3 text-sm" /></label>;
+}
+
+function NavBlock({ block, sitePages, activeDocumentId, decorative }: { block: PageNavBlock; sitePages: PageSiteNavPage[]; activeDocumentId?: string; decorative: boolean }) {
+  if (!sitePages.length) return <p className="rounded-xl bg-black/5 p-4 text-center text-sm opacity-60">ページが追加されるとメニューが表示されます。</p>;
+  return <nav aria-label="サイト内メニュー" className="flex flex-wrap items-center gap-2">{sitePages.map((page) => { const active = page.id === activeDocumentId; const linkClassName = `rounded-xl px-4 py-2 text-sm font-bold transition ${active ? "text-white" : "border border-black/10"}`; const style = active ? { backgroundColor: "var(--page-primary)" } : undefined; return decorative ? <span key={page.id} className={linkClassName} style={style}>{page.title}</span> : <a key={page.id} href={`/${page.slug}`} className={linkClassName} style={style}>{page.title}</a>; })}</nav>;
 }
 
 function CmsBlock({ block, items, decorative }: { block: PageCmsBlock; items: PageCmsItem[]; decorative: boolean }) {

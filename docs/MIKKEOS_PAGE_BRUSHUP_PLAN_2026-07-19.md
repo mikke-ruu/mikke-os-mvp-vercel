@@ -227,10 +227,36 @@ PB-B10 カラムブロックで画像のみの時に余白が固定でつく
   全て空（画像だけ入れたい）場合でも余白が残る。テキスト要素が全て
   空の時はpaddingを詰める、または画像のみカードの専用レイアウトを用意する。
 
-PB-B11 エディタのパネル位置を変更したい（意図確認が先）
-  「メニューの場所」が①左の追加・デザインサイドバー／②右の内容編集
-  インスペクタ／③サイト自体のヘッダーnavのどれを指すか不明瞭。
-  次回セッション冒頭でユーザーに意図を確認してから設計する。
+PB-B11 サイト自体のヘッダーナビが存在しない（2026-07-19 ユーザー回答で判明・設計確定）
+  意図確認の結果、「公開するサイト自体のヘッダーナビ」を指すと判明。
+  調査した結果、これは配置変更要望ではなく機能の欠落だった:
+  PageSitePreviewの上部にある「ページ切替」タブ（PageSitePreview.tsx
+  78-89行）はOS内プレビューツールのUI装飾であり、PageRenderer が実際に
+  出力するブロック列（＝将来PG-3で公開される中身）には他ページへの
+  ナビが一切含まれない。複数ページのサイトを作っても、訪問者はページ間を
+  移動する手段がない状態だった。
+
+  設計（Fable確定・積み上げ式の既存哲学に合わせる）:
+  - 新ブロック種別 "nav" を追加。既存の見出し/文章/ボタン等と同じ
+    「積み上げるブロックの1つ」として扱う（サイト全体の自動ヘッダー化はしない）。
+  - v1の中身はシンプルに: サイトの全ページ（site.documents）を順番に
+    横並びのリンク行として自動列挙する。個別リンクの手動編集・除外設定は
+    v1では作らない（後で拡張可）。
+  - 位置は「ブロックをどこに置くか」で決まる（既存のブロック並び替え
+    ↑↓operationsをそのまま使う）＝「メニューの場所を変えたい」は
+    ブロック移動という既存機能で自然に満たされる。新しい配置システムは作らない。
+  - スタイルは既存のPageBlockStyle（背景色/余白/角丸/文字揃え/アニメーション）
+    をそのまま使う。専用のスタイル系は作らない。
+  - 実装が必要な箇所:
+    lib/page/types.ts に PageNavBlock 追加（type:"nav"）。
+    PageRenderer が nav ブロックをレンダリングするには、そのサイトの
+    documents一覧（id/title/slug）が必要 → PageRenderer props に
+    任意の `sitePages?: {id:string; title:string; slug:string}[]` を追加
+    （呼び出し元: PageDocumentEditor/PageSitePreviewは実データを渡す、
+    PageTemplatePreview等の装飾プレビューは省略可＝空配列扱い）。
+    パーツ追加パネル（BuilderSidebar）に「メニュー」を追加。
+    現在表示中のページはハイライト、リンクは decorative時はspan化
+    （PageRenderer.tsxのbutton/columns/cms同様のパターンを踏襲）。
 
 PB-B12 CMSブロックの絞り込み設定がエディタUIに見当たらない
   docs/MIKKEOS_PAGE_IMPLEMENTATION_PLAN.md PG-2は「セレクト/フィルタ」
@@ -238,4 +264,90 @@ PB-B12 CMSブロックの絞り込み設定がエディタUIに見当たらな�
   （おすすめ/今月/認定のみ等）を触るUIが見当たらないとの指摘。
   実装済みで見つけにくいだけか、docsの記載が先行していたのかを
   次回まず確認する。
+```
+
+## 8. Wave 3 実装結果（2026-07-20・Sonnet実装完了）
+
+```text
+PB-B7 完了。components/page/PageDeviceFrame.tsx のmode="content"スタイルで、
+  zoomMode !== "auto" の時だけ overflowX: "auto" / overflowY: "hidden" を
+  追加（autoの時は従来通りoverflow:"hidden"のまま）。
+
+PB-B12 完了。CMSブロックの絞り込みUI（PageBlockEditor.tsx）に「今月のみ」
+  「承認済みのみ」と並べて「おすすめのみ」（filters.featuredOnly）の
+  Checkboxを追加。既存のPageCmsItem型にfeatured相当のデータ項目が無いため、
+  PageRenderer.tsx側の絞り込みロジック（thisMonthOnly/approvedOnlyと同様の
+  実データ連動）は今回のスコープ外（値の保存とUIのみ。指示通り「追加するだけ」）。
+
+PB-B10 完了。components/page/PageRenderer.tsx のcolumns block描画で、
+  column.eyebrow/title/text/buttonLabelが全て空の時はテキスト用divごと
+  描画しないよう変更（画像だけのカードはpadding無しになる）。1つでも
+  値があれば従来通りp-5で描画。
+
+PB-B8 完了。
+  - PageDocumentEditor.tsx: 「サイトを表示」を<Link>からボタンに変更。
+    save()がPromise<boolean>を返すようにし、dirtyな時はまずsave()を
+    awaitして成功時のみ/apps/page/[siteId]/preview?page=[slug]へ遷移。
+    失敗時はsave()内でmessageにエラーが表示され遷移しない。
+  - PageSitePreview.tsx: 「編集に戻る」を<Link>からボタンに変更し、
+    window.history.length > 1（try/catchで簡易判定）ならrouter.back()、
+    historyが無い場合は/apps/page/[siteId]へrouter.pushするフォールバック。
+
+PB-B9 完了。
+  - 事前確認: BuilderSidebarの「フォーム枠」パーツから2個目以降のform
+    ブロックを追加できるかを確認。addBlocks/createEmptyPageBlockには
+    ブロック種別の重複を防ぐ仕組みが無く、各追加でuniqueなidが発行される
+    ため、複数のformブロック追加は元々技術的制限なく可能だった（バグなし）。
+  - lib/page/types.ts: PageFormField型（id/label/type/required/options）と
+    PageFormBlock.fields?: PageFormField[]を追加。
+  - components/page/PageBlockEditor.tsx: createDefaultPageFormFields()を
+    新設しエクスポート（お名前=text必須／メールアドレス=email必須／
+    お問い合わせ内容=textarea必須の3件）。createEmptyPageBlockの"form"は
+    このデフォルトfieldsを持って生成。インスペクタに項目の追加・削除・
+    並び替え（↑↓）・ラベル編集・種別選択（text/email/tel/textarea/select）・
+    必須トグル・（select時のみ）選択肢テキストエリアを実装
+    （columns/companyの配列編集UIパターンを踏襲）。
+  - components/page/PageRenderer.tsx: form block描画をダミー1個から
+    block.fields（無ければcreateDefaultPageFormFieldsへフォールバック）を
+    mapした実際のinput/textarea/select（すべてdisabled）に変更。ラベルと
+    必須マーク(*)を表示。既存データ（fieldsが無いブロック）でも例外なく
+    デフォルト3件で描画される。
+
+PB-B11 完了。
+  - lib/page/types.ts: PageBlockTypeに"nav"、PageNavBlock（追加フィールド
+    無し）、PageBlock unionに追加。
+  - components/page/PageRenderer.tsx: PageRendererに
+    sitePages?: {id,title,slug}[]（既定[]）とactiveDocumentId?: string
+    を追加しRenderedBlockまで引き渡し。block.type==="nav"の描画を追加
+    （sitePagesを横並びのボタン風リンクとして列挙。activeDocumentIdと
+    一致するページをprimary色でハイライト。decorative時はspan、通常時は
+    `<a href="/${page.slug}">`。sitePagesが空の時は
+    「ページが追加されるとメニューが表示されます。」を表示）。
+  - 呼び出し元: PageDocumentEditor.tsx（previewDocument表示部）と
+    PageSitePreview.tsx はsite.documentsから{id,title,slug}配列と
+    activeDocumentId（document.id / activeDocument.id）を渡すよう更新。
+    PageTemplatePreview.tsx・PageDashboard.tsxは変更なし（sitePages省略
+    ＝空配列扱いでプレースホルダー文言が出るのみ、decorative装飾プレビュー
+    として問題ない）。
+  - components/page/PageBlockEditor.tsx: パーツ一覧に「メニュー」
+    （type:"nav"、Menuアイコン）を追加。createEmptyPageBlockに"nav"の
+    ケースを追加（baseのみ）。インスペクタは説明文のみ
+    （「サイトの全ページが自動で並びます。表示位置はブロックの並び替え
+    (↑↓)で調整できます。」）、編集項目なし。
+
+検証: npm run lint（tsc --noEmit）成功。npm run build成功
+  （/apps/page/[siteId]、/apps/page/[siteId]/[pageId]、
+  /apps/page/[siteId]/preview を含む全93ルートを生成）。
+
+既存データ互換: PageFormBlock.fields、PageRenderer.sitePages/
+  activeDocumentId、PageCmsBlock.filters.featuredOnlyはすべてoptionalで
+  追加し、未指定時のフォールバック（デフォルト3項目／空配列／未定義扱い）
+  を実装。旧データを読み込んでも例外は発生しない。
+
+未実装・妥協点:
+  - PB-B12のfeaturedOnly絞り込みは、UIとデータ保存のみで実際のCMS表示
+    フィルタリングには未接続（PageCmsItem型にfeatured相当のフィールドが
+    無いため。指示通り「Checkboxを追加するだけ」のスコープ）。
+  - フォームの実送信処理・nav以外のリンク手動編集/除外設定は、計画通り
+    後続フェーズ（公開・Supabase本接続フェーズ）送り。
 ```

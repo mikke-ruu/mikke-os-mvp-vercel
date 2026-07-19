@@ -2,6 +2,8 @@
 
 import type { ComponentType } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   Building2,
   Code2,
   Columns2,
@@ -12,6 +14,7 @@ import {
   Heading,
   ImageIcon,
   Link2,
+  Menu,
   Minus,
   PanelTop,
   Plus,
@@ -26,6 +29,8 @@ import type {
   PageBlock,
   PageBlockType,
   PageCmsSource,
+  PageFormField,
+  PageFormFieldType,
   PageJpFontId,
   PageLatinFontId,
   PageMediaItem
@@ -39,6 +44,7 @@ export const pageBlockChoices: { type: PageBlockType; label: string; icon: Compo
   { type: "image", label: "画像", icon: ImageIcon },
   { type: "button", label: "ボタン", icon: Link2 },
   { type: "columns", label: "カラム", icon: Columns2 },
+  { type: "nav", label: "メニュー", icon: Menu },
   { type: "company", label: "会社概要", icon: Building2 },
   { type: "gallery", label: "画像グリッド", icon: GalleryThumbnails },
   { type: "slideshow", label: "スライド", icon: GalleryHorizontal },
@@ -64,13 +70,21 @@ export function createPageBuilderId(prefix = "page_block") {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+export function createDefaultPageFormFields(): PageFormField[] {
+  return [
+    { id: createPageBuilderId("form_field"), label: "お名前", type: "text", required: true },
+    { id: createPageBuilderId("form_field"), label: "メールアドレス", type: "email", required: true },
+    { id: createPageBuilderId("form_field"), label: "お問い合わせ内容", type: "textarea", required: true }
+  ];
+}
+
 export function createEmptyPageBlock(type: PageBlockType, order: number): PageBlock {
   const base = { id: createPageBuilderId(), order, hidden: false, style: { spacing: "normal" as const, radius: "medium" as const, textAlign: "left" as const, animation: "none" as const } };
   if (type === "heading") return { ...base, type, level: 2, text: "新しい見出し" };
   if (type === "text") return { ...base, type, text: "ここに文章を入力します。", size: "normal" };
   if (type === "image") return { ...base, type, imageUrl: "", alt: "", caption: "", fit: "cover" };
   if (type === "button") return { ...base, type, label: "詳しく見る", href: "#", variant: "solid" };
-  if (type === "form") return { ...base, type, title: "お問い合わせ", description: "必要事項をご入力ください。", buttonLabel: "送信する" };
+  if (type === "form") return { ...base, type, title: "お問い合わせ", description: "必要事項をご入力ください。", buttonLabel: "送信する", fields: createDefaultPageFormFields() };
   if (type === "cms") return { ...base, type, source: "story", displayMode: "cards", title: "最新の活動", filters: {} };
   if (type === "company") return { ...base, type, title: "会社概要", rows: ["会社・団体名", "代表者", "所在地", "設立", "事業内容"].map((label) => ({ id: createPageBuilderId("company_row"), label, value: "" })) };
   if (type === "columns") return { ...base, type, title: "2カラム", ratio: "1-1", columns: [1, 2].map((number) => ({ id: createPageBuilderId("column"), eyebrow: `COLUMN ${number}`, title: `カラム ${number}`, text: "文章を入力します。", imageUrl: "", imageAlt: "" })) };
@@ -78,6 +92,7 @@ export function createEmptyPageBlock(type: PageBlockType, order: number): PageBl
   if (type === "slideshow") return { ...base, type, title: "スライドショー", images: [], autoplay: true, intervalSeconds: 5 };
   if (type === "embed") return { ...base, type, title: "", url: "", embedHtml: "", height: 480 };
   if (type === "html") return { ...base, type, title: "", html: "<section><h2>自由なHTMLブロック</h2><p>ここを編集してください。</p></section>", css: "body{margin:0;padding:24px;font-family:system-ui,sans-serif}h2{margin-top:0}", javascript: "", allowScripts: false, height: 360 };
+  if (type === "nav") return { ...base, type };
   return { ...base, type: "divider" };
 }
 
@@ -101,8 +116,31 @@ export function PageBlockFields({ block, siteId, cmsContent, onChange }: {
   if (block.type === "text") return <div className="grid gap-3"><Select label="文字サイズ" value={block.size ?? "normal"} onChange={(size) => update({ size: size as "small" | "normal" | "large" })} options={[{ value: "small", label: "小さめ" }, { value: "normal", label: "標準" }, { value: "large", label: "大きめ" }]} /><TextArea label="文章" value={block.text} onChange={(text) => update({ text })} rows={6} /></div>;
   if (block.type === "image") return <div className="grid gap-3"><PageImageUploader siteId={siteId} currentUrl={currentImageUrl(block.asset, block.imageUrl)} onUploaded={(asset) => update({ asset, imageUrl: asset.publicUrl })} /><div className="grid gap-3 sm:grid-cols-2"><TextInput label="代替テキスト" value={block.alt} onChange={(alt) => update({ alt })} /><TextInput label="キャプション" value={block.caption ?? ""} onChange={(caption) => update({ caption })} /></div><Select label="表示方法" value={block.fit ?? "cover"} onChange={(fit) => update({ fit: fit as "cover" | "contain" })} options={[{ value: "cover", label: "枠いっぱい" }, { value: "contain", label: "全体を表示" }]} /></div>;
   if (block.type === "button") return <div className="grid gap-3 sm:grid-cols-2"><TextInput label="ラベル" value={block.label} onChange={(label) => update({ label })} /><TextInput label="リンク先" value={block.href} onChange={(href) => update({ href })} placeholder="https:// または #section" /><Select label="デザイン" value={block.variant ?? "solid"} onChange={(variant) => update({ variant: variant as "solid" | "outline" | "soft" })} options={[{ value: "solid", label: "塗り" }, { value: "outline", label: "枠線" }, { value: "soft", label: "淡い背景" }]} /></div>;
-  if (block.type === "form") return <div className="grid gap-3"><TextInput label="タイトル" value={block.title} onChange={(title) => update({ title })} /><TextArea label="説明" value={block.description} onChange={(description) => update({ description })} rows={3} /><TextInput label="ボタン表示" value={block.buttonLabel} onChange={(buttonLabel) => update({ buttonLabel })} /><p className="text-xs text-[var(--mikke-muted)]">送信処理は公開・本接続フェーズで設計します。</p></div>;
+  if (block.type === "form") {
+    const fields = block.fields ?? createDefaultPageFormFields();
+    const updateFields = (nextFields: PageFormField[]) => update({ fields: nextFields });
+    const updateField = (fieldId: string, patch: Partial<PageFormField>) => updateFields(fields.map((field) => field.id === fieldId ? { ...field, ...patch } : field));
+    const moveField = (index: number, direction: -1 | 1) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= fields.length) return;
+      const next = [...fields];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      updateFields(next);
+    };
+    return <div className="grid gap-3">
+      <TextInput label="タイトル" value={block.title} onChange={(title) => update({ title })} />
+      <TextArea label="説明" value={block.description} onChange={(description) => update({ description })} rows={3} />
+      <TextInput label="ボタン表示" value={block.buttonLabel} onChange={(buttonLabel) => update({ buttonLabel })} />
+      <div className="grid gap-2">
+        <p className="text-xs font-bold">入力項目</p>
+        {fields.map((field, index) => <section key={field.id} className="rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-3"><div className="grid gap-2 sm:grid-cols-[1fr_140px]"><TextInput label="ラベル" value={field.label} onChange={(label) => updateField(field.id, { label })} /><Select label="種類" value={field.type} onChange={(type) => updateField(field.id, { type: type as PageFormFieldType })} options={[{ value: "text", label: "1行テキスト" }, { value: "email", label: "メールアドレス" }, { value: "tel", label: "電話番号" }, { value: "textarea", label: "複数行テキスト" }, { value: "select", label: "選択肢" }]} /></div>{field.type === "select" ? <div className="mt-2"><TextArea label="選択肢（1行に1つ）" value={(field.options ?? []).join("\n")} onChange={(value) => updateField(field.id, { options: value.split("\n").map((option) => option.trim()).filter(Boolean) })} rows={3} /></div> : null}<div className="mt-2 flex items-center justify-between gap-2"><Check label="必須" checked={field.required} onChange={(required) => updateField(field.id, { required })} /><div className="flex items-center gap-1"><button type="button" onClick={() => moveField(index, -1)} disabled={index === 0} aria-label="上へ" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowUp size={13} /></button><button type="button" onClick={() => moveField(index, 1)} disabled={index === fields.length - 1} aria-label="下へ" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowDown size={13} /></button><button type="button" onClick={() => updateFields(fields.filter((item) => item.id !== field.id))} aria-label="項目を削除" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-danger)]"><Trash2 size={13} /></button></div></div></section>)}
+        <button type="button" onClick={() => updateFields([...fields, { id: createPageBuilderId("form_field"), label: "項目", type: "text", required: false }])} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><Plus size={14} /> 項目を追加</button>
+      </div>
+      <p className="text-xs text-[var(--mikke-muted)]">送信処理は公開・本接続フェーズで設計します。</p>
+    </div>;
+  }
   if (block.type === "divider") return <p className="text-xs text-[var(--mikke-muted)]">横線で内容を区切ります。</p>;
+  if (block.type === "nav") return <p className="text-xs leading-5 text-[var(--mikke-muted)]">サイトの全ページが自動で並びます。表示位置はブロックの並び替え(↑↓)で調整できます。</p>;
   if (block.type === "company") return <div className="grid gap-3"><TextInput label="見出し" value={block.title} onChange={(title) => update({ title })} />{block.rows.map((row, index) => <div key={row.id} className="grid grid-cols-[minmax(100px,.45fr)_1fr_36px] gap-2"><input aria-label={`${index + 1}行目の項目名`} value={row.label} onChange={(event) => update({ rows: block.rows.map((item) => item.id === row.id ? { ...item, label: event.target.value } : item) })} className={inputClass} /><input aria-label={`${index + 1}行目の内容`} value={row.value} onChange={(event) => update({ rows: block.rows.map((item) => item.id === row.id ? { ...item, value: event.target.value } : item) })} className={inputClass} /><button type="button" onClick={() => update({ rows: block.rows.filter((item) => item.id !== row.id) })} className="mt-1.5 grid h-10 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-danger)]" aria-label="行を削除"><Trash2 size={14} /></button></div>)}<button type="button" onClick={() => update({ rows: [...block.rows, { id: createPageBuilderId("company_row"), label: "項目", value: "" }] })} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><Plus size={14} /> 行を追加</button></div>;
   if (block.type === "columns") return <div className="grid gap-4"><div className="grid gap-3 sm:grid-cols-2"><TextInput label="セクション見出し" value={block.title ?? ""} onChange={(title) => update({ title })} /><Select label="比率" value={block.ratio} onChange={(ratio) => { const nextRatio = ratio as typeof block.ratio; const count = nextRatio === "three" ? 3 : 2; const columns = [...block.columns]; while (columns.length < count) columns.push({ id: createPageBuilderId("column"), title: `カラム ${columns.length + 1}`, text: "文章を入力します。", imageUrl: "" }); update({ ratio: nextRatio, columns: columns.slice(0, count) }); }} options={[{ value: "1-1", label: "1 : 1" }, { value: "1-2", label: "1 : 2" }, { value: "2-1", label: "2 : 1" }, { value: "three", label: "3カラム" }]} /></div>{block.columns.map((column, index) => <section key={column.id} className="rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-3"><p className="mb-3 text-xs font-bold text-[var(--mikke-accent)]">カラム {index + 1}</p><div className="grid gap-3"><PageImageUploader compact siteId={siteId} currentUrl={currentImageUrl(column.asset, column.imageUrl)} onUploaded={(asset) => update({ columns: block.columns.map((item) => item.id === column.id ? { ...item, asset, imageUrl: asset.publicUrl, imageAlt: item.imageAlt || asset.fileName } : item) })} /><TextInput label="小見出し" value={column.eyebrow ?? ""} onChange={(eyebrow) => update({ columns: block.columns.map((item) => item.id === column.id ? { ...item, eyebrow } : item) })} /><TextInput label="見出し" value={column.title} onChange={(title) => update({ columns: block.columns.map((item) => item.id === column.id ? { ...item, title } : item) })} /><TextArea label="文章" value={column.text} onChange={(text) => update({ columns: block.columns.map((item) => item.id === column.id ? { ...item, text } : item) })} rows={3} /><div className="grid gap-3 sm:grid-cols-2"><TextInput label="ボタン" value={column.buttonLabel ?? ""} onChange={(buttonLabel) => update({ columns: block.columns.map((item) => item.id === column.id ? { ...item, buttonLabel } : item) })} /><TextInput label="リンク先" value={column.href ?? ""} onChange={(href) => update({ columns: block.columns.map((item) => item.id === column.id ? { ...item, href } : item) })} /></div></div></section>)}</div>;
   if (block.type === "gallery" || block.type === "slideshow") {
@@ -115,7 +153,7 @@ export function PageBlockFields({ block, siteId, cmsContent, onChange }: {
     const candidates = cmsContent[block.source];
     const selected = block.filters.selectedItemIds ?? [];
     const info = pageCmsSourceInfo[block.source];
-    return <div className="grid gap-3"><TextInput label="見出し" value={block.title} onChange={(title) => update({ title })} /><div className="grid gap-3 sm:grid-cols-2"><Select label="参照元" value={block.source} onChange={(source) => update({ source: source as PageCmsSource, filters: { ...block.filters, selectedItemIds: [] } })} options={Object.entries(pageCmsSourceLabels).map(([value, label]) => ({ value, label }))} /><Select label="表示" value={block.displayMode} onChange={(displayMode) => update({ displayMode: displayMode as "list" | "cards" | "featured" })} options={[{ value: "list", label: "リスト" }, { value: "cards", label: "カード" }, { value: "featured", label: "注目表示" }]} /></div><dl className="grid gap-2 rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-3 text-xs leading-5 sm:grid-cols-3"><div><dt className="font-bold text-[var(--mikke-accent)]">mikkeID接続</dt><dd className="mt-1 text-[var(--mikke-muted)]">{info.connection}</dd></div><div><dt className="font-bold text-[var(--mikke-accent)]">表示できる内容</dt><dd className="mt-1 text-[var(--mikke-muted)]">{info.visibleFields}</dd></div><div><dt className="font-bold text-[var(--mikke-accent)]">表示条件</dt><dd className="mt-1 text-[var(--mikke-muted)]">{info.visibilityRule}</dd></div></dl><div className="flex flex-wrap gap-2"><Check label="今月のみ" checked={block.filters.thisMonthOnly ?? false} onChange={(thisMonthOnly) => update({ filters: { ...block.filters, thisMonthOnly } })} /><Check label="承認済みのみ" checked={block.filters.approvedOnly ?? false} onChange={(approvedOnly) => update({ filters: { ...block.filters, approvedOnly } })} /></div><fieldset className="rounded-xl border border-[var(--mikke-line-soft)] p-3"><legend className="px-1 text-xs font-bold">表示する項目（未選択ならすべて）</legend>{candidates.length ? <div className="grid gap-2 sm:grid-cols-2">{candidates.map((item) => <label key={item.id} className="flex items-start gap-2 rounded-lg bg-[var(--mikke-surface-soft)] p-2 text-xs"><input type="checkbox" checked={selected.includes(item.id)} onChange={(event) => update({ filters: { ...block.filters, selectedItemIds: event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id) } })} /><span><strong className="block">{item.title}</strong><span className="text-[var(--mikke-muted)]">{item.meta}</span></span></label>)}</div> : <p className="text-xs text-[var(--mikke-muted)]">現在選択できる公開候補はありません。</p>}</fieldset><p className="text-xs leading-5 text-[var(--mikke-muted)]">Pageには選択IDと絞り込み条件だけを保存し、元アプリのデータはコピーしません。</p></div>;
+    return <div className="grid gap-3"><TextInput label="見出し" value={block.title} onChange={(title) => update({ title })} /><div className="grid gap-3 sm:grid-cols-2"><Select label="参照元" value={block.source} onChange={(source) => update({ source: source as PageCmsSource, filters: { ...block.filters, selectedItemIds: [] } })} options={Object.entries(pageCmsSourceLabels).map(([value, label]) => ({ value, label }))} /><Select label="表示" value={block.displayMode} onChange={(displayMode) => update({ displayMode: displayMode as "list" | "cards" | "featured" })} options={[{ value: "list", label: "リスト" }, { value: "cards", label: "カード" }, { value: "featured", label: "注目表示" }]} /></div><dl className="grid gap-2 rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-3 text-xs leading-5 sm:grid-cols-3"><div><dt className="font-bold text-[var(--mikke-accent)]">mikkeID接続</dt><dd className="mt-1 text-[var(--mikke-muted)]">{info.connection}</dd></div><div><dt className="font-bold text-[var(--mikke-accent)]">表示できる内容</dt><dd className="mt-1 text-[var(--mikke-muted)]">{info.visibleFields}</dd></div><div><dt className="font-bold text-[var(--mikke-accent)]">表示条件</dt><dd className="mt-1 text-[var(--mikke-muted)]">{info.visibilityRule}</dd></div></dl><div className="flex flex-wrap gap-2"><Check label="おすすめのみ" checked={block.filters.featuredOnly ?? false} onChange={(featuredOnly) => update({ filters: { ...block.filters, featuredOnly } })} /><Check label="今月のみ" checked={block.filters.thisMonthOnly ?? false} onChange={(thisMonthOnly) => update({ filters: { ...block.filters, thisMonthOnly } })} /><Check label="承認済みのみ" checked={block.filters.approvedOnly ?? false} onChange={(approvedOnly) => update({ filters: { ...block.filters, approvedOnly } })} /></div><fieldset className="rounded-xl border border-[var(--mikke-line-soft)] p-3"><legend className="px-1 text-xs font-bold">表示する項目（未選択ならすべて）</legend>{candidates.length ? <div className="grid gap-2 sm:grid-cols-2">{candidates.map((item) => <label key={item.id} className="flex items-start gap-2 rounded-lg bg-[var(--mikke-surface-soft)] p-2 text-xs"><input type="checkbox" checked={selected.includes(item.id)} onChange={(event) => update({ filters: { ...block.filters, selectedItemIds: event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id) } })} /><span><strong className="block">{item.title}</strong><span className="text-[var(--mikke-muted)]">{item.meta}</span></span></label>)}</div> : <p className="text-xs text-[var(--mikke-muted)]">現在選択できる公開候補はありません。</p>}</fieldset><p className="text-xs leading-5 text-[var(--mikke-muted)]">Pageには選択IDと絞り込み条件だけを保存し、元アプリのデータはコピーしません。</p></div>;
   }
   return null;
 }

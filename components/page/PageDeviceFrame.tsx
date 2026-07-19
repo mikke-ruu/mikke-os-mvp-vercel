@@ -76,7 +76,11 @@ export function PageDeviceFrame({
       <div
         style={
           mode === "content"
-            ? { height: contentHeight ? Math.ceil(contentHeight * scale) : undefined, overflow: "hidden" }
+            ? {
+                height: contentHeight ? Math.ceil(contentHeight * scale) : undefined,
+                overflow: "hidden",
+                ...(zoomMode !== "auto" ? { overflowX: "auto", overflowY: "hidden" } : {})
+              }
             : { position: "absolute", inset: 0, overflow: "hidden" }
         }
       >

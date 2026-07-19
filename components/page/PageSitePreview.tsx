@@ -39,6 +39,22 @@ export function PageSitePreview() {
   const activeDocument = useMemo(() => site?.documents.find((document) => document.id === activeDocumentId) ?? null, [site, activeDocumentId]);
   const issues = useMemo(() => (site ? collectSiteLinkIssues(site) : []), [site]);
 
+  function hasNavigableHistory() {
+    try {
+      return typeof window !== "undefined" && window.history.length > 1;
+    } catch {
+      return false;
+    }
+  }
+
+  function goBackToEditor() {
+    if (hasNavigableHistory()) {
+      router.back();
+      return;
+    }
+    if (site) router.push(`/apps/page/${site.id}`);
+  }
+
   function navigateToDocument(documentId: string) {
     if (!site) return;
     const target = site.documents.find((document) => document.id === documentId);
@@ -65,7 +81,7 @@ export function PageSitePreview() {
   return (
     <MikkeAppShell appName="Page" title={`${site.name}のプレビュー`} subtitle="サイト全体をブラウザに近い見た目で確認できます" currentApp={{ label: "Page", href: "/apps/page" }}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href={`/apps/page/${site.id}`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold"><ArrowLeft size={15} /> 編集に戻る</Link>
+        <button type="button" onClick={goBackToEditor} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold"><ArrowLeft size={15} /> 編集に戻る</button>
         {activeDocument ? <Link href={`/apps/page/${site.id}/${activeDocument.id}`} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white"><Pencil size={14} /> このページを編集</Link> : null}
       </div>
 
@@ -107,7 +123,7 @@ export function PageSitePreview() {
             {activeDocument ? (
               <PageDeviceFrame device={device} zoomMode={zoomMode} mode="content">
                 <div className="overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-black/5">
-                  <PageRenderer document={activeDocument} theme={site.theme} cmsContent={cmsContent} viewport={device} />
+                  <PageRenderer document={activeDocument} theme={site.theme} cmsContent={cmsContent} viewport={device} sitePages={site.documents.map((item) => ({ id: item.id, title: item.title, slug: item.slug }))} activeDocumentId={activeDocument.id} />
                 </div>
               </PageDeviceFrame>
             ) : (

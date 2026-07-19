@@ -24,7 +24,7 @@ import {
   Type,
   Undo2
 } from "lucide-react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import {
   PageBlockFields,
@@ -99,6 +99,7 @@ function renewNestedIds(block: PageBlock): PageBlock {
 
 export function PageDocumentEditor() {
   const params = useParams<{ siteId: string; pageId: string }>();
+  const router = useRouter();
   const [site, setSite] = useState<PageSite | null>(null);
   const [document, setDocument] = useState<PageDocument | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -189,7 +190,7 @@ export function PageDocumentEditor() {
     setSelectedBlockId(next[0]?.id ?? null);
   }
 
-  async function save() {
+  async function save(): Promise<boolean> {
     setMessage("");
     try {
       const savedSite = savePageSiteTheme(params.siteId, theme);
@@ -204,9 +205,20 @@ export function PageDocumentEditor() {
       setFuture([]);
       setDirty(false);
       setMessage("下書きを保存しました。");
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "下書きを保存できませんでした。");
+      return false;
     }
+  }
+
+  async function openSitePreview() {
+    if (!site || !document) return;
+    if (dirty) {
+      const saved = await save();
+      if (!saved) return;
+    }
+    router.push(`/apps/page/${site.id}/preview?page=${document.slug}`);
   }
 
   if (!loaded) return <MikkeAppShell appName="Page" title="ページを編集" subtitle="読み込み中" currentApp={{ label: "Page", href: "/apps/page" }}><p className="text-sm text-[var(--mikke-muted)]">ページを読み込んでいます。</p></MikkeAppShell>;
@@ -218,7 +230,7 @@ export function PageDocumentEditor() {
         <Link href={`/apps/page/${site.id}`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold"><ArrowLeft size={15} /> ページ一覧へ</Link>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`text-xs font-bold ${dirty ? "text-[var(--mikke-accent)]" : "text-[var(--mikke-success)]"}`}>{dirty ? "未保存の変更があります" : "保存済み"}</span>
-          <Link href={`/apps/page/${site.id}/preview?page=${document.slug}`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]"><Globe2 size={15} /> サイトを表示</Link>
+          <button type="button" onClick={() => void openSitePreview()} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]"><Globe2 size={15} /> サイトを表示</button>
           <button type="button" onClick={undo} disabled={!past.length || mode !== "builder"} aria-label="元に戻す" className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white disabled:opacity-30"><Undo2 size={16} /></button>
           <button type="button" onClick={redo} disabled={!future.length || mode !== "builder"} aria-label="やり直す" className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white disabled:opacity-30"><Redo2 size={16} /></button>
           <button type="button" onClick={() => void save()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white"><Save size={16} /> 下書きを保存</button>
@@ -265,7 +277,7 @@ export function PageDocumentEditor() {
                   {blocks.length === 0 ? <div className="grid min-h-[560px] place-items-center"><div className="max-w-sm text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-[var(--mikke-accent)] shadow-sm"><LayoutTemplate size={22} /></span><p className="mt-4 font-bold">最初のデザインを選びましょう</p><p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">「追加・デザイン」からテンプレートを選ぶと、すぐに編集できます。</p><button type="button" onClick={() => { setSidebarPanel("templates"); setMobileWorkspace("add"); }} className="mt-4 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">テンプレートを見る</button></div></div> : (
                     <PageDeviceFrame device={device} zoomMode={zoomMode} mode="content">
                       <div className="overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-black/5">
-                        <PageRenderer document={previewDocument} theme={theme} cmsContent={cmsContent} viewport={device} editor={{ selectedBlockId, onSelectBlock: (blockId) => { setSelectedBlockId(blockId); if (window.innerWidth < 1024) setMobileWorkspace("edit"); } }} />
+                        <PageRenderer document={previewDocument} theme={theme} cmsContent={cmsContent} viewport={device} editor={{ selectedBlockId, onSelectBlock: (blockId) => { setSelectedBlockId(blockId); if (window.innerWidth < 1024) setMobileWorkspace("edit"); } }} sitePages={site.documents.map((item) => ({ id: item.id, title: item.title, slug: item.slug }))} activeDocumentId={document.id} />
                       </div>
                     </PageDeviceFrame>
                   )}
