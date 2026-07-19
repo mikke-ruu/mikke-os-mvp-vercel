@@ -257,6 +257,7 @@ export type AcademyKitOrder = {
   instructor_id: string;
   user_id: string | null;
   application_id: string | null;
+  shipping_address: string | null;
   items: AcademyKitOrderItem[];
   title: string;
   amount: number;

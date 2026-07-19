@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Package } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
@@ -75,6 +76,17 @@ function KitsContent() {
                       {ins?.business_name || "講師"} ・ {formatDate(order.ordered_at)} ・{" "}
                       <span className="font-bold text-[var(--mikke-text)]">{order.amount.toLocaleString()}円</span>
                     </p>
+                    {order.shipping_address ? (
+                      <p className="mt-0.5 text-xs text-[var(--mikke-muted)]">送り先: {order.shipping_address}</p>
+                    ) : null}
+                    {order.application_id ? (
+                      <Link
+                        href={`/academy/applications/${order.application_id}`}
+                        className="mt-0.5 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]"
+                      >
+                        申込を見る →
+                      </Link>
+                    ) : null}
                   </div>
                   <span className="shrink-0 rounded-full bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">
                     {KIT_STATUS_LABELS[order.status]}

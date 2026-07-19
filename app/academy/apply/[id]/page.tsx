@@ -10,6 +10,17 @@ const inputClass =
   "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 
+// AC-D6: 外部決済URLへメールを事前入力できる場合だけ付与する（努力目標。対応可否はサービス次第）
+function buildPaymentUrl(url: string, email: string): string {
+  try {
+    const u = new URL(url);
+    if (email.trim()) u.searchParams.set("prefilled_email", email.trim());
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 function ApplyInner({ courseId }: { courseId: string }) {
   const searchParams = useSearchParams();
   const instructorId = searchParams.get("k");
@@ -75,7 +86,17 @@ function ApplyInner({ courseId }: { courseId: string }) {
         <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
           {course.name} のお申込みを受け付けました。担当より折り返しご連絡いたします。
         </p>
-        <Link href={`/academy/c/${course.id}${instructorId ? `?k=${instructorId}` : ""}`} className="mt-6 inline-block text-sm font-bold text-[var(--mikke-accent-strong)]">
+        {course.payment_url ? (
+          <a
+            href={buildPaymentUrl(course.payment_url, email)}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-5 inline-block rounded-2xl bg-[var(--mikke-accent)] px-5 py-3 text-sm font-bold text-white"
+          >
+            お支払い手続きへ進む
+          </a>
+        ) : null}
+        <Link href={`/academy/c/${course.id}${instructorId ? `?k=${instructorId}` : ""}`} className="mt-6 block text-sm font-bold text-[var(--mikke-accent-strong)]">
           講座ページに戻る
         </Link>
       </div>

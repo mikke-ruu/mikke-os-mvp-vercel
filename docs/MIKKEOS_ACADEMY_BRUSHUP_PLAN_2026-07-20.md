@@ -252,6 +252,34 @@ comment on column public.academy_instructors.photo_url is
 自分の写真を編集できるようにする場合も、このトリガ定義の変更は不要（保護対象に追加したい場合は
 別途トリガ関数の更新が必要）。
 
+Wave D (AC-D1) のために、`academy_kit_orders` に列を2つ追加する必要がある。
+コード側（`types/database.ts` の `AcademyKitOrder` 型、`lib/academy/kits.ts` の
+`createKitOrder` の insert文、`lib/academy/kits.ts` の `listKitOrdersByApplication`、
+講師ポータルのキット注文フォーム、本部側キット一覧・申込詳細の表示）は実装済み。
+以下のSQLをSupabase側で実行するまでは、application_id・shipping_addressを渡すinsertが
+失敗する（DBに列が無いため）。
+
+```sql
+-- academy_kit_orders.application_id / shipping_address 追加
+-- (Wave D / AC-D1: キット注文を申込に紐づけ、送り先を持てるようにする)
+alter table public.academy_kit_orders
+  add column if not exists application_id uuid references public.academy_applications(id);
+alter table public.academy_kit_orders
+  add column if not exists shipping_address text;
+
+comment on column public.academy_kit_orders.application_id is
+  'このキット注文がどの申込（受講者）向けかを示す。null許容＝申込を選ばない自由記述の注文も引き続き可能。';
+comment on column public.academy_kit_orders.shipping_address is
+  '送り先（受講者へ／自分（講師）へ／その他自由入力）。構造化した住所ではなくテキスト。';
+```
+
+備考: 既存のキット注文データはどちらの列もnullのまま読み込め、既存の一覧・履歴表示はそのまま
+動作する（破壊的変更ではない）。ただし `createKitOrder` の insert文は application_id・
+shipping_address を常に送るよう実装したため（値がnullの場合も含む）、**このSQLを実行するまでは
+「申込から選ぶ」を使わない従来通りの自由記述注文も含め、キット新規注文が全件失敗する**
+（PostgRESTは未知の列を含むinsertを列の値に関わらず拒否するため）。あゆみに向けて: Wave D
+のキット注文機能を使う前に、必ずこのSQLを先に実行すること。
+
 ## 10. Wave C実装メモ（2026-07-20 Sonnet実装・夜間実行）
 
 AC-C1〜AC-C5実装済み。新規Supabaseスキーマ変更なし（すべて既存のjsonb列 `academy_courses.lp_blocks` /
@@ -329,3 +357,94 @@ BlockEditor・PageBlocks・公開LP描画のどの分岐にも従来通り到達
   今回見送り（上記AC-C5参照）。
 - 教材追加ページ(app/academy/materials/new/page.tsx)への?course=引き継ぎ（新規
   作成時に講座を自動選択させる）はプロンプト指定範囲外のため未実装。
+
+## 11. Wave D実装メモ（2026-07-20 Sonnet実装・夜間実行）
+
+AC-D1〜AC-D6すべて実装済み（AC-D6も対象箇所が見つかったため実施）。判断に迷って
+止めた箇所はなし。
+
+```text
+AC-D1: スキーマ追加（コードのみ）
+  types/database.ts の AcademyKitOrder に shipping_address: string | null を追加
+  （application_id は実装前から型に存在していたが insert文に配線されていなかったため
+  今回配線した）。
+  lib/academy/kits.ts の createKitOrder の input型に applicationId・shippingAddress
+  （どちらも省略可・省略時はnull）を追加し、insert文に application_id・shipping_address
+  を含めた。あわせて listKitOrdersByApplication(headquartersId, applicationId) を新設
+  （AC-D3の申込詳細での相互リンク表示に使用）。
+  実際のSQLは本ファイル §9 に追記済み（このSQLを実行するまでキット新規注文が全件失敗する
+  点も明記した。理由はPostgRESTが未知列を含むinsertを値に関わらず拒否するため）。
+
+AC-D2: 講師ポータルのキット注文フローを「申込から選ぶ」形に
+  app/academy/portal/kits/page.tsx を書き換え。
+  - 「申込から選ぶ（任意）」<select> を追加（lib/academy/instructor-portal.ts の
+    listMyApplications を利用。既存関数がそのまま講師視点の担当申込一覧として使えた
+    ため新規追加は不要だった）。
+  - 選択すると受講者の所属講座に一致する講師レコードを自動でinstructorIdにセットし
+    （講座<select>は選択中disabledにして矛盾を防止）、受講者名を読み取り専用の
+    案内ボックスに表示。
+  - 申込のform_answersからキー名またはvalueに「住所」/"address"を含む回答があれば
+    「参考情報」として表示するのみに留めた（設計方針通り、自動転記・厳密突合はしない）。
+  - 送り先<select>（受講者へ／自分（講師）へ／その他=自由入力）を追加。「その他」の
+    ときだけ自由入力欄を出し、選択結果をshippingAddressとしてcreateKitOrderへ渡す。
+  - 申込を選ばない自由記述の注文（application_id=null）は従来通り可能（デフォルト
+    「選択しない」）。
+  - AC-D4のクエリパラメータ(?application=)をuseSearchParamsで読み取り、該当申込が
+    一覧に含まれていれば初期選択に反映（useSearchParams使用のためdefault exportに
+    Suspense境界を追加＝Wave CのAC-C4と同じパターン）。
+
+AC-D3: 本部側キット注文一覧・申込詳細に相互リンク
+  app/academy/kits/page.tsx: application_idがある注文のカードに「申込を見る →」
+  リンク(/academy/applications/[application_id])を追加。あわせてshipping_addressが
+  あれば表示。
+  app/academy/applications/[id]/page.tsx: listKitOrdersByApplicationで取得した
+  キット注文一覧セクションを追加（品目・金額・送り先・ステータスを表示）。0件のときは
+  「まだキット注文はありません。」と表示。「キット発注管理で見る →」リンクも添えた。
+
+AC-D4: portal/applications/page.tsxの文言修正＋キット注文導線
+  39行目付近の文言を指定通り修正（「受講に必要なキットは、ここから注文してください。」
+  を追記）。各申込カードに「キットを注文する」ボタンを追加し、
+  /academy/portal/kits?application=[id] へ遷移するようにした（AC-D2側の
+  useSearchParams読み取りと対で動作）。
+
+AC-D5: 申込ステータスのインライン変更
+  app/academy/applications/page.tsx（本部・申込一覧）の各カードに<select>を追加。
+  カード全体を包んでいたLinkを内側のヘッダー部分だけに絞り、<select>はLink外に配置
+  （onClickでstopPropagationも付与し、クリックでの誤遷移を二重に防止）。
+  lib/academy/applications.ts の updateApplication をstatusのみpatchする形で呼び出す。
+  変更中はbusyIdで対象行の<select>をdisabled、失敗時はカード上部にエラー文言を表示
+  （他の一覧画面のインライン編集パターン=app/academy/kits/page.tsxのbusyId方式に揃えた）。
+  なお申込詳細画面(app/academy/applications/[id]/page.tsx)には元々同種のステータス
+  <select>が実装済みだったため、そちらは変更していない。
+
+AC-D6: 外部決済リンクへの事前入力（実施した）
+  対応箇所が見つかった: app/academy/apply/[id]/page.tsx の申込完了画面
+  （done===trueの分岐）。academy_courses.payment_url（CourseFormの「受講料 決済URL
+  （外部）」欄。既存カラムで元々ある）が、これまでどの画面にも表示・リンクされていな
+  かったため、完了画面に「お支払い手続きへ進む」ボタンとして新規に配置し、
+  buildPaymentUrl()ヘルパーで ?prefilled_email=<申込者のメール> を付与した
+  （URLのパースに失敗した場合や空メールの場合はprefilled_emailを付けず元のURLを
+  そのまま使う=壊れにくさ優先）。Stripe Payment Linksのprefilled_email対応を想定した
+  実装だが、他の決済サービスでも同名クエリパラメータが無視されるだけで実害はない設計。
+```
+
+検証: `npm run lint`（tsc --noEmit）成功・`npm run build` 成功（全93ルート生成、
+/academy/applications・/academy/applications/[id]・/academy/apply/[id]・/academy/kits・
+/academy/portal/applications・/academy/portal/kits 含む）。
+
+既存データ互換の保証方法: application_id・shipping_addressは両方nullable。
+createKitOrderは値未指定時にnullを送るためコード上は既存データ形と整合するが、
+DBに列自体が無い間はinsert自体が失敗する（§9に明記・あゆみのSQL投入が前提）。
+読み取り側（listKitOrders・listMyKitOrders・listKitOrdersByApplication）は
+`as AcademyKitOrder[]`キャストのみで、旧データ（列が無い状態でSELECTした場合に
+Supabaseが単に該当キーを返さない/undefinedになるケース）でも、UI側は
+`order.shipping_address ?`・`order.application_id ?`という条件分岐でしか参照しない
+ため、undefinedでも例外にならず「表示しない」に落ちる形にしてある。
+
+未実装・妥協点:
+- なし（AC-D1〜AC-D6すべて実装。AC-D6は「見つからなければスキップ可」の努力目標
+  だったが、対象箇所(academy/apply/[id]/page.tsx)が見つかったため実装した）。
+- 送り先(shipping_address)は構造化した住所ではなく、選択結果を表すテキスト
+  （「受講者へ（氏名）」「講師（自分）へ」または自由入力文字列）として保存する設計とした。
+  実住所そのものを構造化して持つ列は今回追加していない（§6の申込項目エディタで
+  講座ごとに住所質問を追加する既存の仕組みと役割分担する前提）。

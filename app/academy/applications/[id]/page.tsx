@@ -2,6 +2,8 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Package } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
@@ -12,8 +14,9 @@ import {
   getApplication,
   updateApplication
 } from "@/lib/academy/applications";
+import { KIT_STATUS_LABELS, listKitOrdersByApplication } from "@/lib/academy/kits";
 import { formatDate } from "@/lib/format";
-import type { AcademyApplication, AcademyCourse, AcademyHeadquarters } from "@/types/database";
+import type { AcademyApplication, AcademyCourse, AcademyHeadquarters, AcademyKitOrder } from "@/types/database";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
@@ -34,6 +37,7 @@ function DetailContent({ appId }: { appId: string }) {
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [app, setApp] = useState<AcademyApplication | null>(null);
   const [course, setCourse] = useState<AcademyCourse | null>(null);
+  const [kitOrders, setKitOrders] = useState<AcademyKitOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -45,6 +49,7 @@ function DetailContent({ appId }: { appId: string }) {
         const found = await getApplication(foundHq.id, appId);
         setApp(found);
         setCourse(await getCourse(foundHq.id, found.course_id).catch(() => null as unknown as AcademyCourse));
+        setKitOrders(await listKitOrdersByApplication(foundHq.id, appId));
       }
       setLoading(false);
     }
@@ -133,6 +138,38 @@ function DetailContent({ appId }: { appId: string }) {
         <p className="text-[11px] text-[var(--mikke-muted)]">
           入金・受講完了・認定は、mikke連携用のイベントとして記録されます（Storyへは個人情報を含めず後で反映）。
         </p>
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <p className="text-xs font-bold text-[var(--mikke-accent)]">キット注文</p>
+        {kitOrders.length === 0 ? (
+          <div className="py-6 text-center">
+            <Package size={22} className="mx-auto text-[var(--mikke-muted)]" />
+            <p className="mt-2 text-xs text-[var(--mikke-muted)]">まだキット注文はありません。</p>
+          </div>
+        ) : (
+          <ul className="divide-y divide-[var(--mikke-line-soft)]">
+            {kitOrders.map((o) => (
+              <li key={o.id} className="py-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{o.title}</p>
+                    <p className="mt-0.5 text-[11px] text-[var(--mikke-muted)]">
+                      {formatDate(o.ordered_at)} ・ {o.amount.toLocaleString()}円
+                      {o.shipping_address ? ` ・ 送り先: ${o.shipping_address}` : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">
+                    {KIT_STATUS_LABELS[o.status]}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link href="/academy/kits" className="inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
+          キット発注管理で見る →
+        </Link>
       </section>
 
       <button

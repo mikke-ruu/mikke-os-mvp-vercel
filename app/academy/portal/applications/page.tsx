@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClipboardList } from "lucide-react";
+import Link from "next/link";
+import { ClipboardList, Package } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { APPLICATION_STATUS_LABELS } from "@/lib/academy/applications";
@@ -36,7 +37,10 @@ function MyApplicationsContent() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <p className="text-xs text-[var(--mikke-muted)]">あなたの営業用URLから入った申込（担当申込）の一覧です。ステータスの更新は本部が行います。</p>
+      <p className="text-xs text-[var(--mikke-muted)]">
+        あなたの営業用URLから入った申込（担当申込）の一覧です。ステータスの更新は本部が行います。
+        受講に必要なキットは、ここから注文してください。
+      </p>
 
       {apps.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-10 text-center">
@@ -59,6 +63,12 @@ function MyApplicationsContent() {
                   {APPLICATION_STATUS_LABELS[a.status]}
                 </span>
               </div>
+              <Link
+                href={`/academy/portal/kits?application=${a.id}`}
+                className="mt-2 inline-flex items-center gap-1 rounded-full border border-[var(--mikke-line)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-accent-strong)]"
+              >
+                <Package size={12} /> キットを注文する
+              </Link>
             </li>
           ))}
         </ul>

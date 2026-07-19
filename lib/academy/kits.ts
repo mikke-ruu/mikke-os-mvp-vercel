@@ -33,6 +33,18 @@ export async function listKitOrders(headquartersId: string) {
   return (data ?? []) as AcademyKitOrder[];
 }
 
+// 本部: ある申込に紐づくキット注文（申込詳細画面での相互リンク表示用）
+export async function listKitOrdersByApplication(headquartersId: string, applicationId: string) {
+  const { data, error } = await supabase
+    .from("academy_kit_orders")
+    .select("*")
+    .eq("headquarters_id", headquartersId)
+    .eq("application_id", applicationId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as AcademyKitOrder[];
+}
+
 // 講師: 自分の注文（RLSで自分の分だけ）
 export async function listMyKitOrders(instructorIds: string[]) {
   if (instructorIds.length === 0) return [];
@@ -49,7 +61,13 @@ export async function listMyKitOrders(instructorIds: string[]) {
 export async function createKitOrder(
   profile: Profile,
   instructor: AcademyInstructor,
-  input: { title: string; amount: number; courseId: string | null }
+  input: {
+    title: string;
+    amount: number;
+    courseId: string | null;
+    applicationId?: string | null;
+    shippingAddress?: string | null;
+  }
 ) {
   const { data, error } = await supabase
     .from("academy_kit_orders")
@@ -58,6 +76,8 @@ export async function createKitOrder(
       course_id: input.courseId,
       instructor_id: instructor.id,
       user_id: profile.user_id,
+      application_id: input.applicationId ?? null,
+      shipping_address: input.shippingAddress ?? null,
       title: input.title.trim(),
       amount: input.amount,
       status: "received",
