@@ -1,9 +1,10 @@
 import type { PageStoreState } from "./types";
+import { clonePageTheme, defaultPageHtmlDocument } from "./templates";
 
 const now = "2026-07-18T00:00:00.000Z";
 
 export const pageDemoState: PageStoreState = {
-  version: 1,
+  version: 2,
   sites: [
     {
       id: "page_site_sample_group",
@@ -11,6 +12,7 @@ export const pageDemoState: PageStoreState = {
       name: "サンプル団体",
       description: "活動紹介と問い合わせ導線をまとめる、業種に依存しないPageのデモです。",
       status: "draft",
+      theme: clonePageTheme(),
       publication: {
         slug: "sample-group",
         isPublic: false,
@@ -23,6 +25,8 @@ export const pageDemoState: PageStoreState = {
           title: "ホーム",
           slug: "home",
           status: "draft",
+          mode: "builder",
+          htmlDocument: { ...defaultPageHtmlDocument },
           createdAt: now,
           updatedAt: now,
           blocks: [
@@ -45,7 +49,7 @@ export const pageDemoState: PageStoreState = {
               order: 3,
               imageUrl: "/window.svg",
               alt: "サンプル画像",
-              caption: "PG-0では画像URLの枠だけを確認します。"
+              caption: "ファイルから画像を差し替えられます。"
             },
             {
               id: "page_block_sample_home_button",
@@ -62,6 +66,8 @@ export const pageDemoState: PageStoreState = {
           title: "会社概要",
           slug: "about",
           status: "draft",
+          mode: "builder",
+          htmlDocument: { ...defaultPageHtmlDocument },
           createdAt: now,
           updatedAt: now,
           blocks: [

@@ -3,8 +3,10 @@
 import { useMemo } from "react";
 import { useMikkeEvents } from "@/lib/event/store";
 import { useItemStudio } from "@/lib/item-studio/store";
+import { canViewFundProject, useFundProjects } from "@/lib/fund/store";
 import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
 import { mockProfile } from "@/lib/mikkeos/mock-data";
+import { useOrderMenus } from "@/lib/order/store";
 import { useSessionMenus } from "@/lib/session/store";
 import type { PageCmsSource } from "./types";
 
@@ -63,13 +65,36 @@ export const pageCmsSourceInfo: Record<PageCmsSource, PageCmsSourceInfo> = {
     connection: "mikkeIDに紐づく予約・相談・講座メニュー",
     visibleFields: "メニュー名、概要、所要時間、価格",
     visibilityRule: "公開中のメニューのみ"
+  },
+  order: {
+    source: "order",
+    label: "Order",
+    connection: "mikkeIDに紐づく依頼メニュー",
+    visibleFields: "メニュー名、概要、価格、納期目安、おすすめ対象、申込リンク",
+    visibilityRule: "公開中のメニューのみ。申込者情報は表示しない"
+  },
+  fund: {
+    source: "fund",
+    label: "FUND",
+    connection: "mikkeIDに紐づく応援プロジェクト",
+    visibleFields: "プロジェクト名、概要、カバー画像、目標、進捗、募集期間、公開リンク",
+    visibilityRule: "公開かつ下書き以外。支援者の個人情報は表示しない"
+  },
+  community: {
+    source: "community",
+    label: "Community",
+    connection: "mikkeIDに紐づくコミュニティ活動",
+    visibleFields: "公開活動名、概要、公開日、公開リンク。Community本体完成後は公開投稿・イベントへ拡張",
+    visibilityRule: "公開かつStory表示対象の活動ログのみ。会員・会費・限定投稿は表示しない"
   }
 };
 
-export function usePageCmsContent() {
+export function usePageCmsContent(ownerProfileId?: string) {
   const { items } = useItemStudio();
   const { events } = useMikkeEvents();
   const { menus } = useSessionMenus();
+  const { menus: orderMenus } = useOrderMenus();
+  const { projects: fundProjects } = useFundProjects(ownerProfileId);
   const { logs } = useUnifiedActivityLogs();
 
   return useMemo<Record<PageCmsSource, PageCmsItem[]>>(() => ({
@@ -132,6 +157,45 @@ export function usePageCmsContent() {
         meta: [menu.durationLabel, menu.price === null ? "" : `${menu.price.toLocaleString("ja-JP")}円`].filter(Boolean).join(" / "),
         occurredAt: menu.createdAt,
         approved: true
+      })),
+    order: orderMenus
+      .filter((menu) => menu.published)
+      .map((menu) => ({
+        id: menu.id,
+        source: "order",
+        title: menu.title,
+        summary: menu.summary,
+        imageUrl: "",
+        meta: [menu.priceLabel, menu.price === null ? "" : `${menu.price.toLocaleString("ja-JP")}円`, menu.leadTimeLabel].filter(Boolean).join(" / "),
+        occurredAt: menu.updatedAt,
+        approved: true,
+        href: `/order/${menu.id}`
+      })),
+    fund: fundProjects
+      .filter(canViewFundProject)
+      .map((project) => ({
+        id: project.id,
+        source: "fund",
+        title: project.title,
+        summary: project.shortDescription || project.description,
+        imageUrl: project.coverImageUrl,
+        meta: `${project.currentValue.toLocaleString("ja-JP")} / ${project.goalValue.toLocaleString("ja-JP")}`,
+        occurredAt: project.publishedAt ?? project.createdAt,
+        approved: true,
+        href: `/fund/${project.profileSlug}/${project.slug}`
+      })),
+    community: logs
+      .filter((log) => log.appKey === "community" && log.visibility === "public" && log.storyEnabled)
+      .map((log) => ({
+        id: log.id,
+        source: "community",
+        title: log.title,
+        summary: log.description ?? "",
+        imageUrl: "",
+        meta: log.metadata?.sourceLabel ?? "Community",
+        occurredAt: log.occurredAt,
+        approved: true,
+        href: log.metadata?.publicPath
       }))
-  }), [events, items, logs, menus]);
+  }), [events, fundProjects, items, logs, menus, orderMenus]);
 }

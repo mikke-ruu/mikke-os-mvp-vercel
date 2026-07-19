@@ -12,7 +12,8 @@ import {
   movePageDocument,
   normalizePageSiteSlug
 } from "@/lib/page/store";
-import type { PageSite } from "@/lib/page/types";
+import type { PageDocumentMode, PageSite } from "@/lib/page/types";
+import type { PageStarterTemplateId } from "@/lib/page/templates";
 
 const inputClass =
   "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
@@ -23,6 +24,8 @@ export function PageSiteEditor() {
   const [loaded, setLoaded] = useState(false);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const [mode, setMode] = useState<PageDocumentMode>("builder");
+  const [templateId, setTemplateId] = useState<PageStarterTemplateId>("blank");
   const [message, setMessage] = useState("");
 
   function refresh() {
@@ -38,7 +41,7 @@ export function PageSiteEditor() {
     event.preventDefault();
     setMessage("");
     try {
-      createPageDocument(params.siteId, { title, slug });
+      createPageDocument(params.siteId, { title, slug, mode, templateId });
       setTitle("");
       setSlug("");
       refresh();
@@ -86,7 +89,6 @@ export function PageSiteEditor() {
           <section className="rounded-3xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-accent)]">PG-1-c</p>
                 <h2 className="mt-1 text-xl font-bold tracking-normal">ページ一覧</h2>
                 <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
                   /{site.publication.slug} の下書き構成です。外部公開はまだ行いません。
@@ -107,7 +109,7 @@ export function PageSiteEditor() {
                       </span>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-bold">{index + 1}. {document.title}</p>
-                        <p className="mt-1 text-xs text-[var(--mikke-muted)]">slug: {document.slug} / {document.blocks.length}ブロック</p>
+                        <p className="mt-1 text-xs text-[var(--mikke-muted)]">slug: {document.slug} / {document.mode === "html" ? "AI HTMLページ" : `${document.blocks.length}ブロック`}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
@@ -136,6 +138,14 @@ export function PageSiteEditor() {
                 <span className="text-xs font-bold">ページslug *</span>
                 <input value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/-{2,}/g, "-").replace(/^-/, ""))} onBlur={() => setSlug((current) => normalizePageSiteSlug(current))} className={inputClass} placeholder="contact" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxLength={80} required />
               </label>
+              <label className="block">
+                <span className="text-xs font-bold">ページ形式</span>
+                <select value={mode} onChange={(event) => setMode(event.target.value as PageDocumentMode)} className={inputClass}><option value="builder">かんたんビルダー</option><option value="html">AI HTMLページ</option></select>
+              </label>
+              {mode === "builder" ? <label className="block">
+                <span className="text-xs font-bold">テンプレート</span>
+                <select value={templateId} onChange={(event) => setTemplateId(event.target.value as PageStarterTemplateId)} className={inputClass}><option value="blank">白紙</option><option value="company">会社・団体</option><option value="service">サービス</option><option value="portfolio">作品・実績</option><option value="connect-partners">Connect / Partners</option></select>
+              </label> : null}
             </div>
             {message ? <p role="status" className="mt-4 text-sm font-bold text-[var(--mikke-accent)]">{message}</p> : null}
             <div className="mt-4 flex justify-end">

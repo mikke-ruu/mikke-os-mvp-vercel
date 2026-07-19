@@ -6,6 +6,8 @@ import { ArrowLeft, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { createPageSite, normalizePageSiteSlug } from "@/lib/page/store";
+import type { PageFontPreset } from "@/lib/page/types";
+import type { PageStarterTemplateId } from "@/lib/page/templates";
 
 const inputClass =
   "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
@@ -16,6 +18,8 @@ export function PageNewSiteForm() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [slug, setSlug] = useState("");
+  const [templateId, setTemplateId] = useState<PageStarterTemplateId>("company");
+  const [themePreset, setThemePreset] = useState<PageFontPreset>("gothic");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -35,7 +39,9 @@ export function PageNewSiteForm() {
         ownerProfileId: profile.id,
         name,
         description,
-        slug: normalizedSlug
+        slug: normalizedSlug,
+        templateId,
+        themePreset
       });
       router.push("/apps/page");
     } catch (error) {
@@ -49,10 +55,9 @@ export function PageNewSiteForm() {
       <section className="rounded-3xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-accent)]">PG-1-b</p>
             <h2 className="mt-1 text-xl font-bold tracking-normal">サイトの基本情報</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">
-              まずは下書きサイトと空のホームページを作ります。外部への公開は行いません。
+              テンプレートと雰囲気を選ぶと、編集できるホームページの下書きが作られます。外部への公開は行いません。
             </p>
           </div>
         </div>
@@ -70,6 +75,31 @@ export function PageNewSiteForm() {
               maxLength={80}
               required
             />
+          </label>
+
+          <fieldset>
+            <legend className="text-xs font-bold text-[var(--mikke-text)]">最初のページ</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {([
+                ["company", "会社・団体", "紹介、会社概要、問い合わせ導線"],
+                ["service", "サービス", "特徴、CMS、お問い合わせ"],
+                ["portfolio", "作品・実績", "ギャラリーと活動CMS"],
+                ["connect-partners", "Connect / Partners", "複数アプリCMSの構築例"],
+                ["blank", "白紙", "自分で一から組み立てる"]
+              ] as const).map(([value, label, helper]) => (
+                <label key={value} className={`cursor-pointer rounded-xl border p-3 ${templateId === value ? "border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
+                  <input type="radio" name="template" value={value} checked={templateId === value} onChange={() => setTemplateId(value)} className="sr-only" />
+                  <span className="block text-sm font-bold">{label}</span><span className="mt-1 block text-xs text-[var(--mikke-muted)]">{helper}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <label className="block">
+            <span className="text-xs font-bold text-[var(--mikke-text)]">デザインの雰囲気</span>
+            <select value={themePreset} onChange={(event) => setThemePreset(event.target.value as PageFontPreset)} className={inputClass}>
+              <option value="gothic">すっきり</option><option value="soft">やわらかい</option><option value="serif">上品</option><option value="modern">モダン</option>
+            </select>
           </label>
 
           <label className="block">
@@ -111,7 +141,7 @@ export function PageNewSiteForm() {
               />
             </div>
             <span className="mt-1 block text-xs leading-5 text-[var(--mikke-muted)]">
-              半角英小文字・数字・ハイフンを使います。公開URLはPG-3以降で決めます。
+              半角英小文字・数字・ハイフンを使います。公開URLは公開機能の実装時に決めます。
             </span>
           </label>
         </div>

@@ -1,5 +1,22 @@
 import { pageDemoState } from "./demo";
-import type { PageBlock, PageDocument, PageSite, PageStoreState } from "./types";
+import {
+  clonePageTheme,
+  createStarterTemplate,
+  defaultPageHtmlDocument,
+  defaultPageTheme,
+  pageThemePresets,
+  type PageStarterTemplateId
+} from "./templates";
+import type {
+  PageBlock,
+  PageDocument,
+  PageDocumentMode,
+  PageFontPreset,
+  PageHtmlDocument,
+  PageSite,
+  PageSiteTheme,
+  PageStoreState
+} from "./types";
 
 export const PAGE_STORAGE_KEY = "mikke.page.v1";
 
@@ -8,77 +25,97 @@ export type CreatePageSiteInput = {
   name: string;
   description: string;
   slug: string;
+  templateId?: PageStarterTemplateId;
+  themePreset?: PageFontPreset;
 };
 
 export type CreatePageDocumentInput = {
   title: string;
   slug: string;
+  mode?: PageDocumentMode;
+  templateId?: PageStarterTemplateId;
 };
 
 export type SavePageDocumentInput = {
   title: string;
   slug: string;
+  mode: PageDocumentMode;
   blocks: PageBlock[];
+  htmlDocument: PageHtmlDocument;
 };
 
-function clonePageState(state: PageStoreState): PageStoreState {
-  return JSON.parse(JSON.stringify(state)) as PageStoreState;
-}
-
-function normalizePageState(state: PageStoreState): PageStoreState {
-  return {
-    ...state,
-    sites: state.sites.map((site) => {
-      const normalizedSite = { ...site } as PageSite & { directoryItems?: unknown };
-      delete normalizedSite.directoryItems;
-      return normalizedSite;
-    })
-  };
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function normalizeBlock(value: PageBlock, index: number): PageBlock {
+  return {
+    ...value,
+    order: index + 1,
+    hidden: value.hidden ?? false,
+    style: {
+      spacing: value.style?.spacing ?? "normal",
+      radius: value.style?.radius ?? "medium",
+      textAlign: value.style?.textAlign ?? "left",
+      animation: value.style?.animation ?? "none",
+      backgroundColor: value.style?.backgroundColor,
+      textColor: value.style?.textColor
+    }
+  } as PageBlock;
+}
+
+function normalizeDocument(value: PageDocument): PageDocument {
+  return {
+    ...value,
+    mode: value.mode ?? "builder",
+    blocks: Array.isArray(value.blocks) ? value.blocks.map(normalizeBlock) : [],
+    htmlDocument: value.htmlDocument ? { ...defaultPageHtmlDocument, ...value.htmlDocument } : clone(defaultPageHtmlDocument)
+  };
+}
+
+function normalizePageState(value: { sites: PageSite[] }): PageStoreState {
+  return {
+    version: 2,
+    sites: value.sites.map((site) => {
+      const normalizedSite = { ...site } as PageSite & { directoryItems?: unknown };
+      delete normalizedSite.directoryItems;
+      return {
+        ...normalizedSite,
+        theme: normalizedSite.theme ? { ...defaultPageTheme, ...normalizedSite.theme } : clonePageTheme(),
+        documents: normalizedSite.documents.map(normalizeDocument)
+      };
+    })
+  };
+}
+
 function isPageDocument(value: unknown): value is PageDocument {
   if (!isRecord(value)) return false;
-  return (
-    typeof value.id === "string" &&
-    typeof value.siteId === "string" &&
-    typeof value.title === "string" &&
-    typeof value.slug === "string" &&
-    Array.isArray(value.blocks)
-  );
+  return typeof value.id === "string" && typeof value.siteId === "string" && typeof value.title === "string" && typeof value.slug === "string" && Array.isArray(value.blocks);
 }
 
 function isPageSite(value: unknown): value is PageSite {
   if (!isRecord(value)) return false;
-  return (
-    typeof value.id === "string" &&
-    typeof value.ownerProfileId === "string" &&
-    typeof value.name === "string" &&
-    typeof value.description === "string" &&
-    Array.isArray(value.documents) &&
-    value.documents.every(isPageDocument)
-  );
+  return typeof value.id === "string" && typeof value.ownerProfileId === "string" && typeof value.name === "string" && typeof value.description === "string" && Array.isArray(value.documents) && value.documents.every(isPageDocument);
 }
 
-function isPageStoreState(value: unknown): value is PageStoreState {
+function isPageStoreCandidate(value: unknown): value is { sites: PageSite[] } {
   if (!isRecord(value)) return false;
-  return value.version === 1 && Array.isArray(value.sites) && value.sites.every(isPageSite);
+  return (value.version === 1 || value.version === 2) && Array.isArray(value.sites) && value.sites.every(isPageSite);
 }
 
 export function loadPageStore(): PageStoreState {
-  if (typeof window === "undefined") return clonePageState(pageDemoState);
-
+  if (typeof window === "undefined") return clone(pageDemoState);
   const raw = window.localStorage.getItem(PAGE_STORAGE_KEY);
-  if (!raw) return clonePageState(pageDemoState);
-
+  if (!raw) return clone(pageDemoState);
   try {
     const parsed = JSON.parse(raw) as unknown;
-    return isPageStoreState(parsed) ? normalizePageState(parsed) : clonePageState(pageDemoState);
+    return isPageStoreCandidate(parsed) ? normalizePageState(parsed) : clone(pageDemoState);
   } catch {
-    return clonePageState(pageDemoState);
+    return clone(pageDemoState);
   }
 }
 
@@ -104,12 +141,7 @@ function createPageId(prefix: string) {
 }
 
 export function normalizePageSiteSlug(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/-{2,}/g, "-")
-    .replace(/^-|-$/g, "");
+  return value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-{2,}/g, "-").replace(/^-|-$/g, "");
 }
 
 export function createPageSite(input: CreatePageSiteInput) {
@@ -121,9 +153,7 @@ export function createPageSite(input: CreatePageSiteInput) {
   if (!slug) throw new Error("下書きslugを半角英数字で入力してください。");
 
   const state = loadPageStore();
-  if (state.sites.some((site) => site.publication.slug === slug)) {
-    throw new Error("この下書きslugはすでに使われています。");
-  }
+  if (state.sites.some((site) => site.publication.slug === slug)) throw new Error("この下書きslugはすでに使われています。");
 
   const now = new Date().toISOString();
   const siteId = createPageId("page_site");
@@ -133,23 +163,20 @@ export function createPageSite(input: CreatePageSiteInput) {
     name,
     description,
     status: "draft",
-    publication: {
-      slug,
-      isPublic: false,
-      searchIndexEnabled: false
-    },
-    documents: [
-      {
-        id: createPageId("page_doc"),
-        siteId,
-        title: "ホーム",
-        slug: "home",
-        status: "draft",
-        blocks: [],
-        createdAt: now,
-        updatedAt: now
-      }
-    ],
+    theme: clonePageTheme(pageThemePresets[input.themePreset ?? "gothic"]),
+    publication: { slug, isPublic: false, searchIndexEnabled: false },
+    documents: [{
+      id: createPageId("page_doc"),
+      siteId,
+      title: "ホーム",
+      slug: "home",
+      status: "draft",
+      mode: "builder",
+      blocks: createStarterTemplate(input.templateId ?? "blank"),
+      htmlDocument: clone(defaultPageHtmlDocument),
+      createdAt: now,
+      updatedAt: now
+    }],
     createdAt: now,
     updatedAt: now
   };
@@ -163,11 +190,12 @@ function updatePageSite(siteId: string, update: (site: PageSite) => PageSite) {
   const site = state.sites.find((item) => item.id === siteId);
   if (!site) throw new Error("このPageは見つかりませんでした。");
   const updatedSite = update(site);
-  savePageStore({
-    ...state,
-    sites: state.sites.map((item) => (item.id === siteId ? updatedSite : item))
-  });
+  savePageStore({ ...state, sites: state.sites.map((item) => item.id === siteId ? updatedSite : item) });
   return updatedSite;
+}
+
+export function savePageSiteTheme(siteId: string, theme: PageSiteTheme) {
+  return updatePageSite(siteId, (site) => ({ ...site, theme: clonePageTheme(theme), updatedAt: new Date().toISOString() }));
 }
 
 export function createPageDocument(siteId: string, input: CreatePageDocumentInput) {
@@ -178,9 +206,7 @@ export function createPageDocument(siteId: string, input: CreatePageDocumentInpu
 
   let createdDocument: PageDocument | null = null;
   updatePageSite(siteId, (site) => {
-    if (site.documents.some((document) => document.slug === slug)) {
-      throw new Error("このページslugはすでに使われています。");
-    }
+    if (site.documents.some((document) => document.slug === slug)) throw new Error("このページslugはすでに使われています。");
     const now = new Date().toISOString();
     createdDocument = {
       id: createPageId("page_doc"),
@@ -188,32 +214,22 @@ export function createPageDocument(siteId: string, input: CreatePageDocumentInpu
       title,
       slug,
       status: "draft",
-      blocks: [],
+      mode: input.mode ?? "builder",
+      blocks: createStarterTemplate(input.templateId ?? "blank"),
+      htmlDocument: clone(defaultPageHtmlDocument),
       createdAt: now,
       updatedAt: now
     };
-    return {
-      ...site,
-      documents: [...site.documents, createdDocument],
-      updatedAt: now
-    };
+    return { ...site, documents: [...site.documents, createdDocument], updatedAt: now };
   });
   return createdDocument as PageDocument | null;
 }
 
 export function deletePageDocument(siteId: string, pageId: string) {
   return updatePageSite(siteId, (site) => {
-    if (site.documents.length <= 1) {
-      throw new Error("Pageには最低1ページ必要です。");
-    }
-    if (!site.documents.some((document) => document.id === pageId)) {
-      throw new Error("削除するページが見つかりませんでした。");
-    }
-    return {
-      ...site,
-      documents: site.documents.filter((document) => document.id !== pageId),
-      updatedAt: new Date().toISOString()
-    };
+    if (site.documents.length <= 1) throw new Error("Pageには最低1ページ必要です。");
+    if (!site.documents.some((document) => document.id === pageId)) throw new Error("削除するページが見つかりませんでした。");
+    return { ...site, documents: site.documents.filter((document) => document.id !== pageId), updatedAt: new Date().toISOString() };
   });
 }
 
@@ -238,22 +254,18 @@ export function savePageDocument(siteId: string, pageId: string, input: SavePage
   updatePageSite(siteId, (site) => {
     const currentDocument = site.documents.find((document) => document.id === pageId);
     if (!currentDocument) throw new Error("編集するページが見つかりませんでした。");
-    if (site.documents.some((document) => document.id !== pageId && document.slug === slug)) {
-      throw new Error("このページslugはすでに使われています。");
-    }
+    if (site.documents.some((document) => document.id !== pageId && document.slug === slug)) throw new Error("このページslugはすでに使われています。");
     const now = new Date().toISOString();
     savedDocument = {
       ...currentDocument,
       title,
       slug,
-      blocks: input.blocks.map((block, index) => ({ ...block, order: index + 1 })),
+      mode: input.mode,
+      blocks: input.blocks.map(normalizeBlock),
+      htmlDocument: { ...input.htmlDocument },
       updatedAt: now
     };
-    return {
-      ...site,
-      documents: site.documents.map((document) => (document.id === pageId ? savedDocument as PageDocument : document)),
-      updatedAt: now
-    };
+    return { ...site, documents: site.documents.map((document) => document.id === pageId ? savedDocument as PageDocument : document), updatedAt: now };
   });
   return savedDocument as PageDocument | null;
 }

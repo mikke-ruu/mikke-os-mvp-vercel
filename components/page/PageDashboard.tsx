@@ -32,7 +32,7 @@ export function PageDashboard() {
       <section className="grid grid-cols-3 gap-3">
         <MetricCard label="サイト" value={`${sites.length}件`} helper="localStorageの下書き" />
         <MetricCard label="ページ" value={`${documentCount}件`} helper="ホーム・概要など" tone="green" />
-        <MetricCard label="ブロック" value={`${blockCount}個`} helper="積み上げ式" tone="navy" />
+        <MetricCard label="ブロック" value={`${blockCount}個`} helper="テンプレート・CMS対応" tone="navy" />
       </section>
 
       <section className="mt-6 rounded-3xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm">
@@ -41,10 +41,9 @@ export function PageDashboard() {
             <Globe2 size={22} />
           </span>
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-accent)]">PG-1-a</p>
-            <h2 className="mt-1 text-xl font-bold tracking-normal">Page入口</h2>
+            <h2 className="mt-1 text-xl font-bold tracking-normal">ホームページをかんたんに、あなたらしく</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">
-              ここではPageの下書き構成だけを確認します。公開、独自ドメイン、他者掲載依頼、決済、フォーム送信はまだ行いません。
+              テンプレート、2カラム、ギャラリー、スライド、HTML、mikke CMSを組み合わせて作れます。現在は下書き編集とOS内プレビューまで利用できます。
             </p>
           </div>
         </div>
@@ -81,7 +80,7 @@ export function PageDashboard() {
                     <p className="text-sm font-bold text-[var(--mikke-text)]">{page.title}</p>
                   </div>
                   <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">
-                    {page.blocks.length}ブロック / slug: {page.slug}
+                    {page.mode === "html" ? "AI HTMLページ" : `${page.blocks.length}ブロック`} / slug: {page.slug}
                   </p>
                 </div>
               ))}
@@ -101,9 +100,9 @@ export function PageDashboard() {
             <Layers3 size={20} />
           </span>
           <div>
-            <h2 className="text-lg font-bold tracking-normal">次に作るところ</h2>
+            <h2 className="text-lg font-bold tracking-normal">公開機能は準備中です</h2>
             <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
-              PG-2までの編集土台が揃いました。公開・他者掲載依頼・決済は後続フェーズで扱います。
+              外部公開、他者掲載依頼、決済、独自ドメインは後続フェーズで扱います。今は安心して下書きとデザインを作り込めます。
             </p>
             <Link href="/manager" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-[var(--mikke-accent)]">
               Managerで他アプリの動きを見る <ArrowRight size={15} />

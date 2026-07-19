@@ -1,63 +1,86 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowDown,
   ArrowLeft,
   ArrowUp,
-  Database,
+  ChevronDown,
+  ChevronUp,
+  Copy,
   Eye,
-  FormInput,
-  Heading,
-  ImageIcon,
-  Link2,
-  Minus,
-  Plus,
+  EyeOff,
+  Laptop,
+  Redo2,
   Save,
+  Smartphone,
+  Tablet,
   Trash2,
-  Type
+  Undo2
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
-import { pageCmsSourceInfo, type PageCmsItem, usePageCmsContent } from "@/lib/page/cms-selectors";
-import { getPageDocument, getPageSite, normalizePageSiteSlug, savePageDocument } from "@/lib/page/store";
-import type { PageBlock, PageBlockType, PageCmsSource, PageDocument, PageSite } from "@/lib/page/types";
+import {
+  PageBlockFields,
+  PageBlockStyleFields,
+  createEmptyPageBlock,
+  createPageBuilderId,
+  pageBlockChoices
+} from "./PageBlockEditor";
+import { PageRenderer } from "./PageRenderer";
+import { usePageCmsContent } from "@/lib/page/cms-selectors";
+import {
+  createSectionTemplate,
+  createStarterTemplate,
+  defaultPageHtmlDocument,
+  pageThemePresets,
+  type PageSectionTemplateId,
+  type PageStarterTemplateId
+} from "@/lib/page/templates";
+import {
+  getPageDocument,
+  getPageSite,
+  normalizePageSiteSlug,
+  savePageDocument,
+  savePageSiteTheme
+} from "@/lib/page/store";
+import type {
+  PageBlock,
+  PageDocument,
+  PageDocumentMode,
+  PageHtmlDocument,
+  PageSite,
+  PageSiteTheme
+} from "@/lib/page/types";
 
-const inputClass =
-  "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
-
-const blockChoices: { type: PageBlockType; label: string; icon: typeof Heading }[] = [
-  { type: "heading", label: "見出し", icon: Heading },
-  { type: "text", label: "文章", icon: Type },
-  { type: "image", label: "画像", icon: ImageIcon },
-  { type: "button", label: "ボタン", icon: Link2 },
-  { type: "form", label: "フォーム枠", icon: FormInput },
-  { type: "divider", label: "区切り", icon: Minus },
-  { type: "cms", label: "自組織CMS", icon: Database }
+const inputClass = "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
+const starterTemplates: { id: PageStarterTemplateId; label: string; helper: string }[] = [
+  { id: "company", label: "会社・団体", helper: "ホーム、紹介、会社概要、CTA" },
+  { id: "service", label: "サービス", helper: "特徴、CMS、問い合わせ導線" },
+  { id: "portfolio", label: "作品・実績", helper: "ギャラリーと活動CMS" },
+  { id: "connect-partners", label: "Connect / Partners", helper: "複数アプリCMSの構築例" },
+  { id: "blank", label: "白紙", helper: "すべて自分で組み立てる" }
+];
+const sectionTemplates: { id: PageSectionTemplateId; label: string }[] = [
+  { id: "hero", label: "メインビジュアル" },
+  { id: "image-text", label: "画像＋文章" },
+  { id: "company", label: "会社概要" },
+  { id: "features", label: "特徴カード" },
+  { id: "cta", label: "お問い合わせ導線" },
+  { id: "cms", label: "CMS一覧" }
 ];
 
-const cmsSourceLabels: Record<PageCmsSource, string> = {
-  story: "Story",
-  item_studio: "Item Studio",
-  event: "Event",
-  academy: "Academy",
-  session: "Session"
-};
-
-function createBlockId() {
-  return `page_block_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function createEmptyBlock(type: PageBlockType, order: number): PageBlock {
-  const base = { id: createBlockId(), order };
-  if (type === "heading") return { ...base, type, level: 2, text: "新しい見出し" };
-  if (type === "text") return { ...base, type, text: "ここに文章を入力します。" };
-  if (type === "image") return { ...base, type, imageUrl: "", alt: "", caption: "" };
-  if (type === "button") return { ...base, type, label: "詳しく見る", href: "#" };
-  if (type === "form") return { ...base, type, title: "お問い合わせ", description: "フォーム送信はまだ利用できません。", buttonLabel: "送信する" };
-  if (type === "cms") return { ...base, type, source: "story", displayMode: "cards", title: "活動を見る", filters: {} };
-  return { ...base, type: "divider" };
+function renewNestedIds(block: PageBlock): PageBlock {
+  const next = { ...deepClone(block), id: createPageBuilderId() } as PageBlock;
+  if (next.type === "company") next.rows = next.rows.map((row) => ({ ...row, id: createPageBuilderId("company_row") }));
+  if (next.type === "columns") next.columns = next.columns.map((column) => ({ ...column, id: createPageBuilderId("column") }));
+  if (next.type === "gallery" || next.type === "slideshow") next.images = next.images.map((image) => ({ ...image, id: createPageBuilderId("media") }));
+  return next;
 }
 
 export function PageDocumentEditor() {
@@ -67,9 +90,17 @@ export function PageDocumentEditor() {
   const [loaded, setLoaded] = useState(false);
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const [mode, setMode] = useState<PageDocumentMode>("builder");
   const [blocks, setBlocks] = useState<PageBlock[]>([]);
+  const [htmlDocument, setHtmlDocument] = useState<PageHtmlDocument>({ ...defaultPageHtmlDocument });
+  const [theme, setTheme] = useState<PageSiteTheme>(pageThemePresets.gothic);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [past, setPast] = useState<PageBlock[][]>([]);
+  const [future, setFuture] = useState<PageBlock[][]>([]);
+  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [message, setMessage] = useState("");
-  const cmsContent = usePageCmsContent();
+  const [dirty, setDirty] = useState(false);
+  const cmsContent = usePageCmsContent(site?.ownerProfileId);
 
   useEffect(() => {
     const nextSite = getPageSite(params.siteId);
@@ -78,192 +109,162 @@ export function PageDocumentEditor() {
     setDocument(nextDocument);
     setTitle(nextDocument?.title ?? "");
     setSlug(nextDocument?.slug ?? "");
+    setMode(nextDocument?.mode ?? "builder");
     setBlocks(nextDocument?.blocks.slice().sort((a, b) => a.order - b.order) ?? []);
+    setHtmlDocument(nextDocument?.htmlDocument ?? { ...defaultPageHtmlDocument });
+    setTheme(nextSite?.theme ?? pageThemePresets.gothic);
+    setPast([]);
+    setFuture([]);
+    setDirty(false);
     setLoaded(true);
   }, [params.pageId, params.siteId]);
 
-  function updateBlock(blockId: string, update: (block: PageBlock) => PageBlock) {
-    setBlocks((current) => current.map((block) => (block.id === blockId ? update(block) : block)));
+  const previewDocument = useMemo(() => ({ mode, blocks, htmlDocument }), [blocks, htmlDocument, mode]);
+
+  function commitBlocks(next: PageBlock[]) {
+    setPast((current) => [...current, deepClone(blocks)].slice(-50));
+    setFuture([]);
+    setBlocks(next.map((block, index) => ({ ...block, order: index + 1 })));
+    setDirty(true);
+  }
+
+  function updateBlock(blockId: string, next: PageBlock) {
+    commitBlocks(blocks.map((block) => block.id === blockId ? next : block));
   }
 
   function moveBlock(index: number, direction: -1 | 1) {
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= blocks.length) return;
-    setBlocks((current) => {
-      const next = [...current];
-      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
-      return next;
-    });
+    const next = [...blocks];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    commitBlocks(next);
   }
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function undo() {
+    const previous = past[past.length - 1];
+    if (!previous) return;
+    setFuture((current) => [deepClone(blocks), ...current].slice(0, 50));
+    setPast((current) => current.slice(0, -1));
+    setBlocks(previous);
+    setDirty(true);
+  }
+
+  function redo() {
+    const next = future[0];
+    if (!next) return;
+    setPast((current) => [...current, deepClone(blocks)].slice(-50));
+    setFuture((current) => current.slice(1));
+    setBlocks(next);
+    setDirty(true);
+  }
+
+  function addBlocks(nextBlocks: PageBlock[]) {
+    const start = blocks.length;
+    const prepared = nextBlocks.map((block, index) => ({ ...renewNestedIds(block), order: start + index + 1 }));
+    commitBlocks([...blocks, ...prepared]);
+    setSelectedBlockId(prepared[0]?.id ?? null);
+  }
+
+  function replaceWithTemplate(templateId: PageStarterTemplateId) {
+    if (blocks.length && !window.confirm("現在のブロックをテンプレートへ置き換えますか？")) return;
+    const next = createStarterTemplate(templateId);
+    commitBlocks(next);
+    setSelectedBlockId(next[0]?.id ?? null);
+  }
+
+  function save() {
     setMessage("");
     try {
-      const saved = savePageDocument(params.siteId, params.pageId, { title, slug, blocks });
+      const savedSite = savePageSiteTheme(params.siteId, theme);
+      const saved = savePageDocument(params.siteId, params.pageId, { title, slug, mode, blocks, htmlDocument });
       if (saved) {
         setDocument(saved);
         setBlocks(saved.blocks);
       }
+      setSite(savedSite);
+      setPast([]);
+      setFuture([]);
+      setDirty(false);
       setMessage("下書きを保存しました。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "下書きを保存できませんでした。");
     }
   }
 
+  if (!loaded) return <MikkeAppShell appName="Page" title="ページを編集" subtitle="読み込み中" currentApp={{ label: "Page", href: "/apps/page" }}><p className="text-sm text-[var(--mikke-muted)]">ページを読み込んでいます。</p></MikkeAppShell>;
+  if (!site || !document) return <MikkeAppShell appName="Page" title="ページを編集" subtitle="ページが見つかりません" currentApp={{ label: "Page", href: "/apps/page" }}><section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5"><p className="text-sm text-[var(--mikke-muted)]">このページは見つかりませんでした。</p><Link href="/apps/page" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-accent)]"><ArrowLeft size={16} /> Page一覧へ戻る</Link></section></MikkeAppShell>;
+
   return (
-    <MikkeAppShell
-      appName="Page"
-      title={document?.title ?? "ページを編集"}
-      subtitle={site ? `${site.name}の下書きページ` : "積み上げ式ブロック編集"}
-      currentApp={{ label: "Page", href: "/apps/page" }}
-    >
-      {!loaded ? (
-        <p className="text-sm text-[var(--mikke-muted)]">ページを読み込んでいます。</p>
-      ) : !site || !document ? (
-        <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-          <p className="text-sm text-[var(--mikke-muted)]">このページは見つかりませんでした。</p>
-          <Link href="/apps/page" className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-accent)]"><ArrowLeft size={16} /> Page一覧へ戻る</Link>
-        </section>
+    <MikkeAppShell appName="Page" title={document.title} subtitle={`${site.name}のホームページビルダー`} currentApp={{ label: "Page", href: "/apps/page" }}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Link href={`/apps/page/${site.id}`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold"><ArrowLeft size={15} /> ページ一覧へ</Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`text-xs font-bold ${dirty ? "text-[var(--mikke-accent)]" : "text-[var(--mikke-success)]"}`}>{dirty ? "未保存の変更があります" : "保存済み"}</span>
+          <button type="button" onClick={undo} disabled={!past.length || mode !== "builder"} aria-label="元に戻す" className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white disabled:opacity-30"><Undo2 size={16} /></button>
+          <button type="button" onClick={redo} disabled={!future.length || mode !== "builder"} aria-label="やり直す" className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white disabled:opacity-30"><Redo2 size={16} /></button>
+          <button type="button" onClick={save} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white"><Save size={16} /> 下書きを保存</button>
+        </div>
+      </div>
+
+      {message ? <p role="status" className="mt-4 rounded-xl bg-[var(--mikke-primary-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-accent)]">{message}</p> : null}
+
+      <section className="mt-5 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
+        <div className="grid gap-4 md:grid-cols-[1fr_1fr_220px]">
+          <label className="block"><span className="text-xs font-bold">ページ名 *</span><input value={title} onChange={(event) => { setTitle(event.target.value); setDirty(true); }} className={inputClass} maxLength={80} /></label>
+          <label className="block"><span className="text-xs font-bold">ページslug *</span><input value={slug} onChange={(event) => { setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/-{2,}/g, "-").replace(/^-/, "")); setDirty(true); }} onBlur={() => setSlug((current) => normalizePageSiteSlug(current))} className={inputClass} /></label>
+          <label className="block"><span className="text-xs font-bold">ページ形式</span><select value={mode} onChange={(event) => { setMode(event.target.value as PageDocumentMode); setDirty(true); }} className={inputClass}><option value="builder">かんたんビルダー</option><option value="html">AI HTMLページ</option></select></label>
+        </div>
+      </section>
+
+      {mode === "html" ? (
+        <HtmlPageEditor value={htmlDocument} onChange={(next) => { setHtmlDocument(next); setDirty(true); }} preview={<PageRenderer document={previewDocument} theme={theme} cmsContent={cmsContent} />} />
       ) : (
-        <form onSubmit={submit}>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link href={`/apps/page/${site.id}`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><ArrowLeft size={15} /> ページ一覧へ</Link>
-            <button type="submit" className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white"><Save size={16} /> 下書きを保存</button>
-          </div>
+        <div className="mt-5 grid gap-5 min-[1180px]:grid-cols-[260px_minmax(390px,1fr)_minmax(330px,.78fr)]">
+          <BuilderSidebar theme={theme} onThemeChange={(next) => { setTheme(next); setDirty(true); }} onStarter={replaceWithTemplate} onSection={(templateId) => addBlocks(createSectionTemplate(templateId, blocks.length + 1))} onBlock={(type) => addBlocks([createEmptyPageBlock(type, blocks.length + 1)])} />
 
-          <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)]">
-            <div className="space-y-5">
-              <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-accent)]">PG-1-d</p>
-                <h2 className="mt-1 text-lg font-bold tracking-normal">ページ設定</h2>
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <label className="block"><span className="text-xs font-bold">ページ名 *</span><input value={title} onChange={(event) => setTitle(event.target.value)} className={inputClass} maxLength={80} required /></label>
-                  <label className="block"><span className="text-xs font-bold">ページslug *</span><input value={slug} onChange={(event) => setSlug(event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/-{2,}/g, "-").replace(/^-/, ""))} onBlur={() => setSlug((current) => normalizePageSiteSlug(current))} className={inputClass} pattern="[a-z0-9]+(?:-[a-z0-9]+)*" maxLength={80} required /></label>
+          <main className="min-w-0 space-y-3">
+            {blocks.length === 0 ? <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-10 text-center"><p className="font-bold">テンプレートまたはブロックを選んでください</p><p className="mt-2 text-sm text-[var(--mikke-muted)]">左側から、作りたいページに近いものを選べます。</p></div> : blocks.map((block, index) => {
+              const selected = block.id === selectedBlockId;
+              const label = pageBlockChoices.find((choice) => choice.type === block.type)?.label ?? "ブロック";
+              return <article key={block.id} className={`rounded-2xl border bg-white shadow-sm ${selected ? "border-[var(--mikke-accent)] ring-2 ring-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)]"}`}>
+                <button type="button" onClick={() => setSelectedBlockId(selected ? null : block.id)} className="flex w-full items-center justify-between gap-3 p-4 text-left"><span><span className="text-xs font-bold text-[var(--mikke-accent)]">{index + 1}. {label}</span>{block.hidden ? <span className="ml-2 rounded-full bg-[var(--mikke-surface-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-muted)]">非表示</span> : null}</span>{selected ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button>
+                {selected ? <div className="border-t border-[var(--mikke-line-soft)] p-4"><PageBlockFields block={block} siteId={site.id} cmsContent={cmsContent} onChange={(next) => updateBlock(block.id, next)} /><PageBlockStyleFields block={block} onChange={(next) => updateBlock(block.id, next)} /></div> : null}
+                <div className="flex flex-wrap items-center justify-end gap-1 border-t border-[var(--mikke-line-soft)] px-3 py-2">
+                  <button type="button" onClick={() => moveBlock(index, -1)} disabled={index === 0} aria-label="上へ" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowUp size={14} /></button>
+                  <button type="button" onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1} aria-label="下へ" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowDown size={14} /></button>
+                  <button type="button" onClick={() => updateBlock(block.id, { ...block, hidden: !block.hidden })} aria-label={block.hidden ? "表示する" : "非表示にする"} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)]">{block.hidden ? <Eye size={14} /> : <EyeOff size={14} />}</button>
+                  <button type="button" onClick={() => { const copy = renewNestedIds(block); commitBlocks([...blocks.slice(0, index + 1), copy, ...blocks.slice(index + 1)]); setSelectedBlockId(copy.id); }} aria-label="複製" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)]"><Copy size={14} /></button>
+                  <button type="button" onClick={() => { commitBlocks(blocks.filter((item) => item.id !== block.id)); if (selected) setSelectedBlockId(null); }} aria-label="削除" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-danger)]"><Trash2 size={14} /></button>
                 </div>
-              </section>
+              </article>;
+            })}
+          </main>
 
-              <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm">
-                <div>
-                  <h2 className="text-lg font-bold tracking-normal">ブロックを追加</h2>
-                  <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">上から順に表示されます。自由配置は行いません。</p>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {blockChoices.map((choice) => {
-                    const Icon = choice.icon;
-                    return <button key={choice.type} type="button" onClick={() => setBlocks((current) => [...current, createEmptyBlock(choice.type, current.length + 1)])} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-3 text-xs font-bold"><Icon size={16} /> {choice.label}</button>;
-                  })}
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                {blocks.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-8 text-center text-sm text-[var(--mikke-muted)]">ブロックはまだありません。</div>
-                ) : blocks.map((block, index) => (
-                  <BlockEditor
-                    key={block.id}
-                    block={block}
-                    index={index}
-                    total={blocks.length}
-                    onChange={(update) => updateBlock(block.id, update)}
-                    onMove={(direction) => moveBlock(index, direction)}
-                    onDelete={() => setBlocks((current) => current.filter((item) => item.id !== block.id))}
-                    cmsContent={cmsContent}
-                  />
-                ))}
-              </section>
-              {message ? <p role="status" className="rounded-xl bg-[var(--mikke-primary-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-accent)]">{message}</p> : null}
+          <aside className="min-[1180px]:sticky min-[1180px]:top-24 min-[1180px]:self-start">
+            <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><Eye size={16} className="text-[var(--mikke-accent)]" /><h2 className="text-sm font-bold">ライブプレビュー</h2></div><div className="flex gap-1"><DeviceButton active={device === "desktop"} label="PC" onClick={() => setDevice("desktop")} icon={<Laptop size={14} />} /><DeviceButton active={device === "tablet"} label="タブレット" onClick={() => setDevice("tablet")} icon={<Tablet size={14} />} /><DeviceButton active={device === "mobile"} label="スマホ" onClick={() => setDevice("mobile")} icon={<Smartphone size={14} />} /></div></div>
+              <div className="mt-3 overflow-auto rounded-xl bg-[#dfe3ea] p-3"><div className={`mx-auto overflow-hidden rounded-xl bg-white shadow-lg transition-[width] ${device === "desktop" ? "w-full" : device === "tablet" ? "w-[720px] max-w-full" : "w-[390px] max-w-full"}`}><PageRenderer compact document={previewDocument} theme={theme} cmsContent={cmsContent} /></div></div>
             </div>
-
-            <aside className="xl:sticky xl:top-24 xl:self-start">
-              <div className="rounded-3xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4 shadow-sm">
-                <div className="flex items-center gap-2"><Eye size={17} className="text-[var(--mikke-accent)]" /><h2 className="text-sm font-bold">OS内プレビュー</h2></div>
-                <p className="mt-1 text-xs text-[var(--mikke-muted)]">編集者だけが見る下書き表示です。</p>
-                <div className="mt-4 min-h-80 overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-                  <PageBlockPreview blocks={blocks} cmsContent={cmsContent} />
-                </div>
-              </div>
-            </aside>
-          </div>
-        </form>
+          </aside>
+        </div>
       )}
     </MikkeAppShell>
   );
 }
 
-function BlockEditor({ block, index, total, onChange, onMove, onDelete, cmsContent }: { block: PageBlock; index: number; total: number; onChange: (update: (block: PageBlock) => PageBlock) => void; onMove: (direction: -1 | 1) => void; onDelete: () => void; cmsContent: Record<PageCmsSource, PageCmsItem[]> }) {
-  const label = blockChoices.find((choice) => choice.type === block.type)?.label ?? "ブロック";
-  return (
-    <article className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--mikke-line-soft)] pb-3">
-        <p className="text-xs font-bold text-[var(--mikke-accent)]">{index + 1}. {label}</p>
-        <div className="flex items-center gap-1">
-          <button type="button" onClick={() => onMove(-1)} disabled={index === 0} aria-label="上へ" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowUp size={14} /></button>
-          <button type="button" onClick={() => onMove(1)} disabled={index === total - 1} aria-label="下へ" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowDown size={14} /></button>
-          <button type="button" onClick={onDelete} aria-label="削除" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-danger)]"><Trash2 size={14} /></button>
-        </div>
-      </div>
-      <div className="mt-3"><BlockFields block={block} onChange={onChange} cmsContent={cmsContent} /></div>
-    </article>
-  );
+function BuilderSidebar({ theme, onThemeChange, onStarter, onSection, onBlock }: { theme: PageSiteTheme; onThemeChange: (theme: PageSiteTheme) => void; onStarter: (id: PageStarterTemplateId) => void; onSection: (id: PageSectionTemplateId) => void; onBlock: (type: PageBlock["type"]) => void }) {
+  return <aside className="space-y-4 min-[1180px]:sticky min-[1180px]:top-24 min-[1180px]:self-start">
+    <details open className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"><summary className="cursor-pointer text-sm font-bold">サイトデザイン</summary><div className="mt-3 grid gap-3"><label className="block"><span className="text-xs font-bold">雰囲気</span><select value={theme.presetId} onChange={(event) => onThemeChange({ ...pageThemePresets[event.target.value as keyof typeof pageThemePresets] })} className={inputClass}><option value="gothic">すっきり</option><option value="soft">やわらかい</option><option value="serif">上品</option><option value="modern">モダン</option></select></label><div className="grid grid-cols-2 gap-2"><ColorField label="メイン" value={theme.primaryColor} onChange={(primaryColor) => onThemeChange({ ...theme, primaryColor })} /><ColorField label="アクセント" value={theme.accentColor} onChange={(accentColor) => onThemeChange({ ...theme, accentColor })} /><ColorField label="背景" value={theme.backgroundColor} onChange={(backgroundColor) => onThemeChange({ ...theme, backgroundColor })} /><ColorField label="文字" value={theme.textColor} onChange={(textColor) => onThemeChange({ ...theme, textColor })} /></div><label className="block"><span className="text-xs font-bold">コンテンツ幅</span><select value={theme.contentWidth} onChange={(event) => onThemeChange({ ...theme, contentWidth: event.target.value as PageSiteTheme["contentWidth"] })} className={inputClass}><option value="narrow">読み物向け</option><option value="standard">標準</option><option value="wide">ワイド</option></select></label></div></details>
+    <details className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"><summary className="cursor-pointer text-sm font-bold">ページテンプレート</summary><div className="mt-3 grid gap-2">{starterTemplates.map((template) => <button key={template.id} type="button" onClick={() => onStarter(template.id)} className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 text-left"><strong className="block text-xs">{template.label}</strong><span className="mt-1 block text-[10px] leading-4 text-[var(--mikke-muted)]">{template.helper}</span></button>)}</div></details>
+    <details open className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"><summary className="cursor-pointer text-sm font-bold">セクションテンプレート</summary><div className="mt-3 grid grid-cols-2 gap-2">{sectionTemplates.map((template) => <button key={template.id} type="button" onClick={() => onSection(template.id)} className="rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold">{template.label}</button>)}</div></details>
+    <details className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"><summary className="cursor-pointer text-sm font-bold">パーツを追加</summary><div className="mt-3 grid grid-cols-2 gap-2">{pageBlockChoices.map((choice) => { const Icon = choice.icon; return <button key={choice.type} type="button" onClick={() => onBlock(choice.type)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-[11px] font-bold"><Icon size={14} />{choice.label}</button>; })}</div></details>
+  </aside>;
 }
 
-function BlockFields({ block, onChange, cmsContent }: { block: PageBlock; onChange: (update: (block: PageBlock) => PageBlock) => void; cmsContent: Record<PageCmsSource, PageCmsItem[]> }) {
-  if (block.type === "heading") return <div className="grid gap-3 sm:grid-cols-[120px_1fr]"><label className="block"><span className="text-xs font-bold">大きさ</span><select value={block.level} onChange={(event) => onChange((current) => current.type === "heading" ? { ...current, level: Number(event.target.value) as 1 | 2 | 3 } : current)} className={inputClass}><option value={1}>大</option><option value={2}>中</option><option value={3}>小</option></select></label><label className="block"><span className="text-xs font-bold">見出し</span><input value={block.text} onChange={(event) => onChange((current) => current.type === "heading" ? { ...current, text: event.target.value } : current)} className={inputClass} /></label></div>;
-  if (block.type === "text") return <label className="block"><span className="text-xs font-bold">文章</span><textarea value={block.text} onChange={(event) => onChange((current) => current.type === "text" ? { ...current, text: event.target.value } : current)} rows={5} className={`${inputClass} resize-y`} /></label>;
-  if (block.type === "image") return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">画像URL</span><input value={block.imageUrl} onChange={(event) => onChange((current) => current.type === "image" ? { ...current, imageUrl: event.target.value } : current)} className={inputClass} placeholder="https:// または /image.jpg" /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">代替テキスト</span><input value={block.alt} onChange={(event) => onChange((current) => current.type === "image" ? { ...current, alt: event.target.value } : current)} className={inputClass} /></label><label className="block"><span className="text-xs font-bold">キャプション</span><input value={block.caption ?? ""} onChange={(event) => onChange((current) => current.type === "image" ? { ...current, caption: event.target.value } : current)} className={inputClass} /></label></div></div>;
-  if (block.type === "button") return <div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">ラベル</span><input value={block.label} onChange={(event) => onChange((current) => current.type === "button" ? { ...current, label: event.target.value } : current)} className={inputClass} /></label><label className="block"><span className="text-xs font-bold">リンク先</span><input value={block.href} onChange={(event) => onChange((current) => current.type === "button" ? { ...current, href: event.target.value } : current)} className={inputClass} placeholder="https:// または #section" /></label></div>;
-  if (block.type === "form") return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">タイトル</span><input value={block.title} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, title: event.target.value } : current)} className={inputClass} /></label><label className="block"><span className="text-xs font-bold">説明</span><textarea value={block.description} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, description: event.target.value } : current)} rows={2} className={`${inputClass} resize-y`} /></label><label className="block"><span className="text-xs font-bold">ボタン表示</span><input value={block.buttonLabel} onChange={(event) => onChange((current) => current.type === "form" ? { ...current, buttonLabel: event.target.value } : current)} className={inputClass} /></label><p className="text-xs text-[var(--mikke-muted)]">送信処理はPG-5以降で設計します。</p></div>;
-  if (block.type === "divider") return <p className="text-xs text-[var(--mikke-muted)]">横線で内容を区切ります。</p>;
-  if (block.type === "cms") {
-    const candidates = cmsContent[block.source];
-    const selectedItemIds = block.filters.selectedItemIds ?? [];
-    const sourceInfo = pageCmsSourceInfo[block.source];
-    return <div className="grid gap-3"><label className="block"><span className="text-xs font-bold">見出し</span><input value={block.title} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, title: event.target.value } : current)} className={inputClass} /></label><div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="text-xs font-bold">参照元</span><select value={block.source} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, source: event.target.value as PageCmsSource, filters: { ...current.filters, selectedItemIds: [] } } : current)} className={inputClass}>{Object.entries(cmsSourceLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block"><span className="text-xs font-bold">表示</span><select value={block.displayMode} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, displayMode: event.target.value as "list" | "cards" | "featured" } : current)} className={inputClass}><option value="list">リスト</option><option value="cards">カード</option><option value="featured">注目表示</option></select></label></div><dl className="grid gap-2 rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-3 text-xs leading-5 sm:grid-cols-3"><div><dt className="font-bold text-[var(--mikke-accent)]">mikkeID接続</dt><dd className="mt-1 text-[var(--mikke-muted)]">{sourceInfo.connection}</dd></div><div><dt className="font-bold text-[var(--mikke-accent)]">表示できる内容</dt><dd className="mt-1 text-[var(--mikke-muted)]">{sourceInfo.visibleFields}</dd></div><div><dt className="font-bold text-[var(--mikke-accent)]">表示条件</dt><dd className="mt-1 text-[var(--mikke-muted)]">{sourceInfo.visibilityRule}</dd></div></dl><div className="flex flex-wrap gap-2"><label className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><input type="checkbox" checked={block.filters.thisMonthOnly ?? false} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, filters: { ...current.filters, thisMonthOnly: event.target.checked } } : current)} /> 今月のみ</label><label className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><input type="checkbox" checked={block.filters.approvedOnly ?? false} onChange={(event) => onChange((current) => current.type === "cms" ? { ...current, filters: { ...current.filters, approvedOnly: event.target.checked } } : current)} /> 承認済みのみ</label></div><fieldset className="rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-3"><legend className="px-1 text-xs font-bold">表示する項目（未選択ならすべて）</legend>{candidates.length === 0 ? <p className="text-xs text-[var(--mikke-muted)]">選択できる公開候補はありません。</p> : <div className="grid gap-2 sm:grid-cols-2">{candidates.map((item) => <label key={item.id} className="flex items-start gap-2 rounded-lg bg-white p-2 text-xs"><input type="checkbox" checked={selectedItemIds.includes(item.id)} onChange={(event) => onChange((current) => { if (current.type !== "cms") return current; const selected = current.filters.selectedItemIds ?? []; return { ...current, filters: { ...current.filters, selectedItemIds: event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id) } }; })} className="mt-0.5" /><span><span className="block font-bold">{item.title}</span>{item.meta ? <span className="mt-0.5 block text-[var(--mikke-muted)]">{item.meta}</span> : null}</span></label>)}</div>}</fieldset><p className="text-xs leading-5 text-[var(--mikke-muted)]">Pageには選択IDと絞り込み条件だけを保存し、元データはコピーしません。Connect / Partnersのようなページも、このCMSブロックを組み合わせて構築します。</p></div>;
-  }
-  return null;
+function HtmlPageEditor({ value, onChange, preview }: { value: PageHtmlDocument; onChange: (value: PageHtmlDocument) => void; preview: React.ReactNode }) {
+  return <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(420px,.8fr)_minmax(0,1fr)]"><section className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm"><div><h2 className="text-lg font-bold">AI HTMLページ</h2><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">AIが作ったHTML・CSS・JavaScriptを貼り付けます。コードはmikkeOSから隔離して表示されます。</p></div><CodeField label="HTML" value={value.html} rows={12} onChange={(html) => onChange({ ...value, html })} /><CodeField label="CSS" value={value.css} rows={10} onChange={(css) => onChange({ ...value, css })} /><label className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><input type="checkbox" checked={value.allowScripts} onChange={(event) => onChange({ ...value, allowScripts: event.target.checked })} /> JavaScriptを有効にする</label>{value.allowScripts ? <CodeField label="JavaScript" value={value.javascript} rows={8} onChange={(javascript) => onChange({ ...value, javascript })} /> : null}</section><aside className="xl:sticky xl:top-24 xl:self-start"><div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm"><div className="border-b border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">安全プレビュー</div>{preview}</div></aside></div>;
 }
 
-function PageBlockPreview({ blocks, cmsContent }: { blocks: PageBlock[]; cmsContent: Record<PageCmsSource, PageCmsItem[]> }) {
-  if (blocks.length === 0) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">ブロックを追加すると、ここに表示されます。</p>;
-  return <div className="space-y-5">{blocks.map((block) => {
-    if (block.type === "heading") {
-      const className = block.level === 1 ? "text-2xl" : block.level === 2 ? "text-xl" : "text-lg";
-      return <h3 key={block.id} className={`${className} font-bold tracking-normal`}>{block.text || "見出し"}</h3>;
-    }
-    if (block.type === "text") return <p key={block.id} className="whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{block.text}</p>;
-    if (block.type === "image") return <div key={block.id}>{block.imageUrl ? <img src={block.imageUrl} alt={block.alt} className="max-h-64 w-full rounded-xl object-cover" /> : <div className="grid h-36 place-items-center rounded-xl bg-[var(--mikke-surface-soft)] text-xs text-[var(--mikke-muted)]"><ImageIcon size={24} />画像URLを入力</div>}{block.caption ? <p className="mt-1 text-center text-xs text-[var(--mikke-muted)]">{block.caption}</p> : null}</div>;
-    if (block.type === "button") return <span key={block.id} className="inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">{block.label || "ボタン"}</span>;
-    if (block.type === "form") return <div key={block.id} className="rounded-2xl border border-[var(--mikke-line)] p-4"><p className="font-bold">{block.title}</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{block.description}</p><div className="mt-3 h-10 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" /><button type="button" disabled className="mt-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white opacity-60">{block.buttonLabel}</button></div>;
-    if (block.type === "divider") return <hr key={block.id} className="border-[var(--mikke-line)]" />;
-    if (block.type === "cms") return <CmsBlockPreview key={block.id} block={block} items={cmsContent[block.source]} />;
-    return null;
-  })}</div>;
-}
-
-function CmsBlockPreview({ block, items }: { block: Extract<PageBlock, { type: "cms" }>; items: PageCmsItem[] }) {
-  const selectedItemIds = block.filters.selectedItemIds ?? [];
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const filteredItems = items.filter((item) => {
-    if (selectedItemIds.length > 0 && !selectedItemIds.includes(item.id)) return false;
-    if (block.filters.thisMonthOnly && !item.occurredAt.startsWith(currentMonth)) return false;
-    if (block.filters.approvedOnly && !item.approved) return false;
-    return true;
-  });
-  const visibleItems = block.displayMode === "featured" ? filteredItems.slice(0, 1) : filteredItems.slice(0, 6);
-  return (
-    <section>
-      <div className="flex items-center justify-between gap-2"><h3 className="text-lg font-bold tracking-normal">{block.title || cmsSourceLabels[block.source]}</h3><span className="text-[10px] font-bold text-[var(--mikke-muted)]">{cmsSourceLabels[block.source]}</span></div>
-      {visibleItems.length === 0 ? <p className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] p-4 text-xs text-[var(--mikke-muted)]">公開中の表示候補はありません。</p> : (
-        <div className={block.displayMode === "list" ? "mt-3 space-y-2" : "mt-3 grid gap-3 sm:grid-cols-2"}>
-          {visibleItems.map((item) => (
-            <article key={item.id} className="overflow-hidden rounded-xl border border-[var(--mikke-line-soft)] bg-white">
-              {item.imageUrl && block.displayMode !== "list" ? <img src={item.imageUrl} alt="" className="h-28 w-full object-cover" /> : null}
-              <div className="p-3"><p className="text-sm font-bold">{item.title}</p>{item.summary ? <p className="mt-1 line-clamp-3 text-xs leading-5 text-[var(--mikke-muted)]">{item.summary}</p> : null}{item.meta ? <p className="mt-2 text-[10px] font-bold text-[var(--mikke-accent)]">{item.meta}</p> : null}{item.href ? <a href={item.href} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-[10px] font-bold text-[var(--mikke-primary)]">リンクを開く</a> : null}</div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
+function DeviceButton({ active, label, onClick, icon }: { active: boolean; label: string; onClick: () => void; icon: React.ReactNode }) { return <button type="button" onClick={onClick} aria-label={label} className={`grid h-8 w-8 place-items-center rounded-lg border ${active ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>{icon}</button>; }
+function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className="text-[10px] font-bold">{label}</span><input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-[var(--mikke-line)] bg-white p-1" /></label>; }
+function CodeField({ label, value, rows, onChange }: { label: string; value: string; rows: number; onChange: (value: string) => void }) { return <label className="block"><span className="text-xs font-bold">{label}</span><textarea spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} rows={rows} className={`${inputClass} resize-y font-mono text-xs leading-5`} /></label>; }

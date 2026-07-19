@@ -1,0 +1,29 @@
+.fade,
+.fadeUp,
+.zoom,
+.slideLeft,
+.slideRight {
+  animation-duration: 620ms;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(.22, 1, .36, 1);
+}
+
+.fade { animation-name: pageFade; }
+.fadeUp { animation-name: pageFadeUp; }
+.zoom { animation-name: pageZoom; }
+.slideLeft { animation-name: pageSlideLeft; }
+.slideRight { animation-name: pageSlideRight; }
+
+@keyframes pageFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pageFadeUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pageZoom { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes pageSlideLeft { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pageSlideRight { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .fade,
+  .fadeUp,
+  .zoom,
+  .slideLeft,
+  .slideRight { animation: none; }
+}
