@@ -1,4 +1,5 @@
 import { pageDemoState } from "./demo";
+import { analyzePageHtmlPayload, PAGE_HTML_MAX_BYTES } from "./html";
 import {
   clonePageTheme,
   createStarterTemplate,
@@ -249,6 +250,11 @@ export function savePageDocument(siteId: string, pageId: string, input: SavePage
   const slug = normalizePageSiteSlug(input.slug);
   if (!title) throw new Error("ページ名を入力してください。");
   if (!slug) throw new Error("ページslugを半角英数字で入力してください。");
+  if (input.mode === "html") {
+    const htmlPayload = analyzePageHtmlPayload(input.htmlDocument);
+    if (htmlPayload.hasEmbeddedData) throw new Error("HTMLへ画像やフォントを直接埋め込めません。Mikke Mediaまたはhttps URLを使ってください。");
+    if (htmlPayload.bytes > PAGE_HTML_MAX_BYTES) throw new Error("HTML・CSS・JavaScriptは合計500KB以下にしてください。");
+  }
 
   let savedDocument: PageDocument | null = null;
   updatePageSite(siteId, (site) => {

@@ -29,7 +29,11 @@ CMSは参照元アプリのデータを選び、表示するための仕組み�
 - Pageデータには画像本体を入れず、公開URL、保存パス、ファイル名、サイズ、縦横寸法だけを保存
 - 画像と外部表示は遅延読み込み
 
-DB変更は `supabase/migrations/20260719044459_page_builder_assets.sql` に記録し、接続中のSupabaseプロジェクトにも適用済み。
+2026-07-19の追加決定により、Page専用画像保存からmikkeOS共通の `Mikke Media` へ移行した。新規画像は `mikke-media` bucketへ保存し、無料枠はmikkeIDごと100MBとする。保存済み画像をPage内および将来の他アプリから再利用できる。
+
+詳細は `docs/MIKKEOS_MEDIA_FOUNDATION_AND_HTML_POLICY_2026-07-19.md` を参照する。
+
+初期DB変更は `supabase/migrations/20260719044459_page_builder_assets.sql`、共通メディア移行は `supabase/migrations/20260719053654_mikke_media_foundation.sql`、使用箇所同期と安全な削除は `supabase/migrations/20260719054957_mikke_media_lifecycle.sql` に記録し、接続中のSupabaseプロジェクトにも適用済み。
 
 ## 安全性
 

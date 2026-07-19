@@ -29,6 +29,8 @@ import {
   pageBlockChoices
 } from "./PageBlockEditor";
 import { PageRenderer } from "./PageRenderer";
+import { analyzePageHtmlPayload, PAGE_HTML_MAX_BYTES } from "@/lib/page/html";
+import { syncMikkeMediaUsages } from "@/lib/media/client";
 import { usePageCmsContent } from "@/lib/page/cms-selectors";
 import {
   createSectionTemplate,
@@ -172,11 +174,12 @@ export function PageDocumentEditor() {
     setSelectedBlockId(next[0]?.id ?? null);
   }
 
-  function save() {
+  async function save() {
     setMessage("");
     try {
       const savedSite = savePageSiteTheme(params.siteId, theme);
       const saved = savePageDocument(params.siteId, params.pageId, { title, slug, mode, blocks, htmlDocument });
+      await syncMikkeMediaUsages({ appKey: "page", entityType: "page_document", entityId: params.pageId, assetIds: mode === "builder" ? collectPageMediaAssetIds(blocks) : [] });
       if (saved) {
         setDocument(saved);
         setBlocks(saved.blocks);
@@ -202,7 +205,7 @@ export function PageDocumentEditor() {
           <span className={`text-xs font-bold ${dirty ? "text-[var(--mikke-accent)]" : "text-[var(--mikke-success)]"}`}>{dirty ? "未保存の変更があります" : "保存済み"}</span>
           <button type="button" onClick={undo} disabled={!past.length || mode !== "builder"} aria-label="元に戻す" className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white disabled:opacity-30"><Undo2 size={16} /></button>
           <button type="button" onClick={redo} disabled={!future.length || mode !== "builder"} aria-label="やり直す" className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white disabled:opacity-30"><Redo2 size={16} /></button>
-          <button type="button" onClick={save} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white"><Save size={16} /> 下書きを保存</button>
+          <button type="button" onClick={() => void save()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white"><Save size={16} /> 下書きを保存</button>
         </div>
       </div>
 
@@ -261,8 +264,21 @@ function BuilderSidebar({ theme, onThemeChange, onStarter, onSection, onBlock }:
   </aside>;
 }
 
+function collectPageMediaAssetIds(blocks: PageBlock[]) {
+  const ids: string[] = [];
+  for (const block of blocks) {
+    if (block.type === "image" && block.asset?.mediaAssetId) ids.push(block.asset.mediaAssetId);
+    if (block.type === "columns") for (const column of block.columns) if (column.asset?.mediaAssetId) ids.push(column.asset.mediaAssetId);
+    if (block.type === "gallery" || block.type === "slideshow") for (const image of block.images) if (image.asset?.mediaAssetId) ids.push(image.asset.mediaAssetId);
+  }
+  return [...new Set(ids)];
+}
+
 function HtmlPageEditor({ value, onChange, preview }: { value: PageHtmlDocument; onChange: (value: PageHtmlDocument) => void; preview: React.ReactNode }) {
-  return <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(420px,.8fr)_minmax(0,1fr)]"><section className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm"><div><h2 className="text-lg font-bold">AI HTMLページ</h2><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">AIが作ったHTML・CSS・JavaScriptを貼り付けます。コードはmikkeOSから隔離して表示されます。</p></div><CodeField label="HTML" value={value.html} rows={12} onChange={(html) => onChange({ ...value, html })} /><CodeField label="CSS" value={value.css} rows={10} onChange={(css) => onChange({ ...value, css })} /><label className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><input type="checkbox" checked={value.allowScripts} onChange={(event) => onChange({ ...value, allowScripts: event.target.checked })} /> JavaScriptを有効にする</label>{value.allowScripts ? <CodeField label="JavaScript" value={value.javascript} rows={8} onChange={(javascript) => onChange({ ...value, javascript })} /> : null}</section><aside className="xl:sticky xl:top-24 xl:self-start"><div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm"><div className="border-b border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">安全プレビュー</div>{preview}</div></aside></div>;
+  const payload = analyzePageHtmlPayload(value);
+  const usedKb = Math.max(1, Math.ceil(payload.bytes / 1024));
+  const limitKb = Math.round(PAGE_HTML_MAX_BYTES / 1024);
+  return <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(420px,.8fr)_minmax(0,1fr)]"><section className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm"><div><h2 className="text-lg font-bold">AI HTMLページ</h2><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">AIが作ったHTML・CSS・JavaScriptを貼り付けます。コードはmikkeOSから隔離して表示されます。</p></div><div className={`rounded-xl border p-3 text-xs leading-5 ${payload.hasEmbeddedData || payload.bytes > PAGE_HTML_MAX_BYTES ? "border-[var(--mikke-danger)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-danger)]" : "border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] text-[var(--mikke-accent)]"}`}><strong>コード容量 {usedKb}KB / {limitKb}KB</strong><p>HTML文字は小容量です。外部画像・動画は表示元の通信を使い、Mikke MediaのURLならSupabase通信として計上されます。</p><p>base64画像・フォントの直接埋め込みは保存できません。画像はMikke Mediaを使ってください。</p></div><CodeField label="HTML" value={value.html} rows={12} onChange={(html) => onChange({ ...value, html })} /><CodeField label="CSS" value={value.css} rows={10} onChange={(css) => onChange({ ...value, css })} /><label className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><input type="checkbox" checked={value.allowScripts} onChange={(event) => onChange({ ...value, allowScripts: event.target.checked })} /> JavaScriptを有効にする</label>{value.allowScripts ? <CodeField label="JavaScript" value={value.javascript} rows={8} onChange={(javascript) => onChange({ ...value, javascript })} /> : null}</section><aside className="xl:sticky xl:top-24 xl:self-start"><div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm"><div className="border-b border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">安全プレビュー</div>{preview}</div></aside></div>;
 }
 
 function DeviceButton({ active, label, onClick, icon }: { active: boolean; label: string; onClick: () => void; icon: React.ReactNode }) { return <button type="button" onClick={onClick} aria-label={label} className={`grid h-8 w-8 place-items-center rounded-lg border ${active ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>{icon}</button>; }

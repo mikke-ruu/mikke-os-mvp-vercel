@@ -1,4 +1,13 @@
 const allowedProtocols = new Set(["http:", "https:"]);
+export const PAGE_HTML_MAX_BYTES = 500 * 1024;
+
+export function analyzePageHtmlPayload(input: { html: string; css: string; javascript: string }) {
+  const combined = `${input.html}\n${input.css}\n${input.javascript}`;
+  return {
+    bytes: new TextEncoder().encode(combined).byteLength,
+    hasEmbeddedData: /data:(?:image|font|audio|video)\//i.test(combined)
+  };
+}
 
 export function normalizePageEmbedUrl(input: string) {
   const value = input.trim();
@@ -43,7 +52,7 @@ export function buildSandboxedHtmlDocument(input: {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: data: blob:; media-src https: blob:; style-src 'unsafe-inline' https:; font-src https: data:; ${scriptPolicy}; connect-src https:; frame-src https:; form-action https:; object-src 'none'; base-uri 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: blob:; media-src https: blob:; style-src 'unsafe-inline' https:; font-src https:; ${scriptPolicy}; connect-src https:; frame-src https:; form-action https:; object-src 'none'; base-uri 'none'" />
   <style>${escapeClosingTag(input.css, "style")}</style>
 </head>
 <body>${input.html}${script}</body>

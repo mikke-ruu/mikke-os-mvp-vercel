@@ -36,6 +36,7 @@ export type PageBlockStyle = {
 };
 
 export type PageAssetRef = {
+  mediaAssetId?: string;
   storagePath: string;
   publicUrl: string;
   fileName: string;
