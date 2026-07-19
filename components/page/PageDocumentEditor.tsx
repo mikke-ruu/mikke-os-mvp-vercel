@@ -5,13 +5,16 @@ import Link from "next/link";
 import {
   ArrowDown,
   ArrowLeft,
+  ArrowRight,
   ArrowUp,
-  ChevronDown,
-  ChevronUp,
   Copy,
   Eye,
   EyeOff,
   Laptop,
+  LayoutTemplate,
+  ListPlus,
+  Palette,
+  PanelRight,
   Redo2,
   Save,
   Smartphone,
@@ -29,9 +32,10 @@ import {
   pageBlockChoices
 } from "./PageBlockEditor";
 import { PageRenderer } from "./PageRenderer";
+import { PageTemplatePreview } from "./PageTemplatePreview";
 import { analyzePageHtmlPayload, PAGE_HTML_MAX_BYTES } from "@/lib/page/html";
 import { syncMikkeMediaUsages } from "@/lib/media/client";
-import { usePageCmsContent } from "@/lib/page/cms-selectors";
+import { usePageCmsContent, type PageCmsItem } from "@/lib/page/cms-selectors";
 import {
   createSectionTemplate,
   createStarterTemplate,
@@ -52,6 +56,7 @@ import type {
   PageDocument,
   PageDocumentMode,
   PageHtmlDocument,
+  PageCmsSource,
   PageSite,
   PageSiteTheme
 } from "@/lib/page/types";
@@ -100,6 +105,9 @@ export function PageDocumentEditor() {
   const [past, setPast] = useState<PageBlock[][]>([]);
   const [future, setFuture] = useState<PageBlock[][]>([]);
   const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [zoom, setZoom] = useState(60);
+  const [mobileWorkspace, setMobileWorkspace] = useState<"preview" | "edit" | "add">("preview");
+  const [sidebarPanel, setSidebarPanel] = useState<"templates" | "sections" | "parts" | "design">("sections");
   const [message, setMessage] = useState("");
   const [dirty, setDirty] = useState(false);
   const cmsContent = usePageCmsContent(site?.ownerProfileId);
@@ -222,45 +230,89 @@ export function PageDocumentEditor() {
       {mode === "html" ? (
         <HtmlPageEditor value={htmlDocument} onChange={(next) => { setHtmlDocument(next); setDirty(true); }} preview={<PageRenderer document={previewDocument} theme={theme} cmsContent={cmsContent} />} />
       ) : (
-        <div className="mt-5 grid gap-5 min-[1180px]:grid-cols-[260px_minmax(390px,1fr)_minmax(330px,.78fr)]">
-          <BuilderSidebar theme={theme} onThemeChange={(next) => { setTheme(next); setDirty(true); }} onStarter={replaceWithTemplate} onSection={(templateId) => addBlocks(createSectionTemplate(templateId, blocks.length + 1))} onBlock={(type) => addBlocks([createEmptyPageBlock(type, blocks.length + 1)])} />
+        <>
+          <nav className="mt-5 grid grid-cols-3 gap-2 rounded-2xl border border-[var(--mikke-line)] bg-white p-2 shadow-sm lg:hidden" aria-label="スマホ編集メニュー">
+            <WorkspaceButton active={mobileWorkspace === "preview"} label="見る" icon={<Eye size={16} />} onClick={() => setMobileWorkspace("preview")} />
+            <WorkspaceButton active={mobileWorkspace === "edit"} label="編集" icon={<PanelRight size={16} />} onClick={() => setMobileWorkspace("edit")} />
+            <WorkspaceButton active={mobileWorkspace === "add"} label="追加・デザイン" icon={<ListPlus size={16} />} onClick={() => setMobileWorkspace("add")} />
+          </nav>
 
-          <main className="min-w-0 space-y-3">
-            {blocks.length === 0 ? <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-10 text-center"><p className="font-bold">テンプレートまたはブロックを選んでください</p><p className="mt-2 text-sm text-[var(--mikke-muted)]">左側から、作りたいページに近いものを選べます。</p></div> : blocks.map((block, index) => {
-              const selected = block.id === selectedBlockId;
-              const label = pageBlockChoices.find((choice) => choice.type === block.type)?.label ?? "ブロック";
-              return <article key={block.id} className={`rounded-2xl border bg-white shadow-sm ${selected ? "border-[var(--mikke-accent)] ring-2 ring-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)]"}`}>
-                <button type="button" onClick={() => setSelectedBlockId(selected ? null : block.id)} className="flex w-full items-center justify-between gap-3 p-4 text-left"><span><span className="text-xs font-bold text-[var(--mikke-accent)]">{index + 1}. {label}</span>{block.hidden ? <span className="ml-2 rounded-full bg-[var(--mikke-surface-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-muted)]">非表示</span> : null}</span>{selected ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button>
-                {selected ? <div className="border-t border-[var(--mikke-line-soft)] p-4"><PageBlockFields block={block} siteId={site.id} cmsContent={cmsContent} onChange={(next) => updateBlock(block.id, next)} /><PageBlockStyleFields block={block} onChange={(next) => updateBlock(block.id, next)} /></div> : null}
-                <div className="flex flex-wrap items-center justify-end gap-1 border-t border-[var(--mikke-line-soft)] px-3 py-2">
-                  <button type="button" onClick={() => moveBlock(index, -1)} disabled={index === 0} aria-label="上へ" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowUp size={14} /></button>
-                  <button type="button" onClick={() => moveBlock(index, 1)} disabled={index === blocks.length - 1} aria-label="下へ" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowDown size={14} /></button>
-                  <button type="button" onClick={() => updateBlock(block.id, { ...block, hidden: !block.hidden })} aria-label={block.hidden ? "表示する" : "非表示にする"} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)]">{block.hidden ? <Eye size={14} /> : <EyeOff size={14} />}</button>
-                  <button type="button" onClick={() => { const copy = renewNestedIds(block); commitBlocks([...blocks.slice(0, index + 1), copy, ...blocks.slice(index + 1)]); setSelectedBlockId(copy.id); }} aria-label="複製" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)]"><Copy size={14} /></button>
-                  <button type="button" onClick={() => { commitBlocks(blocks.filter((item) => item.id !== block.id)); if (selected) setSelectedBlockId(null); }} aria-label="削除" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-danger)]"><Trash2 size={14} /></button>
-                </div>
-              </article>;
-            })}
-          </main>
-
-          <aside className="min-[1180px]:sticky min-[1180px]:top-24 min-[1180px]:self-start">
-            <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><Eye size={16} className="text-[var(--mikke-accent)]" /><h2 className="text-sm font-bold">ライブプレビュー</h2></div><div className="flex gap-1"><DeviceButton active={device === "desktop"} label="PC" onClick={() => setDevice("desktop")} icon={<Laptop size={14} />} /><DeviceButton active={device === "tablet"} label="タブレット" onClick={() => setDevice("tablet")} icon={<Tablet size={14} />} /><DeviceButton active={device === "mobile"} label="スマホ" onClick={() => setDevice("mobile")} icon={<Smartphone size={14} />} /></div></div>
-              <div className="mt-3 overflow-auto rounded-xl bg-[#dfe3ea] p-3"><div className={`mx-auto overflow-hidden rounded-xl bg-white shadow-lg transition-[width] ${device === "desktop" ? "w-full" : device === "tablet" ? "w-[720px] max-w-full" : "w-[390px] max-w-full"}`}><PageRenderer compact document={previewDocument} theme={theme} cmsContent={cmsContent} /></div></div>
+          <div className={`mt-4 grid gap-4 ${mobileWorkspace === "add" ? "lg:grid-cols-[280px_minmax(0,1fr)]" : "lg:grid-cols-[minmax(0,1fr)_360px]"} xl:grid-cols-[250px_minmax(0,1fr)_360px]`}>
+            <div className={`${mobileWorkspace === "add" ? "block" : "hidden"} ${mobileWorkspace === "add" ? "lg:block" : "lg:hidden"} xl:block`}>
+              <BuilderSidebar panel={sidebarPanel} onPanelChange={setSidebarPanel} theme={theme} onThemeChange={(next) => { setTheme(next); setDirty(true); }} onStarter={replaceWithTemplate} onSection={(templateId) => addBlocks(createSectionTemplate(templateId, blocks.length + 1))} onBlock={(type) => addBlocks([createEmptyPageBlock(type, blocks.length + 1)])} />
             </div>
-          </aside>
-        </div>
+
+            <main className={`${mobileWorkspace === "preview" ? "block" : "hidden"} min-w-0 lg:block`}>
+              <section className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--mikke-line-soft)] px-3 py-2.5">
+                  <div><h2 className="text-sm font-bold">ページを見ながら編集</h2><p className="mt-0.5 text-[10px] text-[var(--mikke-muted)]">変更したい場所をプレビュー内で選べます</p></div>
+                  <div className="flex items-center gap-1">
+                    <DeviceButton active={device === "desktop"} label="PC" onClick={() => { setDevice("desktop"); setZoom(60); }} icon={<Laptop size={14} />} />
+                    <DeviceButton active={device === "tablet"} label="タブレット" onClick={() => { setDevice("tablet"); setZoom(75); }} icon={<Tablet size={14} />} />
+                    <DeviceButton active={device === "mobile"} label="スマホ" onClick={() => { setDevice("mobile"); setZoom(100); }} icon={<Smartphone size={14} />} />
+                    <select aria-label="プレビュー倍率" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} className="ml-1 h-8 rounded-lg border border-[var(--mikke-line)] bg-white px-2 text-[11px] font-bold"><option value={50}>50%</option><option value={60}>60%</option><option value={75}>75%</option><option value={100}>100%</option></select>
+                  </div>
+                </div>
+                <div className="min-h-[620px] overflow-auto bg-[var(--mikke-surface-soft)] p-3 sm:p-6">
+                  {blocks.length === 0 ? <div className="grid min-h-[560px] place-items-center"><div className="max-w-sm text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-[var(--mikke-accent)] shadow-sm"><LayoutTemplate size={22} /></span><p className="mt-4 font-bold">最初のデザインを選びましょう</p><p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">「追加・デザイン」からテンプレートを選ぶと、すぐに編集できます。</p><button type="button" onClick={() => { setSidebarPanel("templates"); setMobileWorkspace("add"); }} className="mt-4 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">テンプレートを見る</button></div></div> : (
+                    <div className="mx-auto w-max max-w-none transition-all" style={{ zoom: zoom / 100 }}>
+                      <div className="overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-black/5" style={{ width: device === "desktop" ? 1280 : device === "tablet" ? 768 : 390 }}>
+                        <PageRenderer document={previewDocument} theme={theme} cmsContent={cmsContent} viewport={device} editor={{ selectedBlockId, onSelectBlock: (blockId) => { setSelectedBlockId(blockId); if (window.innerWidth < 1024) setMobileWorkspace("edit"); } }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </main>
+
+            <div className={`${mobileWorkspace === "edit" ? "block" : "hidden"} ${mobileWorkspace === "add" ? "lg:hidden" : "lg:block"} xl:block`}>
+              <BlockInspector siteId={site.id} blocks={blocks} selectedBlockId={selectedBlockId} onSelectBlock={setSelectedBlockId} cmsContent={cmsContent} onChangeBlock={updateBlock} onMoveBlock={moveBlock} onDuplicate={(block, index) => { const copy = renewNestedIds(block); commitBlocks([...blocks.slice(0, index + 1), copy, ...blocks.slice(index + 1)]); setSelectedBlockId(copy.id); }} onDelete={(blockId) => { commitBlocks(blocks.filter((item) => item.id !== blockId)); setSelectedBlockId(null); }} />
+            </div>
+          </div>
+        </>
       )}
     </MikkeAppShell>
   );
 }
 
-function BuilderSidebar({ theme, onThemeChange, onStarter, onSection, onBlock }: { theme: PageSiteTheme; onThemeChange: (theme: PageSiteTheme) => void; onStarter: (id: PageStarterTemplateId) => void; onSection: (id: PageSectionTemplateId) => void; onBlock: (type: PageBlock["type"]) => void }) {
-  return <aside className="space-y-4 min-[1180px]:sticky min-[1180px]:top-24 min-[1180px]:self-start">
-    <details open className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"><summary className="cursor-pointer text-sm font-bold">サイトデザイン</summary><div className="mt-3 grid gap-3"><label className="block"><span className="text-xs font-bold">雰囲気</span><select value={theme.presetId} onChange={(event) => onThemeChange({ ...pageThemePresets[event.target.value as keyof typeof pageThemePresets] })} className={inputClass}><option value="gothic">すっきり</option><option value="soft">やわらかい</option><option value="serif">上品</option><option value="modern">モダン</option></select></label><div className="grid grid-cols-2 gap-2"><ColorField label="メイン" value={theme.primaryColor} onChange={(primaryColor) => onThemeChange({ ...theme, primaryColor })} /><ColorField label="アクセント" value={theme.accentColor} onChange={(accentColor) => onThemeChange({ ...theme, accentColor })} /><ColorField label="背景" value={theme.backgroundColor} onChange={(backgroundColor) => onThemeChange({ ...theme, backgroundColor })} /><ColorField label="文字" value={theme.textColor} onChange={(textColor) => onThemeChange({ ...theme, textColor })} /></div><label className="block"><span className="text-xs font-bold">コンテンツ幅</span><select value={theme.contentWidth} onChange={(event) => onThemeChange({ ...theme, contentWidth: event.target.value as PageSiteTheme["contentWidth"] })} className={inputClass}><option value="narrow">読み物向け</option><option value="standard">標準</option><option value="wide">ワイド</option></select></label></div></details>
-    <details className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"><summary className="cursor-pointer text-sm font-bold">ページテンプレート</summary><div className="mt-3 grid gap-2">{starterTemplates.map((template) => <button key={template.id} type="button" onClick={() => onStarter(template.id)} className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 text-left"><strong className="block text-xs">{template.label}</strong><span className="mt-1 block text-[10px] leading-4 text-[var(--mikke-muted)]">{template.helper}</span></button>)}</div></details>
-    <details open className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"><summary className="cursor-pointer text-sm font-bold">セクションテンプレート</summary><div className="mt-3 grid grid-cols-2 gap-2">{sectionTemplates.map((template) => <button key={template.id} type="button" onClick={() => onSection(template.id)} className="rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold">{template.label}</button>)}</div></details>
-    <details className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"><summary className="cursor-pointer text-sm font-bold">パーツを追加</summary><div className="mt-3 grid grid-cols-2 gap-2">{pageBlockChoices.map((choice) => { const Icon = choice.icon; return <button key={choice.type} type="button" onClick={() => onBlock(choice.type)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-[11px] font-bold"><Icon size={14} />{choice.label}</button>; })}</div></details>
+type BuilderPanel = "templates" | "sections" | "parts" | "design";
+
+function BuilderSidebar({ panel, onPanelChange, theme, onThemeChange, onStarter, onSection, onBlock }: { panel: BuilderPanel; onPanelChange: (panel: BuilderPanel) => void; theme: PageSiteTheme; onThemeChange: (theme: PageSiteTheme) => void; onStarter: (id: PageStarterTemplateId) => void; onSection: (id: PageSectionTemplateId) => void; onBlock: (type: PageBlock["type"]) => void }) {
+  const tabs: { id: BuilderPanel; label: string; icon: React.ReactNode }[] = [
+    { id: "templates", label: "ひな形", icon: <LayoutTemplate size={15} /> },
+    { id: "sections", label: "セット", icon: <ListPlus size={15} /> },
+    { id: "parts", label: "パーツ", icon: <PanelRight size={15} /> },
+    { id: "design", label: "デザイン", icon: <Palette size={15} /> }
+  ];
+  return <aside className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm xl:sticky xl:top-24 xl:self-start">
+    <nav className="grid grid-cols-4 border-b border-[var(--mikke-line-soft)] p-1.5">{tabs.map((tab) => <button key={tab.id} type="button" onClick={() => onPanelChange(tab.id)} className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[9px] font-bold ${panel === tab.id ? "bg-[var(--mikke-primary)] text-white" : "text-[var(--mikke-muted)] hover:bg-[var(--mikke-surface-soft)]"}`}>{tab.icon}<span>{tab.label}</span></button>)}</nav>
+    <div className="max-h-[calc(100vh-190px)] overflow-y-auto p-3">
+      {panel === "templates" ? <div><h2 className="text-sm font-bold">ページのひな形</h2><p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">ページ全体を置き換えます。</p><div className="mt-3 grid gap-3">{starterTemplates.map((template) => <button key={template.id} type="button" onClick={() => onStarter(template.id)} className="rounded-xl border border-[var(--mikke-line)] p-2 text-left transition hover:border-[var(--mikke-accent)]"><PageTemplatePreview templateId={template.id} /><strong className="mt-2 block text-xs">{template.label}</strong><span className="mt-1 block text-[10px] leading-4 text-[var(--mikke-muted)]">{template.helper}</span></button>)}</div></div> : null}
+      {panel === "sections" ? <div><h2 className="text-sm font-bold">よく使うページ要素</h2><p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">まとまった内容をワンタップで追加。</p><div className="mt-3 grid grid-cols-2 gap-2">{sectionTemplates.map((template) => <button key={template.id} type="button" onClick={() => onSection(template.id)} className="min-h-20 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-2 py-3 text-xs font-bold transition hover:border-[var(--mikke-accent)] hover:bg-white">{template.label}</button>)}</div></div> : null}
+      {panel === "parts" ? <div><h2 className="text-sm font-bold">パーツを1つ追加</h2><p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">必要なものだけ自由に組み合わせます。</p><div className="mt-3 grid grid-cols-2 gap-2">{pageBlockChoices.map((choice) => { const Icon = choice.icon; return <button key={choice.type} type="button" onClick={() => onBlock(choice.type)} className="inline-flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-[10px] font-bold text-[var(--mikke-accent)] hover:border-[var(--mikke-accent)]"><Icon size={17} /><span className="text-[var(--mikke-text)]">{choice.label}</span></button>; })}</div></div> : null}
+      {panel === "design" ? <div><h2 className="text-sm font-bold">サイトデザイン</h2><p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">全ページ共通の雰囲気を整えます。</p><div className="mt-4 grid gap-4"><label className="block"><span className="text-xs font-bold">雰囲気</span><select value={theme.presetId} onChange={(event) => onThemeChange({ ...pageThemePresets[event.target.value as keyof typeof pageThemePresets] })} className={inputClass}><option value="gothic">すっきり</option><option value="soft">やわらかい</option><option value="serif">上品</option><option value="modern">モダン</option></select></label><div className="grid grid-cols-2 gap-2"><ColorField label="メイン" value={theme.primaryColor} onChange={(primaryColor) => onThemeChange({ ...theme, primaryColor })} /><ColorField label="アクセント" value={theme.accentColor} onChange={(accentColor) => onThemeChange({ ...theme, accentColor })} /><ColorField label="背景" value={theme.backgroundColor} onChange={(backgroundColor) => onThemeChange({ ...theme, backgroundColor })} /><ColorField label="文字" value={theme.textColor} onChange={(textColor) => onThemeChange({ ...theme, textColor })} /></div><label className="block"><span className="text-xs font-bold">コンテンツ幅</span><select value={theme.contentWidth} onChange={(event) => onThemeChange({ ...theme, contentWidth: event.target.value as PageSiteTheme["contentWidth"] })} className={inputClass}><option value="narrow">読み物向け</option><option value="standard">標準</option><option value="wide">ワイド</option></select></label></div></div> : null}
+    </div>
+  </aside>;
+}
+
+function BlockInspector({ siteId, blocks, selectedBlockId, onSelectBlock, cmsContent, onChangeBlock, onMoveBlock, onDuplicate, onDelete }: { siteId: string; blocks: PageBlock[]; selectedBlockId: string | null; onSelectBlock: (id: string | null) => void; cmsContent: Record<PageCmsSource, PageCmsItem[]>; onChangeBlock: (id: string, block: PageBlock) => void; onMoveBlock: (index: number, direction: -1 | 1) => void; onDuplicate: (block: PageBlock, index: number) => void; onDelete: (id: string) => void }) {
+  const index = blocks.findIndex((block) => block.id === selectedBlockId);
+  const block = index >= 0 ? blocks[index] : null;
+  return <aside className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm xl:sticky xl:top-24 xl:self-start">
+    <div className="border-b border-[var(--mikke-line-soft)] px-4 py-3"><div className="flex items-center gap-2"><PanelRight size={16} className="text-[var(--mikke-accent)]" /><h2 className="text-sm font-bold">内容を編集</h2></div><p className="mt-1 text-[10px] text-[var(--mikke-muted)]">プレビューをクリックすると、その場所を編集できます。</p></div>
+    <div className="max-h-[calc(100vh-210px)] overflow-y-auto p-3">
+      {!blocks.length ? <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-5 text-center text-xs leading-5 text-[var(--mikke-muted)]">まだ編集するパーツがありません。追加メニューから選んでください。</div> : !block ? <div><p className="px-1 text-xs font-bold">編集する場所を選択</p><div className="mt-2 space-y-1.5">{blocks.map((item, itemIndex) => { const label = pageBlockChoices.find((choice) => choice.type === item.type)?.label ?? "ブロック"; return <button key={item.id} type="button" onClick={() => onSelectBlock(item.id)} className="flex w-full items-center justify-between rounded-xl border border-[var(--mikke-line)] px-3 py-3 text-left text-xs font-bold hover:border-[var(--mikke-accent)]"><span>{itemIndex + 1}. {label}</span>{item.hidden ? <EyeOff size={13} className="text-[var(--mikke-muted)]" /> : <ArrowRight size={13} />}</button>; })}</div></div> : <div>
+        <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--mikke-primary-soft)] px-3 py-2"><div><p className="text-[10px] font-bold text-[var(--mikke-accent)]">選択中</p><p className="text-xs font-bold">{index + 1}. {pageBlockChoices.find((choice) => choice.type === block.type)?.label ?? "ブロック"}</p></div><button type="button" onClick={() => onSelectBlock(null)} className="rounded-lg border border-[var(--mikke-line)] bg-white px-2 py-1.5 text-[10px] font-bold">一覧</button></div>
+        <div className="mt-4"><PageBlockFields block={block} siteId={siteId} cmsContent={cmsContent} onChange={(next) => onChangeBlock(block.id, next)} /><PageBlockStyleFields block={block} onChange={(next) => onChangeBlock(block.id, next)} /></div>
+        <div className="sticky bottom-0 mt-4 flex items-center justify-end gap-1 border-t border-[var(--mikke-line-soft)] bg-white py-3">
+          <button type="button" onClick={() => onMoveBlock(index, -1)} disabled={index === 0} aria-label="上へ" className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowUp size={14} /></button>
+          <button type="button" onClick={() => onMoveBlock(index, 1)} disabled={index === blocks.length - 1} aria-label="下へ" className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ArrowDown size={14} /></button>
+          <button type="button" onClick={() => onChangeBlock(block.id, { ...block, hidden: !block.hidden })} aria-label={block.hidden ? "表示する" : "非表示にする"} className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)]">{block.hidden ? <Eye size={14} /> : <EyeOff size={14} />}</button>
+          <button type="button" onClick={() => onDuplicate(block, index)} aria-label="複製" className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)]"><Copy size={14} /></button>
+          <button type="button" onClick={() => onDelete(block.id)} aria-label="削除" className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-danger)]"><Trash2 size={14} /></button>
+        </div>
+      </div>}
+    </div>
   </aside>;
 }
 
@@ -281,6 +333,7 @@ function HtmlPageEditor({ value, onChange, preview }: { value: PageHtmlDocument;
   return <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(420px,.8fr)_minmax(0,1fr)]"><section className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm"><div><h2 className="text-lg font-bold">AI HTMLページ</h2><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">AIが作ったHTML・CSS・JavaScriptを貼り付けます。コードはmikkeOSから隔離して表示されます。</p></div><div className={`rounded-xl border p-3 text-xs leading-5 ${payload.hasEmbeddedData || payload.bytes > PAGE_HTML_MAX_BYTES ? "border-[var(--mikke-danger)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-danger)]" : "border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] text-[var(--mikke-accent)]"}`}><strong>コード容量 {usedKb}KB / {limitKb}KB</strong><p>HTML文字は小容量です。外部画像・動画は表示元の通信を使い、Mikke MediaのURLならSupabase通信として計上されます。</p><p>base64画像・フォントの直接埋め込みは保存できません。画像はMikke Mediaを使ってください。</p></div><CodeField label="HTML" value={value.html} rows={12} onChange={(html) => onChange({ ...value, html })} /><CodeField label="CSS" value={value.css} rows={10} onChange={(css) => onChange({ ...value, css })} /><label className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold"><input type="checkbox" checked={value.allowScripts} onChange={(event) => onChange({ ...value, allowScripts: event.target.checked })} /> JavaScriptを有効にする</label>{value.allowScripts ? <CodeField label="JavaScript" value={value.javascript} rows={8} onChange={(javascript) => onChange({ ...value, javascript })} /> : null}</section><aside className="xl:sticky xl:top-24 xl:self-start"><div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm"><div className="border-b border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">安全プレビュー</div>{preview}</div></aside></div>;
 }
 
+function WorkspaceButton({ active, label, icon, onClick }: { active: boolean; label: string; icon: React.ReactNode; onClick: () => void }) { return <button type="button" onClick={onClick} className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-2 text-xs font-bold ${active ? "bg-[var(--mikke-primary)] text-white" : "text-[var(--mikke-muted)]"}`}>{icon}{label}</button>; }
 function DeviceButton({ active, label, onClick, icon }: { active: boolean; label: string; onClick: () => void; icon: React.ReactNode }) { return <button type="button" onClick={onClick} aria-label={label} className={`grid h-8 w-8 place-items-center rounded-lg border ${active ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>{icon}</button>; }
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) { return <label className="block"><span className="text-[10px] font-bold">{label}</span><input type="color" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 h-10 w-full cursor-pointer rounded-lg border border-[var(--mikke-line)] bg-white p-1" /></label>; }
 function CodeField({ label, value, rows, onChange }: { label: string; value: string; rows: number; onChange: (value: string) => void }) { return <label className="block"><span className="text-xs font-bold">{label}</span><textarea spellCheck={false} value={value} onChange={(event) => onChange(event.target.value)} rows={rows} className={`${inputClass} resize-y font-mono text-xs leading-5`} /></label>; }

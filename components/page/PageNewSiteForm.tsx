@@ -1,10 +1,11 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Save } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ArrowLeft, Check, Save, Sparkles } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
+import { PageTemplatePreview } from "./PageTemplatePreview";
 import { createPageSite, normalizePageSiteSlug } from "@/lib/page/store";
 import type { PageFontPreset } from "@/lib/page/types";
 import type { PageStarterTemplateId } from "@/lib/page/templates";
@@ -12,8 +13,17 @@ import type { PageStarterTemplateId } from "@/lib/page/templates";
 const inputClass =
   "mt-1.5 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
 
+const templates = [
+  ["company", "会社・団体", "紹介、会社概要、問い合わせ導線"],
+  ["service", "サービス", "特徴、CMS、お問い合わせ"],
+  ["portfolio", "作品・実績", "ギャラリーと活動CMS"],
+  ["connect-partners", "CMSポータル", "mikkeIDの複数アプリをまとめる"],
+  ["blank", "白紙", "自分で一から組み立てる"]
+] as const;
+
 export function PageNewSiteForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile } = useAuth();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -22,6 +32,11 @@ export function PageNewSiteForm() {
   const [themePreset, setThemePreset] = useState<PageFontPreset>("gothic");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const requested = searchParams.get("template");
+    if (templates.some(([id]) => id === requested)) setTemplateId(requested as PageStarterTemplateId);
+  }, [searchParams]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -51,49 +66,45 @@ export function PageNewSiteForm() {
   }
 
   return (
-    <form onSubmit={submit} className="mx-auto max-w-3xl">
-      <section className="rounded-3xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm sm:p-6">
+    <form onSubmit={submit} className="mx-auto max-w-6xl">
+      <section className="rounded-3xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm sm:p-7">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="mt-1 text-xl font-bold tracking-normal">サイトの基本情報</h2>
+            <p className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--mikke-accent)]"><Sparkles size={14} /> 3ステップで下書き完成</p>
+            <h2 className="mt-2 text-xl font-bold tracking-normal sm:text-2xl">どんなサイトを作りますか？</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">
               テンプレートと雰囲気を選ぶと、編集できるホームページの下書きが作られます。外部への公開は行いません。
             </p>
           </div>
         </div>
 
-        <div className="mt-6 grid gap-5">
-          <label className="block">
-            <span className="text-xs font-bold text-[var(--mikke-text)]">
-              サイト名<span className="ml-1 text-[var(--mikke-accent)]">*</span>
-            </span>
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              className={inputClass}
-              placeholder="例: むすび商店"
-              maxLength={80}
-              required
-            />
-          </label>
-
+        <div className="mt-7 grid gap-7 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)]">
+          <div className="space-y-6">
           <fieldset>
-            <legend className="text-xs font-bold text-[var(--mikke-text)]">最初のページ</legend>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {([
-                ["company", "会社・団体", "紹介、会社概要、問い合わせ導線"],
-                ["service", "サービス", "特徴、CMS、お問い合わせ"],
-                ["portfolio", "作品・実績", "ギャラリーと活動CMS"],
-                ["connect-partners", "Connect / Partners", "複数アプリCMSの構築例"],
-                ["blank", "白紙", "自分で一から組み立てる"]
-              ] as const).map(([value, label, helper]) => (
-                <label key={value} className={`cursor-pointer rounded-xl border p-3 ${templateId === value ? "border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
+            <legend className="text-xs font-bold text-[var(--mikke-text)]">1. 最初のデザイン</legend>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {templates.map(([value, label, helper]) => (
+                <label key={value} className={`relative cursor-pointer rounded-2xl border p-2.5 transition ${templateId === value ? "border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] shadow-sm" : "border-[var(--mikke-line)] bg-white hover:border-[var(--mikke-primary-border)]"}`}>
                   <input type="radio" name="template" value={value} checked={templateId === value} onChange={() => setTemplateId(value)} className="sr-only" />
-                  <span className="block text-sm font-bold">{label}</span><span className="mt-1 block text-xs text-[var(--mikke-muted)]">{helper}</span>
+                  <PageTemplatePreview templateId={value} selected={templateId === value} />
+                  {templateId === value ? <span className="absolute right-4 top-4 grid h-6 w-6 place-items-center rounded-full bg-[var(--mikke-accent)] text-white shadow-sm"><Check size={14} /></span> : null}
+                  <span className="mt-2 block text-sm font-bold">{label}</span><span className="mt-1 block text-xs text-[var(--mikke-muted)]">{helper}</span>
                 </label>
               ))}
             </div>
           </fieldset>
+
+          </div>
+
+          <aside className="space-y-5 rounded-2xl bg-[var(--mikke-surface-soft)] p-4 sm:p-5 lg:sticky lg:top-24 lg:self-start">
+            <div><p className="text-xs font-bold text-[var(--mikke-accent)]">2. サイト情報</p><h3 className="mt-1 font-bold">あとから変更できます</h3></div>
+
+          <label className="block">
+            <span className="text-xs font-bold text-[var(--mikke-text)]">
+              サイト名<span className="ml-1 text-[var(--mikke-accent)]">*</span>
+            </span>
+            <input value={name} onChange={(event) => setName(event.target.value)} className={inputClass} placeholder="例: むすび商店" maxLength={80} required />
+          </label>
 
           <label className="block">
             <span className="text-xs font-bold text-[var(--mikke-text)]">デザインの雰囲気</span>
@@ -144,6 +155,7 @@ export function PageNewSiteForm() {
               半角英小文字・数字・ハイフンを使います。公開URLは公開機能の実装時に決めます。
             </span>
           </label>
+          </aside>
         </div>
 
         {message ? (
