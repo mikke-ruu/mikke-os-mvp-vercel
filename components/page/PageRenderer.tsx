@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
 import type { PageCmsItem } from "@/lib/page/cms-selectors";
 import { buildSandboxedHtmlDocument, normalizePageEmbedUrl } from "@/lib/page/html";
+import { buildPageFontFamily, resolvePageThemeFonts } from "@/lib/page/fonts";
 import type {
   PageBlock,
   PageCmsBlock,
@@ -12,6 +13,7 @@ import type {
   PageMediaItem,
   PageSiteTheme
 } from "@/lib/page/types";
+import { PageFontLoader } from "./PageFontLoader";
 import styles from "./PageRenderer.module.css";
 
 const sourceLabels: Record<PageCmsSource, string> = {
@@ -37,16 +39,22 @@ function animationClass(block: PageBlock) {
   return "";
 }
 
-function blockShellStyle(block: PageBlock): CSSProperties {
+function blockShellStyle(block: PageBlock, theme: PageSiteTheme): CSSProperties {
   const spacing = block.style?.spacing ?? "normal";
   const radius = block.style?.radius ?? "medium";
-  return {
+  const style: CSSProperties = {
     backgroundColor: block.style?.backgroundColor || "transparent",
     color: block.style?.textColor || "inherit",
     textAlign: block.style?.textAlign ?? "left",
     padding: spacing === "compact" ? "12px" : spacing === "spacious" ? "36px" : "22px",
     borderRadius: radius === "none" ? 0 : radius === "large" ? "28px" : "16px"
   };
+  if (block.style?.jpFontId || block.style?.latinFontId) {
+    const overrideFamily = buildPageFontFamily(block.style.jpFontId, block.style.latinFontId, theme.bodyFont);
+    style.fontFamily = overrideFamily;
+    (style as CSSProperties & Record<string, string>)["--page-heading-font"] = overrideFamily;
+  }
+  return style;
 }
 
 function imageSource(item: Pick<PageMediaItem, "asset" | "imageUrl">) {
@@ -69,17 +77,19 @@ export function PageRenderer({ document, theme, cmsContent, compact = false, edi
     return <iframe title="AI HTMLページ" srcDoc={srcDoc} sandbox={document.htmlDocument.allowScripts ? "allow-scripts allow-forms allow-popups" : ""} className="h-[720px] w-full border-0 bg-white" />;
   }
 
+  const fonts = resolvePageThemeFonts(theme);
   const themeStyle = {
     backgroundColor: theme.backgroundColor,
     color: theme.textColor,
-    fontFamily: theme.bodyFont,
+    fontFamily: fonts.body,
     "--page-primary": theme.primaryColor,
     "--page-accent": theme.accentColor,
-    "--page-heading-font": theme.headingFont
+    "--page-heading-font": fonts.heading
   } as CSSProperties;
 
   return (
     <div style={themeStyle} className={compact ? "min-h-72" : "min-h-screen"}>
+      <PageFontLoader theme={theme} blocks={document.blocks} />
       <div className={`mx-auto space-y-5 ${widthClass[theme.contentWidth]} ${compact ? "p-4" : "px-4 py-10 sm:px-8 sm:py-14"}`}>
         {document.blocks.filter((block) => !block.hidden).length === 0 ? (
           <p className="py-20 text-center text-sm opacity-60">テンプレートまたはブロックを追加してください。</p>
@@ -92,7 +102,7 @@ export function PageRenderer({ document, theme, cmsContent, compact = false, edi
               editor.onSelectBlock(block.id);
             } : undefined}
             className={`${animationClass(block)} ${editor ? "group relative cursor-pointer outline outline-1 -outline-offset-1 transition hover:outline-[var(--mikke-accent)]" : ""} ${editor?.selectedBlockId === block.id ? "outline-2 outline-[var(--mikke-accent)] ring-4 ring-[var(--mikke-accent-soft)]" : editor ? "outline-transparent" : ""}`}
-            style={blockShellStyle(block)}
+            style={blockShellStyle(block, theme)}
           >
             {editor ? <span className={`pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-[var(--mikke-primary)] px-2 py-1 text-[10px] font-bold text-white shadow-sm ${editor.selectedBlockId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>クリックして編集</span> : null}
             <RenderedBlock block={block} cmsContent={cmsContent} theme={theme} compact={compact} viewport={viewport} />

@@ -26,6 +26,27 @@ export type PageRadius = "none" | "medium" | "large";
 export type PageAnimation = "none" | "fade" | "fade-up" | "zoom" | "slide-left" | "slide-right";
 export type PageFontPreset = "gothic" | "soft" | "serif" | "modern";
 
+export type PageJpFontId =
+  | "noto-sans"
+  | "noto-serif"
+  | "zen-kaku"
+  | "zen-old"
+  | "zen-maru"
+  | "mplus-round"
+  | "shippori"
+  | "biz-ud";
+
+export type PageLatinFontId =
+  | "none"
+  | "inter"
+  | "montserrat"
+  | "poppins"
+  | "playfair"
+  | "cormorant"
+  | "dm-serif"
+  | "josefin"
+  | "caveat";
+
 export type PageBlockStyle = {
   backgroundColor?: string;
   textColor?: string;
@@ -33,6 +54,9 @@ export type PageBlockStyle = {
   spacing?: PageSpacing;
   radius?: PageRadius;
   animation?: PageAnimation;
+  /** このブロックだけ見出し・本文フォントを上書きする（未指定ならサイト全体の設定を継承） */
+  jpFontId?: PageJpFontId;
+  latinFontId?: PageLatinFontId;
 };
 
 export type PageAssetRef = {
@@ -226,8 +250,14 @@ export type PageSiteTheme = {
   accentColor: string;
   backgroundColor: string;
   textColor: string;
+  /** 旧仕様のフォント指定（文字列）。新しいheading/bodyのJp/LatinFontIdが未指定のときのフォールバック */
   headingFont: string;
   bodyFont: string;
+  /** 新仕様: 日本語×欧文フォントの自由組合せ（省略時はheadingFont/bodyFontへフォールバック） */
+  headingJpFontId?: PageJpFontId;
+  headingLatinFontId?: PageLatinFontId;
+  bodyJpFontId?: PageJpFontId;
+  bodyLatinFontId?: PageLatinFontId;
   contentWidth: "narrow" | "standard" | "wide";
   buttonStyle: "rounded" | "pill" | "square";
 };

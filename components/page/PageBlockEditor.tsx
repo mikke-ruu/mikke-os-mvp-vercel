@@ -20,11 +20,14 @@ import {
 } from "lucide-react";
 import { PageImageUploader } from "./PageImageUploader";
 import { pageCmsSourceInfo, type PageCmsItem } from "@/lib/page/cms-selectors";
+import { pageJpFontOrder, pageJpFonts, pageLatinFontOrder, pageLatinFonts } from "@/lib/page/fonts";
 import type {
   PageAssetRef,
   PageBlock,
   PageBlockType,
   PageCmsSource,
+  PageJpFontId,
+  PageLatinFontId,
   PageMediaItem
 } from "@/lib/page/types";
 
@@ -117,9 +120,29 @@ export function PageBlockFields({ block, siteId, cmsContent, onChange }: {
   return null;
 }
 
+const INHERIT_FONT = "__inherit";
+
 export function PageBlockStyleFields({ block, onChange }: { block: PageBlock; onChange: (next: PageBlock) => void }) {
   const style = block.style ?? {};
-  return <div className="grid gap-3 border-t border-[var(--mikke-line-soft)] pt-4"><p className="text-xs font-bold">デザインと動き</p><div className="grid gap-3 sm:grid-cols-2"><Select label="文字位置" value={style.textAlign ?? "left"} onChange={(textAlign) => onChange({ ...block, style: { ...style, textAlign: textAlign as "left" | "center" | "right" } })} options={[{ value: "left", label: "左" }, { value: "center", label: "中央" }, { value: "right", label: "右" }]} /><Select label="余白" value={style.spacing ?? "normal"} onChange={(spacing) => onChange({ ...block, style: { ...style, spacing: spacing as "compact" | "normal" | "spacious" } })} options={[{ value: "compact", label: "コンパクト" }, { value: "normal", label: "標準" }, { value: "spacious", label: "ゆったり" }]} /><Select label="角丸" value={style.radius ?? "medium"} onChange={(radius) => onChange({ ...block, style: { ...style, radius: radius as "none" | "medium" | "large" } })} options={[{ value: "none", label: "なし" }, { value: "medium", label: "標準" }, { value: "large", label: "大きめ" }]} /><Select label="アニメーション" value={style.animation ?? "none"} onChange={(animation) => onChange({ ...block, style: { ...style, animation: animation as NonNullable<typeof style.animation> } })} options={[{ value: "none", label: "なし" }, { value: "fade", label: "フェード" }, { value: "fade-up", label: "下から表示" }, { value: "zoom", label: "ふわっと拡大" }, { value: "slide-left", label: "右から" }, { value: "slide-right", label: "左から" }]} /><ColorInput label="背景色" value={style.backgroundColor ?? "#ffffff"} onChange={(backgroundColor) => onChange({ ...block, style: { ...style, backgroundColor } })} /><ColorInput label="文字色" value={style.textColor ?? "#17203a"} onChange={(textColor) => onChange({ ...block, style: { ...style, textColor } })} /></div></div>;
+  return <div className="grid gap-3 border-t border-[var(--mikke-line-soft)] pt-4"><p className="text-xs font-bold">デザインと動き</p><div className="grid gap-3 sm:grid-cols-2"><Select label="文字位置" value={style.textAlign ?? "left"} onChange={(textAlign) => onChange({ ...block, style: { ...style, textAlign: textAlign as "left" | "center" | "right" } })} options={[{ value: "left", label: "左" }, { value: "center", label: "中央" }, { value: "right", label: "右" }]} /><Select label="余白" value={style.spacing ?? "normal"} onChange={(spacing) => onChange({ ...block, style: { ...style, spacing: spacing as "compact" | "normal" | "spacious" } })} options={[{ value: "compact", label: "コンパクト" }, { value: "normal", label: "標準" }, { value: "spacious", label: "ゆったり" }]} /><Select label="角丸" value={style.radius ?? "medium"} onChange={(radius) => onChange({ ...block, style: { ...style, radius: radius as "none" | "medium" | "large" } })} options={[{ value: "none", label: "なし" }, { value: "medium", label: "標準" }, { value: "large", label: "大きめ" }]} /><Select label="アニメーション" value={style.animation ?? "none"} onChange={(animation) => onChange({ ...block, style: { ...style, animation: animation as NonNullable<typeof style.animation> } })} options={[{ value: "none", label: "なし" }, { value: "fade", label: "フェード" }, { value: "fade-up", label: "下から表示" }, { value: "zoom", label: "ふわっと拡大" }, { value: "slide-left", label: "右から" }, { value: "slide-right", label: "左から" }]} /><ColorInput label="背景色" value={style.backgroundColor ?? "#ffffff"} onChange={(backgroundColor) => onChange({ ...block, style: { ...style, backgroundColor } })} /><ColorInput label="文字色" value={style.textColor ?? "#17203a"} onChange={(textColor) => onChange({ ...block, style: { ...style, textColor } })} /></div>
+    <div className="mt-1 grid gap-3 border-t border-[var(--mikke-line-soft)] pt-4">
+      <p className="text-xs font-bold">フォント（このブロックだけ変更）</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Select
+          label="日本語フォント"
+          value={style.jpFontId ?? INHERIT_FONT}
+          onChange={(value) => onChange({ ...block, style: { ...style, jpFontId: value === INHERIT_FONT ? undefined : (value as PageJpFontId) } })}
+          options={[{ value: INHERIT_FONT, label: "サイト全体に合わせる" }, ...pageJpFontOrder.map((id) => ({ value: id, label: pageJpFonts[id].label }))]}
+        />
+        <Select
+          label="欧文フォント"
+          value={style.latinFontId ?? INHERIT_FONT}
+          onChange={(value) => onChange({ ...block, style: { ...style, latinFontId: value === INHERIT_FONT ? undefined : (value as PageLatinFontId) } })}
+          options={[{ value: INHERIT_FONT, label: "サイト全体に合わせる" }, ...pageLatinFontOrder.map((id) => ({ value: id, label: pageLatinFonts[id].label }))]}
+        />
+      </div>
+    </div>
+  </div>;
 }
 
 function TextInput({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) { return <label className="block"><span className="text-xs font-bold">{label}</span><input value={value} onChange={(event) => onChange(event.target.value)} className={inputClass} placeholder={placeholder} /></label>; }

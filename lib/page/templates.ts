@@ -26,6 +26,10 @@ export const pageThemePresets: Record<PageFontPreset, PageSiteTheme> = {
     textColor: "#17203a",
     headingFont: '"Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif',
     bodyFont: '"Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif',
+    headingJpFontId: "noto-sans",
+    headingLatinFontId: "none",
+    bodyJpFontId: "noto-sans",
+    bodyLatinFontId: "none",
     contentWidth: "standard",
     buttonStyle: "rounded"
   },
@@ -37,6 +41,10 @@ export const pageThemePresets: Record<PageFontPreset, PageSiteTheme> = {
     textColor: "#443b37",
     headingFont: '"Zen Kaku Gothic New", "Noto Sans JP", sans-serif',
     bodyFont: '"Noto Sans JP", sans-serif',
+    headingJpFontId: "zen-kaku",
+    headingLatinFontId: "none",
+    bodyJpFontId: "noto-sans",
+    bodyLatinFontId: "none",
     contentWidth: "standard",
     buttonStyle: "pill"
   },
@@ -48,6 +56,10 @@ export const pageThemePresets: Record<PageFontPreset, PageSiteTheme> = {
     textColor: "#282d29",
     headingFont: '"Noto Serif JP", "Yu Mincho", serif',
     bodyFont: '"Noto Sans JP", sans-serif',
+    headingJpFontId: "noto-serif",
+    headingLatinFontId: "none",
+    bodyJpFontId: "noto-sans",
+    bodyLatinFontId: "none",
     contentWidth: "narrow",
     buttonStyle: "square"
   },
@@ -59,6 +71,10 @@ export const pageThemePresets: Record<PageFontPreset, PageSiteTheme> = {
     textColor: "#111827",
     headingFont: 'Inter, "Noto Sans JP", sans-serif',
     bodyFont: 'Inter, "Noto Sans JP", sans-serif',
+    headingJpFontId: "noto-sans",
+    headingLatinFontId: "inter",
+    bodyJpFontId: "noto-sans",
+    bodyLatinFontId: "inter",
     contentWidth: "wide",
     buttonStyle: "rounded"
   }

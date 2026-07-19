@@ -89,6 +89,18 @@ export const pageCmsSourceInfo: Record<PageCmsSource, PageCmsSourceInfo> = {
   }
 };
 
+/** テンプレートカード等の縮小プレビュー用。CMSブロックは「表示候補なし」の空状態で描画される。 */
+export const emptyPageCmsContent: Record<PageCmsSource, PageCmsItem[]> = {
+  story: [],
+  item_studio: [],
+  event: [],
+  academy: [],
+  session: [],
+  order: [],
+  fund: [],
+  community: []
+};
+
 export function usePageCmsContent(ownerProfileId?: string) {
   const { items } = useItemStudio();
   const { events } = useMikkeEvents();

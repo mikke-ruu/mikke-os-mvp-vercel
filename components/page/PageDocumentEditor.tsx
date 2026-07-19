@@ -10,6 +10,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  Globe2,
   Laptop,
   LayoutTemplate,
   ListPlus,
@@ -20,6 +21,7 @@ import {
   Smartphone,
   Tablet,
   Trash2,
+  Type,
   Undo2
 } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -31,11 +33,14 @@ import {
   createPageBuilderId,
   pageBlockChoices
 } from "./PageBlockEditor";
+import { PageDeviceFrame, type PageViewportDevice, type PageZoomMode } from "./PageDeviceFrame";
 import { PageRenderer } from "./PageRenderer";
 import { PageTemplatePreview } from "./PageTemplatePreview";
 import { analyzePageHtmlPayload, PAGE_HTML_MAX_BYTES } from "@/lib/page/html";
 import { syncMikkeMediaUsages } from "@/lib/media/client";
 import { usePageCmsContent, type PageCmsItem } from "@/lib/page/cms-selectors";
+import { pageJpFontOrder, pageJpFonts, pageLatinFontOrder, pageLatinFonts } from "@/lib/page/fonts";
+import { applyPagePaletteToTheme, findMatchingPagePaletteId, pagePalettes } from "@/lib/page/palettes";
 import {
   createSectionTemplate,
   createStarterTemplate,
@@ -57,6 +62,8 @@ import type {
   PageDocumentMode,
   PageHtmlDocument,
   PageCmsSource,
+  PageJpFontId,
+  PageLatinFontId,
   PageSite,
   PageSiteTheme
 } from "@/lib/page/types";
@@ -104,8 +111,8 @@ export function PageDocumentEditor() {
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [past, setPast] = useState<PageBlock[][]>([]);
   const [future, setFuture] = useState<PageBlock[][]>([]);
-  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [zoom, setZoom] = useState(60);
+  const [device, setDevice] = useState<PageViewportDevice>("desktop");
+  const [zoomMode, setZoomMode] = useState<PageZoomMode>("auto");
   const [mobileWorkspace, setMobileWorkspace] = useState<"preview" | "edit" | "add">("preview");
   const [sidebarPanel, setSidebarPanel] = useState<"templates" | "sections" | "parts" | "design">("sections");
   const [message, setMessage] = useState("");
@@ -211,6 +218,7 @@ export function PageDocumentEditor() {
         <Link href={`/apps/page/${site.id}`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold"><ArrowLeft size={15} /> ページ一覧へ</Link>
         <div className="flex flex-wrap items-center gap-2">
           <span className={`text-xs font-bold ${dirty ? "text-[var(--mikke-accent)]" : "text-[var(--mikke-success)]"}`}>{dirty ? "未保存の変更があります" : "保存済み"}</span>
+          <Link href={`/apps/page/${site.id}/preview?page=${document.slug}`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]"><Globe2 size={15} /> サイトを表示</Link>
           <button type="button" onClick={undo} disabled={!past.length || mode !== "builder"} aria-label="元に戻す" className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white disabled:opacity-30"><Undo2 size={16} /></button>
           <button type="button" onClick={redo} disabled={!future.length || mode !== "builder"} aria-label="やり直す" className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white disabled:opacity-30"><Redo2 size={16} /></button>
           <button type="button" onClick={() => void save()} className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white"><Save size={16} /> 下書きを保存</button>
@@ -247,19 +255,19 @@ export function PageDocumentEditor() {
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--mikke-line-soft)] px-3 py-2.5">
                   <div><h2 className="text-sm font-bold">ページを見ながら編集</h2><p className="mt-0.5 text-[10px] text-[var(--mikke-muted)]">変更したい場所をプレビュー内で選べます</p></div>
                   <div className="flex items-center gap-1">
-                    <DeviceButton active={device === "desktop"} label="PC" onClick={() => { setDevice("desktop"); setZoom(60); }} icon={<Laptop size={14} />} />
-                    <DeviceButton active={device === "tablet"} label="タブレット" onClick={() => { setDevice("tablet"); setZoom(75); }} icon={<Tablet size={14} />} />
-                    <DeviceButton active={device === "mobile"} label="スマホ" onClick={() => { setDevice("mobile"); setZoom(100); }} icon={<Smartphone size={14} />} />
-                    <select aria-label="プレビュー倍率" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} className="ml-1 h-8 rounded-lg border border-[var(--mikke-line)] bg-white px-2 text-[11px] font-bold"><option value={50}>50%</option><option value={60}>60%</option><option value={75}>75%</option><option value={100}>100%</option></select>
+                    <DeviceButton active={device === "desktop"} label="PC" onClick={() => setDevice("desktop")} icon={<Laptop size={14} />} />
+                    <DeviceButton active={device === "tablet"} label="タブレット" onClick={() => setDevice("tablet")} icon={<Tablet size={14} />} />
+                    <DeviceButton active={device === "mobile"} label="スマホ" onClick={() => setDevice("mobile")} icon={<Smartphone size={14} />} />
+                    <select aria-label="プレビュー倍率" value={String(zoomMode)} onChange={(event) => setZoomMode(event.target.value === "auto" ? "auto" : (Number(event.target.value) as PageZoomMode))} className="ml-1 h-8 rounded-lg border border-[var(--mikke-line)] bg-white px-2 text-[11px] font-bold"><option value="auto">自動</option><option value={50}>50%</option><option value={60}>60%</option><option value={75}>75%</option><option value={100}>100%</option></select>
                   </div>
                 </div>
                 <div className="min-h-[620px] overflow-auto bg-[var(--mikke-surface-soft)] p-3 sm:p-6">
                   {blocks.length === 0 ? <div className="grid min-h-[560px] place-items-center"><div className="max-w-sm text-center"><span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-white text-[var(--mikke-accent)] shadow-sm"><LayoutTemplate size={22} /></span><p className="mt-4 font-bold">最初のデザインを選びましょう</p><p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">「追加・デザイン」からテンプレートを選ぶと、すぐに編集できます。</p><button type="button" onClick={() => { setSidebarPanel("templates"); setMobileWorkspace("add"); }} className="mt-4 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">テンプレートを見る</button></div></div> : (
-                    <div className="mx-auto w-max max-w-none transition-all" style={{ zoom: zoom / 100 }}>
-                      <div className="overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-black/5" style={{ width: device === "desktop" ? 1280 : device === "tablet" ? 768 : 390 }}>
+                    <PageDeviceFrame device={device} zoomMode={zoomMode} mode="content">
+                      <div className="overflow-hidden rounded-xl bg-white shadow-xl ring-1 ring-black/5">
                         <PageRenderer document={previewDocument} theme={theme} cmsContent={cmsContent} viewport={device} editor={{ selectedBlockId, onSelectBlock: (blockId) => { setSelectedBlockId(blockId); if (window.innerWidth < 1024) setMobileWorkspace("edit"); } }} />
                       </div>
-                    </div>
+                    </PageDeviceFrame>
                   )}
                 </div>
               </section>
@@ -290,9 +298,86 @@ function BuilderSidebar({ panel, onPanelChange, theme, onThemeChange, onStarter,
       {panel === "templates" ? <div><h2 className="text-sm font-bold">ページのひな形</h2><p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">ページ全体を置き換えます。</p><div className="mt-3 grid gap-3">{starterTemplates.map((template) => <button key={template.id} type="button" onClick={() => onStarter(template.id)} className="rounded-xl border border-[var(--mikke-line)] p-2 text-left transition hover:border-[var(--mikke-accent)]"><PageTemplatePreview templateId={template.id} /><strong className="mt-2 block text-xs">{template.label}</strong><span className="mt-1 block text-[10px] leading-4 text-[var(--mikke-muted)]">{template.helper}</span></button>)}</div></div> : null}
       {panel === "sections" ? <div><h2 className="text-sm font-bold">よく使うページ要素</h2><p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">まとまった内容をワンタップで追加。</p><div className="mt-3 grid grid-cols-2 gap-2">{sectionTemplates.map((template) => <button key={template.id} type="button" onClick={() => onSection(template.id)} className="min-h-20 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-2 py-3 text-xs font-bold transition hover:border-[var(--mikke-accent)] hover:bg-white">{template.label}</button>)}</div></div> : null}
       {panel === "parts" ? <div><h2 className="text-sm font-bold">パーツを1つ追加</h2><p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">必要なものだけ自由に組み合わせます。</p><div className="mt-3 grid grid-cols-2 gap-2">{pageBlockChoices.map((choice) => { const Icon = choice.icon; return <button key={choice.type} type="button" onClick={() => onBlock(choice.type)} className="inline-flex min-h-16 flex-col items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-[10px] font-bold text-[var(--mikke-accent)] hover:border-[var(--mikke-accent)]"><Icon size={17} /><span className="text-[var(--mikke-text)]">{choice.label}</span></button>; })}</div></div> : null}
-      {panel === "design" ? <div><h2 className="text-sm font-bold">サイトデザイン</h2><p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">全ページ共通の雰囲気を整えます。</p><div className="mt-4 grid gap-4"><label className="block"><span className="text-xs font-bold">雰囲気</span><select value={theme.presetId} onChange={(event) => onThemeChange({ ...pageThemePresets[event.target.value as keyof typeof pageThemePresets] })} className={inputClass}><option value="gothic">すっきり</option><option value="soft">やわらかい</option><option value="serif">上品</option><option value="modern">モダン</option></select></label><div className="grid grid-cols-2 gap-2"><ColorField label="メイン" value={theme.primaryColor} onChange={(primaryColor) => onThemeChange({ ...theme, primaryColor })} /><ColorField label="アクセント" value={theme.accentColor} onChange={(accentColor) => onThemeChange({ ...theme, accentColor })} /><ColorField label="背景" value={theme.backgroundColor} onChange={(backgroundColor) => onThemeChange({ ...theme, backgroundColor })} /><ColorField label="文字" value={theme.textColor} onChange={(textColor) => onThemeChange({ ...theme, textColor })} /></div><label className="block"><span className="text-xs font-bold">コンテンツ幅</span><select value={theme.contentWidth} onChange={(event) => onThemeChange({ ...theme, contentWidth: event.target.value as PageSiteTheme["contentWidth"] })} className={inputClass}><option value="narrow">読み物向け</option><option value="standard">標準</option><option value="wide">ワイド</option></select></label></div></div> : null}
+      {panel === "design" ? <DesignPanel theme={theme} onThemeChange={onThemeChange} /> : null}
     </div>
   </aside>;
+}
+
+function DesignPanel({ theme, onThemeChange }: { theme: PageSiteTheme; onThemeChange: (theme: PageSiteTheme) => void }) {
+  const [tab, setTab] = useState<"color" | "font">("color");
+  const activePaletteId = findMatchingPagePaletteId(theme);
+  return <div>
+    <h2 className="text-sm font-bold">サイトデザイン</h2>
+    <p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">全ページ共通の雰囲気を整えます。</p>
+    <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-[var(--mikke-surface-soft)] p-1">
+      <button type="button" onClick={() => setTab("color")} className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${tab === "color" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><Palette size={13} /> カラー</button>
+      <button type="button" onClick={() => setTab("font")} className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition ${tab === "font" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><Type size={13} /> フォント</button>
+    </div>
+
+    {tab === "color" ? (
+      <div className="mt-4 grid gap-4">
+        <div>
+          <span className="text-xs font-bold">カラーパレット</span>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {pagePalettes.map((palette) => (
+              <button
+                key={palette.id}
+                type="button"
+                onClick={() => onThemeChange(applyPagePaletteToTheme(theme, palette))}
+                className={`rounded-xl border p-2 text-left transition ${activePaletteId === palette.id ? "border-[var(--mikke-accent)] ring-2 ring-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] hover:border-[var(--mikke-accent)]"}`}
+              >
+                <span className="flex gap-1">
+                  <span className="h-5 w-5 rounded-full border border-black/10" style={{ backgroundColor: palette.backgroundColor }} />
+                  <span className="h-5 w-5 rounded-full border border-black/10" style={{ backgroundColor: palette.primaryColor }} />
+                  <span className="h-5 w-5 rounded-full border border-black/10" style={{ backgroundColor: palette.accentColor }} />
+                </span>
+                <span className="mt-1.5 block text-[11px] font-bold">{palette.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <details className="rounded-xl border border-[var(--mikke-line-soft)] p-3">
+          <summary className="cursor-pointer text-xs font-bold">色を個別に調整</summary>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <ColorField label="メイン" value={theme.primaryColor} onChange={(primaryColor) => onThemeChange({ ...theme, primaryColor })} />
+            <ColorField label="アクセント" value={theme.accentColor} onChange={(accentColor) => onThemeChange({ ...theme, accentColor })} />
+            <ColorField label="背景" value={theme.backgroundColor} onChange={(backgroundColor) => onThemeChange({ ...theme, backgroundColor })} />
+            <ColorField label="文字" value={theme.textColor} onChange={(textColor) => onThemeChange({ ...theme, textColor })} />
+          </div>
+        </details>
+        <label className="block"><span className="text-xs font-bold">コンテンツ幅</span><select value={theme.contentWidth} onChange={(event) => onThemeChange({ ...theme, contentWidth: event.target.value as PageSiteTheme["contentWidth"] })} className={inputClass}><option value="narrow">読み物向け</option><option value="standard">標準</option><option value="wide">ワイド</option></select></label>
+        <label className="block"><span className="text-xs font-bold">ボタンの形</span><select value={theme.buttonStyle} onChange={(event) => onThemeChange({ ...theme, buttonStyle: event.target.value as PageSiteTheme["buttonStyle"] })} className={inputClass}><option value="rounded">角丸</option><option value="pill">ピル</option><option value="square">角ばり</option></select></label>
+        <details className="rounded-xl border border-[var(--mikke-line-soft)] p-3">
+          <summary className="cursor-pointer text-xs font-bold">おまかせセットから選ぶ（色＋フォントを一括変更）</summary>
+          <select value="" onChange={(event) => { if (event.target.value) onThemeChange({ ...pageThemePresets[event.target.value as keyof typeof pageThemePresets] }); }} className={inputClass}>
+            <option value="">セットを選択…</option>
+            <option value="gothic">すっきり</option>
+            <option value="soft">やわらかい</option>
+            <option value="serif">上品</option>
+            <option value="modern">モダン</option>
+          </select>
+        </details>
+      </div>
+    ) : (
+      <div className="mt-4 grid gap-4">
+        <div>
+          <p className="text-xs font-bold">見出し用フォント</p>
+          <div className="mt-2 grid grid-cols-1 gap-2">
+            <label className="block"><span className="text-[10px] font-bold">日本語</span><select value={theme.headingJpFontId ?? ""} onChange={(event) => onThemeChange({ ...theme, headingJpFontId: (event.target.value || undefined) as PageJpFontId | undefined })} className={inputClass}><option value="">（既定のフォント文字列を使う）</option>{pageJpFontOrder.map((id) => <option key={id} value={id}>{pageJpFonts[id].label}（{pageJpFonts[id].helper}）</option>)}</select></label>
+            <label className="block"><span className="text-[10px] font-bold">欧文</span><select value={theme.headingLatinFontId ?? "none"} onChange={(event) => onThemeChange({ ...theme, headingLatinFontId: event.target.value as PageLatinFontId })} className={inputClass}>{pageLatinFontOrder.map((id) => <option key={id} value={id}>{pageLatinFonts[id].label}</option>)}</select></label>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs font-bold">本文用フォント</p>
+          <div className="mt-2 grid grid-cols-1 gap-2">
+            <label className="block"><span className="text-[10px] font-bold">日本語</span><select value={theme.bodyJpFontId ?? ""} onChange={(event) => onThemeChange({ ...theme, bodyJpFontId: (event.target.value || undefined) as PageJpFontId | undefined })} className={inputClass}><option value="">（既定のフォント文字列を使う）</option>{pageJpFontOrder.map((id) => <option key={id} value={id}>{pageJpFonts[id].label}（{pageJpFonts[id].helper}）</option>)}</select></label>
+            <label className="block"><span className="text-[10px] font-bold">欧文</span><select value={theme.bodyLatinFontId ?? "none"} onChange={(event) => onThemeChange({ ...theme, bodyLatinFontId: event.target.value as PageLatinFontId })} className={inputClass}>{pageLatinFontOrder.map((id) => <option key={id} value={id}>{pageLatinFonts[id].label}</option>)}</select></label>
+          </div>
+        </div>
+        <p className="text-[10px] leading-4 text-[var(--mikke-muted)]">日本語×欧文を自由に組み合わせられます。欧文フォントを選ぶと英数字だけそのフォントになり、日本語部分は日本語フォントで表示されます。ブロックごとの上書きは各パーツの編集画面から行えます。</p>
+      </div>
+    )}
+  </div>;
 }
 
 function BlockInspector({ siteId, blocks, selectedBlockId, onSelectBlock, cmsContent, onChangeBlock, onMoveBlock, onDuplicate, onDelete }: { siteId: string; blocks: PageBlock[]; selectedBlockId: string | null; onSelectBlock: (id: string | null) => void; cmsContent: Record<PageCmsSource, PageCmsItem[]>; onChangeBlock: (id: string, block: PageBlock) => void; onMoveBlock: (index: number, direction: -1 | 1) => void; onDuplicate: (block: PageBlock, index: number) => void; onDelete: (id: string) => void }) {

@@ -64,7 +64,9 @@ function normalizeBlock(value: PageBlock, index: number): PageBlock {
       textAlign: value.style?.textAlign ?? "left",
       animation: value.style?.animation ?? "none",
       backgroundColor: value.style?.backgroundColor,
-      textColor: value.style?.textColor
+      textColor: value.style?.textColor,
+      jpFontId: value.style?.jpFontId,
+      latinFontId: value.style?.latinFontId
     }
   } as PageBlock;
 }
@@ -78,6 +80,19 @@ function normalizeDocument(value: PageDocument): PageDocument {
   };
 }
 
+// defaultPageTheme(=gothicプリセット)からheading/bodyのフォントID群を除いた基底値。
+// これらのキーは「未指定=旧headingFont/bodyFont文字列にフォールバック」という意味を持つため、
+// 他プリセット（soft/serif/modern）で作られた旧テーマにgothicのフォントIDを誤って埋め込まないよう、
+// 通常のdefault-mergeからは除外する。
+const themeMergeBase: PageSiteTheme = (() => {
+  const { headingJpFontId, headingLatinFontId, bodyJpFontId, bodyLatinFontId, ...rest } = defaultPageTheme;
+  void headingJpFontId;
+  void headingLatinFontId;
+  void bodyJpFontId;
+  void bodyLatinFontId;
+  return rest as PageSiteTheme;
+})();
+
 function normalizePageState(value: { sites: PageSite[] }): PageStoreState {
   return {
     version: 2,
@@ -86,7 +101,7 @@ function normalizePageState(value: { sites: PageSite[] }): PageStoreState {
       delete normalizedSite.directoryItems;
       return {
         ...normalizedSite,
-        theme: normalizedSite.theme ? { ...defaultPageTheme, ...normalizedSite.theme } : clonePageTheme(),
+        theme: normalizedSite.theme ? { ...themeMergeBase, ...normalizedSite.theme } : clonePageTheme(),
         documents: normalizedSite.documents.map(normalizeDocument)
       };
     })

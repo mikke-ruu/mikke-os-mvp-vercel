@@ -2,7 +2,7 @@
 
 import { type FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowLeft, ArrowUp, FileText, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, FileText, Globe2, Pencil, Plus, Trash2 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import {
@@ -94,9 +94,14 @@ export function PageSiteEditor() {
                   /{site.publication.slug} の下書き構成です。外部公開はまだ行いません。
                 </p>
               </div>
-              <Link href="/apps/page" className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold">
-                <ArrowLeft size={15} /> 一覧へ戻る
-              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href={`/apps/page/${site.id}/preview`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">
+                  <Globe2 size={15} /> サイトを表示
+                </Link>
+                <Link href="/apps/page" className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold">
+                  <ArrowLeft size={15} /> 一覧へ戻る
+                </Link>
+              </div>
             </div>
 
             <div className="mt-5 space-y-3">
