@@ -91,15 +91,71 @@ base64画像・フォントをHTMLへ直接埋め込むと、HTML自体が巨大
 
 外部HTMLは無料ではあるが無通信ではない。外部サービス側の規約、Cookie、追跡、表示停止の影響も受けるため、埋め込み枠はsandbox iframe内で継続する。
 
-## 7. 他アプリへの移行順
+## 7. 他アプリへの移行順（2026-07-19 Fable監査で実態に合わせ更新）
 
-1. PageでMikke Mediaを先行検証
-2. Story / Eventの画像URL欄を共通Pickerへ変更
-3. Order / FUND / Communityの掲載画像へ変更
-4. Item Studio / Academyの公開画像へ変更
-5. 各アプリ保存時に、`mikke_media_usages`へ利用箇所を登録
-6. 30日ゴミ箱、管理者の容量監視
-7. 有料プラン確定後、Standard / Businessの容量を設定
+Claude Codeが既存コードを確認した結果、Story・Event・Orderには移行対象の画像URL欄が
+実在しなかった（Story/Eventは編集UI自体が未実装、Orderは画像フィールドなし）。
+実際に「画像URLを手入力させる」生テキスト入力が残っていたのは Fund と Academy、
+Item Studioのみ。移行順を実態に合わせて番号タスク化する。
+
+```text
+1. PageでMikke Mediaを先行検証 → 完了（90e93e8）
+2. MM-1〜MM-4（下記）を実装
+3. 各アプリ保存時に、mikke_media_usagesへ利用箇所を登録（MM-1〜4に含める）
+4. 30日ゴミ箱、管理者の容量監視
+5. 有料プラン確定後、Standard / Businessの容量を設定
+```
+
+### 移行タスク（MM番号・codexへ番号指定で依頼）
+
+各タスクは `components/page/PageImageUploader.tsx` と同型の薄いラッパー
+（`MikkeMediaPicker` に `sourceApp` だけ変えて渡す）で実装する。
+既存の保存済みURL（過去データ）は消さない。表示は維持しつつ、新規保存分から
+Mikke Media経由にする段階移行（画像を差し替えた時だけ新方式に切り替わる）。
+
+```text
+MM-1: Fund
+  対象: components/fund/FundProjectForm.tsx
+    - 「メイン画像URL」(coverImageUrl)
+    - プラン毎「画像URL」(plan.imageUrl)
+  2箇所ともMikkeMediaPickerへ置換。sourceApp="fund"。
+  外部決済URL・外部申込URLはこのまま生URL入力（画像ではないので対象外）。
+
+MM-2: Item Studio
+  対象: components/item-studio/StudioItemForm.tsx
+    - 「写真URL（任意）」(photoUrl)
+  sourceApp="item-studio"。
+
+MM-3: Academy（本部側の画像2箇所）
+  対象:
+    - app/academy/courses/CourseForm.tsx の「メイン画像URL」(mainImageUrl)
+    - app/academy/front/page.tsx の「メイン画像URL」(hero_image_url)
+  sourceApp="academy"。
+
+MM-4: Academy（ブロックビルダーの画像ブロック2箇所）
+  対象:
+    - app/academy/courses/[id]/lp/page.tsx の画像ブロック（画像URL入力）
+    - app/academy/courses/[id]/instructor-page/page.tsx の画像ブロック（画像URL入力）
+  sourceApp="academy"。ブロック内の1要素として埋め込む点がMM-3と異なるため別タスクにした。
+```
+
+### 対象外として明記（誤って巻き込まない）
+
+```text
+Team Works成果物添付（TeamWorksWorkerProjectDetail.tsx / TeamWorksProjectFormResponse.tsx）
+  は非公開の案件成果物（画像以外のファイルも含む）であり、公開・再利用前提の
+  Mikke Media（JPEG/PNG/WebP限定・WebP自動変換・100MB共有枠）とは性質が異なる。
+  Mikke Media化の対象にしない。
+```
+
+### 次にUIが新設される時（移行ではなく新規実装として最初からPicker）
+
+```text
+Story: プロフィール画像・ポートフォリオ画像の編集UIがまだ存在しない
+  （StoryProfile.tsxは現状デモデータ）。実装時は最初からMikkeMediaPickerを使う。
+Event: coverImageUrlは型・storeに定義済みだがフォームに入力欄がない（未使用フィールド）。
+  実装時は最初からMikkeMediaPickerを使う。
+```
 
 移行時は、既存URLを直ちに消さない。既存URLを表示しながら、差し替え時からMikke Mediaへ保存する段階移行にする。
 
