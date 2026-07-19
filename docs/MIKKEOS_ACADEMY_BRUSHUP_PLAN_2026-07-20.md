@@ -97,36 +97,91 @@ MM-4: courses/[id]/lp/page.tsx・courses/[id]/instructor-page/page.tsx の
   着手前に一言確認できると安全。
 ```
 
-## 4. Wave D（申込・決済・キット注文フローの整理）— 設計は次回、要件だけ記録
+## 4. Wave D（申込・決済・キット注文フローの整理）— 実コード確認済み・設計確定
 
-これはAcademyの中で一番複雑な部分（お金と個人情報が絡む）。実装前に
-`lib/academy/applications.ts`・`lib/academy/kits.ts` の現状データモデルを
-確認してから設計を固める（今回は節約のため未確認・次回冒頭で行う）。
+`lib/academy/applications.ts`・`lib/academy/kits.ts`・`lib/academy/lp.ts` を読んだ結果、
+想定より土台は良好だった。**大きなスキーマ再設計は不要**、小さな追加2点で要件を満たせる。
 
-わかっている要件（あゆみ発言ママ記録）:
+### 実コードで判明した現状（誤解していた点の訂正）
 
 ```text
-- 現状の申込管理の文言「あなたの営業用URLから入った申込（担当申込）の一覧です。
-  ステータスの更新は本部が行います。」は実態と異なる。
-  正しい業務フロー:
-    受講者 = 申込者（講師受付経由でも受講者本人が申し込む）
-    講師受付の場合、キットの注文者 = 講師（受講者ではない）
-    キット発送 = 本部が行う
-    送り先 = 指定の場所（講師 or 受講者、ケースによる）
-- ディプロマを扱う講座では、申込時に追加情報を記入してもらうフォームが必要
-  （現状の申込フォームには無い専用項目）。
-- キット注文は「受講済みの講座」を選択する形にする。選ぶと受講者・講師・
-  送り先の情報が自動的に本部側にも共有される（現状は別々に手入力している
-  可能性が高い＝要確認）。
-- 申込フォームと決済リンクが連動しておらず、お客様が情報を2回入力する
-  形になっている可能性がある。整理したい（完全自動連携は外部決済サービス
-  次第で難しい場合もあるため、次回データモデルを見てから現実的な線を判断）。
-- 申込ステータスは一覧画面から直接変更できるようにしたい（詳細画面への
-  遷移を挟まないインライン変更）。
-- 講師側プロフィール編集（コウシポータル）に写真・自由記述欄を追加
-  （ビルド式でなくてよい、シンプルなフォーム）。決済は講師自身が行うため、
-  本部と同じ項目のフォーム＋決済方法・決済URLを講師が入力できるようにする。
-  掲載される講座情報自体は本部のものがそのまま出る。
+- academy_applications には既に honbu_revenue/instructor_revenue の分離、
+  intake_source("honbu"|"koushi")、instructor_id が存在する。
+- academy_kit_orders は createKitOrder(profile, instructor, input) で
+  instructor_id: instructor.id が最初から入る＝「注文者=講師」は
+  **既に正しくモデル化されている**。誤解していたのはここではない。
+- 実際に欠けているのは2点だけ:
+  ① academy_kit_orders に academy_applications への紐づけが無い
+    （instructor_idはあるがapplication_idが無い。キット注文が「どの受講者の分か」
+    を構造的に持てず、講師がtitleに自由記述するしかない状態）。
+  ② 送り先住所を持つ列がどこにも無い（applications・kit_ordersどちらにも無い）。
+- ディプロマ用の追加質問は、**既に汎用の仕組みがある**。
+  CourseFormの申込項目エディタ（AcademyFormField型・text/textarea/email/tel/
+  select/checkbox）で講座ごとにカスタム質問を定義でき、公開申込フォームの
+  submitPublicApplication(lib/academy/lp.ts)で form_answers(jsonb想定)に
+  回答が保存される。→ **コード変更不要**。ディプロマを発行する講座側で
+  申込項目エディタから必要な質問（例: 本名・送付先住所・生年月日等）を
+  追加するだけで、あゆみ自身が今すぐ設定できる。今回のWave Dでは触らない。
+- app/academy/portal/applications/page.tsx 39行目の文言
+  「あなたの営業用URLから入った申込（担当申込）の一覧です。
+  ステータスの更新は本部が行います。」自体は、
+  「本部がステータスを更新する」という部分は現状の設計として正しい
+  （講師は閲覧のみ・honbu側で一元管理、というのは意図した設計）。
+  問題は「ここからキットを注文する」という導線が無く、文言もそれに触れて
+  いないこと。
+```
+
+### 実装タスク（AC-D番号）
+
+```text
+AC-D1: スキーマ追加（要SQL投入・あゆみが実行）
+  academy_kit_orders に以下を追加:
+    application_id uuid null references academy_applications(id)
+    shipping_address text null
+  （既存行はnullのままで問題ない。破壊的変更ではない）
+
+AC-D2: 講師ポータルのキット注文フローを「申込から選ぶ」形に変更
+  app/academy/portal/kits/page.tsx の発注フォームを、自由記述titleではなく
+  「自分が担当した申込（自分のinstructor_idが付いたacademy_applications）」
+  から選択する形に変更。選択すると:
+    - course_id・受講者名（表示用）が自動セット
+    - 送り先セレクタ（受講者へ／自分（講師）へ／その他=自由入力）を出し、
+      shipping_addressへ保存。もしその申込のform_answersに住所らしき
+      回答があれば初期値として提示してよい（キー名の厳密突合は不要、
+      「参考情報として表示するだけ」でよい＝壊れにくい実装にする）。
+    - lib/academy/kits.ts の createKitOrder に application_id/shipping_address
+      を渡せるよう引数拡張。
+
+AC-D3: 本部側キット注文一覧・申込詳細に相互リンクを追加
+  app/academy/kits/page.tsx（本部キット一覧）: application_idがある注文には
+  「申込を見る」リンクを追加。
+  app/academy/applications/[id]/page.tsx（本部申込詳細）: その申込に紐づく
+  キット注文があれば表示（無ければ「まだキット注文はありません」）。
+
+AC-D4: portal/applications/page.tsxの文言修正＋キット注文導線追加
+  39行目の文言を実態に合わせて修正（例:「あなたの営業用URLから入った申込の
+  一覧です。ステータスの更新は本部が行います。受講に必要なキットは、
+  ここから注文してください。」）。各行に「キットを注文する」ボタンを追加し、
+  押すとAC-D2のフォームへ該当applicationを渡した状態で遷移する。
+
+AC-D5: 申込ステータスのインライン変更
+  app/academy/applications/page.tsx（本部・申込一覧）の各行にステータスの
+  <select>を直接置き、詳細画面へ遷移せずに更新できるようにする
+  （lib/academy/applications.ts の updateApplication を流用）。
+
+AC-D6: 外部決済リンクへの事前入力（可能な範囲で・必須ではない）
+  申込完了画面から外部決済URLへ遷移する際、対応していれば
+  ?prefilled_email=... 等のクエリパラメータを付与する（Stripe Payment Links
+  はprefilled_emailに対応）。決済サービス側の対応可否はまちまちなので、
+  「付けられる時だけ付ける」努力目標とし、無条件の前提にしない。
+```
+
+対象外（今回やらない）:
+
+```text
+- キット注文フォームでのform_answers自動転記の完全一致マッチング
+  （キー名規約が定まっていないため、参考表示までに留める）
+- 決済ステータスの外部サービスとの自動同期（Webhook等）は本接続フェーズ送り
 ```
 
 ## 5. Academyの位置づけの再確認（あゆみ発言・訂正なし）
