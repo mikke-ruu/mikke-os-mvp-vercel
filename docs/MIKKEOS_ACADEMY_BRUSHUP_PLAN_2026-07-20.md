@@ -251,3 +251,81 @@ comment on column public.academy_instructors.photo_url is
 保護対象リストに含めていない。今回は本部側からのみ書き込む実装だが、将来Wave Dで講師本人が
 自分の写真を編集できるようにする場合も、このトリガ定義の変更は不要（保護対象に追加したい場合は
 別途トリガ関数の更新が必要）。
+
+## 10. Wave C実装メモ（2026-07-20 Sonnet実装・夜間実行）
+
+AC-C1〜AC-C5実装済み。新規Supabaseスキーマ変更なし（すべて既存のjsonb列 `academy_courses.lp_blocks` /
+`academy_instructor_pages.blocks` の中身の型拡張のみ）。判断に迷って止めた箇所はなし。
+
+```text
+AC-C1: LPビルダーのブロック拡張
+  types/database.ts の AcademyLpBlock に image-text/gallery/cta を追加
+  （AcademyGalleryImage型を新設し images: AcademyGalleryImage[] で共有）。
+  app/academy/courses/[id]/lp/page.tsx を、instructor-page.tsx と同じ
+  BlockEditor(block, onChange)コンポーネント方式に揃えてリファクタし、
+  3種→6種のブロック追加ボタンに拡張。
+  あわせて公開LP側 app/academy/c/[id]/page.tsx の描画分岐（従来
+  「heading ? : text ? : url ? : null」の3値三項）を書き直し、
+  image-text/gallery/ctaの表示を追加（ここを直さないと新ブロックが
+  公開LPに出ないため、プロンプト指定範囲に加えて対応した）。
+
+AC-C2: 講師専用ページビルダーのブロック拡張
+  AcademyPageBlock に image-text/gallery/cta（AC-C1と同形）を追加。
+  app/academy/courses/[id]/instructor-page/page.tsx のBlockEditorに
+  同じ編集UIを追加。
+
+AC-C5: 画像入力のMikkeMediaPicker統一
+  components/academy/AcademyImageUploader.tsx を新設（sourceApp="academy"の
+  薄いラッパー。PageImageUploader.tsxを参考にしたが、Academyのブロック型は
+  画像URLを単純文字列で持つ方針のため、mediaAssetIdは保持せずpublicUrlのみ
+  onUploadedへ返す設計にした）。
+  CourseForm.tsx(mainImageUrl)・front/page.tsx(hero_image_url)・LP/instructor-page
+  ビルダーのimage・image-text・galleryブロックの画像欄をすべて置換。
+  既存の文字列URLはcurrentUrlとしてそのまま表示され、選び直すと上書きされる
+  （プロンプト指定通り「単純に上書き」の段階移行。mikke_media_usagesへの
+  使用量トラッキング登録は実装していない — AC-C5本文が「単純な上書きで
+  問題ない」と明記しており、トラッキングにはmediaAssetIdの保持が必要で
+  スコープ外の設計変更になるため見送った。Wave Cの§6提案にある使用量
+  トラッキングの徹底は次回以降の課題として残る）。
+
+AC-C3: 教材リストブロック
+  AcademyPageBlockに materials-list（設定項目なし）を追加。
+  instructor-page.tsxのビルダーに追加ボタンを追加（設定欄は「自動表示され
+  ます」という説明文のみ）。
+  components/academy/PageBlocks.tsx を拡張し、materials(AcademyMaterial[])を
+  propで受け取ってmaterials-listブロックの位置にレンダリングするように変更。
+  あわせて pageBlocksHasMaterialsList() ヘルパーを追加。
+  app/academy/portal/study/page.tsx（講師が復習ページを見る画面）を更新し、
+  PageBlocksにcourseMaterialsを渡すように変更。旧データ（materials-list
+  ブロックを含まないページ）との互換のため、ブロックが無い場合だけ従来通り
+  ページ末尾に別枠で教材一覧を表示する分岐を残した（二重表示を回避）。
+
+AC-C4: 教材・資料を独立ナビから除去
+  components/academy/AcademyShell.tsx の honbuNav から
+  「教材・資料」(/academy/materials) の項目を削除（FolderOpenのimportも
+  未使用化したため削除）。app/academy/materials/page.tsx自体・
+  academy_materialsのCRUDは変更していない。
+  代わりにinstructor-page.tsxビルダー画面の上部に「教材・資料はこの講座
+  専用の管理画面で編集します」という案内ブロックを追加し、
+  「教材・資料を編集すると、教材リストブロックに自動で反映されます」という
+  説明文と「この講座の教材を管理する」リンク(/academy/materials?course=[id])
+  を設置。
+  app/academy/materials/page.tsx はもともと ?course= クエリパラメータに
+  対応していなかったため、useSearchParamsで読み取ってcourseFilterの初期値に
+  する対応を追加（Next.jsのCSR bailout制約によりuseSearchParamsを使う
+  コンポーネントをSuspenseで包む必要があったため、default exportに
+  Suspense境界を追加した）。
+```
+
+検証: `npm run lint`（tsc --noEmit）成功・`npm run build` 成功（全93ルート生成、
+/academy/courses/[id]/lp・/academy/courses/[id]/instructor-page・/academy/c/[id]・
+/academy/materials 含む）。既存データ互換は、新ブロック型をすべて既存unionへの
+追加のみで実装し、旧ブロック配列（heading/text/image/video/linksのみ）が
+BlockEditor・PageBlocks・公開LP描画のどの分岐にも従来通り到達する形で確認した
+（型を壊す変更・必須フィールド追加は行っていない）。
+
+未実装・妥協点:
+- Mikke Media使用量トラッキング（sync_mikke_media_usages）へのAcademy画像登録は
+  今回見送り（上記AC-C5参照）。
+- 教材追加ページ(app/academy/materials/new/page.tsx)への?course=引き継ぎ（新規
+  作成時に講座を自動選択させる）はプロンプト指定範囲外のため未実装。

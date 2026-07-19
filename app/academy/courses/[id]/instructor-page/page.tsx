@@ -1,9 +1,25 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import { ArrowDown, ArrowUp, Heading, Image as ImageIcon, Link2, Plus, Trash2, Type, Video } from "lucide-react";
+import Link from "next/link";
+import {
+  ArrowDown,
+  ArrowUp,
+  FolderOpen,
+  Heading,
+  Image as ImageIcon,
+  LayoutGrid,
+  LayoutPanelLeft,
+  Link2,
+  MousePointerClick,
+  Plus,
+  Trash2,
+  Type,
+  Video
+} from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import { getInstructorPage, saveInstructorPageBlocks } from "@/lib/academy/instructor-page";
@@ -17,6 +33,10 @@ function newBlock(type: AcademyPageBlock["type"]): AcademyPageBlock {
   if (type === "image") return { type: "image", url: "", caption: "" };
   if (type === "video") return { type: "video", url: "", caption: "" };
   if (type === "links") return { type: "links", title: "", items: [{ label: "", url: "" }] };
+  if (type === "image-text") return { type: "image-text", imageUrl: "", heading: "", text: "" };
+  if (type === "gallery") return { type: "gallery", images: [] };
+  if (type === "cta") return { type: "cta", heading: "", buttonLabel: "", buttonUrl: "" };
+  if (type === "materials-list") return { type: "materials-list" };
   return { type: "text", text: "" };
 }
 
@@ -25,7 +45,11 @@ const BLOCK_LABEL: Record<AcademyPageBlock["type"], string> = {
   text: "文章",
   image: "画像",
   video: "動画",
-  links: "リンク集"
+  links: "リンク集",
+  "image-text": "画像+文章",
+  gallery: "画像グリッド",
+  cta: "CTA",
+  "materials-list": "教材リスト"
 };
 
 function BlockEditor({
@@ -44,7 +68,7 @@ function BlockEditor({
   if (block.type === "image")
     return (
       <>
-        <input className={inputClass} placeholder="画像URL" value={block.url} onChange={(e) => onChange({ ...block, url: e.target.value })} />
+        <AcademyImageUploader compact currentUrl={block.url || undefined} onUploaded={(url) => onChange({ ...block, url })} />
         <input className={inputClass} placeholder="キャプション（任意）" value={block.caption ?? ""} onChange={(e) => onChange({ ...block, caption: e.target.value })} />
       </>
     );
@@ -55,6 +79,64 @@ function BlockEditor({
         <input className={inputClass} placeholder="動画URL（YouTube等）" value={block.url} onChange={(e) => onChange({ ...block, url: e.target.value })} />
         <input className={inputClass} placeholder="キャプション（任意）" value={block.caption ?? ""} onChange={(e) => onChange({ ...block, caption: e.target.value })} />
       </>
+    );
+
+  if (block.type === "image-text")
+    return (
+      <>
+        <AcademyImageUploader compact currentUrl={block.imageUrl || undefined} onUploaded={(url) => onChange({ ...block, imageUrl: url })} />
+        <input className={inputClass} placeholder="見出し（任意）" value={block.heading ?? ""} onChange={(e) => onChange({ ...block, heading: e.target.value })} />
+        <textarea className={`${inputClass} min-h-16`} placeholder="文章" value={block.text} onChange={(e) => onChange({ ...block, text: e.target.value })} />
+      </>
+    );
+
+  if (block.type === "gallery")
+    return (
+      <div className="space-y-2">
+        {block.images.map((img, i) => (
+          <div key={i} className="space-y-1 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-2">
+            <AcademyImageUploader
+              compact
+              currentUrl={img.url || undefined}
+              onUploaded={(url) => onChange({ ...block, images: block.images.map((x, j) => (j === i ? { ...x, url } : x)) })}
+            />
+            <div className="flex items-center gap-1">
+              <input
+                className={inputClass}
+                placeholder="キャプション（任意）"
+                value={img.caption ?? ""}
+                onChange={(e) => onChange({ ...block, images: block.images.map((x, j) => (j === i ? { ...x, caption: e.target.value } : x)) })}
+              />
+              <button type="button" className="shrink-0 text-[var(--mikke-danger)]" onClick={() => onChange({ ...block, images: block.images.filter((_, j) => j !== i) })}>
+                <Trash2 size={15} />
+              </button>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange({ ...block, images: [...block.images, { url: "", caption: "" }] })}
+          className="flex items-center gap-1 text-xs font-bold text-[var(--mikke-accent-strong)]"
+        >
+          <Plus size={13} /> 画像を追加
+        </button>
+      </div>
+    );
+
+  if (block.type === "cta")
+    return (
+      <>
+        <input className={inputClass} placeholder="見出し" value={block.heading} onChange={(e) => onChange({ ...block, heading: e.target.value })} />
+        <input className={inputClass} placeholder="ボタンのラベル（例: 詳しく見る）" value={block.buttonLabel} onChange={(e) => onChange({ ...block, buttonLabel: e.target.value })} />
+        <input className={inputClass} placeholder="ボタンのリンクURL" value={block.buttonUrl} onChange={(e) => onChange({ ...block, buttonUrl: e.target.value })} />
+      </>
+    );
+
+  if (block.type === "materials-list")
+    return (
+      <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs text-[var(--mikke-muted)]">
+        設定項目はありません。この講座の教材・資料（公開設定にしたもの）が、ここに自動で一覧表示されます。
+      </p>
     );
 
   // links（リンク集）
@@ -161,6 +243,20 @@ function BuilderContent({ courseId }: { courseId: string }) {
         認定講師の復習・共有用ページです。ここで作った内容は、この講座を取得した活動中の講師だけが「講師ホーム」で閲覧できます（受講者・部外者には見えません）。
       </p>
 
+      {/* AC-C4: 教材・資料タブを独立ナビから外した代わりの導線。教材データはacademy_materialsのまま。 */}
+      <div className="rounded-xl border border-dashed border-[var(--mikke-line)] bg-white p-3">
+        <p className="text-xs font-bold text-[var(--mikke-text)]">教材・資料はこの講座専用の管理画面で編集します</p>
+        <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">
+          教材・資料を編集すると、下の「教材リスト」ブロックに自動で反映されます。
+        </p>
+        <Link
+          href={`/academy/materials?course=${course.id}`}
+          className="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--mikke-accent-soft)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent-strong)]"
+        >
+          <FolderOpen size={13} /> この講座の教材を管理する
+        </Link>
+      </div>
+
       {blocks.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-6 text-center text-sm text-[var(--mikke-muted)]">
           まだブロックがありません。下のボタンで追加します。
@@ -183,7 +279,7 @@ function BuilderContent({ courseId }: { courseId: string }) {
         </ul>
       )}
 
-      <div className="grid grid-cols-5 gap-1">
+      <div className="grid grid-cols-3 gap-1">
         <button type="button" onClick={() => add("heading")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
           <Heading size={14} /> 見出し
         </button>
@@ -198,6 +294,18 @@ function BuilderContent({ courseId }: { courseId: string }) {
         </button>
         <button type="button" onClick={() => add("links")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
           <Link2 size={14} /> リンク集
+        </button>
+        <button type="button" onClick={() => add("image-text")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
+          <LayoutPanelLeft size={14} /> 画像+文章
+        </button>
+        <button type="button" onClick={() => add("gallery")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
+          <LayoutGrid size={14} /> 画像グリッド
+        </button>
+        <button type="button" onClick={() => add("cta")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
+          <MousePointerClick size={14} /> CTA
+        </button>
+        <button type="button" onClick={() => add("materials-list")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
+          <FolderOpen size={14} /> 教材リスト
         </button>
       </div>
 

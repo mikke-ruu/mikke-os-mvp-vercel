@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ExternalLink, Eye, EyeOff, GraduationCap, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
@@ -12,10 +13,13 @@ import type { AcademyCourse, AcademyHeadquarters, AcademyMaterial } from "@/type
 
 function MaterialsContent() {
   const { profile } = useAuth();
+  // AC-C4: 講師専用ページビルダーの「この講座の教材を管理する」リンク
+  // (/academy/materials?course=[id]) から来た場合、その講座で絞り込んだ状態で開く。
+  const searchParams = useSearchParams();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [materials, setMaterials] = useState<AcademyMaterial[]>([]);
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
-  const [courseFilter, setCourseFilter] = useState<string>("");
+  const [courseFilter, setCourseFilter] = useState<string>(searchParams.get("course") ?? "");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -146,7 +150,9 @@ function MaterialsContent() {
 export default function MaterialsPage() {
   return (
     <HonbuShell title="教材・資料">
-      <MaterialsContent />
+      <Suspense fallback={<p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>}>
+        <MaterialsContent />
+      </Suspense>
     </HonbuShell>
   );
 }

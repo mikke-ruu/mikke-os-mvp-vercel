@@ -126,24 +126,65 @@ function PublicLpInner({ courseId }: { courseId: string }) {
         {course.lp_blocks?.length ? (
           <section className="border-t border-[var(--mikke-line)] px-5 py-8 md:px-12 md:py-12">
             <div className="mx-auto max-w-2xl space-y-5">
-              {course.lp_blocks.map((b, i) =>
-                b.type === "heading" ? (
-                  <h2 key={i} className="pt-2 text-center text-lg font-bold tracking-wide text-[var(--mikke-text)] md:text-xl">
-                    {b.text}
-                  </h2>
-                ) : b.type === "text" ? (
-                  <p key={i} className="whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text)] md:text-[15px] md:leading-8">
-                    {b.text}
-                  </p>
-                ) : b.url ? (
-                  <figure key={i}>
-                    <img src={b.url} alt={b.caption ?? ""} className="w-full rounded-xl" />
-                    {b.caption ? (
-                      <figcaption className="mt-1 text-center text-xs text-[var(--mikke-muted)]">{b.caption}</figcaption>
-                    ) : null}
-                  </figure>
-                ) : null
-              )}
+              {course.lp_blocks.map((b, i) => {
+                if (b.type === "heading")
+                  return (
+                    <h2 key={i} className="pt-2 text-center text-lg font-bold tracking-wide text-[var(--mikke-text)] md:text-xl">
+                      {b.text}
+                    </h2>
+                  );
+                if (b.type === "text")
+                  return (
+                    <p key={i} className="whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text)] md:text-[15px] md:leading-8">
+                      {b.text}
+                    </p>
+                  );
+                if (b.type === "image")
+                  return b.url ? (
+                    <figure key={i}>
+                      <img src={b.url} alt={b.caption ?? ""} className="w-full rounded-xl" />
+                      {b.caption ? (
+                        <figcaption className="mt-1 text-center text-xs text-[var(--mikke-muted)]">{b.caption}</figcaption>
+                      ) : null}
+                    </figure>
+                  ) : null;
+                if (b.type === "image-text")
+                  return (
+                    <div key={i} className="grid gap-4 sm:grid-cols-2 sm:items-center">
+                      {b.imageUrl ? <img src={b.imageUrl} alt="" className="w-full rounded-xl" /> : null}
+                      <div>
+                        {b.heading ? <h3 className="text-base font-bold text-[var(--mikke-text)] md:text-lg">{b.heading}</h3> : null}
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text)] md:text-[15px] md:leading-8">{b.text}</p>
+                      </div>
+                    </div>
+                  );
+                if (b.type === "gallery")
+                  return b.images.length ? (
+                    <div key={i} className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                      {b.images.filter((img) => img.url).map((img, j) => (
+                        <figure key={j}>
+                          <img src={img.url} alt={img.caption ?? ""} className="aspect-square w-full rounded-xl object-cover" />
+                          {img.caption ? <figcaption className="mt-1 text-center text-xs text-[var(--mikke-muted)]">{img.caption}</figcaption> : null}
+                        </figure>
+                      ))}
+                    </div>
+                  ) : null;
+                if (b.type === "cta")
+                  return b.buttonUrl ? (
+                    <div key={i} className="rounded-2xl bg-[var(--mikke-surface-soft)] p-6 text-center">
+                      {b.heading ? <p className="text-base font-bold text-[var(--mikke-text)]">{b.heading}</p> : null}
+                      <a
+                        href={b.buttonUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-4 inline-block rounded-full bg-[var(--mikke-accent)] px-6 py-3 text-sm font-bold tracking-wider text-white"
+                      >
+                        {b.buttonLabel || "詳しく見る"}
+                      </a>
+                    </div>
+                  ) : null;
+                return null;
+              })}
             </div>
           </section>
         ) : null}

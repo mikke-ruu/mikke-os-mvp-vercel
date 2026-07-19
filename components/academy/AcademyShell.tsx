@@ -6,7 +6,6 @@ import {
   BookOpen,
   ClipboardList,
   ExternalLink,
-  FolderOpen,
   GraduationCap,
   LayoutDashboard,
   Link2,
@@ -49,7 +48,9 @@ const honbuNav: NavItem[] = [
   { href: "/academy/instructors", label: "講師管理", icon: Users },
   { href: "/academy/applications", label: "申込管理", icon: ClipboardList },
   { href: "/academy/kits", label: "キット発送", icon: Package },
-  { href: "/academy/materials", label: "教材・資料", icon: FolderOpen },
+  // AC-C4: 「教材・資料」は独立ナビから外し、講師専用ページビルダー内の導線
+  // （/academy/materials?course=[id]）から編集する動線に統合した。
+  // ページ自体（app/academy/materials/page.tsx）とデータ(academy_materials)は削除していない。
   { href: "/academy/front", label: "フロント編集", icon: Store },
   {
     href: "/academy/instructor-pages",

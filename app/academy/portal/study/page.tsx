@@ -6,7 +6,7 @@ import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { getCoursesByIds, getMyInstructorRecords, listMaterialsForInstructor } from "@/lib/academy/instructor-portal";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
-import { PageBlocks } from "@/components/academy/PageBlocks";
+import { PageBlocks, pageBlocksHasMaterialsList } from "@/components/academy/PageBlocks";
 import type { AcademyCourse, AcademyInstructor, AcademyInstructorPage, AcademyMaterial } from "@/types/database";
 
 function kindIcon(kind: AcademyMaterial["kind"]) {
@@ -51,6 +51,9 @@ function StudyContent() {
         const course = courseMap[rec.course_id];
         const courseMaterials = materials.filter((m) => m.course_id === rec.course_id);
         const page = pageMap[rec.course_id];
+        // AC-C3: 講師専用ページに「教材リスト」ブロックがあれば、そこ(PageBlocks内)に一覧を差し込む。
+        // 旧データ（ブロック未設置）との互換のため、無い場合だけ末尾に別枠で表示する。
+        const hasMaterialsBlock = pageBlocksHasMaterialsList(page?.blocks);
         return (
           <section key={rec.id} className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
             <div className="flex items-center gap-2">
@@ -64,13 +67,13 @@ function StudyContent() {
               <>
                 {page?.blocks.length ? (
                   <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4 md:p-5">
-                    <PageBlocks blocks={page.blocks} />
+                    <PageBlocks blocks={page.blocks} materials={courseMaterials} />
                   </div>
                 ) : (
                   <p className="text-xs text-[var(--mikke-muted)]">復習ページは準備中です。</p>
                 )}
 
-                {courseMaterials.length ? (
+                {!hasMaterialsBlock && courseMaterials.length ? (
                   <div>
                     <p className="text-xs font-bold text-[var(--mikke-accent)]">教材・資料</p>
                     <ul className="mt-2 grid gap-1.5 md:grid-cols-2">

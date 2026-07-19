@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
 import type { AcademyFaqItem, AcademyFormField } from "@/types/database";
 import type { CourseInput } from "@/lib/academy/courses";
 
@@ -93,8 +94,8 @@ export function CourseForm({
           <input className={inputClass} value={form.subtitle} onChange={(e) => set("subtitle", e.target.value)} />
         </div>
         <div>
-          <label className={labelClass}>メイン画像URL</label>
-          <input className={inputClass} value={form.mainImageUrl} onChange={(e) => set("mainImageUrl", e.target.value)} placeholder="https://…" />
+          <label className={labelClass}>メイン画像</label>
+          <AcademyImageUploader currentUrl={form.mainImageUrl || undefined} onUploaded={(url) => set("mainImageUrl", url)} />
         </div>
         <div>
           <label className={labelClass}>講座説明</label>

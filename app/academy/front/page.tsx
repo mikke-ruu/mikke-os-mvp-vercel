@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ExternalLink, LayoutTemplate } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
@@ -111,8 +112,8 @@ function FrontContent() {
           />
         </div>
         <div>
-          <label className={labelClass}>メイン画像URL</label>
-          <input className={inputClass} value={form.hero_image_url} onChange={(e) => set("hero_image_url", e.target.value)} placeholder="https://…" />
+          <label className={labelClass}>メイン画像</label>
+          <AcademyImageUploader currentUrl={form.hero_image_url || undefined} onUploaded={(url) => set("hero_image_url", url)} />
         </div>
         <div>
           <label className={labelClass}>お問い合わせメール</label>
