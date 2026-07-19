@@ -1,6 +1,6 @@
-import { AppMiniPage } from "@/components/mikkeos/AppMiniPage";
+import { redirect } from "next/navigation";
 
-export default function AcademyMiniPage() {
-  return <AppMiniPage appKey="academy" />;
+export default function AcademyAppPage() {
+  redirect("/academy");
 }
 

@@ -50,7 +50,7 @@ export const mikkeApps: MikkeAppDefinition[] = [
     name: "Academy",
     shortName: "Academy",
     role: "講座、教材、受講、認定講師、キット注文を管理する入口。",
-    status: "planned",
+    status: "active",
     activityExamples: ["講座を作成", "受講申込を受付", "認定を完了", "更新を記録"],
     storyOutputs: ["講座実績", "認定実績", "講師プロフィール"],
     deskOutputs: ["講座売上", "教材売上", "更新料"],
