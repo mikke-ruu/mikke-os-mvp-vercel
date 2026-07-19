@@ -294,13 +294,25 @@ Activity Log出力:
 支援金・リターン原価     → DESK対象（強制private）
 ```
 
-### 4.6 Community（構想段階・Academy連動）
+### 4.6 Community（構想段階・2026-07-20訂正: Academy非依存の独立アプリ）
 
-最後に着手。理由: Academyのraw event方式（`academy_activity_events` → OS側変換）が先に固まると、Communityも同じ型で作れる。単体で設計を先行させない。
+**訂正（2026-07-20ユーザー確定）**: Academyで講師になった人だけがCommunity会員になるとは限らない。
+Academyを使わない事業者でも、Communityだけを立ち上げてオンラインサロン運営ができる。
+「認定講座構築を作ってAcademy・Communityの両方を使い、講師=会員」というスクールも今後出てくるが、
+それは数あるパターンの1つであって「AcademyとCommunityはイコール」ではない。
 
 ```text
-- 会員・月会費の構造はAcademyの受講者・受講料と共通化できる可能性が高い。
-- Academy側の会員モデルが見えてから設計する。
+- Community = 独立アプリ。会員はmikkeID単位で参加する（他アプリと同じ標準パターン）。
+  Academyの受講・講師データを前提条件にしない。
+- Academyとの連携は「あれば使える任意機能」として設計する。例: 「認定済み講師を
+  自動的にCommunity会員に加える」設定はONにできるが、既定では独立。
+  academy-app記憶に残る「academy_instructors→Community会員 紐付け1カラム追加」
+  のアイデアは、この任意連携の実装候補として温存する（必須の前提条件ではない）。
+- 会員・月会費の構造は、Academyの受講者・受講料と型が似る可能性はあるが、
+  Community自身の会員モデルとして単独で設計してよい（Academy側の決定を待たない）。
+- 着手順の理由だった「Academy確定待ち」は撤回。優先順位はビジネス都合
+  （2026-07-20時点: Academy→Community→Team Works→MarketNote→Event→Order→Session→Page）
+  で決める。
 ```
 
 ---
@@ -346,7 +358,8 @@ BP-3-a: Item Studio仕様抽出（読む対象: item-studio_2/item-studio.html, 
 BP-3-b: Item Studio MVP実装（台帳のみ・写真補正は外部リンク）
 BP-4:   Session実装（BP-1-b完了後に判断。単独の仕様抽出は不要）
 BP-5:   Fund実装（BP-1-b完了済み。MIKKEOS_FUND_IMPLEMENTATION_PLAN.mdのF1から段階実装）
-BP-6:   Community（Academyの会員モデル確定後に仕様化）
+BP-6:   Community（2026-07-20訂正: Academy会員モデル待ちではない独立アプリ。
+        4.6章参照。着手はビジネス優先順位で判断）
 ```
 
 依頼の前提条件:
@@ -366,7 +379,7 @@ Session / Fund の実装は BP-1-b（Order）がレビューを通ってから�
 決済（Stripe等）の実装方式      → 各アプリのSupabase本接続フェーズで
 Mikkeruu-codexのActivity Log接続 → 別フェーズで検討
 Fundの料金確定・法務文言・本部運用 → F5前に別途判断
-Communityの詳細設計              → Academy会員モデル確定後
+Community・Academyの任意連携（認定講師の自動会員化等）の具体仕様 → 着手時に別途
 ```
 
 ## 8. Event後続フェーズ（2026-07-13追記）
