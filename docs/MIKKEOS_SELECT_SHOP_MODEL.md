@@ -169,6 +169,38 @@ worker portalのアクセス制御をRLSで担保すること。
 3者で読めないことを実証）と同じパターンを worker portal に適用する。
 ```
 
+### N4監査結果（2026-07-19 Fable・ポリシーレビューのみ）
+
+`supabase/migrations/20260717155456_team_works_p8a_foundation.sql` のRLSポリシーを読んだ。
+
+```text
+確認できたこと（良い兆候）:
+- payouts/invoicesは payee_member_id / billed_member_id を
+  auth.uid() に紐づく organization_member行と突き合わせるusing句で、
+  本人以外は行ごと見えない設計になっている（UIフィルタではなくDB層で強制）。
+- tasks/resourcesも assignee_member_id・audience区分でproject_role='worker'を
+  経由した絞り込みがあり、他ワーカーのタスク・資料が無条件に見えるRLSではない。
+- team_works_organization_members テーブル自体には氏名(display_name)・
+  role・statusのみで、住所等の個人情報カラムはまだ存在しない
+  （＝現時点でセレクトショップ用の発送先情報を保持するテーブルがそもそも無い）。
+
+まだ足りないこと（未着手のまま）:
+- 上記はSQL定義を読んでの静的レビューであり、Fund F5-aで実施した
+  「owner／別authenticated actor／anonの3者で実際にログインして確認する」
+  否定testそのものは未実施（自動テストにもなっていない）。
+- セレクトショップ用の発送先情報カラム・テーブルは未設計・未実装
+  （worker=提携店舗の個人情報を載せる箱がまだ無いので、今は漏洩しようがない）。
+
+結論: 既存のpayout/invoice/task RLSパターンは、セレクトショップの
+worker portal要件（本人分だけ見える）を満たす形で既に確立されている
+（新規に考案する必要はなく、同じパターンを流用できる）。
+ただし「本当に守られているか」の実地3者テストは、発送先情報を実装する
+セレクトショップ着手時に、その新テーブル・新カラムに対して行うのが
+筋が良い（今、対象データの無い状態でテストしても検証にならない）。
+→ 着手条件は「解除」ではなく「実装方式は確立済み・実地テストは
+   セレクトショップ本体の着手と同時に行う」に更新する。
+```
+
 ## 10. 実装に必要なもの
 
 ```text
