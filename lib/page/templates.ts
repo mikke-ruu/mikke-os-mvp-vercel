@@ -90,6 +90,40 @@ function style(overrides: PageBlockStyle = {}): PageBlockStyle {
   return { spacing: "normal", radius: "medium", animation: "none", textAlign: "left", ...overrides };
 }
 
+// テンプレートの初期イメージを湧かせるための同梱デモ写真（public/page-templates/）。
+// ユーザーが実際の写真に差し替えるまでの仮画像。Mikke Mediaは使わず容量を消費しない。
+function templateAssetUrl(file: string) {
+  return `/page-templates/${file}`;
+}
+
+const starterHeroPhotos: Record<Exclude<PageStarterTemplateId, "blank">, { file: string; alt: string }> = {
+  company: { file: "hero-company.webp", alt: "小さなオフィスでの打ち合わせの様子" },
+  service: { file: "hero-service.webp", alt: "丁寧にサービスを提供する手元" },
+  portfolio: { file: "hero-portfolio.webp", alt: "ハンドメイド作家のアトリエ風景" },
+  "connect-partners": { file: "hero-portal.webp", alt: "屋外マルシェを歩く人々" }
+};
+
+const aboutSectionPhoto = { file: "about-1.webp", alt: "白い棚に飾られた手作りの雑貨と花" };
+
+const galleryDemoPhotos = [
+  { file: "gallery-1.webp", alt: "白背景に置かれたハンドメイドアクセサリー" },
+  { file: "gallery-2.webp", alt: "木のトレイに並ぶ焼き菓子" },
+  { file: "gallery-3.webp", alt: "白壁に掛かるドライフラワーのスワッグ" }
+];
+
+function createHeroShowcaseBlock(templateId: Exclude<PageStarterTemplateId, "blank">, order: number): PageBlock {
+  const photo = starterHeroPhotos[templateId];
+  return {
+    id: id("page_image"),
+    type: "image",
+    order,
+    alt: photo.alt,
+    imageUrl: templateAssetUrl(photo.file),
+    fit: "cover",
+    style: style({ radius: "large", spacing: "spacious" })
+  };
+}
+
 export function clonePageTheme(theme: PageSiteTheme = defaultPageTheme): PageSiteTheme {
   return { ...theme };
 }
@@ -111,7 +145,7 @@ export function createSectionTemplate(templateId: PageSectionTemplateId, startOr
       title: "私たちについて",
       ratio: "1-1",
       columns: [
-        { id: id("page_column"), title: "写真で伝える", text: "ファイルから写真を追加できます。", imageUrl: "", imageAlt: "" },
+        { id: id("page_column"), title: "写真で伝える", text: "ファイルから写真を追加できます。", imageUrl: templateAssetUrl(aboutSectionPhoto.file), imageAlt: aboutSectionPhoto.alt },
         { id: id("page_column"), eyebrow: "ABOUT", title: "大切にしていること", text: "活動の背景や、大事にしている価値観を書きます。", imageUrl: "", imageAlt: "", buttonLabel: "もっと知る", href: "#" }
       ],
       style: style({ spacing: "spacious", animation: "fade-up" })
@@ -178,33 +212,45 @@ export function createStarterTemplate(templateId: PageStarterTemplateId): PageBl
   if (templateId === "company") {
     return [
       ...createSectionTemplate("hero", 1),
-      ...createSectionTemplate("image-text", 4),
-      ...createSectionTemplate("company", 5),
-      ...createSectionTemplate("cta", 6)
+      createHeroShowcaseBlock("company", 4),
+      ...createSectionTemplate("image-text", 5),
+      ...createSectionTemplate("company", 6),
+      ...createSectionTemplate("cta", 7)
     ];
   }
   if (templateId === "service") {
     return [
       ...createSectionTemplate("hero", 1),
-      ...createSectionTemplate("features", 4),
-      ...createSectionTemplate("cms", 5),
-      ...createSectionTemplate("cta", 6)
+      createHeroShowcaseBlock("service", 4),
+      ...createSectionTemplate("features", 5),
+      ...createSectionTemplate("cms", 6),
+      ...createSectionTemplate("cta", 7)
     ];
   }
   if (templateId === "portfolio") {
     return [
       ...createSectionTemplate("hero", 1),
-      { id: id("page_gallery"), type: "gallery", order: 4, title: "ギャラリー", columns: 3, images: [], style: style({ spacing: "spacious" }) },
-      ...createSectionTemplate("cms", 5)
+      createHeroShowcaseBlock("portfolio", 4),
+      {
+        id: id("page_gallery"),
+        type: "gallery",
+        order: 5,
+        title: "ギャラリー",
+        columns: 3,
+        images: galleryDemoPhotos.map((photo) => ({ id: id("page_media"), imageUrl: templateAssetUrl(photo.file), alt: photo.alt })),
+        style: style({ spacing: "spacious" })
+      },
+      ...createSectionTemplate("cms", 6)
     ];
   }
   return [
     { id: id("page_heading"), type: "heading", order: 1, level: 1, text: "Connect / Partners", style: style({ textAlign: "center", spacing: "spacious", animation: "fade-up" }) },
     { id: id("page_text"), type: "text", order: 2, text: "mikkeIDでつながる活動・商品・イベント・応援プロジェクトを紹介します。", size: "large", style: style({ textAlign: "center" }) },
+    createHeroShowcaseBlock("connect-partners", 3),
     ...(["story", "item_studio", "event", "fund", "community"] as const).map((source, index) => ({
       id: id("page_cms"),
       type: "cms" as const,
-      order: index + 3,
+      order: index + 4,
       source,
       displayMode: "cards" as const,
       title: source === "story" ? "つながる人" : source === "fund" ? "応援したい活動" : source === "community" ? "コミュニティ" : "活動を知る",
