@@ -61,7 +61,7 @@ function imageSource(item: Pick<PageMediaItem, "asset" | "imageUrl">) {
   return item.asset?.publicUrl || item.imageUrl;
 }
 
-export function PageRenderer({ document, theme, cmsContent, compact = false, editor, viewport }: {
+export function PageRenderer({ document, theme, cmsContent, compact = false, editor, viewport, decorative = false }: {
   document: Pick<PageDocument, "mode" | "blocks" | "htmlDocument">;
   theme: PageSiteTheme;
   cmsContent: Record<PageCmsSource, PageCmsItem[]>;
@@ -71,6 +71,8 @@ export function PageRenderer({ document, theme, cmsContent, compact = false, edi
     selectedBlockId: string | null;
     onSelectBlock: (blockId: string) => void;
   };
+  /** サムネイル・カードプレビューなど、外側が既に<Link>（<a>）の時に使う。ブロック内のa要素をspanへ差し替え、a-in-aの入れ子を防ぐ。 */
+  decorative?: boolean;
 }) {
   if (document.mode === "html") {
     const srcDoc = buildSandboxedHtmlDocument(document.htmlDocument);
@@ -105,7 +107,7 @@ export function PageRenderer({ document, theme, cmsContent, compact = false, edi
             style={blockShellStyle(block, theme)}
           >
             {editor ? <span className={`pointer-events-none absolute left-2 top-2 z-10 rounded-full bg-[var(--mikke-primary)] px-2 py-1 text-[10px] font-bold text-white shadow-sm ${editor.selectedBlockId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>クリックして編集</span> : null}
-            <RenderedBlock block={block} cmsContent={cmsContent} theme={theme} compact={compact} viewport={viewport} />
+            <RenderedBlock block={block} cmsContent={cmsContent} theme={theme} compact={compact} viewport={viewport} decorative={decorative} />
           </div>
         ))}
       </div>
@@ -113,7 +115,7 @@ export function PageRenderer({ document, theme, cmsContent, compact = false, edi
   );
 }
 
-function RenderedBlock({ block, cmsContent, theme, compact, viewport }: { block: PageBlock; cmsContent: Record<PageCmsSource, PageCmsItem[]>; theme: PageSiteTheme; compact: boolean; viewport?: "desktop" | "tablet" | "mobile" }) {
+function RenderedBlock({ block, cmsContent, theme, compact, viewport, decorative }: { block: PageBlock; cmsContent: Record<PageCmsSource, PageCmsItem[]>; theme: PageSiteTheme; compact: boolean; viewport?: "desktop" | "tablet" | "mobile"; decorative: boolean }) {
   if (block.type === "heading") {
     const size = block.level === 1 ? (compact || viewport === "mobile" ? "text-3xl" : viewport === "tablet" ? "text-5xl" : "text-4xl sm:text-6xl") : block.level === 2 ? (compact || viewport === "mobile" ? "text-2xl" : "text-3xl sm:text-4xl") : "text-xl sm:text-2xl";
     return <h2 className={`${size} font-extrabold leading-tight tracking-tight`} style={{ fontFamily: "var(--page-heading-font)" }}>{block.text || "見出し"}</h2>;
@@ -130,14 +132,17 @@ function RenderedBlock({ block, cmsContent, theme, compact, viewport }: { block:
     const radius = theme.buttonStyle === "pill" ? "rounded-full" : theme.buttonStyle === "square" ? "rounded-none" : "rounded-xl";
     const variant = block.variant ?? "solid";
     const style = variant === "solid" ? { backgroundColor: "var(--page-primary)", color: "white" } : variant === "outline" ? { borderColor: "var(--page-primary)", color: "var(--page-primary)" } : { backgroundColor: "color-mix(in srgb, var(--page-primary) 12%, white)", color: "var(--page-primary)" };
-    return <a href={block.href || "#"} className={`inline-flex border px-5 py-3 text-sm font-bold ${radius}`} style={style}>{block.label || "ボタン"}</a>;
+    const buttonClassName = `inline-flex border px-5 py-3 text-sm font-bold ${radius}`;
+    return decorative
+      ? <span className={buttonClassName} style={style}>{block.label || "ボタン"}</span>
+      : <a href={block.href || "#"} className={buttonClassName} style={style}>{block.label || "ボタン"}</a>;
   }
   if (block.type === "form") return <section className="mx-auto max-w-xl rounded-2xl border border-black/10 bg-white/80 p-5 text-left"><h3 className="text-lg font-bold">{block.title}</h3><p className="mt-2 text-sm leading-6 opacity-70">{block.description}</p><div className="mt-4 h-11 rounded-xl border border-black/10 bg-white" /><button type="button" disabled className="mt-3 rounded-xl px-5 py-3 text-sm font-bold text-white opacity-60" style={{ backgroundColor: "var(--page-primary)" }}>{block.buttonLabel}</button></section>;
   if (block.type === "divider") return <hr className="border-black/10" />;
   if (block.type === "company") return <section><h2 className="mb-5 text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title}</h2><dl className="divide-y divide-black/10 border-y border-black/10">{block.rows.map((row) => <div key={row.id} className="grid gap-1 py-4 sm:grid-cols-[160px_1fr]"><dt className="text-sm font-bold opacity-60">{row.label}</dt><dd className="whitespace-pre-wrap text-sm leading-7">{row.value || "—"}</dd></div>)}</dl></section>;
   if (block.type === "columns") {
     const grid = viewport === "mobile" ? "grid-cols-1" : viewport ? (block.ratio === "three" ? "grid-cols-3" : block.ratio === "1-2" ? "grid-cols-[1fr_2fr]" : block.ratio === "2-1" ? "grid-cols-[2fr_1fr]" : "grid-cols-2") : block.ratio === "three" ? "md:grid-cols-3" : block.ratio === "1-2" ? "md:grid-cols-[1fr_2fr]" : block.ratio === "2-1" ? "md:grid-cols-[2fr_1fr]" : "md:grid-cols-2";
-    return <section>{block.title ? <h2 className="mb-6 text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title}</h2> : null}<div className={`grid gap-5 ${grid}`}>{block.columns.map((column) => <article key={column.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white/70">{column.asset?.publicUrl || column.imageUrl ? <img src={column.asset?.publicUrl || column.imageUrl} alt={column.imageAlt || ""} loading="lazy" className="h-52 w-full object-cover" /> : null}<div className="p-5">{column.eyebrow ? <p className="text-xs font-bold tracking-[.15em]" style={{ color: "var(--page-accent)" }}>{column.eyebrow}</p> : null}<h3 className="mt-1 text-xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{column.title}</h3><p className="mt-3 whitespace-pre-wrap text-sm leading-7 opacity-75">{column.text}</p>{column.buttonLabel ? <a href={column.href || "#"} className="mt-4 inline-flex text-sm font-bold" style={{ color: "var(--page-primary)" }}>{column.buttonLabel} →</a> : null}</div></article>)}</div></section>;
+    return <section>{block.title ? <h2 className="mb-6 text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title}</h2> : null}<div className={`grid gap-5 ${grid}`}>{block.columns.map((column) => <article key={column.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white/70">{column.asset?.publicUrl || column.imageUrl ? <img src={column.asset?.publicUrl || column.imageUrl} alt={column.imageAlt || ""} loading="lazy" className="h-52 w-full object-cover" /> : null}<div className="p-5">{column.eyebrow ? <p className="text-xs font-bold tracking-[.15em]" style={{ color: "var(--page-accent)" }}>{column.eyebrow}</p> : null}<h3 className="mt-1 text-xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{column.title}</h3><p className="mt-3 whitespace-pre-wrap text-sm leading-7 opacity-75">{column.text}</p>{column.buttonLabel ? (decorative ? <span className="mt-4 inline-flex text-sm font-bold" style={{ color: "var(--page-primary)" }}>{column.buttonLabel} →</span> : <a href={column.href || "#"} className="mt-4 inline-flex text-sm font-bold" style={{ color: "var(--page-primary)" }}>{column.buttonLabel} →</a>) : null}</div></article>)}</div></section>;
   }
   if (block.type === "gallery") return <section><h2 className="mb-5 text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title}</h2>{block.images.length ? <div className={`grid gap-3 ${viewport === "mobile" ? "grid-cols-2" : viewport ? (block.columns === 4 ? "grid-cols-4" : block.columns === 3 ? "grid-cols-3" : "grid-cols-2") : block.columns === 2 ? "grid-cols-2" : block.columns === 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-2 md:grid-cols-3"}`}>{block.images.map((item) => <figure key={item.id}><img src={imageSource(item)} alt={item.alt} loading="lazy" className="aspect-square w-full rounded-xl object-cover" />{item.caption ? <figcaption className="mt-1 text-xs opacity-60">{item.caption}</figcaption> : null}</figure>)}</div> : <ImagePlaceholder label="画像を追加するとグリッド表示されます" />}</section>;
   if (block.type === "slideshow") return <Slideshow block={block} />;
@@ -149,10 +154,10 @@ function RenderedBlock({ block, cmsContent, theme, compact, viewport }: { block:
     const srcDoc = buildSandboxedHtmlDocument(block);
     return <section>{block.title ? <h2 className="mb-4 text-xl font-bold">{block.title}</h2> : null}<iframe title={block.title || "HTMLブロック"} srcDoc={srcDoc} sandbox={block.allowScripts ? "allow-scripts allow-forms allow-popups" : ""} style={{ height: Math.max(180, Math.min(1200, block.height)) }} className="w-full rounded-2xl border border-black/10 bg-white" /></section>;
   }
-  return <CmsBlock block={block} items={cmsContent[block.source]} />;
+  return <CmsBlock block={block} items={cmsContent[block.source]} decorative={decorative} />;
 }
 
-function CmsBlock({ block, items }: { block: PageCmsBlock; items: PageCmsItem[] }) {
+function CmsBlock({ block, items, decorative }: { block: PageCmsBlock; items: PageCmsItem[]; decorative: boolean }) {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const selected = block.filters.selectedItemIds ?? [];
   const filtered = useMemo(() => items.filter((item) => {
@@ -162,7 +167,7 @@ function CmsBlock({ block, items }: { block: PageCmsBlock; items: PageCmsItem[] 
     return true;
   }), [block.filters.approvedOnly, block.filters.thisMonthOnly, currentMonth, items, selected]);
   const visible = block.displayMode === "featured" ? filtered.slice(0, 1) : filtered.slice(0, 8);
-  return <section><div className="flex items-end justify-between gap-3"><h2 className="text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title || sourceLabels[block.source]}</h2><span className="text-xs font-bold opacity-50">{sourceLabels[block.source]}</span></div>{visible.length === 0 ? <p className="mt-4 rounded-xl bg-black/5 p-5 text-sm opacity-60">公開中の表示候補はありません。</p> : <div className={block.displayMode === "list" ? "mt-4 space-y-3" : "mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"}>{visible.map((item) => <article key={item.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white/80">{item.imageUrl && block.displayMode !== "list" ? <img src={item.imageUrl} alt="" loading="lazy" className="h-40 w-full object-cover" /> : null}<div className="p-4"><h3 className="font-bold">{item.title}</h3>{item.summary ? <p className="mt-2 line-clamp-3 text-sm leading-6 opacity-65">{item.summary}</p> : null}{item.meta ? <p className="mt-3 text-xs font-bold" style={{ color: "var(--page-accent)" }}>{item.meta}</p> : null}{item.href ? <a href={item.href} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-xs font-bold" style={{ color: "var(--page-primary)" }}>詳しく見る →</a> : null}</div></article>)}</div>}</section>;
+  return <section><div className="flex items-end justify-between gap-3"><h2 className="text-2xl font-bold" style={{ fontFamily: "var(--page-heading-font)" }}>{block.title || sourceLabels[block.source]}</h2><span className="text-xs font-bold opacity-50">{sourceLabels[block.source]}</span></div>{visible.length === 0 ? <p className="mt-4 rounded-xl bg-black/5 p-5 text-sm opacity-60">公開中の表示候補はありません。</p> : <div className={block.displayMode === "list" ? "mt-4 space-y-3" : "mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"}>{visible.map((item) => <article key={item.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white/80">{item.imageUrl && block.displayMode !== "list" ? <img src={item.imageUrl} alt="" loading="lazy" className="h-40 w-full object-cover" /> : null}<div className="p-4"><h3 className="font-bold">{item.title}</h3>{item.summary ? <p className="mt-2 line-clamp-3 text-sm leading-6 opacity-65">{item.summary}</p> : null}{item.meta ? <p className="mt-3 text-xs font-bold" style={{ color: "var(--page-accent)" }}>{item.meta}</p> : null}{item.href ? (decorative ? <span className="mt-3 inline-flex text-xs font-bold" style={{ color: "var(--page-primary)" }}>詳しく見る →</span> : <a href={item.href} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-xs font-bold" style={{ color: "var(--page-primary)" }}>詳しく見る →</a>) : null}</div></article>)}</div>}</section>;
 }
 
 function Slideshow({ block }: { block: Extract<PageBlock, { type: "slideshow" }> }) {

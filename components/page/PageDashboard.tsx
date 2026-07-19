@@ -85,7 +85,7 @@ export function PageDashboard() {
                 <div className="relative aspect-[16/9] overflow-hidden" style={{ backgroundColor: site.theme.backgroundColor }}>
                   {firstPage ? (
                     <PageDeviceFrame device="desktop" zoomMode="auto" mode="crop" className="pointer-events-none">
-                      <PageRenderer document={{ mode: firstPage.mode, blocks: firstPage.blocks, htmlDocument: firstPage.htmlDocument }} theme={site.theme} cmsContent={emptyPageCmsContent} compact />
+                      <PageRenderer document={{ mode: firstPage.mode, blocks: firstPage.blocks, htmlDocument: firstPage.htmlDocument }} theme={site.theme} cmsContent={emptyPageCmsContent} compact decorative />
                     </PageDeviceFrame>
                   ) : (
                     <div className="grid h-full place-items-center bg-gradient-to-br from-[var(--mikke-surface-soft)] to-white">

@@ -49,6 +49,7 @@ export function PageTemplatePreview({ templateId, selected = false }: { template
               theme={theme}
               cmsContent={emptyPageCmsContent}
               compact
+              decorative
             />
           </PageDeviceFrame>
         )}
