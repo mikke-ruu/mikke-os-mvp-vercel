@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  Activity,
   BriefcaseBusiness,
   BookOpenText,
   ChevronRight,
@@ -38,8 +37,7 @@ export type MikkeOwnerMenuProps = {
 };
 
 const defaultEditItems: MikkeOwnerMenuItem[] = [
-  { title: "表示設定", helper: "このアプリの見せ方を整える", href: "/settings", icon: Settings },
-  { title: "Log", helper: "内部の活動記録を確認する", href: "/log", icon: Activity }
+  { title: "表示設定", helper: "このアプリの見せ方を整える", href: "/settings", icon: Settings }
 ];
 
 const defaultOwnedApps: MikkeOwnerMenuItem[] = [
