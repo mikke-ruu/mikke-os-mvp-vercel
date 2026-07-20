@@ -365,86 +365,125 @@ comment on column public.academy_kit_orders.instructor_note is
   '講師から本部へのメッセージ（任意）。既存のtitle列とは別に持つ（titleは講座名ベースで自動生成する運用に変更）。';
 ```
 
-### AC-E6: academy_applications のSELECT RLS変更（要調査の上、投入）
+### AC-E6: academy_applications のSELECT/UPDATE RLS変更（実ポリシー確認済み・確定版）
 
-実装時に `supabase/migrations` 配下および本リポジトリ全体を検索したが、
-`academy_applications` のCREATE TABLE文・既存RLSポリシー定義を記録したSQLファイルは
-**見つからなかった**（Academy関連テーブルはSupabaseダッシュボード側で直接作成されており、
-migrationとして記録されていない）。また本実装環境（Sonnetサブエージェント実行環境）には
-service_role鍵・DB接続パスワードが無く、`pg_policies` への問い合わせも実行できなかった
-（`.env.local` にはNEXT_PUBLIC_SUPABASE_URL・NEXT_PUBLIC_SUPABASE_ANON_KEYのみ存在）。
+あゆみがSupabase SQL Editorで `pg_policies` を実際に照会し、既存の全ポリシーを確認した
+（2026-07-20）。既存ポリシーは以下の5本のみ（migrationファイルには記録されておらず、
+Supabaseダッシュボード側で直接作成されたもの）:
 
-そのため「実ファイルを確認してから書く」という指示を、「まず実DBのポリシー名を確認してから
-DROP対象を特定する」という手順に代えて進める。**既存ポリシー名を確認せずに新ポリシーだけ
-追加すると、Postgresの複数PERMISSIVEポリシーはOR結合されるため、古い（全件許可の）
-ポリシーが生き残って新しい制限が効かない**。必ず手順1→2の順で実行すること。
-
-```sql
--- 手順1: 現在academy_applicationsに設定されているSELECTポリシーを確認する
-select policyname, cmd, qual, with_check
-from pg_policies
-where schemaname = 'public' and tablename = 'academy_applications';
-
--- 手順2: 手順1で出てきた既存ポリシー名を確認し、以下の "<既存のSELECTポリシー名>" を
--- 実際の名前に置き換えてから、DROPと3本の新ポリシー作成を実行する
--- （SELECTポリシーが複数見つかった場合は、該当するもの全てをDROPすること）
-drop policy if exists "<既存のSELECTポリシー名>" on public.academy_applications;
-
--- 本部オーナーは intake_source='honbu' の行だけSELECT可能
-create policy "academy_applications_select_honbu_own_source"
-  on public.academy_applications
-  for select
-  to authenticated
-  using (
-    academy_applications.intake_source = 'honbu'
-    and exists (
-      select 1 from public.academy_headquarters h
-      where h.id = academy_applications.headquarters_id
-        and h.user_id = auth.uid()
-    )
-  );
-
--- 担当講師本人（instructor_idが自分のprofile_idに一致 = academy_instructors.user_id経由）
-create policy "academy_applications_select_instructor_koushi"
-  on public.academy_applications
-  for select
-  to authenticated
-  using (
-    academy_applications.intake_source = 'koushi'
-    and exists (
-      select 1 from public.academy_instructors i
-      where i.id = academy_applications.instructor_id
-        and i.user_id = auth.uid()
-    )
-  );
-
--- 申込者本人（user_id = auth.uid()）
-create policy "academy_applications_select_own"
-  on public.academy_applications
-  for select
-  to authenticated
-  using (academy_applications.user_id = auth.uid());
+```text
+applications delete hq            DELETE  USING: academy_owns_hq(headquarters_id)
+applications insert hq or instructor  INSERT  WITH CHECK: (user_id = auth.uid()) AND
+    (academy_owns_hq(headquarters_id) OR ((intake_source = 'koushi') AND
+     academy_is_instructor_self(instructor_id)))
+applications read hq or instructor    SELECT  USING: academy_owns_hq(headquarters_id) OR
+    academy_is_instructor_self(instructor_id)
+applications update hq or instructor  UPDATE  USING/WITH CHECK: 同上のSELECTと同じ条件
+public can submit applications        INSERT  （匿名の公開申込フォーム用。is_published等の
+    講座側条件で判定。変更不要）
 ```
 
-実装済みの `app/academy/applications/page.tsx`・`app/academy/applications/[id]/page.tsx`
-（本部側の申込一覧・詳細）は、上記適用後は `intake_source='koushi'` の申込を返さなくなる
-（これは設計通りの副作用。本部は koushi 申込の件数・存在を `academy_kit_orders` 経由で
-把握する、という§12の方針通り）。
+判明した通り、SELECT/UPDATEどちらも「本部かどうか／担当講師かどうか」だけで判定しており
+`intake_source`の区別が無い（本部が講師受付分も含め全件見えてしまう）。また「申込者本人が
+自分の申込を見る」ポリシーがそもそも存在しない（AC-E7の受講後フローが動かない原因）。
 
-**参考: AC-E7の動作に追加で必要と判明した項目（AC-E6の指示範囲外だが、実装中に発見した
-ため参考として記載。実行要否はあゆみの判断に委ねる。いずれも未実行）**
+以下が確定版SQL。DROP対象のポリシー名・条件は上記で確認済みの実物なので、
+そのまま上から順に実行すればよい。
 
 ```sql
--- (a) 公開申込フォーム(submitPublicApplication)はuser_id: nullで登録する（匿名申込のため）。
---     そのため上記「申込者本人(user_id=auth.uid())」ポリシーだけでは、受講後にログインしても
---     自分の申込にヒットしない可能性が高い。対応案: 上記2つの新ポリシーのUSING句に
---     以下をORで追加すると、ログイン中のメールアドレスと申込のapplicant_emailが一致する行も
---     見えるようになる（user_idの事後紐付け作業をしなくても機能する）。
---       or academy_applications.applicant_email = (auth.jwt() ->> 'email')
+-- ============================================================
+-- SELECT: 本部はintake_source='honbu'のみ。担当講師は自分の担当分（変更なし）。
+--         申込者本人も自分の行を見られるようにする（user_id一致、または
+--         匿名申込(user_id null)の場合はログイン中のメールアドレスと照合）。
+-- ============================================================
+drop policy "applications read hq or instructor" on public.academy_applications;
 
--- (b) 「認定講師登録する」は受講者本人がacademy_instructorsへ直接INSERTする設計。
---     現状のINSERTポリシーは本部専用の可能性が高く、受講者本人からのINSERTを許可する
---     ポリシーが別途必要になる見込み:
+create policy "applications read hq or instructor or self"
+  on public.academy_applications
+  for select
+  to authenticated
+  using (
+    (academy_owns_hq(headquarters_id) and intake_source = 'honbu')
+    or academy_is_instructor_self(instructor_id)
+    or user_id = auth.uid()
+    or (user_id is null and applicant_email = (auth.jwt() ->> 'email'))
+  );
+
+-- ============================================================
+-- UPDATE: 本部・担当講師の既存の更新権限はそのまま維持しつつ（本部は
+--         honbu受付分のみに絞る）、申込者本人にも許可を広げる。
+--         ただし本人による更新は community_interest 以外の列を変更できないよう
+--         トリガーで強制する（下のguard_academy_application_self_columns参照。
+--         academy_instructorsの既存のguard_academy_instructor_columnsと同じ考え方）。
+-- ============================================================
+drop policy "applications update hq or instructor" on public.academy_applications;
+
+create policy "applications update hq or instructor or self"
+  on public.academy_applications
+  for update
+  to authenticated
+  using (
+    (academy_owns_hq(headquarters_id) and intake_source = 'honbu')
+    or academy_is_instructor_self(instructor_id)
+    or user_id = auth.uid()
+    or (user_id is null and applicant_email = (auth.jwt() ->> 'email'))
+  )
+  with check (
+    (academy_owns_hq(headquarters_id) and intake_source = 'honbu')
+    or academy_is_instructor_self(instructor_id)
+    or user_id = auth.uid()
+    or (user_id is null and applicant_email = (auth.jwt() ->> 'email'))
+  );
+
+create or replace function public.guard_academy_application_self_columns()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- 本部（honbu受付分）または担当講師による更新は従来通り無制限に許可
+  if (academy_owns_hq(new.headquarters_id) and new.intake_source = 'honbu')
+     or academy_is_instructor_self(new.instructor_id) then
+    return new;
+  end if;
+
+  -- それ以外（=申込者本人によるセルフ更新）は community_interest 以外を
+  -- 元の値へ戻す。ステータス・金額・受講者情報などを本人が書き換えられないようにする。
+  new.status := old.status;
+  new.payment_status := old.payment_status;
+  new.certification_status := old.certification_status;
+  new.price := old.price;
+  new.kit_cost := old.kit_cost;
+  new.honbu_revenue := old.honbu_revenue;
+  new.instructor_revenue := old.instructor_revenue;
+  new.applicant_name := old.applicant_name;
+  new.applicant_email := old.applicant_email;
+  new.applicant_phone := old.applicant_phone;
+  new.applicant_note := old.applicant_note;
+  new.instructor_id := old.instructor_id;
+  new.intake_source := old.intake_source;
+  new.diploma_name_en := old.diploma_name_en;
+  new.applicant_shipping_address := old.applicant_shipping_address;
+  new.form_answers := old.form_answers;
+  new.event_date := old.event_date;
+  new.format := old.format;
+  new.display_on_story := old.display_on_story;
+  new.reflect_on_desk := old.reflect_on_desk;
+  return new;
+end;
+$$;
+
+drop trigger if exists guard_academy_application_self_columns on public.academy_applications;
+create trigger guard_academy_application_self_columns
+  before update on public.academy_applications
+  for each row
+  execute function public.guard_academy_application_self_columns();
+
+-- ============================================================
+-- academy_instructors: 受講者本人による「認定講師登録する」のセルフINSERTを許可
+-- （既存のINSERTポリシーは変更しない・新規ポリシーを追加するだけなので安全）
+-- ============================================================
 create policy "academy_instructors_self_register"
   on public.academy_instructors
   for insert
@@ -453,23 +492,15 @@ create policy "academy_instructors_self_register"
     user_id = auth.uid()
     and profile_id in (select id from public.profiles where user_id = auth.uid())
   );
-
--- (c) 「communityに参加する」はacademy_applications.community_interestを受講者本人が
---     UPDATEする設計。現状のUPDATEポリシーは本部専用の可能性が高く、受講者本人からの
---     UPDATEを許可するポリシーが別途必要になる見込み:
-create policy "academy_applications_self_update_community_interest"
-  on public.academy_applications
-  for update
-  to authenticated
-  using (
-    user_id = auth.uid()
-    or applicant_email = (auth.jwt() ->> 'email')
-  )
-  with check (
-    user_id = auth.uid()
-    or applicant_email = (auth.jwt() ->> 'email')
-  );
 ```
+
+適用後の影響（設計通りの副作用）: `app/academy/applications/page.tsx`・
+`app/academy/applications/[id]/page.tsx`（本部側の申込一覧・詳細）は、
+`intake_source='koushi'` の申込を返さなくなる。本部は koushi 申込の件数・存在を
+`academy_kit_orders` 経由（§12の方針通り）で把握する。
+
+**INSERT（本部/講師）・DELETEポリシーは変更不要**（既存のまま。本部/講師が新規作成・
+削除する場合の条件は現状で問題ない）。
 
 ## 10. Wave C実装メモ（2026-07-20 Sonnet実装・夜間実行）
 
