@@ -35,7 +35,9 @@ function NewApplicationContent() {
     price: 0,
     kitCost: 0,
     honbuRevenue: 0,
-    instructorRevenue: 0
+    instructorRevenue: 0,
+    diplomaNameEn: "",
+    applicantShippingAddress: ""
   });
 
   useEffect(() => {
@@ -137,6 +139,10 @@ function NewApplicationContent() {
           </div>
         </div>
         <div>
+          <label className={labelClass}>ディプロマに入れるお名前（英語表記）*</label>
+          <input className={inputClass} value={form.diplomaNameEn} onChange={(e) => set("diplomaNameEn", e.target.value)} placeholder="例: Taro Yamada" />
+        </div>
+        <div>
           <label className={labelClass}>メモ（内部用）</label>
           <textarea className={`${inputClass} min-h-16`} value={form.applicantNote} onChange={(e) => set("applicantNote", e.target.value)} />
         </div>
@@ -158,6 +164,17 @@ function NewApplicationContent() {
             </select>
           </div>
         </div>
+        {form.format === "online" ? (
+          <div>
+            <label className={labelClass}>配送先情報（オンライン受講時）</label>
+            <textarea
+              className={`${inputClass} min-h-16`}
+              value={form.applicantShippingAddress}
+              onChange={(e) => set("applicantShippingAddress", e.target.value)}
+              placeholder="キットのお届け先"
+            />
+          </div>
+        ) : null}
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className={labelClass}>受講料（円）</label>

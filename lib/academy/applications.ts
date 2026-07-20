@@ -48,6 +48,9 @@ export type ApplicationInput = {
   kitCost: number;
   honbuRevenue: number;
   instructorRevenue: number;
+  // Wave E (AC-E3): 公開申込フォームと項目を揃える。
+  diplomaNameEn: string;
+  applicantShippingAddress: string;
 };
 
 export async function listApplications(headquartersId: string) {
@@ -88,6 +91,8 @@ export async function createApplication(profile: Profile, headquartersId: string
       applicant_note: input.applicantNote || null,
       event_date: input.eventDate || null,
       format: input.format || null,
+      diploma_name_en: input.diplomaNameEn.trim() || null,
+      applicant_shipping_address: input.applicantShippingAddress || null,
       price: input.price,
       kit_cost: input.kitCost,
       honbu_revenue: input.honbuRevenue,

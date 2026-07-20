@@ -83,6 +83,10 @@ export type PublicApplicationInput = {
   eventDate: string;
   format: "in_person" | "online" | "";
   formAnswers: Record<string, string>;
+  // Wave E (AC-E2): ディプロマに入れる英語表記名（必須項目）。
+  diplomaNameEn: string;
+  // Wave E (AC-E2): オンライン受講時のみ入力する配送先情報。
+  applicantShippingAddress: string;
 };
 
 export async function submitPublicApplication(input: PublicApplicationInput) {
@@ -100,6 +104,8 @@ export async function submitPublicApplication(input: PublicApplicationInput) {
     form_answers: input.formAnswers,
     event_date: input.eventDate || null,
     format: input.format || null,
+    diploma_name_en: input.diplomaNameEn.trim() || null,
+    applicant_shipping_address: input.applicantShippingAddress || null,
     price: input.course.price,
     kit_cost: 0,
     honbu_revenue: 0,

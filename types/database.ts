@@ -206,6 +206,15 @@ export type AcademyInstructor = {
   updated_at: string;
 };
 
+// Wave E (AC-E1): 講師の配送先住所帳（新規テーブル・複数登録可）。
+export type AcademyInstructorAddress = {
+  id: string;
+  instructor_id: string;
+  label: string;
+  address_text: string;
+  created_at: string;
+};
+
 export type AcademyApplicationStatus =
   | "received"
   | "awaiting_payment"
@@ -244,6 +253,11 @@ export type AcademyApplication = {
   certification_status: "not_yet" | "pending" | "certified";
   display_on_story: boolean;
   reflect_on_desk: boolean;
+  // Wave E (AC-E2): ディプロマ用の英語表記名・オンライン受講時の配送先。どちらもnullable（既存データ互換）。
+  diploma_name_en: string | null;
+  applicant_shipping_address: string | null;
+  // Wave E (AC-E7): 受講後の任意community参加の意思表示。DBデフォルトfalse想定。
+  community_interest: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -258,6 +272,12 @@ export type AcademyKitOrder = {
   user_id: string | null;
   application_id: string | null;
   shipping_address: string | null;
+  // Wave E (AC-E4): 本部が見てよい情報だけの部分集合として整理。
+  // applicant_name・applicant_phoneに相当する列は意図的に持たせない（個人情報を本部に渡さないため）。
+  desired_date: string | null;
+  diploma_name_en: string | null;
+  contact_email: string | null;
+  instructor_note: string | null;
   items: AcademyKitOrderItem[];
   title: string;
   amount: number;

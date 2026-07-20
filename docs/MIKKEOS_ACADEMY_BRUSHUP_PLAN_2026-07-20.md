@@ -280,6 +280,197 @@ shipping_address を常に送るよう実装したため（値がnullの場合�
 （PostgRESTは未知の列を含むinsertを列の値に関わらず拒否するため）。あゆみに向けて: Wave D
 のキット注文機能を使う前に、必ずこのSQLを先に実行すること。
 
+### Wave E (AC-E1〜AC-E6) 追加分
+
+**重要（あゆみへ）**: `createApplication`・`submitPublicApplication`・`createKitOrder` は
+いずれも新しい列を常に送るよう実装した（値がnullの場合を含む）。そのため、下記SQLを
+実行するまでは **申込の新規作成（公開申込フォーム・本部受付フォームどちらも）と
+キット注文の新規作成が全件失敗する**（PostgRESTは未知の列を含むinsertを列の値に
+関わらず拒否するため）。Wave Eの機能を使う前に、必ず以下を先に実行すること。
+
+```sql
+-- ============================================================
+-- AC-E1: 講師の配送先住所帳（新規テーブル）
+-- ============================================================
+create table if not exists public.academy_instructor_addresses (
+  id uuid primary key default gen_random_uuid(),
+  instructor_id uuid not null references public.academy_instructors(id) on delete cascade,
+  label text not null,
+  address_text text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.academy_instructor_addresses enable row level security;
+
+-- 講師本人（academy_instructors.user_id = auth.uid()）だけが自分の住所帳を操作できる
+create policy "academy_instructor_addresses_owner_all"
+  on public.academy_instructor_addresses
+  for all
+  to authenticated
+  using (
+    exists (
+      select 1 from public.academy_instructors i
+      where i.id = academy_instructor_addresses.instructor_id
+        and i.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.academy_instructors i
+      where i.id = academy_instructor_addresses.instructor_id
+        and i.user_id = auth.uid()
+    )
+  );
+
+comment on table public.academy_instructor_addresses is
+  'Wave E (AC-E1): 講師の配送先住所帳。対面キットの送り先候補（自宅に限らず、職場・レンタルサロン等を複数登録可、上限目安5件）。';
+
+-- ============================================================
+-- AC-E2: academy_applications に列を3つ追加
+-- ============================================================
+alter table public.academy_applications
+  add column if not exists diploma_name_en text;
+alter table public.academy_applications
+  add column if not exists applicant_shipping_address text;
+alter table public.academy_applications
+  add column if not exists community_interest boolean not null default false;
+
+comment on column public.academy_applications.diploma_name_en is
+  'ディプロマに入れる氏名（英語表記）。公開申込フォーム・本部受付フォームどちらも入力欄を追加済み。';
+comment on column public.academy_applications.applicant_shipping_address is
+  'オンライン受講(format=online)時のみ、申込者本人が入力する配送先情報。対面時は使わない。';
+comment on column public.academy_applications.community_interest is
+  'Wave E (AC-E7): 受講後の「communityに参加する」チェックの意思表示。Community本体が無いため、フラグを立てるだけで実処理はしない。';
+
+-- ============================================================
+-- AC-E4: academy_kit_orders に列を4つ追加
+-- ============================================================
+alter table public.academy_kit_orders
+  add column if not exists desired_date date;
+alter table public.academy_kit_orders
+  add column if not exists diploma_name_en text;
+alter table public.academy_kit_orders
+  add column if not exists contact_email text;
+alter table public.academy_kit_orders
+  add column if not exists instructor_note text;
+
+comment on column public.academy_kit_orders.desired_date is
+  '講師が「受講日を確定してキットを仕入れる」操作で入力した受講日。academy_applications.event_dateとは別に持つ。';
+comment on column public.academy_kit_orders.diploma_name_en is
+  'ディプロマに入れる氏名（英語表記）。キット仕入れ時に申込のdiploma_name_enを自動で引き継ぐ。';
+comment on column public.academy_kit_orders.contact_email is
+  '受講者の連絡先メール。申込のapplicant_emailを自動で引き継ぐ。academy_kit_ordersには
+   applicant_name・applicant_phoneに相当する列は意図的に追加していない（本部への非開示を構造的に保証するため）。';
+comment on column public.academy_kit_orders.instructor_note is
+  '講師から本部へのメッセージ（任意）。既存のtitle列とは別に持つ（titleは講座名ベースで自動生成する運用に変更）。';
+```
+
+### AC-E6: academy_applications のSELECT RLS変更（要調査の上、投入）
+
+実装時に `supabase/migrations` 配下および本リポジトリ全体を検索したが、
+`academy_applications` のCREATE TABLE文・既存RLSポリシー定義を記録したSQLファイルは
+**見つからなかった**（Academy関連テーブルはSupabaseダッシュボード側で直接作成されており、
+migrationとして記録されていない）。また本実装環境（Sonnetサブエージェント実行環境）には
+service_role鍵・DB接続パスワードが無く、`pg_policies` への問い合わせも実行できなかった
+（`.env.local` にはNEXT_PUBLIC_SUPABASE_URL・NEXT_PUBLIC_SUPABASE_ANON_KEYのみ存在）。
+
+そのため「実ファイルを確認してから書く」という指示を、「まず実DBのポリシー名を確認してから
+DROP対象を特定する」という手順に代えて進める。**既存ポリシー名を確認せずに新ポリシーだけ
+追加すると、Postgresの複数PERMISSIVEポリシーはOR結合されるため、古い（全件許可の）
+ポリシーが生き残って新しい制限が効かない**。必ず手順1→2の順で実行すること。
+
+```sql
+-- 手順1: 現在academy_applicationsに設定されているSELECTポリシーを確認する
+select policyname, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public' and tablename = 'academy_applications';
+
+-- 手順2: 手順1で出てきた既存ポリシー名を確認し、以下の "<既存のSELECTポリシー名>" を
+-- 実際の名前に置き換えてから、DROPと3本の新ポリシー作成を実行する
+-- （SELECTポリシーが複数見つかった場合は、該当するもの全てをDROPすること）
+drop policy if exists "<既存のSELECTポリシー名>" on public.academy_applications;
+
+-- 本部オーナーは intake_source='honbu' の行だけSELECT可能
+create policy "academy_applications_select_honbu_own_source"
+  on public.academy_applications
+  for select
+  to authenticated
+  using (
+    academy_applications.intake_source = 'honbu'
+    and exists (
+      select 1 from public.academy_headquarters h
+      where h.id = academy_applications.headquarters_id
+        and h.user_id = auth.uid()
+    )
+  );
+
+-- 担当講師本人（instructor_idが自分のprofile_idに一致 = academy_instructors.user_id経由）
+create policy "academy_applications_select_instructor_koushi"
+  on public.academy_applications
+  for select
+  to authenticated
+  using (
+    academy_applications.intake_source = 'koushi'
+    and exists (
+      select 1 from public.academy_instructors i
+      where i.id = academy_applications.instructor_id
+        and i.user_id = auth.uid()
+    )
+  );
+
+-- 申込者本人（user_id = auth.uid()）
+create policy "academy_applications_select_own"
+  on public.academy_applications
+  for select
+  to authenticated
+  using (academy_applications.user_id = auth.uid());
+```
+
+実装済みの `app/academy/applications/page.tsx`・`app/academy/applications/[id]/page.tsx`
+（本部側の申込一覧・詳細）は、上記適用後は `intake_source='koushi'` の申込を返さなくなる
+（これは設計通りの副作用。本部は koushi 申込の件数・存在を `academy_kit_orders` 経由で
+把握する、という§12の方針通り）。
+
+**参考: AC-E7の動作に追加で必要と判明した項目（AC-E6の指示範囲外だが、実装中に発見した
+ため参考として記載。実行要否はあゆみの判断に委ねる。いずれも未実行）**
+
+```sql
+-- (a) 公開申込フォーム(submitPublicApplication)はuser_id: nullで登録する（匿名申込のため）。
+--     そのため上記「申込者本人(user_id=auth.uid())」ポリシーだけでは、受講後にログインしても
+--     自分の申込にヒットしない可能性が高い。対応案: 上記2つの新ポリシーのUSING句に
+--     以下をORで追加すると、ログイン中のメールアドレスと申込のapplicant_emailが一致する行も
+--     見えるようになる（user_idの事後紐付け作業をしなくても機能する）。
+--       or academy_applications.applicant_email = (auth.jwt() ->> 'email')
+
+-- (b) 「認定講師登録する」は受講者本人がacademy_instructorsへ直接INSERTする設計。
+--     現状のINSERTポリシーは本部専用の可能性が高く、受講者本人からのINSERTを許可する
+--     ポリシーが別途必要になる見込み:
+create policy "academy_instructors_self_register"
+  on public.academy_instructors
+  for insert
+  to authenticated
+  with check (
+    user_id = auth.uid()
+    and profile_id in (select id from public.profiles where user_id = auth.uid())
+  );
+
+-- (c) 「communityに参加する」はacademy_applications.community_interestを受講者本人が
+--     UPDATEする設計。現状のUPDATEポリシーは本部専用の可能性が高く、受講者本人からの
+--     UPDATEを許可するポリシーが別途必要になる見込み:
+create policy "academy_applications_self_update_community_interest"
+  on public.academy_applications
+  for update
+  to authenticated
+  using (
+    user_id = auth.uid()
+    or applicant_email = (auth.jwt() ->> 'email')
+  )
+  with check (
+    user_id = auth.uid()
+    or applicant_email = (auth.jwt() ->> 'email')
+  );
+```
+
 ## 10. Wave C実装メモ（2026-07-20 Sonnet実装・夜間実行）
 
 AC-C1〜AC-C5実装済み。新規Supabaseスキーマ変更なし（すべて既存のjsonb列 `academy_courses.lp_blocks` /
@@ -565,3 +756,128 @@ Wave D完了後、あゆみから実際の業務フローの訂正が入った�
 - 講師登録を取り消す/講師を降格する導線（既存のstatus管理で足りる想定）
 - 配送先住所の郵便番号検索等の入力補助（自由テキストのままでよい）
 ```
+
+## 13. Wave E実装メモ（2026-07-20 Sonnet実装）
+
+AC-E1〜AC-E5・AC-E7を実装済み。AC-E6はSQL草案の作成のみ（指示通り実行はしていない）。
+実SQLは本ファイル §9「Wave E (AC-E1〜AC-E6) 追加分」に追記済み。
+
+```text
+AC-E1: 講師の配送先住所帳
+  types/database.ts に AcademyInstructorAddress を追加。
+  lib/academy/instructor-addresses.ts を新規作成（list/create/delete。上限5件はUI側チェック）。
+  app/academy/portal/url/page.tsx（既存の「プロフィールを編集」画面。講師レコード単位で
+  ループしているUIがあり、ここが最も自然な置き場所だった）の各講師レコードに
+  「配送先住所帳」の<details>ブロックを追加し、AddressBookコンポーネントとしてCRUD UIを実装。
+
+AC-E2: academy_applications にフィールド追加
+  types/database.ts に diploma_name_en・applicant_shipping_address・community_interest を追加。
+  app/academy/apply/[id]/page.tsx（公開申込フォーム）に、受講希望日（既存event_dateを流用・
+  ラベルを「希望開催日」→「受講希望日」に変更）、ディプロマ名(英語表記・必須)、配送先情報
+  （format="online"の時だけ表示・必須。textareaで実装）を追加。メール欄の下にmikkeID既存
+  ユーザー向けの注意書きも追加。備考欄は既存のapplicant_note（「ご質問・ご要望」欄）をそのまま
+  流用（新規追加はしていない＝指示通り）。
+  lib/academy/lp.ts の submitPublicApplication の入力型・insert文に両フィールドを追加。
+
+AC-E3: 講師受付フォーム（本部手入力）の項目を揃える
+  lib/academy/applications.ts の ApplicationInput に diplomaNameEn・applicantShippingAddress
+  を追加し、createApplication のinsert文に配線。
+  app/academy/applications/new/page.tsx に「ディプロマに入れるお名前（英語表記）」欄
+  （受講者情報セクション）と、format="online"選択時のみ表示する配送先情報欄
+  （開催・金額セクション）を追加。公開フォームと異なり、本部の手入力フォームでは
+  必須バリデーションを付けていない（他の任意項目＝メール・電話と同じ扱いに揃えた。
+  本部が把握しきれていない段階でも申込だけ先に登録できるようにする意図）。
+
+AC-E4: academy_kit_orders を「本部が見てよい部分集合」として整理
+  types/database.ts に desired_date・diploma_name_en・contact_email・instructor_note を追加。
+  applicant_name・applicant_phoneに相当する列は追加していない（意図的な非対応）。
+  lib/academy/kits.ts の createKitOrder の入力型・insert文を拡張。
+  あわせて app/academy/kits/page.tsx（本部キット一覧）に4項目の表示を追加した
+  （プロンプト範囲外だが、本部がこの情報を実際に見られないと収集する意味が無いため対応した）。
+
+AC-E5: キット仕入れフローを1操作に統合
+  app/academy/portal/applications/page.tsx の各申込カードに「受講日を確定してキットを
+  仕入れる」ボタンを追加し、押すとKitIntakeModal（同ファイル内に実装）が開く。
+  モーダルは受講日(必須・application.event_dateがあれば初期値に)・送り先
+  （in_person=instructor-addressesから<select>／online=applicant_shipping_addressを
+  自動採用し読み取り専用表示／未設定時は案内文のみ）・講師からの備考の3項目のみ。
+  送信すると createKitOrder に application_id・diploma_name_en・applicant_email
+  （contactEmailとして）を自動で引き継いで1件作成する。titleは
+  「{講座コード} {講座名} キット」で自動生成し、受講者名は一切渡さない
+  （Wave Dのshipping_address文字列に受講者名を埋め込んでいた実装は、この新フローでは
+  使っていない＝個人情報リークの是正になっている）。
+  同じ申込に対してすでにキット注文がある場合はボタンの代わりに
+  「キット仕入れ済み（ステータス）」の表示に切り替え、二重発注を防止する
+  （1申込=1キットの業務ルールをUI側で保証）。
+  app/academy/portal/kits/page.tsx は、注文履歴を主目的の一覧に縮小し、
+  「申込から選ぶ」pickerと?application=クエリパラメータ処理は削除した。
+  申込に紐付かない自由記述の単発注文は<details>で折りたたんだ
+  「申込に紐づかない単発注文（例外対応・通常は使いません）」として存続させた
+  （application_id: null、shipping_addressは自由入力メモとして保存）。
+
+AC-E6: RLSポリシー変更（SQL草案のみ・未実行）
+  supabase/migrations 配下・リポジトリ全体を検索したが、academy_applicationsの
+  テーブル定義・既存RLSポリシーを記録したファイルが見つからなかった（Supabase側で
+  直接作成されmigration化されていない）。本実行環境はservice_role鍵・DB接続情報を
+  持たずpg_policiesへの問い合わせもできなかったため、「既存ポリシー文を引用する」
+  代わりに「実DBで確認する手順」をSQLとして残した（§9参照。まずpg_policiesを
+  SELECTしてポリシー名を特定してからDROP+CREATEする2段階の手順）。
+  あわせて、実装中に判明したAC-E7動作に必要な追加RLS（受講者本人によるacademy_
+  instructorsへのINSERT、community_interestのUPDATE、匿名申込のuser_id=null問題への
+  対処としてのメールアドレス一致条件）も§9に「参考」として書き添えた
+  （AC-E6の指示範囲外だが、書かないとAC-E7が機能しないまま見えてしまうため）。
+
+AC-E7: 受講後の任意講師登録・community参加フロー
+  新規ルート app/academy/graduate/[applicationId]/page.tsx を作成。
+  lib/academy/graduate.ts を新規作成（getMyApplicationById・findMyApplicationsByEmail・
+  setCommunityInterest・registerAsInstructorFromGraduation）。
+  ログイン中プロフィールのuser.emailと対象申込のapplicant_emailを照合し、一致すれば
+  復習コンテンツ（getInstructorPageForViewerで講師専用ページを試み、RLSで読めない
+  場合はgetPublicCourseの基本情報にフォールバック）と、認定講師登録／community参加の
+  2つの独立チェックを表示する。
+  不一致の場合は「申込時と異なるメールアドレスでお申込みの場合はこちら」という
+  入力欄を出し、入力されたメールで再検索する（findMyApplicationsByEmailはRLSの
+  範囲内でしか行を返さないため、他人の申込を探し当てることはできない設計）。
+  講師登録は lib/academy/instructors.ts の findExistingInstructorNumber
+  （講師番号の引き継ぎロジック）を再利用しつつ、academy_instructorsへの新規insertは
+  本関数内で直接行っている（is_certified/is_active/is_listed/accepts_applicationsを
+  trueで初期化）。
+```
+
+検証: `npm run lint`（tsc --noEmit）成功・`npm run build` 成功（全94ルート生成、
+新規追加の `/academy/graduate/[applicationId]` を含む）。
+
+既存データ互換の保証方法: AC-E2/AC-E4で追加した型フィールドはすべてnullable
+（community_interestのみboolean・DBデフォルトfalse想定）。読み取り側は
+`as AcademyApplication[]` 等の既存キャストパターンのみで、UI側も
+`order.desired_date ?`・`application.community_interest`（boolean、未定義時はundefined
+がfalsyとして扱われる）という条件分岐でしか参照しないため、DBに新列が無い状態で
+SELECTしても例外にはならない。ただし前述の通り、新規INSERT（申込作成・キット注文作成）は
+列が存在するまで全件失敗するため、§9のSQLが実行されるまでは新規作成系の機能は使えない
+（読み取り専用の既存データ表示は壊れない、という意味での「破壊的変更ではない」）。
+
+未実装・妥協点・判断に迷って止めた箇所:
+- AC-E6は「実ファイルを確認してから書く」の対象ファイルがリポジトリ内に存在しなかった
+  （academy系テーブルはSupabase側で直接作成されmigration化されていない）。DB接続情報も
+  無かったため、既存ポリシーを実際に読むことができず、代わりに「まずpg_policiesを
+  確認してからDROP対象を特定する」手順をSQLとして用意した。既存ポリシー名を推測で
+  DROPする（=間違ったポリシーを消す/消し忘れる）リスクを避けるための判断。
+- AC-E7の「受講者本人がacademy_instructorsへINSERT」「受講者本人がcommunity_interestを
+  UPDATE」は、既存のRLSが本部専用の書き込みしか想定していない可能性が高く、
+  AC-E6の指示範囲には無かった追加のRLS変更が必要になる見込み（§9に参考として記載、未実行）。
+  あゆみの確認の上、実行要否を判断してください。
+- 公開申込フォーム(submitPublicApplication)はuser_id: nullで登録する匿名申込のため、
+  §12で確定した「申込者本人(user_id=auth.uid())」ポリシーだけでは、受講後にログインしても
+  自分の申込を見つけられない可能性が高いと判断した。§9の参考SQLで
+  `applicant_email = (auth.jwt() ->> 'email')` を条件に加える代替案を提示したが、
+  これも未実行・あゆみの判断待ち（新しい仕様を独断で確定させないため、コード側は
+  「見つからなければメール再検索フォールバックを出す」という壊れにくい実装にとどめた）。
+- app/academy/applications/[id]/page.tsx（本部申込詳細）・app/academy/applications/page.tsx
+  （本部申込一覧）は、AC-E6のRLSが適用されると intake_source='koushi' の申込を
+  返さなくなる（§12の設計通りの副作用）。これらの画面のUI・文言自体は今回変更していない
+  （AC-E系の指示に無かったため）。RLS適用後にkoushi申込がどう見えるか（0件になるか、
+  エラー表示になるか）を実際に確認し、必要であれば別途UI調整することを推奨する。
+- AC-E5のKitIntakeModalで受講形式(format)が未設定の申込は、送り先を自動判定できない旨の
+  案内文を出すだけで送信自体は止めていない（shippingAddressはnullのまま保存される）。
+  運用上、本部受付フォームでformatが「未定」のまま申込が来るケースがあり得るため、
+  ブロックせずnullを許容する設計にした。

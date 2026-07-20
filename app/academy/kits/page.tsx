@@ -76,8 +76,20 @@ function KitsContent() {
                       {ins?.business_name || "講師"} ・ {formatDate(order.ordered_at)} ・{" "}
                       <span className="font-bold text-[var(--mikke-text)]">{order.amount.toLocaleString()}円</span>
                     </p>
+                    {order.desired_date ? (
+                      <p className="mt-0.5 text-xs text-[var(--mikke-muted)]">受講日: {formatDate(order.desired_date)}</p>
+                    ) : null}
+                    {order.diploma_name_en ? (
+                      <p className="mt-0.5 text-xs text-[var(--mikke-muted)]">ディプロマ名: {order.diploma_name_en}</p>
+                    ) : null}
+                    {order.contact_email ? (
+                      <p className="mt-0.5 text-xs text-[var(--mikke-muted)]">連絡先: {order.contact_email}</p>
+                    ) : null}
                     {order.shipping_address ? (
                       <p className="mt-0.5 text-xs text-[var(--mikke-muted)]">送り先: {order.shipping_address}</p>
+                    ) : null}
+                    {order.instructor_note ? (
+                      <p className="mt-0.5 text-xs text-[var(--mikke-muted)]">講師からの備考: {order.instructor_note}</p>
                     ) : null}
                     {order.application_id ? (
                       <Link

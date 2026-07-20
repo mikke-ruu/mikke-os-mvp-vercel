@@ -38,6 +38,9 @@ function ApplyInner({ courseId }: { courseId: string }) {
   const [eventDate, setEventDate] = useState("");
   const [format, setFormat] = useState<"in_person" | "online" | "">("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  // Wave E (AC-E2): ディプロマ用の英語表記名（必須）・オンライン受講時のみの配送先。
+  const [diplomaNameEn, setDiplomaNameEn] = useState("");
+  const [shippingAddress, setShippingAddress] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -54,6 +57,8 @@ function ApplyInner({ courseId }: { courseId: string }) {
     setError(null);
     if (!course) return;
     if (!name.trim()) return setError("お名前を入力してください。");
+    if (!diplomaNameEn.trim()) return setError("ディプロマに入れるお名前（英語表記）を入力してください。");
+    if (format === "online" && !shippingAddress.trim()) return setError("オンライン受講の場合は配送先情報を入力してください。");
     setSaving(true);
     try {
       await submitPublicApplication({
@@ -65,7 +70,9 @@ function ApplyInner({ courseId }: { courseId: string }) {
         applicantNote: note,
         eventDate,
         format,
-        formAnswers: answers
+        formAnswers: answers,
+        diplomaNameEn,
+        applicantShippingAddress: format === "online" ? shippingAddress : ""
       });
       setDone(true);
     } catch (err) {
@@ -126,9 +133,21 @@ function ApplyInner({ courseId }: { courseId: string }) {
             <input className={inputClass} value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
         </div>
+        <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">
+          既にmikkeIDをお持ちの方は、そのログインメールアドレスでお申込みください。受講後、このメールアドレスで講師ページにログインできます。
+        </p>
+        <div>
+          <label className={labelClass}>ディプロマに入れるお名前（英語表記）*</label>
+          <input
+            className={inputClass}
+            value={diplomaNameEn}
+            onChange={(e) => setDiplomaNameEn(e.target.value)}
+            placeholder="例: Taro Yamada"
+          />
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className={labelClass}>希望開催日</label>
+            <label className={labelClass}>受講希望日</label>
             <input type="date" className={inputClass} value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
           </div>
           <div>
@@ -140,6 +159,18 @@ function ApplyInner({ courseId }: { courseId: string }) {
             </select>
           </div>
         </div>
+
+        {format === "online" ? (
+          <div>
+            <label className={labelClass}>配送先情報*</label>
+            <textarea
+              className={`${inputClass} min-h-16`}
+              value={shippingAddress}
+              onChange={(e) => setShippingAddress(e.target.value)}
+              placeholder="キットのお届け先（郵便番号・ご住所・お名前）"
+            />
+          </div>
+        ) : null}
 
         {course.application_form_fields.map((field) => (
           <div key={field.key}>

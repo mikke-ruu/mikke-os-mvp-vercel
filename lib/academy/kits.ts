@@ -58,6 +58,8 @@ export async function listMyKitOrders(instructorIds: string[]) {
 }
 
 // 講師: キットを本部に注文する
+// Wave E (AC-E4/AC-E5): 「本部が見てよい情報だけの部分集合」を明示的に渡せるよう拡張。
+// application.applicant_name/applicant_phoneに相当する値は呼び出し側からも絶対に渡さないこと。
 export async function createKitOrder(
   profile: Profile,
   instructor: AcademyInstructor,
@@ -67,6 +69,10 @@ export async function createKitOrder(
     courseId: string | null;
     applicationId?: string | null;
     shippingAddress?: string | null;
+    desiredDate?: string | null;
+    diplomaNameEn?: string | null;
+    contactEmail?: string | null;
+    instructorNote?: string | null;
   }
 ) {
   const { data, error } = await supabase
@@ -78,6 +84,10 @@ export async function createKitOrder(
       user_id: profile.user_id,
       application_id: input.applicationId ?? null,
       shipping_address: input.shippingAddress ?? null,
+      desired_date: input.desiredDate ?? null,
+      diploma_name_en: input.diplomaNameEn ?? null,
+      contact_email: input.contactEmail ?? null,
+      instructor_note: input.instructorNote ?? null,
       title: input.title.trim(),
       amount: input.amount,
       status: "received",

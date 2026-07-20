@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Copy, ExternalLink } from "lucide-react";
+import { Check, Copy, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { QrCode } from "@/components/academy/QrCode";
 import { getCoursesByIds, getMyInstructorRecords, updateMyInstructorProfile, type InstructorProfileEdit } from "@/lib/academy/instructor-portal";
-import type { AcademyCourse, AcademyInstructor } from "@/types/database";
+import {
+  MAX_INSTRUCTOR_ADDRESSES,
+  createInstructorAddress,
+  deleteInstructorAddress,
+  listInstructorAddresses
+} from "@/lib/academy/instructor-addresses";
+import type { AcademyCourse, AcademyInstructor, AcademyInstructorAddress } from "@/types/database";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
@@ -90,6 +96,114 @@ function ProfileEditor({ instructor }: { instructor: AcademyInstructor }) {
         </button>
         {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
       </div>
+    </div>
+  );
+}
+
+// Wave E (AC-E1): 講師の配送先住所帳。対面キットの送り先を事前に複数登録しておける
+// （自宅に限定せず、職場・レンタルサロン等も想定。上限は緩く5件程度でよい）。
+function AddressBook({ instructor }: { instructor: AcademyInstructor }) {
+  const [addresses, setAddresses] = useState<AcademyInstructorAddress[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [label, setLabel] = useState("");
+  const [addressText, setAddressText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setAddresses(await listInstructorAddresses(instructor.id));
+    setLoading(false);
+  }, [instructor.id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!label.trim() || !addressText.trim()) return setError("ラベルと住所を入力してください。");
+    if (addresses.length >= MAX_INSTRUCTOR_ADDRESSES) return setError(`配送先は最大${MAX_INSTRUCTOR_ADDRESSES}件まで登録できます。`);
+    setSaving(true);
+    try {
+      await createInstructorAddress(instructor.id, label, addressText);
+      setLabel("");
+      setAddressText("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "登録に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setBusyId(id);
+    try {
+      await deleteInstructorAddress(instructor.id, id);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-[11px] text-[var(--mikke-muted)]">
+        対面講座のキット送り先として選べる住所です（自宅に限らず、職場・レンタルサロン等でも構いません）。
+      </p>
+      {loading ? (
+        <p className="text-xs text-[var(--mikke-muted)]">読み込み中…</p>
+      ) : addresses.length === 0 ? (
+        <p className="text-xs text-[var(--mikke-muted)]">まだ登録された配送先がありません。</p>
+      ) : (
+        <ul className="space-y-2">
+          {addresses.map((a) => (
+            <li key={a.id} className="flex items-start justify-between gap-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-2.5">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[var(--mikke-text)]">{a.label}</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-[11px] text-[var(--mikke-muted)]">{a.address_text}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleDelete(a.id)}
+                disabled={busyId === a.id}
+                className="shrink-0 rounded-full p-1.5 text-[var(--mikke-muted)] hover:bg-white hover:text-[var(--mikke-danger)]"
+                aria-label="削除"
+              >
+                <Trash2 size={14} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {addresses.length < MAX_INSTRUCTOR_ADDRESSES ? (
+        <form onSubmit={handleAdd} className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_2fr_auto]">
+          <input
+            className={inputClass}
+            placeholder="ラベル（例: 自宅／レンタルサロンA）"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <input
+            className={inputClass}
+            placeholder="住所"
+            value={addressText}
+            onChange={(e) => setAddressText(e.target.value)}
+          />
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center justify-center gap-1 rounded-xl bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
+          >
+            <Plus size={13} /> 追加
+          </button>
+        </form>
+      ) : null}
+      {error ? <p className="text-xs font-bold text-[var(--mikke-danger)]">{error}</p> : null}
     </div>
   );
 }
@@ -180,6 +294,13 @@ function UrlContent() {
               <summary className="cursor-pointer text-xs font-bold text-[var(--mikke-accent-strong)]">プロフィールを編集（ページに掲載されます）</summary>
               <div className="mt-3">
                 <ProfileEditor instructor={rec} />
+              </div>
+            </details>
+
+            <details>
+              <summary className="cursor-pointer text-xs font-bold text-[var(--mikke-accent-strong)]">配送先住所帳（対面キットの送り先）</summary>
+              <div className="mt-3">
+                <AddressBook instructor={rec} />
               </div>
             </details>
           </section>
