@@ -34,6 +34,15 @@ export const APPLICATION_STATUS_ORDER: AcademyApplicationStatus[] = [
   "cancelled"
 ];
 
+// Wave F (AC-F5e): requires_kit=falseの講座では、キット系ステータスをUIの選択肢から除外する
+// （データ・型は変更しない。表示だけの絞り込み）。
+const KIT_ONLY_STATUSES: AcademyApplicationStatus[] = ["kit_pending", "kit_preparing", "kit_shipped"];
+
+export function visibleStatusOptions(requiresKit: boolean): AcademyApplicationStatus[] {
+  if (requiresKit) return APPLICATION_STATUS_ORDER;
+  return APPLICATION_STATUS_ORDER.filter((s) => !KIT_ONLY_STATUSES.includes(s));
+}
+
 export type ApplicationInput = {
   courseId: string;
   intakeSource: "honbu" | "koushi";

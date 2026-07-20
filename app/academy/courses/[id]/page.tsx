@@ -27,7 +27,10 @@ function toInput(course: AcademyCourse): CourseInput {
     applicationFormFields: course.application_form_fields,
     acceptAtHonbu: course.accept_at_honbu,
     acceptAtKoushi: course.accept_at_koushi,
-    paymentUrl: course.payment_url ?? ""
+    paymentUrl: course.payment_url ?? "",
+    kitPrice: course.kit_price ?? 0,
+    kitPaymentUrl: course.kit_payment_url ?? "",
+    requiresKit: course.requires_kit ?? true
   };
 }
 

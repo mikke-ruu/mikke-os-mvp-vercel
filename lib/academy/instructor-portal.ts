@@ -59,6 +59,9 @@ export type InstructorProfileEdit = {
   accepts_applications: boolean;
   is_listed: boolean;
   display_on_story: boolean;
+  // Wave F (AC-F5b): 講師本人の決済設定。本部管理列保護トリガの対象外なので講師本人が書ける。
+  payment_method_note: string | null;
+  payment_url: string | null;
 };
 
 export async function updateMyInstructorProfile(instructor: AcademyInstructor, patch: Partial<InstructorProfileEdit>) {

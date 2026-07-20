@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BookOpen, ClipboardList, Package, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, ClipboardList, Heart, JapaneseYen, Package, Users } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { ensureHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
@@ -42,7 +42,7 @@ function StatCard({
         <p className="text-xs font-bold text-[var(--mikke-muted)]">{label}</p>
       </div>
       <p className="mt-2 text-2xl font-bold text-[var(--mikke-text)]">
-        {value}
+        {value.toLocaleString()}
         <span className="ml-1 text-xs font-bold text-[var(--mikke-muted-light)]">{sub}</span>
       </p>
       {detail ? <p className="mt-1 truncate text-[11px] text-[var(--mikke-muted)]">{detail}</p> : null}
@@ -118,6 +118,20 @@ function DashboardContent() {
     ? Math.max(0, Math.floor((Date.now() - new Date(oldestPendingApp.created_at).getTime()) / 86400000))
     : 0;
 
+  // Wave F (AC-F6): 「今月の売上」「累計売上」= 本部受付申込のhonbu_revenue(payment_status=paid)
+  // ＋キット発注のamount(payment_status=paid)の合計。RLS適用後はappsが自動的にhonbu受付分のみに
+  // 絞られるが、念のため intake_source !== "koushi" でも明示的に絞る。
+  const honbuPaidApps = apps.filter((a) => a.intake_source !== "koushi" && a.payment_status === "paid");
+  const paidKits = kits.filter((k) => k.payment_status === "paid");
+  const revenueTotal =
+    honbuPaidApps.reduce((sum, a) => sum + a.honbu_revenue, 0) + paidKits.reduce((sum, k) => sum + k.amount, 0);
+  const revenueThisMonth =
+    honbuPaidApps.filter((a) => a.created_at.startsWith(monthKey)).reduce((sum, a) => sum + a.honbu_revenue, 0) +
+    paidKits.filter((k) => k.created_at.startsWith(monthKey)).reduce((sum, k) => sum + k.amount, 0);
+
+  // 「community参加希望」= community_interest=trueの件数（本部受付分のみ。RLS上見える範囲がそもそもそれ）。
+  const communityInterestCount = apps.filter((a) => a.intake_source !== "koushi" && a.community_interest).length;
+
   return (
     <div className="mx-auto max-w-5xl space-y-5 md:space-y-6">
       <div>
@@ -138,6 +152,13 @@ function DashboardContent() {
           detail={pendingApps.length > 0 ? `最古の申込: ${oldestPendingDays}日前` : "対応待ちなし"}
           alert={pendingApps.length > 0}
         />
+      </div>
+
+      {/* Wave F (AC-F6) */}
+      <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-3">
+        <StatCard icon={JapaneseYen} label="今月の売上" value={revenueThisMonth} sub="円" detail="本部受付申込＋キット発注の入金済み分" />
+        <StatCard icon={JapaneseYen} label="累計売上" value={revenueTotal} sub="円" detail="本部受付申込＋キット発注の入金済み分" />
+        <StatCard icon={Heart} label="community参加希望" value={communityInterestCount} sub="名" detail="本部受付分のみの集計です" />
       </div>
 
       {renewalAlerts.length > 0 ? (
@@ -218,7 +239,7 @@ function DashboardContent() {
         <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-[var(--mikke-text)]">対応中のキット注文</h2>
-            <Link href="/academy/kits" className="flex items-center gap-1 text-xs font-bold text-[var(--mikke-accent)]">
+            <Link href="/academy/applications" className="flex items-center gap-1 text-xs font-bold text-[var(--mikke-accent)]">
               一覧を見る <ArrowRight size={13} />
             </Link>
           </div>

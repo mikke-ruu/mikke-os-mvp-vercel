@@ -101,7 +101,7 @@ function PortalDashboard() {
 
       {/* クイックメニュー */}
       <div className="grid gap-3 md:grid-cols-2">
-        <QuickCard href="/academy/portal/study" icon={GraduationCap} title="復習ページ" desc="講座の資料・動画・リンク集をいつでも確認" />
+        <QuickCard href="/academy/portal/study" icon={GraduationCap} title="講師ページ" desc="講座の資料・動画・リンク集をいつでも確認" />
         <QuickCard href="/academy/portal/url" icon={Link2} title="営業用URL" desc="あなた専用の講師紹介ページをSNSで活用" />
         <QuickCard href="/academy/portal/applications" icon={ClipboardList} title="申込管理" desc={`担当申込 ${apps.length}件${pendingApps.length ? `（未対応 ${pendingApps.length}件）` : ""}`} />
         <QuickCard href="/academy/portal/kits" icon={Package} title="キット発注" desc={`注文履歴 ${kits.length}件`} />

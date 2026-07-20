@@ -88,7 +88,8 @@ function KitIntakeModal({
     try {
       const order = await createKitOrder(profile, instructor, {
         title: `${course?.code ?? ""} ${course?.name ?? "講座"} キット`.trim(),
-        amount: 0,
+        amount: course?.kit_price ?? 0,
+        paymentUrl: course?.kit_payment_url ?? null,
         courseId: application.course_id,
         applicationId: application.id,
         shippingAddress,
@@ -240,6 +241,8 @@ function MyApplicationsContent() {
           {apps.map((a) => {
             const existingOrder = kitOrders.find((o) => o.application_id === a.id);
             const inst = instructorForApp(a);
+            // Wave F (AC-F5e): キットを販売しない講座(requires_kit=false)ではキット仕入れ導線を出さない。
+            const requiresKit = courseMap[a.course_id]?.requires_kit ?? true;
             return (
               <li key={a.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
                 <div className="flex items-start justify-between gap-2">
@@ -254,7 +257,7 @@ function MyApplicationsContent() {
                     {APPLICATION_STATUS_LABELS[a.status]}
                   </span>
                 </div>
-                {existingOrder ? (
+                {!requiresKit ? null : existingOrder ? (
                   <p className="mt-2 text-[11px] font-bold text-[var(--mikke-accent-strong)]">
                     キット仕入れ済み（{KIT_STATUS_LABELS[existingOrder.status]}）
                   </p>

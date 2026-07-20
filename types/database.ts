@@ -97,6 +97,9 @@ export type AcademyHeadquarters = {
   plan_started_at: string | null;
   default_payment_note: string | null;
   is_active: boolean;
+  // Wave F (AC-F3): フロントページのブロックビルダー（既存ヒーロー項目の下に積む自由ブロック）。
+  // AcademyLpBlockを再利用。既存hqデータはこの列が無いためundefined→[]フォールバック必須。
+  front_blocks: AcademyLpBlock[];
   created_at: string;
   updated_at: string;
 };
@@ -173,6 +176,13 @@ export type AcademyCourse = {
   accept_at_koushi: boolean;
   is_published: boolean;
   payment_url: string | null;
+  // Wave F (AC-F5a): キット代金・決済URL。講師のキット発注(KitIntakeModal)へ自動で引き継ぐ。
+  kit_price: number;
+  kit_payment_url: string | null;
+  // Wave F (AC-F5c): この講座がキット（教材）を販売するかどうか。falseの講座では
+  // キット関連UI（発注ボタン・CourseFormのキット欄・キット系ステータス選択肢）を隠す。
+  // 既存データはundefined→true扱い（デフォルトON・破壊的変更ではない）。
+  requires_kit: boolean;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -202,6 +212,10 @@ export type AcademyInstructor = {
   accepts_applications: boolean;
   is_listed: boolean;
   display_on_story: boolean;
+  // Wave F (AC-F5b): 講師本人の決済設定。講師受付(koushi)の申込完了画面で
+  // 本部のcourse.payment_urlの代わりに使う。講師本人が営業用URL画面から編集する。
+  payment_method_note: string | null;
+  payment_url: string | null;
   created_at: string;
   updated_at: string;
 };

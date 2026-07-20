@@ -105,7 +105,7 @@ function StudyContent() {
 
 export default function StudyPage() {
   return (
-    <KoushiShell title="復習ページ">
+    <KoushiShell title="講師ページ">
       <StudyContent />
     </KoushiShell>
   );

@@ -30,7 +30,10 @@ function emptyInput(): CourseInput {
     applicationFormFields: [],
     acceptAtHonbu: true,
     acceptAtKoushi: true,
-    paymentUrl: ""
+    paymentUrl: "",
+    kitPrice: 0,
+    kitPaymentUrl: "",
+    requiresKit: true
   };
 }
 
@@ -142,10 +145,28 @@ export function CourseForm({
           <label className={labelClass}>受講後にできること</label>
           <textarea className={`${inputClass} min-h-16`} value={form.canDoAfter} onChange={(e) => set("canDoAfter", e.target.value)} />
         </div>
-        <div>
-          <label className={labelClass}>キット内容</label>
-          <textarea className={`${inputClass} min-h-16`} value={form.kitContents} onChange={(e) => set("kitContents", e.target.value)} />
-        </div>
+        <label className="flex items-center gap-2 text-sm text-[var(--mikke-text)]">
+          <input type="checkbox" checked={form.requiresKit} onChange={(e) => set("requiresKit", e.target.checked)} />
+          この講座はキット（教材）を販売する
+        </label>
+        {form.requiresKit ? (
+          <>
+            <div>
+              <label className={labelClass}>キット内容</label>
+              <textarea className={`${inputClass} min-h-16`} value={form.kitContents} onChange={(e) => set("kitContents", e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className={labelClass}>キット代金（円）</label>
+                <input type="number" min={0} className={inputClass} value={form.kitPrice} onChange={(e) => set("kitPrice", Number(e.target.value) || 0)} />
+              </div>
+              <div>
+                <label className={labelClass}>キット代金 決済URL</label>
+                <input className={inputClass} value={form.kitPaymentUrl} onChange={(e) => set("kitPaymentUrl", e.target.value)} placeholder="https://…" />
+              </div>
+            </div>
+          </>
+        ) : null}
         <div>
           <label className={labelClass}>教材内容</label>
           <textarea className={`${inputClass} min-h-16`} value={form.materialContents} onChange={(e) => set("materialContents", e.target.value)} />

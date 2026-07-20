@@ -93,7 +93,22 @@ function ApplyInner({ courseId }: { courseId: string }) {
         <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
           {course.name} のお申込みを受け付けました。担当より折り返しご連絡いたします。
         </p>
-        {course.payment_url ? (
+        {/* Wave F (AC-F5d): 講師受付(instructorあり)の場合は本部のcourse.payment_urlではなく
+            担当講師のpayment_urlを使う。講師が未設定なら案内文言のみでボタンは出さない。 */}
+        {instructor ? (
+          instructor.payment_url ? (
+            <a
+              href={buildPaymentUrl(instructor.payment_url, email)}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-5 inline-block rounded-2xl bg-[var(--mikke-accent)] px-5 py-3 text-sm font-bold text-white"
+            >
+              お支払い手続きへ進む
+            </a>
+          ) : (
+            <p className="mt-5 text-xs text-[var(--mikke-muted)]">お支払い方法は担当講師からご案内します。</p>
+          )
+        ) : course.payment_url ? (
           <a
             href={buildPaymentUrl(course.payment_url, email)}
             target="_blank"

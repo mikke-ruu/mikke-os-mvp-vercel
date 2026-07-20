@@ -46,8 +46,9 @@ const honbuNav: NavItem[] = [
       (pathname.startsWith("/academy/courses/") && !INSTRUCTOR_PAGE_ROUTE_RE.test(pathname))
   },
   { href: "/academy/instructors", label: "講師管理", icon: Users },
+  // AC-F1: 「キット発送」独立タブは廃止し、申込管理内の「講師受付」タブへ統合した
+  // （/academy/kitsは/academy/applicationsへリダイレクト。lib/academy/kits.tsとデータは変更なし）。
   { href: "/academy/applications", label: "申込管理", icon: ClipboardList },
-  { href: "/academy/kits", label: "キット発送", icon: Package },
   // AC-C4: 「教材・資料」は独立ナビから外し、講師専用ページビルダー内の導線
   // （/academy/materials?course=[id]）から編集する動線に統合した。
   // ページ自体（app/academy/materials/page.tsx）とデータ(academy_materials)は削除していない。
@@ -65,10 +66,10 @@ const honbuNav: NavItem[] = [
 
 const koushiNav: NavItem[] = [
   { href: "/academy/portal", label: "ダッシュボード", icon: LayoutDashboard, exact: true },
-  { href: "/academy/portal/study", label: "復習ページ", icon: GraduationCap },
+  { href: "/academy/portal/study", label: "講師ページ", icon: GraduationCap },
   { href: "/academy/portal/url", label: "営業用URL", icon: Link2 },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList },
-  { href: "/academy/portal/kits", label: "キット発送", icon: Package }
+  { href: "/academy/portal/kits", label: "キット発注", icon: Package }
 ];
 
 // AC-1: モバイル下部ナビの最優先4項目（残りは横スクロールタブ／ハンバーガーメニューから）。
@@ -189,7 +190,7 @@ function ShellInner({
                 className="inline-flex items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
               >
                 {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-                {variant === "honbu" ? "講師画面へ" : "本部画面へ"}
+                {variant === "honbu" ? "講師ポータルへ" : "本部画面へ"}
               </Link>
               <button
                 type="button"

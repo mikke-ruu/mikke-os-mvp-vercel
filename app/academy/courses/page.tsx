@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Eye, EyeOff, GraduationCap, LayoutTemplate, Plus } from "lucide-react";
+import { BookOpen, Eye, EyeOff, GraduationCap, LayoutTemplate, PenSquare, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { ensureHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
@@ -82,42 +82,72 @@ function CoursesContent() {
           </Link>
         </div>
       ) : (
-        <ul className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-4 md:grid-cols-2">
           {courses.map((course) => (
-            <li key={course.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
-              <div className="flex items-start justify-between gap-2">
-                <Link href={`/academy/courses/${course.id}`} className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course.code}</span>
-                    <span className="truncate text-sm font-bold text-[var(--mikke-text)]">{course.name}</span>
+            <li key={course.id} className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+              {course.main_image_url ? (
+                <img src={course.main_image_url} alt="" className="h-36 w-full object-cover" />
+              ) : (
+                <div className="flex h-20 items-center justify-center bg-[var(--mikke-surface-soft)]">
+                  <BookOpen size={22} className="text-[var(--mikke-primary-border)]" />
+                </div>
+              )}
+              <div className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="shrink-0 rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course.code}</span>
+                      <span className="truncate text-sm font-bold text-[var(--mikke-text)]">{course.name}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-[var(--mikke-muted)]">
+                      受講料 {course.price.toLocaleString()}円{course.duration_text ? ` ・ ${course.duration_text}` : ""}
+                    </p>
                   </div>
-                  <p className="mt-1 text-xs text-[var(--mikke-muted)]">
-                    受講料 {course.price.toLocaleString()}円{course.duration_text ? ` ・ ${course.duration_text}` : ""}
-                  </p>
-                </Link>
-                <button
-                  onClick={() => togglePublish(course)}
-                  disabled={busyId === course.id}
-                  className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${
-                    course.is_published
-                      ? "border-[var(--mikke-success)]/30 bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]"
-                      : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"
-                  }`}
-                >
-                  {course.is_published ? <Eye size={12} /> : <EyeOff size={12} />}
-                  {course.is_published ? "公開中" : "非公開"}
-                </button>
-              </div>
-              <div className="mt-2 flex gap-2 border-t border-[var(--mikke-line-soft)] pt-2">
-                <Link href={`/academy/courses/${course.id}/lp`} className="flex items-center gap-1 text-[11px] font-bold text-[var(--mikke-accent-strong)]">
-                  <LayoutTemplate size={13} /> LPビルダー
-                </Link>
-                <Link href={`/academy/c/${course.id}`} target="_blank" className="flex items-center gap-1 text-[11px] font-bold text-[var(--mikke-muted)]">
-                  <Eye size={13} /> 公開LP
-                </Link>
-                <Link href={`/academy/courses/${course.id}/instructor-page`} className="flex items-center gap-1 text-[11px] font-bold text-[var(--mikke-accent-strong)]">
-                  <GraduationCap size={13} /> 講師専用ページ
-                </Link>
+                  <button
+                    onClick={() => togglePublish(course)}
+                    disabled={busyId === course.id}
+                    className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${
+                      course.is_published
+                        ? "border-[var(--mikke-success)]/30 bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]"
+                        : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"
+                    }`}
+                  >
+                    {course.is_published ? <Eye size={12} /> : <EyeOff size={12} />}
+                    {course.is_published ? "公開中" : "非公開"}
+                  </button>
+                </div>
+
+                <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-[11px] leading-5 text-[var(--mikke-text-soft)]">
+                  受講料・キット・FAQなどの基本情報は「講座情報を編集」、ページの見せ方は「LPビルダー」で編集します。
+                </p>
+
+                <div className="grid grid-cols-2 gap-2 border-t border-[var(--mikke-line-soft)] pt-3">
+                  <Link
+                    href={`/academy/courses/${course.id}`}
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-[var(--mikke-accent)] px-2 py-2 text-xs font-bold text-white"
+                  >
+                    <PenSquare size={14} /> 講座情報を編集
+                  </Link>
+                  <Link
+                    href={`/academy/courses/${course.id}/lp`}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-accent)] px-2 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
+                  >
+                    <LayoutTemplate size={14} /> LPビルダー
+                  </Link>
+                  <Link
+                    href={`/academy/c/${course.id}`}
+                    target="_blank"
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+                  >
+                    <Eye size={14} /> 公開LPを見る
+                  </Link>
+                  <Link
+                    href={`/academy/courses/${course.id}/instructor-page`}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+                  >
+                    <GraduationCap size={14} /> 講師専用ページ
+                  </Link>
+                </div>
               </div>
             </li>
           ))}

@@ -73,6 +73,8 @@ export async function createKitOrder(
     diplomaNameEn?: string | null;
     contactEmail?: string | null;
     instructorNote?: string | null;
+    // Wave F (AC-F5b): 講座のkit_payment_urlを引き継ぐ（未指定ならnull）。
+    paymentUrl?: string | null;
   }
 ) {
   const { data, error } = await supabase
@@ -90,6 +92,7 @@ export async function createKitOrder(
       instructor_note: input.instructorNote ?? null,
       title: input.title.trim(),
       amount: input.amount,
+      payment_url: input.paymentUrl ?? null,
       status: "received",
       payment_status: "unpaid"
     })

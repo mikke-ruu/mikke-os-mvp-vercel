@@ -502,6 +502,65 @@ create policy "academy_instructors_self_register"
 **INSERT（本部/講師）・DELETEポリシーは変更不要**（既存のまま。本部/講師が新規作成・
 削除する場合の条件は現状で問題ない）。
 
+### Wave F (AC-F3/AC-F5) 追加分
+
+**重要（あゆみへ）**: `updateHeadquarters`・`createCourse`/`updateCourse`・`updateMyInstructorProfile` は
+いずれも新しい列を常に送るよう実装した（値が未設定の場合を含む）。そのため、下記SQLを
+実行するまでは **フロントページの保存・講座の新規作成/編集の保存・講師プロフィールの保存が
+全件失敗する**（PostgRESTは未知の列を含むinsert/updateを列の値に関わらず拒否するため）。
+Wave Fの機能を使う前に、必ず以下を先に実行すること。
+
+```sql
+-- ============================================================
+-- AC-F3: academy_headquarters にフロントの自由ブロック列を追加
+-- ============================================================
+alter table public.academy_headquarters
+  add column if not exists front_blocks jsonb not null default '[]'::jsonb;
+
+comment on column public.academy_headquarters.front_blocks is
+  'Wave F (AC-F3): フロントページ（/academy/site）のヒーローと講座一覧の間に表示する自由ブロック。
+   AcademyLpBlock型の配列（見出し/文章/画像/画像+文章/画像グリッド/CTA）。既存hqデータは
+   このSQL実行前はキー自体が無いためコード側でundefined→[]フォールバック済み。';
+
+-- ============================================================
+-- AC-F5a/c: academy_courses にキット代金・決済URL・キット要否を追加
+-- ============================================================
+alter table public.academy_courses
+  add column if not exists kit_price numeric not null default 0;
+alter table public.academy_courses
+  add column if not exists kit_payment_url text;
+alter table public.academy_courses
+  add column if not exists requires_kit boolean not null default true;
+
+comment on column public.academy_courses.kit_price is
+  'Wave F (AC-F5a): キット代金。講師のキット発注(KitIntakeModal)のacademy_kit_orders.amountへ
+   自動で引き継ぐ（Wave Eで残っていたamount=0固定の解消）。';
+comment on column public.academy_courses.kit_payment_url is
+  'Wave F (AC-F5a): キット代金の外部決済URL。academy_kit_orders.payment_urlへ自動で引き継ぐ。';
+comment on column public.academy_courses.requires_kit is
+  'Wave F (AC-F5c): この講座がキット（教材）を販売するかどうか。falseの講座では
+   講師のキット仕入れ導線・CourseFormのキット関連欄・申込ステータスのkit_*選択肢を
+   UI側で非表示にする（データ・列挙値そのものは変更しない）。既定true（既存データ互換）。';
+
+-- ============================================================
+-- AC-F5b: academy_instructors に講師本人の決済設定を追加
+-- ============================================================
+alter table public.academy_instructors
+  add column if not exists payment_method_note text;
+alter table public.academy_instructors
+  add column if not exists payment_url text;
+
+comment on column public.academy_instructors.payment_method_note is
+  'Wave F (AC-F5b): 講師本人が設定する決済方法メモ（例: 銀行振込のみ対応、等）。
+   講師本人が営業用URL画面（プロフィール編集）から編集する。';
+comment on column public.academy_instructors.payment_url is
+  'Wave F (AC-F5b): 講師本人の決済URL。講師受付(koushi)の申込完了画面で、
+   本部のacademy_courses.payment_urlの代わりにこちらを案内する。未設定の場合は
+   決済ボタンを出さず「お支払い方法は担当講師からご案内します」の文言のみ表示する。
+   既存の本部管理列保護トリガ(guard_academy_instructor_columns)の保護対象には含めない
+   （講師本人が書き込む前提の列のため）。';
+```
+
 ### §9 SQL投入 完了報告（2026-07-20）
 
 あゆみが本章の全SQL（Wave A講師写真列／Wave Dキット注文2列／Wave E新テーブル・
@@ -1022,3 +1081,149 @@ academy_instructors: payment_method_note text / payment_url text
 - Stripe等との自動連携（リンク方式のまま）
 - 講師受付タブでの申込個人情報表示（RLS設計上、本部には出せない・出さない）
 ```
+
+## 15. Wave F実装メモ（2026-07-20 Sonnet実装）
+
+AC-F1〜AC-F6すべて実装済み。新規Supabaseスキーマ変更は§9に追記済み（未実行・あゆみ実行待ち）。
+
+```text
+AC-F1: 本部の申込管理を2タブ統合＋キット発送タブ廃止
+  app/academy/applications/page.tsx を「本部受付」「講師受付」の2タブ構成に書き換え。
+  本部受付タブ(HonbuTab)は既存のacademy_applications一覧・インラインステータス変更を
+  そのまま維持（visibleStatusOptionsで絞り込みを追加した点のみAC-F5eで後述）。
+  講師受付タブ(KoushiTab)は旧app/academy/kits/page.tsxの中身（academy_kit_orders一覧・
+  ステータス/入金/決済URLのインライン変更・desired_date/diploma_name_en/contact_email/
+  shipping_address/instructor_noteの表示・申込へのリンク）をそのまま移植。
+  app/academy/kits/page.tsx は redirect("/academy/applications") に置き換え
+  （app/apps/academy/page.tsxの既存パターンを踏襲）。lib/academy/kits.tsの関数・
+  academy_kit_ordersのデータは一切変更していない。
+  AcademyShell.tsx honbuNavから「キット発送」項目を削除。他画面から/academy/kitsへ
+  張られていたリンク（app/academy/page.tsx「対応中のキット注文」・
+  app/academy/applications/[id]/page.tsxの相互リンク）も/academy/applicationsへ張り替えた
+  （リダイレクト経由でも動くが、直接リンクの方が1ホップ減って自然なため）。
+
+AC-F2: 講座管理カードの拡大＋リンク検証
+  app/academy/courses/page.tsx のカードをmain_image_urlサムネイル付き・2列グリッドに拡大し、
+  4つの導線をすべて明示ラベル付きボタン化した（講座情報を編集/LPビルダー/公開LPを見る/
+  講師専用ページ）。カード内に指定の説明文を追加。
+  リンク切れの原因調査: 4リンク先すべて（courses/[id]/page.tsx・courses/[id]/lp/page.tsx・
+  c/[id]/page.tsx・courses/[id]/instructor-page/page.tsx）を実ファイルで確認したところ、
+  ルーティング自体（paramsの受け方=`params: Promise<{id}>`+`use(params)`・hrefの
+  パス文字列）に不一致は無く、npm run buildでも全ルートが正常に生成されることを確認した
+  （コードレベルでは「リンク切れ」という不具合は再現できなかった）。最も有力な原因として
+  特定したのは、旧カードの下部にあった3リンク行
+  （`<div className="mt-2 flex gap-2 ...">`内の「LPビルダー」「公開LP」「講師専用ページ」）が
+  `flex-wrap`も`overflow`制御も無いテキストリンクで、日本語ラベル+アイコンの合計幅が
+  カード幅（lg:grid-cols-3で1カラムあたり約300px）を超えると折り返さずにカード外へ
+  はみ出し、隣のカードや周辺要素と視覚的に重なって「リンクが切れている（押しても反応しない/
+  違う場所に飛ぶように見える）」という体感を生んでいた可能性が高い、というUIレイアウト上の
+  不具合と判断した。今回のカード拡大（2列グリッド・グリッドボタン化・十分なタップ領域確保）で
+  この重なりは解消される。ルーティング自体の修正は不要だった。
+
+AC-F3: フロントのブロックビルダー化
+  types/database.ts の AcademyHeadquarters に front_blocks: AcademyLpBlock[] を追加。
+  lib/academy/headquarters.ts の updateHeadquarters の patch型に front_blocks を追加。
+  BlockEditor共用の判断: Wave Cのcourses/[id]/lp/page.tsx内にあったBlockEditor実装は
+  ページファイル内のプライベート関数だったため、そのままexportして共用するのではなく
+  components/academy/LpBlocksEditor.tsx という新規共通コンポーネントへ切り出した
+  （newLpBlock・LP_BLOCK_LABEL・LpBlockEditor・そして一覧描画+並べ替え+追加ボタンまでを
+  含む完結コンポーネントLpBlocksEditorをエクスポート）。courses/[id]/lp/page.tsx も
+  この共通コンポーネントを使う形にリファクタし、重複コードを削除した
+  （「密結合なら最小限の複製」ではなく「切り出して共用」を選んだ。理由: 元の実装が
+  ページ内ローカル関数のみで外部依存が無く、切り出しのリスクが低かったため）。
+  app/academy/front/page.tsx: 既存のヒーロー項目セクションの下に「フロントの自由ブロック」
+  セクションを追加し、LpBlocksEditorを配置。保存は既存のsave()関数を拡張してhero項目と
+  front_blocksを同時に1回のupdateHeadquartersで保存する（セクションごとに保存ボタンを
+  分けると保存漏れが起きやすいため、あえて同じ保存アクションを両方のセクションに置いた）。
+  app/academy/site/page.tsx（公開フロント）: ヒーローと講座一覧の間にfront_blocksを描画。
+  components/academy/PageBlocks.tsxのblocksパラメータ型はAcademyPageBlock[]だが、
+  AcademyLpBlock（heading/text/image/image-text/gallery/cta）はAcademyPageBlockの
+  対応するバリアントと完全に同じ形なので、追加のマッピング・キャスト無しでそのまま
+  渡せた（構造的部分型としてTypeScriptが受理し、npm run buildでも型エラー無し）。
+
+AC-F4: 文言・ナビ変更
+  koushiNav「復習ページ」→「講師ページ」（AcademyShell.tsx・app/academy/portal/study/page.tsxの
+  KoushiShell titleの両方）、koushiNav「キット発送」→「キット発注」、
+  ShellInnerの192行目付近「講師画面へ」→「講師ポータルへ」、
+  app/academy/portal/page.tsx のQuickCard文言「復習ページ」→「講師ページ」を変更。
+  なお「キット発注」自体はapp/academy/portal/page.tsxのQuickCardでは元から
+  「キット発注」表記済みだったため変更不要だった。
+
+AC-F5: 決済設定＋キットなし講座
+  a) AcademyCourseにkit_price/kit_payment_url/requires_kitを追加。CourseInput・CourseForm・
+     lib/academy/courses.tsのinsert/updateに配線。CourseFormでは「この講座はキット（教材）を
+     販売する」チェックボックス（デフォルトON=requiresKit: true）を追加し、OFF時は
+     キット内容・キット代金・キット代金決済URLの3欄を非表示にした（教材内容欄は
+     プロンプト指定通りキット欄に含めず常時表示のまま）。
+  b) KitIntakeModal（portal/applications/page.tsx）のamount: 0固定を
+     course?.kit_price ?? 0に修正（Wave Eから持ち越しだった既知の軽微不具合の解消）。
+     lib/academy/kits.tsのcreateKitOrderにpaymentUrl引数を追加し、insert文へ
+     payment_url: input.paymentUrl ?? nullを配線。呼び出し側でcourse?.kit_payment_url ?? null
+     を渡すようにした。
+     AcademyInstructorにpayment_method_note/payment_urlを追加。
+     lib/academy/instructor-portal.tsのInstructorProfileEdit型に両フィールドを追加し、
+     app/academy/portal/url/page.tsxのProfileEditorに「決済方法メモ」「決済URL」欄を追加
+     （既存のupdateMyInstructorProfileは patch を素通しするだけの実装だったため関数自体の
+     変更は不要だった）。
+  c) 上記bで実施済み（住所帳と同じportal/url/page.tsxに配置）。
+  d) app/academy/apply/[id]/page.tsx の申込完了画面: instructor（講師受付=kで担当講師が
+     判明している場合のみセット）が存在する場合は、course.payment_urlではなく
+     instructor.payment_urlを使うよう分岐を追加。講師ありでpayment_url未設定の場合は
+     ボタンを出さず「お支払い方法は担当講師からご案内します」の文言のみ表示。
+     講師なし（本部受付）の場合は従来通りcourse.payment_urlを使う分岐を維持。
+  e) requires_kit=falseの講座向けUI制御:
+     - lib/academy/applications.tsにvisibleStatusOptions(requiresKit)ヘルパーを追加し
+       （kit_pending/kit_preparing/kit_shippedを除外するだけの純粋関数）、
+       app/academy/applications/page.tsx（本部受付タブの一覧select）と
+       app/academy/applications/[id]/page.tsx（申込詳細のステータスselect）の両方で
+       APPLICATION_STATUS_ORDER直参照からこのヘルパー経由に置き換えた。
+     - app/academy/portal/applications/page.tsx: courseMap[a.course_id]?.requires_kit ?? true
+       がfalseの場合、「受講日を確定してキットを仕入れる」ボタンと「キット仕入れ済み」表示を
+       両方非表示にした（既存のexistingOrderチェックの前に早期return相当の条件を追加）。
+     - データ・列挙値そのものは一切変更していない（表示の絞り込みのみ）。
+
+AC-F6: 本部ダッシュボード充実
+  app/academy/page.tsx に「今月の売上」「累計売上」「community参加希望」の3カードを追加
+  （既存の4カードグリッドの下に新しい3カードグリッドとして配置）。
+  売上計算は apps.filter(intake_source !== "koushi" && payment_status === "paid") の
+  honbu_revenue合計 と kits.filter(payment_status === "paid") のamount合計を足し合わせる形
+  （RLS適用後はappsが自動的にhonbu受付分のみになる設計だが、念のためintake_source条件も
+  明示的に付けた=defense in depth）。今月判定は既存のmonthKey（created_atの年月一致）を流用。
+  community参加希望も同様にintake_source !== "koushi"で絞った上でcommunity_interest=trueを
+  カウントし、カードのdetail文言に「本部受付分のみの集計です」と明記した。
+  StatCardコンポーネントは既存のvalue表示を{value}から{value.toLocaleString()}に変更し、
+  金額カードで桁区切りが入るようにした（既存の4カードの表示にも桁区切りが適用されるが、
+  件数表示なので実質的な見た目の変化はほぼ無い）。
+```
+
+検証: `npm run lint`（tsc --noEmit）成功・`npm run build` 成功（全93ルート生成、
+`/academy/kits`はredirectページとして静的生成、`/academy/applications`・
+`/academy/applications/[id]`・`/academy/courses`・`/academy/courses/[id]/lp`・
+`/academy/front`・`/academy/site`・`/academy/apply/[id]`・`/academy/portal/applications`・
+`/academy/portal/url`・`/academy/page`含む）。lucide-reactの新規使用アイコン
+（PenSquare/JapaneseYen/Heart）は事前にnode -eでexport存在を確認済み。
+
+既存データ互換の保証方法: front_blocks/kit_price/kit_payment_url/requires_kit/
+payment_method_note/payment_urlはすべて読み取り側で `??` フォールバック
+（front_blocks→[]、kit_price→0、requires_kit→true、他はnull/undefined許容の
+文字列項目としてそのまま扱う）を通しており、DBに列が無い状態でのSELECTでも
+例外にはならない。ただし前回まで同様、新規INSERT/UPDATE（講座の保存・講師プロフィールの
+保存・フロントページの保存）は§9のSQLが実行されるまで全件失敗する
+（PostgRESTが未知列を含むinsert/updateを拒否するため）。
+
+未実装・妥協点・判断に迷って止めた箇所:
+- AC-F2の「リンクが切れている」原因特定は、実データでの再現（実際にあゆみが踏んだ操作の
+  再現）ができない環境のため、コードレベルの検証（ルーティング・params・href文字列の
+  突合、build成功）で「構造的な断線は無い」ことは確認できたが、上記の3リンク行の
+  折り返し不備というUIレイアウト仮説は状況証拠からの推定であり、100%の確証ではない。
+  今回のカード再設計でこの仮説が指す問題は解消されるはずだが、もし再現しない別の原因が
+  あった場合は、次回あゆみの実機・実ブラウザでの再現手順（どの講座・どの端末幅・
+  どのリンクか）を教えてもらえると特定が速い。
+- AC-F3のフロントブロックビルダーは「保存する」ボタンをヒーローセクションと自由ブロック
+  セクションの両方に置いたが、内部的には同じsave()を呼ぶ1つの保存アクションであり、
+  セクションごとの個別保存はできない（意図的な設計。プロンプトにセクション別保存の
+  指定は無かったため、保存漏れを避ける単純な設計を選んだ）。
+- AC-F5eのキット系ステータス除外は申込一覧・申込詳細のみに適用した。KoushiTab
+  （講師受付タブ）のキット注文自体のステータス（KIT_STATUS_ORDER）はrequires_kitと
+  無関係の別概念のため対象外とした（そもそもrequires_kit=falseの講座からはキット注文が
+  発生しない設計なので、実質的に問題にならない）。

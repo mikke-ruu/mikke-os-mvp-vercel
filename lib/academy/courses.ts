@@ -20,6 +20,10 @@ export type CourseInput = {
   acceptAtHonbu: boolean;
   acceptAtKoushi: boolean;
   paymentUrl: string;
+  // Wave F (AC-F5a/c)
+  kitPrice: number;
+  kitPaymentUrl: string;
+  requiresKit: boolean;
 };
 
 function toRow(hqId: string, userId: string, input: CourseInput) {
@@ -42,7 +46,10 @@ function toRow(hqId: string, userId: string, input: CourseInput) {
     application_form_fields: input.applicationFormFields,
     accept_at_honbu: input.acceptAtHonbu,
     accept_at_koushi: input.acceptAtKoushi,
-    payment_url: input.paymentUrl || null
+    payment_url: input.paymentUrl || null,
+    kit_price: input.kitPrice,
+    kit_payment_url: input.kitPaymentUrl || null,
+    requires_kit: input.requiresKit
   };
 }
 

@@ -10,9 +10,9 @@ import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import {
   APPLICATION_STATUS_LABELS,
-  APPLICATION_STATUS_ORDER,
   getApplication,
-  updateApplication
+  updateApplication,
+  visibleStatusOptions
 } from "@/lib/academy/applications";
 import { KIT_STATUS_LABELS, listKitOrdersByApplication } from "@/lib/academy/kits";
 import { formatDate } from "@/lib/format";
@@ -100,7 +100,7 @@ function DetailContent({ appId }: { appId: string }) {
             disabled={saving}
             onChange={(e) => apply({ status: e.target.value as AcademyApplication["status"] })}
           >
-            {APPLICATION_STATUS_ORDER.map((s) => (
+            {visibleStatusOptions(course?.requires_kit ?? true).map((s) => (
               <option key={s} value={s}>
                 {APPLICATION_STATUS_LABELS[s]}
               </option>
@@ -167,8 +167,8 @@ function DetailContent({ appId }: { appId: string }) {
             ))}
           </ul>
         )}
-        <Link href="/academy/kits" className="inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
-          キット発注管理で見る →
+        <Link href="/academy/applications" className="inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
+          申込管理（講師受付タブ）で見る →
         </Link>
       </section>
 

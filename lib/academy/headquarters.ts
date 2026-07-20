@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
-import type { AcademyHeadquarters, Profile } from "@/types/database";
+import type { AcademyHeadquarters, AcademyLpBlock, Profile } from "@/types/database";
 
 // 現在のユーザーがオーナーの本部（MVPは1件想定）。
 export async function getOwnedHeadquarters(userId: string) {
@@ -29,6 +29,8 @@ export async function updateHeadquarters(
     main_color: string | null;
     renewal_period_months: number | null;
     next_instructor_number: number | null;
+    // Wave F (AC-F3): フロントページのブロックビルダー
+    front_blocks: AcademyLpBlock[];
   }>
 ) {
   const { data, error } = await supabase

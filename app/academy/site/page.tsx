@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CalendarCheck, ClipboardPen, GraduationCap, Search } from "lucide-react";
+import { PageBlocks } from "@/components/academy/PageBlocks";
 import { getPublicHeadquarters, listListedInstructors, listPublishedCourses } from "@/lib/academy/lp";
 import type { AcademyCourse, AcademyHeadquarters, AcademyInstructor } from "@/types/database";
 
@@ -85,6 +86,15 @@ function SitePage() {
           )}
         </div>
       </section>
+
+      {/* Wave F (AC-F3): フロントの自由ブロック（ヒーローと講座一覧の間） */}
+      {hq.front_blocks?.length ? (
+        <section className="border-t border-[var(--mikke-line)] px-5 py-12 md:py-16">
+          <div className="mx-auto max-w-3xl">
+            <PageBlocks blocks={hq.front_blocks} />
+          </div>
+        </section>
+      ) : null}
 
       {/* 講座一覧 */}
       <section id="courses" className="bg-[var(--mikke-surface-soft)] px-5 py-12 md:py-16">

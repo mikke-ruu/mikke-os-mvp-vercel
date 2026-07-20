@@ -30,7 +30,9 @@ function ProfileEditor({ instructor }: { instructor: AcademyInstructor }) {
     available_note: instructor.available_note,
     accepts_applications: instructor.accepts_applications,
     is_listed: instructor.is_listed,
-    display_on_story: instructor.display_on_story
+    display_on_story: instructor.display_on_story,
+    payment_method_note: instructor.payment_method_note,
+    payment_url: instructor.payment_url
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -77,6 +79,24 @@ function ProfileEditor({ instructor }: { instructor: AcademyInstructor }) {
       <div>
         <label className={labelClass}>開催可能日・エリアメモ</label>
         <textarea className={`${inputClass} min-h-14`} value={form.available_note ?? ""} onChange={(e) => set("available_note", e.target.value)} />
+      </div>
+      <div>
+        <label className={labelClass}>決済方法メモ</label>
+        <textarea
+          className={`${inputClass} min-h-14`}
+          value={form.payment_method_note ?? ""}
+          onChange={(e) => set("payment_method_note", e.target.value)}
+          placeholder="例: 銀行振込のみ対応。振込先は別途ご案内します。"
+        />
+      </div>
+      <div>
+        <label className={labelClass}>決済URL</label>
+        <input
+          className={inputClass}
+          value={form.payment_url ?? ""}
+          onChange={(e) => set("payment_url", e.target.value)}
+          placeholder="https://…（受講者への決済案内に使われます）"
+        />
       </div>
       <label className="flex items-center gap-2 text-sm text-[var(--mikke-text)]">
         <input type="checkbox" checked={form.online_available} onChange={(e) => set("online_available", e.target.checked)} />
