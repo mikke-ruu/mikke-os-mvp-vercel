@@ -502,6 +502,25 @@ create policy "academy_instructors_self_register"
 **INSERT（本部/講師）・DELETEポリシーは変更不要**（既存のまま。本部/講師が新規作成・
 削除する場合の条件は現状で問題ない）。
 
+### §9 SQL投入 完了報告（2026-07-20）
+
+あゆみが本章の全SQL（Wave A講師写真列／Wave Dキット注文2列／Wave E新テーブル・
+新列・確定版RLS＋トリガー／講師自己登録ポリシー、全175行）をSupabase SQL Editorで
+一括実行し `Success. No rows returned` を確認。さらに `pg_policies` を再照会し、
+academy_applicationsのポリシーが以下5本（意図通り）になっていることを確認済み:
+
+```text
+applications delete hq                      DELETE
+applications insert hq or instructor        INSERT
+public can submit applications              INSERT
+applications read hq or instructor or self  SELECT   ← 新規（本部はhonbu受付限定+自己参照追加）
+applications update hq or instructor or self UPDATE  ← 新規（同上+ガードトリガー）
+```
+
+Wave A〜EはDB適用まで完了。Academyブラッシュアップは今回のスコープを完了した。
+残タスク: フロントページ(academy/front)のブロック化（意図的に対象外のまま）、
+キット自動作成時のamount=0固定（本部側に編集欄がない・軽微・次回の小さな直し）。
+
 ## 10. Wave C実装メモ（2026-07-20 Sonnet実装・夜間実行）
 
 AC-C1〜AC-C5実装済み。新規Supabaseスキーマ変更なし（すべて既存のjsonb列 `academy_courses.lp_blocks` /
