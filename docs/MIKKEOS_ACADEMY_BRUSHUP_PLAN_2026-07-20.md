@@ -931,3 +931,94 @@ SELECTしても例外にはならない。ただし前述の通り、新規INSER
   案内文を出すだけで送信自体は止めていない（shippingAddressはnullのまま保存される）。
   運用上、本部受付フォームでformatが「未定」のまま申込が来るケースがあり得るため、
   ブロックせずnullを許容する設計にした。
+
+## 14. Wave F（2026-07-20夜・実地FB第2弾＋決済設定・設計確定）
+
+あゆみの実地フィードバック（スクリーンショット4枚＋要望リスト）と、直前に合意した
+決済設定・キットなし講座対応を1つのWaveに統合。設計はFable確定、実装はSonnet。
+
+### あゆみFBの解釈（Fable整理）
+
+```text
+1. 本部の「キット発送」独立タブが分かりにくい
+   → 本部の申込管理を「本部受付」「講師受付」の2タブに統合する。
+   RLS設計（本部はkoushi申込の生データを見ない）上、講師受付タブの中身は
+   academy_kit_orders（プライバシー安全な部分集合）がそのまま実体になる。
+   つまり本部にとっての「講師受付の申込」=「講師からのキット発注」で1対1。
+   タブを分けるだけで両方を1画面・一覧インラインステータス変更で扱える。
+   /academy/kits は /academy/applications へリダイレクト化。
+
+2. 講座管理カードが小さく編集導線が分散・リンク切れあり
+   → カード拡大（メイン画像サムネ付き）、導線を明示ラベル化:
+   「講座情報を編集」（受講料・キット・FAQ等の基本情報）と「LPビルダー」
+   （見せ方の編集）が別物であることをカード上の文言で説明する。
+   4リンク（講座編集/LPビルダー/公開LP/講師専用ページ）を全部実際に踏んで
+   検証し、切れているものを修正（実装者が特定する）。
+
+3. フロント編集が簡素すぎる
+   → Wave Cで意図的に除外していたフロントのブロックビルダー化を実施。
+   academy_headquarters に front_blocks jsonb を追加（要SQL）。
+   既存のヒーロー項目（アカデミー名・キャッチ・紹介文・メイン画像・メール）は
+   温存し、その下に自由ブロック（Wave Cで作った heading/text/image/
+   image-text/gallery/cta のエディタとレンダラーを再利用）を積める形。
+   公開フロント(/academy/site)のヒーローと講座一覧の間にblocksを描画。
+
+4. 文言・ナビ統一
+   - 講師ポータル「復習ページ」→「講師ページ」（nav・ダッシュボードカード両方）
+   - 本部ヘッダー「講師画面へ」→「講師ポータルへ」
+   - 講師ポータルnav「キット発送」→「キット発注」
+   - 本部navから「キット発送」を削除（1.の統合による）
+```
+
+### 決済設定＋キットなし講座（直前の合意分）
+
+```text
+AC-F5a 講座に「キット代金」(kit_price numeric・デフォルト0)と
+  「キット代金 決済URL」(kit_payment_url text)を追加（CourseForm・要SQL）。
+  講師のキット発注（KitIntakeModal）で amount=course.kit_price、
+  payment_url=course.kit_payment_url を自動で引き継ぐ
+  （Wave Eの「amount=0固定」問題の解消）。
+AC-F5b 講師の決済設定: academy_instructors に payment_method_note text・
+  payment_url text を追加（要SQL）。講師ポータルのプロフィール編集
+  （営業用URL画面=portal/url。住所帳と同じ場所）に入力欄を追加。
+  講師受付(koushi)の申込完了画面では、本部のcourse.payment_urlではなく
+  担当講師のpayment_urlを「お支払い手続きへ進む」に使う（講師が
+  設定していない場合はボタン非表示・案内文のみ）。
+AC-F5c 講座に requires_kit boolean（デフォルトtrue・要SQL）を追加。
+  falseの講座（教えっぱなし・キット販売なし団体）では:
+  - 講師の申込一覧から「受講日を確定してキットを仕入れる」を非表示
+  - CourseFormのキット関連欄（キット内容・キット代金・同決済URL）を
+    折りたたみ/非表示
+  - 申込ステータスの選択肢からkit_pending/kit_preparing/kit_shippedを
+    除外表示（データ上の互換のため列挙自体は残す・UIで出さないだけ）
+```
+
+### ダッシュボード充実（AC-F6）
+
+```text
+- 本部ダッシュボードに金額カードを追加:
+  「今月の売上」「累計売上」= 本部受付申込のhonbu_revenue(payment_status=paid)
+  ＋キット発注のamount(payment_status=paid)の合計。
+- 「community参加希望 N名」カード: academy_applications.community_interest=true
+  の件数を表示（Community本体は未構築のため、集計表示のみ。接続は
+  Community構築後）。※本部はhonbu受付分しか見えないRLSのため、この集計は
+  本部から見える範囲の数字になる。それで良い（正確な全体数はCommunity
+  構築時に別途設計）。
+```
+
+### 要SQL（§9へ実装後に追記すること）
+
+```text
+academy_headquarters: front_blocks jsonb default '[]'
+academy_courses: kit_price numeric default 0 / kit_payment_url text /
+                 requires_kit boolean default true
+academy_instructors: payment_method_note text / payment_url text
+```
+
+### 対象外
+
+```text
+- Community本体・実接続（集計カードのみ）
+- Stripe等との自動連携（リンク方式のまま）
+- 講師受付タブでの申込個人情報表示（RLS設計上、本部には出せない・出さない）
+```
