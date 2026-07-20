@@ -448,3 +448,120 @@ Supabaseが単に該当キーを返さない/undefinedになるケース）で�
   （「受講者へ（氏名）」「講師（自分）へ」または自由入力文字列）として保存する設計とした。
   実住所そのものを構造化して持つ列は今回追加していない（§6の申込項目エディタで
   講座ごとに住所質問を追加する既存の仕組みと役割分担する前提）。
+
+## 12. Wave E（2026-07-20・業務フロー再訂正・実コード確認済み・設計確定）
+
+Wave D完了後、あゆみから実際の業務フローの訂正が入った。**Wave Dの前提が一部
+誤っていた**ため、キット注文の扱いを作り直す。誤りと訂正は本会話に記録済み、
+ここには確定した設計だけをまとめる。
+
+### 訂正された業務フロー
+
+```text
+1申込 = 1キット（まとめ買いなし・確定）。講師受付の申込が来たら:
+  ① 受講者が講師へ講座代金を支払う（講師の決済リンク・既存のinstructor_revenueのまま）
+  ② 講師が受講日を決定し、送り先を選び、本部にキットを仕入れる
+     （※「別画面で申込を選び直す」二度手間をやめ、申込の確認と同じ流れの中で行う）
+  ③ 本部は「受講日・デュプロマ名(英語)・メール・配送先・講師の備考」だけを受け取り、
+     指定住所へ発送する。受講者の氏名(日本語)・電話・申込備考は本部に渡さない
+     （個人情報トラブル回避のため、あゆみ確定事項）。
+
+送り先の自動振り分け:
+  対面(format="in_person") → 講師が事前登録した配送先住所（2-3件登録可・職場や
+    レンタルサロン等、講師の自宅に限定しない）から選ぶ。
+  オンライン(format="online") → 受講者が申込時に入力した配送先情報をそのまま使う。
+
+受講後の任意フロー（確定）:
+  受講者が申込時メールで講師ページにログイン
+  → □認定講師登録する／□communityに参加する（両方任意・独立チェック）
+  → 講師登録にチェックした場合のみ営業ページ解放・本部の認定講師一覧に掲載
+  → community参加チェックは、Community本体が無いため今回は「予約枠」として
+    保存だけする（実際の参加処理はCommunity構築後）
+```
+
+### 技術設計（確定）
+
+```text
+1. academy_kit_orders を「本部が見てよい情報だけを持つ、申込のプライバシー安全な
+   部分集合」として再定義する。Wave Dで追加したapplication_id/shipping_addressは
+   活かしつつ、以下を追加/整理する:
+     desired_date（受講日・講師が確定）
+     diploma_name_en（デュプロマに入れる名前・英語表記）
+     contact_email（受講者。講師登録時の照合キー）
+     shipping_address（Wave Dで追加済み。対面=講師の登録住所／オンライン=
+       受講者の配送先を自動で入れる。手動選択も残す）
+     instructor_note（講師から本部へのメッセージ。既存titleを転用してよい）
+   academy_kit_ordersにはapplicant_name・applicant_phoneに相当する列を
+   絶対に持たせない（本部への非開示を構造的に保証する）。
+
+2. academy_applications に以下を追加（講師受付フォームの必須項目に合わせる）:
+     diploma_name_en text null
+     applicant_shipping_address text null
+       （オンライン選択時のみ申込フォームで入力・対面時は不要）
+
+3. 講師の配送先住所帳（新規テーブル）:
+     academy_instructor_addresses
+       id uuid pk, instructor_id uuid references academy_instructors(id),
+       label text（例:「自宅」「レンタルサロンA」）, address_text text,
+       created_at timestamptz
+   講師ポータルのプロフィール編集あたりに簡易CRUD（2-3件想定・上限は
+   ゆるく5件程度でよい）を追加。
+
+4. キット仕入れフローの統合（二度手間の解消）:
+   app/academy/portal/applications/page.tsx（担当申込一覧）の各行、または
+   その詳細画面に「受講日を確定してキットを仕入れる」という**1つの操作**を置く。
+   押すと: 受講日(desired_date)入力・送り先（対面=登録住所から選択／
+   オンライン=自動でapplicant_shipping_addressを使用、表示のみで変更不要）・
+   講師からの備考、の3項目だけの短いフォームが開き、送信すると
+   academy_kit_orders行が自動生成される（application_idの手動選択UIは廃止。
+   Wave Dで作ったapp/academy/portal/kits/page.tsxの「申込から選ぶ」pickerは、
+   この新フローに置き換えるか、pickerを開いた時点で自動的にすべての項目が
+   埋まった状態にする形で統合する）。
+   自由記述の単発キット注文（申込に紐付かない）が今後も必要な場面が万一
+   出た場合に備え、application_idなしの注文経路そのものは消さずに残す
+   （ただし主導線ではなくする）。
+
+5. RLS変更（要SQL投入・あゆみ実行・重要）:
+   academy_applications のSELECTポリシーを変更し、本部（headquarters owner）は
+   intake_source='honbu'の行のみ閲覧可能にする。intake_source='koushi'の行は、
+   担当講師本人（instructor_idが自分のprofile_idに一致）と、申込者本人
+   （user_idが自分）だけが見られるようにする。本部は koushi 申込の存在や
+   件数集計は academy_kit_orders 経由（プライバシー安全な部分集合）で把握する。
+   **これは実際のRLSポリシー変更のためSQLのみ作成し実行しない**
+   （既存のacademy_applications RLSポリシー定義を実コードで確認してから
+   ALTER POLICY / DROP+CREATE POLICYを書くこと）。
+
+6. メールの同定UX（確定: 注意書き＋フォールバック検索の併用）:
+   - 公開申込フォーム(app/academy/apply/[id]/page.tsx)のメール欄近くに注意書き:
+     「既にmikkeIDをお持ちの方は、そのログインメールアドレスでお申込みください。
+     受講後、このメールアドレスで講師ページにログインできます。」
+   - 講師ページ入口（受講後ログインする画面。新規に作る必要があれば
+     app/academy/graduate等の入口を1つ作る。既存の講師ポータルログイン画面が
+     流用できればそちらに追記）にも同様の注意書き。
+   - フォールバック: ログイン済みプロフィールのメールで該当する申込が
+     見つからない場合、「申込時と異なるメールアドレスでお申込みの場合はこちら」
+     という入力欄を出し、そこに入力されたメールでacademy_applications
+     （自分のuser_idの行のみ・RLSの範囲内）を再検索できるようにする。
+
+7. 受講後の任意講師登録フロー（新規画面が必要）:
+   受講者が申込時メールでログイン後に案内する画面（新規ルート、例:
+   app/academy/graduate/[applicationId]/page.tsx）:
+     - 受講した講座の復習内容（既存の講師専用ページblocksを流用表示）
+     - □認定講師登録する（チェックすると academy_instructors 行を新規作成、
+       instructor_number自動採番・certified_at記録・academy_certifiedイベント
+       seam記録。既存のinstructors.tsの採番ロジックを再利用）
+     - □communityに参加する（チェックした事実だけ保存。Community本体が
+       無いので実処理はしない。academy_applications等に
+       community_interest boolean を1列追加して保存するだけでよい）
+     - 講師登録した場合のみ is_listed/accepts_applications を有効にし、
+       営業ページ・認定講師一覧に反映されるようにする（既存のinstructors.ts
+       のロジックに乗せる）。
+```
+
+### 対象外（今回もやらない）
+
+```text
+- Community本体の実装（参加チェックは予約のみ）
+- 講師登録を取り消す/講師を降格する導線（既存のstatus管理で足りる想定）
+- 配送先住所の郵便番号検索等の入力補助（自由テキストのままでよい）
+```
