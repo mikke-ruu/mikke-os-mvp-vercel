@@ -208,6 +208,19 @@ where email='info.jsparts@gmail.com';
 
 ---
 
+## 2026-07-27 本番デプロイ完了（Sonnet）
+
+- リポジトリ`github.com/mikke-ruu/mikke-os-mvp-vercel`（Vercel連携済み・GitHub push→自動デプロイ）へ、Team Works関連72ファイル＋依存する共通部品（AppHeader/StatChip/MikkeAppShell等）を選別コミット（`d5a7b11`）。ai-office/Academy/Story等の別作業は含めず。
+- **本番URL稼働中**: `https://mikke-os-mvp-vercel.vercel.app`。Supabase本番環境変数も設定済みで、実データ（スリランカ校の予定・参加者・メッセージ）が正しく表示されることを実機確認済み。
+- デプロイ後に発覚・即修正した2件（いずれもpush・再デプロイ済み）:
+  - **ビルド失敗**: `AuthGate.tsx`に足した`useSearchParams()`がSuspense境界なしで、全アプリ共通のためAcademy等の静的prerenderが軒並み失敗。`AuthGate`内部で`<Suspense>`ラップする根本修正（`6921bdb`）。
+  - **非スタッフのルーティング事故**: worker/client役割のみのアカウントが`/apps/team-works`（本部ダッシュボード）に直接入ると「最初の運営型プロジェクトを作成」画面が出てしまう（新規組織を誤って作りかねない）。staff権限が無く、worker/clientいずれかの役割があれば自動で該当ポータルへ`router.replace`する修正（`389646d`）。実機で解消確認済み（あゆみ「kawarimashita」）。
+- 固定ポータルURLカード(`TeamWorksPortalUrlCard.tsx`)は`window.location.origin`ベースで動的生成のため、本番URLで開けば自動的に本番アドレスになる。コード修正不要、確認のみ。
+- 独自ドメイン（`mikke-os.com`取得検討中）は未接続。取得後にVercelのDomainsで接続すれば、既存の登録データ・ログインアカウントはそのまま引き継がれる（やり直し不要、共有済みURLの再案内のみ発生）。
+- 次: 実際のパートナー・クライアントのメールアドレスで名簿登録→本番URLの固定リンクを渡す、の実運用開始。P3残り（左メニューの役割ベース入口の全体反映）・P4（ポータルカスタム）は継続中。
+
+---
+
 ## 進捗ノート（P3+ 実装セッションが追記）
 
 - 2026-07-27 Sonnet: 手順1〜4を実装。
