@@ -3,21 +3,26 @@
 import {
   BriefcaseBusiness,
   BookOpenText,
-  ChevronRight,
+  ChevronDown,
   Grid3X3,
   Link as LinkIcon,
   PlusCircle,
   Settings,
-  X,
-  type LucideIcon
+  X
 } from "lucide-react";
 import Link from "next/link";
+import { useState, type ComponentType, type ReactNode } from "react";
+import type { StatChipTone } from "./StatChip";
+
+type OwnerMenuIcon = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
 
 export type MikkeOwnerMenuItem = {
   title: string;
-  helper: string;
+  /** @deprecated 軽量ドロワーでは説明文を表示しない。型のみ後方互換で残す。 */
+  helper?: string;
   href: string;
-  icon?: LucideIcon;
+  icon?: OwnerMenuIcon;
+  tone?: StatChipTone;
 };
 
 export type MikkeOwnerMenuSuggestedApp = {
@@ -28,23 +33,26 @@ export type MikkeOwnerMenuSuggestedApp = {
 
 export type MikkeOwnerMenuProps = {
   appName: string;
+  /** メニューのアクティブ囲い等に使うアプリ別アクセント色（5色固定パレットから選ぶ）。 */
+  theme?: StatChipTone;
+  /** @deprecated 未使用。型のみ後方互換で残す。 */
   description?: string;
   editItems?: MikkeOwnerMenuItem[];
   ownedApps?: MikkeOwnerMenuItem[];
   otherApps?: MikkeOwnerMenuItem[];
   suggestedApps?: MikkeOwnerMenuSuggestedApp[];
+  /** ヘッダー行に close ボタンと並べる追加アクション（STORYの「編集」ボタン等）。 */
+  headerAction?: ReactNode;
   onClose?: () => void;
 };
 
-const defaultEditItems: MikkeOwnerMenuItem[] = [
-  { title: "表示設定", helper: "このアプリの見せ方を整える", href: "/settings", icon: Settings }
-];
+const defaultEditItems: MikkeOwnerMenuItem[] = [{ title: "表示設定", href: "/settings", icon: Settings }];
 
 const defaultOwnedApps: MikkeOwnerMenuItem[] = [
-  { title: "Manager", helper: "予定・タスク・進行をまとめて見る", href: "/manager", icon: BriefcaseBusiness },
-  { title: "Story", helper: "公開プロフィールを見る", href: "/story", icon: BookOpenText },
-  { title: "DESK", helper: "売上・経費を確認する", href: "/desk", icon: Grid3X3 },
-  { title: "Apps", helper: "アプリ一覧へ戻る", href: "/apps", icon: Grid3X3 }
+  { title: "Manager", href: "/manager", icon: BriefcaseBusiness },
+  { title: "Story", href: "/story", icon: BookOpenText },
+  { title: "DESK", href: "/desk", icon: Grid3X3 },
+  { title: "Apps", href: "/apps", icon: Grid3X3 }
 ];
 
 const defaultSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
@@ -52,112 +60,167 @@ const defaultSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
   { name: "Community", helper: "会員・投稿対応をつなげますか", href: "/apps/community" }
 ];
 
+/**
+ * 濃色(blue/orange)は白アイコン・淡色(pink/yellow/green)は黒アイコン（StatChipの可読性ルールと統一）。
+ * APPSタイルだけでなく、PC常時サイドバー／モバイル下部メニューのアクティブ差し色にも同じ表を使い、
+ * 「5色を濃くも薄くもしない」ルールを守ったまま各所でコントラストが崩れないようにする。
+ */
+export const tileToneStyles: Record<StatChipTone, { background: string; foreground: string }> = {
+  blue: { background: "var(--mikke-blue)", foreground: "#ffffff" },
+  orange: { background: "var(--mikke-orange)", foreground: "#ffffff" },
+  green: { background: "var(--mikke-green)", foreground: "#1b1b1f" },
+  yellow: { background: "var(--mikke-yellow)", foreground: "#1b1b1f" },
+  pink: { background: "var(--mikke-pink)", foreground: "#1b1b1f" }
+};
+
+export const tileToneCycle: StatChipTone[] = ["blue", "orange", "green", "yellow", "pink"];
+
+/**
+ * APPSタイルグリッド（1行4つ・カラフル5色サイクル）。MikkeOwnerMenu（ドロワー）と
+ * MikkeAppShellのPC常時サイドバー下部で共通利用する（重複実装を避ける＝brief指示）。
+ */
+export function MikkeAppsTileGrid({ apps }: { apps: MikkeOwnerMenuItem[] }) {
+  if (apps.length === 0) return null;
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {apps.map((app, index) => {
+        const Icon = app.icon ?? Grid3X3;
+        const tone = app.tone ?? tileToneCycle[index % tileToneCycle.length];
+        const style = tileToneStyles[tone];
+        return (
+          <Link
+            key={`${app.title}-${app.href}`}
+            href={app.href}
+            className="flex flex-col items-center gap-1.5 rounded-xl p-2.5 text-center"
+            style={{ background: style.background }}
+          >
+            <Icon size={20} color={style.foreground} strokeWidth={1.8} />
+            <span className="w-full truncate text-[11px] font-bold" style={{ color: style.foreground }}>
+              {app.title}
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * 本人メニュー（ハンバーガードロワー）: 軽量版。
+ * ①この画面の機能=アイコン+文字1行(箱なし・説明なし) ②APPS=カラフル小アイコンタイルのグリッド
+ * ③「＋アプリをつなげる」1行折りたたみ。全アプリ共通（STORY含む）。
+ */
 export function MikkeOwnerMenu({
   appName,
-  description,
+  theme = "blue",
   editItems = defaultEditItems,
   ownedApps = defaultOwnedApps,
   otherApps = [],
   suggestedApps = defaultSuggestedApps,
+  headerAction,
   onClose
 }: MikkeOwnerMenuProps) {
+  const themeStyle = tileToneStyles[theme];
+  const appTiles = [...ownedApps, ...otherApps];
+
   return (
-    <section className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-bold tracking-normal">{appName}メニュー</h2>
-          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">
-            {description ?? `${appName}の操作、使っているアプリ、これからつなげられるアプリをまとめています。`}
-          </p>
+    <section className="flex flex-col gap-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ background: themeStyle.background }}>
+            <Grid3X3 size={16} color={themeStyle.foreground} />
+          </span>
+          <p className="truncate text-sm font-bold tracking-normal">{appName}</p>
         </div>
-        {onClose ? (
-          <button
-            type="button"
-            aria-label="メニューを閉じる"
-            onClick={onClose}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"
-          >
-            <X size={16} />
-          </button>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {headerAction}
+          {onClose ? (
+            <button
+              type="button"
+              aria-label="メニューを閉じる"
+              onClick={onClose}
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-[var(--mikke-muted)]"
+            >
+              <X size={18} />
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      <MenuSection title={`${appName}を操作`} items={editItems} accent="orange" />
-      <MenuSection title="使っているアプリ" items={ownedApps} />
-      {otherApps.length > 0 ? <MenuSection title="他のアプリ" items={otherApps} /> : null}
-
-      {suggestedApps.length > 0 ? (
-        <div className="mt-4 rounded-lg border border-dashed border-[var(--mikke-primary-border)] bg-white p-3">
-          <p className="text-xs font-bold text-[var(--mikke-primary)]">つなげられるアプリ</p>
-          <div className="mt-2 grid gap-2">
-            {suggestedApps.map((app) => {
-              const content = (
-                <>
-                  <PlusCircle className="shrink-0 text-[var(--mikke-primary)]" size={20} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold">{app.name}</span>
-                    <span className="mt-0.5 block truncate text-xs font-semibold text-[var(--mikke-muted)]">{app.helper}</span>
-                  </span>
-                  <span className="shrink-0 rounded-lg border border-[var(--mikke-primary-border)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">
-                    つなげますか
-                  </span>
-                </>
-              );
-
-              return app.href ? (
-                <Link key={app.name} href={app.href} className="flex items-center gap-3 rounded-lg bg-[var(--mikke-surface-soft)] p-3">
-                  {content}
-                </Link>
-              ) : (
-                <div key={app.name} className="flex items-center gap-3 rounded-lg bg-[var(--mikke-surface-soft)] p-3">
-                  {content}
-                </div>
-              );
-            })}
-          </div>
+      {editItems.length > 0 ? (
+        <div className="flex flex-col">
+          {editItems.map((item) => {
+            const Icon = item.icon ?? LinkIcon;
+            return (
+              <Link
+                key={`${item.title}-${item.href}`}
+                href={item.href}
+                className="flex items-center gap-3 rounded-lg px-1 py-2.5 text-sm font-bold hover:bg-[var(--mikke-surface-soft)]"
+              >
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: themeStyle.background }}>
+                  <Icon size={16} color={themeStyle.foreground} />
+                </span>
+                {item.title}
+              </Link>
+            );
+          })}
         </div>
       ) : null}
+
+      {appTiles.length > 0 ? (
+        <div>
+          <p
+            className="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--mikke-muted)]"
+            style={{ fontFamily: "var(--mikke-font-display)" }}
+          >
+            APPS
+          </p>
+          <MikkeAppsTileGrid apps={appTiles} />
+        </div>
+      ) : null}
+
+      {suggestedApps.length > 0 ? <ConnectAppsSection apps={suggestedApps} /> : null}
     </section>
   );
 }
 
-function MenuSection({
-  title,
-  items,
-  accent = "blue"
-}: {
-  title: string;
-  items: MikkeOwnerMenuItem[];
-  accent?: "blue" | "orange";
-}) {
-  if (items.length === 0) return null;
+function ConnectAppsSection({ apps }: { apps: MikkeOwnerMenuSuggestedApp[] }) {
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="mt-4">
-      <p className="mb-2 text-xs font-bold text-[var(--mikke-primary)]">{title}</p>
-      <div className="grid gap-2">
-        {items.map((item) => {
-          const Icon = item.icon ?? LinkIcon;
-          return (
-            <Link key={`${item.title}-${item.href}`} href={item.href} className="flex items-center gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-3">
-              <span
-                className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${
-                  accent === "orange"
-                    ? "bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent-strong)]"
-                    : "bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]"
-                }`}
-              >
-                <Icon size={18} />
-              </span>
+    <div className="border-t border-[var(--mikke-line-soft)] pt-3">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        className="flex w-full items-center gap-2 text-sm font-bold text-[var(--mikke-muted)]"
+      >
+        <PlusCircle size={18} />
+        アプリをつなげる
+        <ChevronDown size={16} className={`ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
+      </button>
+
+      {expanded ? (
+        <div className="mt-2 flex flex-col gap-1">
+          {apps.map((app) => {
+            const content = (
               <span className="min-w-0">
-                <span className="block truncate text-sm font-bold">{item.title}</span>
-                <span className="mt-0.5 block truncate text-xs font-semibold text-[var(--mikke-muted)]">{item.helper}</span>
+                <span className="block text-sm font-bold">{app.name}</span>
+                <span className="block truncate text-xs font-semibold text-[var(--mikke-muted)]">{app.helper}</span>
               </span>
-              <ChevronRight className="ml-auto shrink-0 text-[var(--mikke-muted-light)]" size={16} />
-            </Link>
-          );
-        })}
-      </div>
+            );
+            return app.href ? (
+              <Link key={app.name} href={app.href} className="rounded-lg px-1 py-2 hover:bg-[var(--mikke-surface-soft)]">
+                {content}
+              </Link>
+            ) : (
+              <div key={app.name} className="rounded-lg px-1 py-2">
+                {content}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }

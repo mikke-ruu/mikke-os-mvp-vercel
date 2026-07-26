@@ -15,6 +15,7 @@ import {
   Layers3,
   Languages,
   MessageCircle,
+  Plus,
   RotateCcw,
   Save,
   Send,
@@ -29,6 +30,7 @@ import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { TeamWorksAdminProjectDashboard } from "@/components/team-works/projects/TeamWorksAdminProjectDashboard";
 import { TeamWorksWorkerModeNav } from "@/components/team-works/worker-projects/TeamWorksWorkerModeNav";
+import { SchoolCalendar } from "@/components/team-works/school/SchoolCalendar";
 import {
   createTeamWorksId,
   formatSessionTime,
@@ -45,6 +47,7 @@ import {
   type PartnerAvailability,
   type SessionStatus,
   type TeamWorksClient,
+  type TeamWorksGroup,
   type TeamWorksGuideItem,
   type TeamWorksParticipant,
   type TeamWorksReport,
@@ -164,7 +167,7 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
   );
 
   const screen = (
-    <MikkeAppShell appName="Team Works" title={config.title} subtitle={config.description} currentApp={{ label: "Team", href: "/apps/team-works" }}>
+    <MikkeAppShell appName="Team Works" title={config.title} subtitle={config.description} currentApp={{ label: "Team", href: "/apps/team-works" }} theme="green">
       <div className="tw-app min-w-0" data-text-scale={textScale}>
         <div className="tw-workspace min-w-0">
           <DesktopSidebar view={effectiveView} mode={mode} setMode={setMode} />
@@ -570,13 +573,23 @@ function ParticipantsView({ state, updateState, helpers }: ScreenProps & { helpe
     level: "N4",
     cautions: "",
     memo: "",
-    currentGuideItemId: firstGuideId
+    currentGuideItemId: firstGuideId,
+    groupId: ""
   });
 
   useEffect(() => {
     if (!form.clientId && firstClientId) setForm((current) => ({ ...current, clientId: firstClientId }));
     if (!form.currentGuideItemId && firstGuideId) setForm((current) => ({ ...current, currentGuideItemId: firstGuideId }));
   }, [firstClientId, firstGuideId, form.clientId, form.currentGuideItemId]);
+
+  const clientGroups = state.groups.filter((group) => group.clientId === form.clientId);
+
+  useEffect(() => {
+    if (form.groupId && !clientGroups.some((group) => group.id === form.groupId)) {
+      setForm((current) => ({ ...current, groupId: "" }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.clientId]);
 
   function addParticipant() {
     if (!form.name.trim() || !form.clientId) return;
@@ -591,10 +604,11 @@ function ParticipantsView({ state, updateState, helpers }: ScreenProps & { helpe
       currentGuideItemId: form.currentGuideItemId,
       lastGuideItemId: "",
       lastMemo: "",
-      nextMemo: ""
+      nextMemo: "",
+      groupId: form.groupId || undefined
     };
     updateState({ ...state, participants: [next, ...state.participants] });
-    setForm({ name: "", clientId: firstClientId, level: "N4", cautions: "", memo: "", currentGuideItemId: firstGuideId });
+    setForm({ name: "", clientId: firstClientId, level: "N4", cautions: "", memo: "", currentGuideItemId: firstGuideId, groupId: "" });
   }
 
   return (
@@ -605,12 +619,16 @@ function ParticipantsView({ state, updateState, helpers }: ScreenProps & { helpe
             {state.participants.map((participant) => {
               const currentGuide = helpers.guide(participant.currentGuideItemId);
               const lastGuide = helpers.guide(participant.lastGuideItemId);
+              const group = state.groups.find((candidate) => candidate.id === participant.groupId);
               return (
                 <article key={participant.id} className="tw-card p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <p className="tw-card-title">{participant.name} / {participant.level}</p>
-                      <p className="tw-helper mt-1">{helpers.clientName(participant.clientId)}</p>
+                      <p className="tw-helper mt-1">
+                        {helpers.clientName(participant.clientId)}
+                        {group ? ` / ${group.name}` : " / 未分類"}
+                      </p>
                     </div>
                     <StatusChip status="assigned" label={`次: ${currentGuide ? `${currentGuide.number}. ${currentGuide.title}` : "未設定"}`} />
                   </div>
@@ -628,17 +646,127 @@ function ParticipantsView({ state, updateState, helpers }: ScreenProps & { helpe
         </Panel>
       }
       side={
-        <Panel title="生徒を追加">
-          <TextInput label="生徒名" value={form.name} onChange={(name) => setForm({ ...form, name })} />
-          <SelectInput label="所属学校" value={form.clientId} onChange={(clientId) => setForm({ ...form, clientId })} options={state.clients.map((client) => ({ value: client.id, label: client.name }))} />
-          <TextInput label="レベル" value={form.level} onChange={(level) => setForm({ ...form, level })} />
-          <SelectInput label="開始テーマ" value={form.currentGuideItemId} onChange={(currentGuideItemId) => setForm({ ...form, currentGuideItemId })} options={state.guideItems.map((guide) => ({ value: guide.id, label: `${guide.number}. ${guide.title}` }))} />
-          <TextArea label="注意事項" value={form.cautions} onChange={(cautions) => setForm({ ...form, cautions })} />
-          <TextArea label="メモ" value={form.memo} onChange={(memo) => setForm({ ...form, memo })} />
-          <ActionButton label="生徒を追加" onClick={addParticipant} icon="save" />
-        </Panel>
+        <div className="grid gap-4">
+          <GroupManagerPanel state={state} updateState={updateState} clientId={form.clientId} />
+          <Panel title="生徒を追加">
+            <TextInput label="生徒名" value={form.name} onChange={(name) => setForm({ ...form, name })} />
+            <SelectInput label="所属学校" value={form.clientId} onChange={(clientId) => setForm({ ...form, clientId })} options={state.clients.map((client) => ({ value: client.id, label: client.name }))} />
+            <SelectInput
+              label="所属グループ"
+              value={form.groupId}
+              onChange={(groupId) => setForm({ ...form, groupId })}
+              options={[{ value: "", label: "未分類/なし" }, ...clientGroups.map((group) => ({ value: group.id, label: group.name }))]}
+            />
+            <TextInput label="レベル" value={form.level} onChange={(level) => setForm({ ...form, level })} />
+            <SelectInput label="開始テーマ" value={form.currentGuideItemId} onChange={(currentGuideItemId) => setForm({ ...form, currentGuideItemId })} options={state.guideItems.map((guide) => ({ value: guide.id, label: `${guide.number}. ${guide.title}` }))} />
+            <TextArea label="注意事項" value={form.cautions} onChange={(cautions) => setForm({ ...form, cautions })} />
+            <TextArea label="メモ" value={form.memo} onChange={(memo) => setForm({ ...form, memo })} />
+            <ActionButton label="生徒を追加" onClick={addParticipant} icon="save" />
+          </Panel>
+        </div>
       }
     />
+  );
+}
+
+function GroupManagerPanel({ state, updateState, clientId }: ScreenProps & { clientId: string }) {
+  const [newGroupName, setNewGroupName] = useState("");
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  const clientGroups = state.groups.filter((group) => group.clientId === clientId);
+  const clientName = state.clients.find((client) => client.id === clientId)?.name ?? "未選択";
+
+  function addGroup() {
+    if (!newGroupName.trim() || !clientId) return;
+    const next: TeamWorksGroup = {
+      id: createTeamWorksId("group"),
+      organizationId: teamWorksTemplate.organizationId,
+      clientId,
+      name: newGroupName.trim()
+    };
+    updateState({ ...state, groups: [...state.groups, next] });
+    setNewGroupName("");
+  }
+
+  function startRename(group: TeamWorksGroup) {
+    setRenamingGroupId(group.id);
+    setRenameValue(group.name);
+  }
+
+  function saveRename() {
+    if (!renamingGroupId || !renameValue.trim()) return;
+    updateState({
+      ...state,
+      groups: state.groups.map((group) => (group.id === renamingGroupId ? { ...group, name: renameValue.trim() } : group))
+    });
+    setRenamingGroupId(null);
+    setRenameValue("");
+  }
+
+  function deleteGroup(groupId: string) {
+    updateState({
+      ...state,
+      groups: state.groups.filter((group) => group.id !== groupId),
+      participants: state.participants.map((participant) =>
+        participant.groupId === groupId ? { ...participant, groupId: undefined } : participant
+      )
+    });
+    if (renamingGroupId === groupId) {
+      setRenamingGroupId(null);
+      setRenameValue("");
+    }
+  }
+
+  return (
+    <Panel title="グループ管理" lead={`${clientName}のグループ。生徒登録時にここで選べます。`}>
+      <div className="grid gap-2">
+        {clientGroups.length === 0 ? <Empty text="この学校のグループはまだありません。" /> : null}
+        {clientGroups.map((group) => (
+          <div key={group.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2">
+            {renamingGroupId === group.id ? (
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <input
+                  value={renameValue}
+                  onChange={(event) => setRenameValue(event.target.value)}
+                  className="tw-form-input flex-1"
+                />
+                <button type="button" onClick={saveRename} className="tw-secondary-button min-h-8 px-3">
+                  保存
+                </button>
+                <button type="button" onClick={() => setRenamingGroupId(null)} className="tw-text-button">
+                  取消
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="text-[length:var(--font-body)] font-bold text-[var(--mikke-primary)]">{group.name}</p>
+                <div className="flex gap-1">
+                  <button type="button" onClick={() => startRename(group)} className="tw-secondary-button min-h-8 px-3">
+                    リネーム
+                  </button>
+                  <button type="button" onClick={() => deleteGroup(group.id)} className="tw-text-button">
+                    削除
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={newGroupName}
+          onChange={(event) => setNewGroupName(event.target.value)}
+          placeholder="新しいグループ名"
+          className="tw-form-input flex-1"
+        />
+        <button type="button" onClick={addGroup} className="tw-primary-button min-h-8 px-3">
+          <Plus size={16} />
+          追加
+        </button>
+      </div>
+    </Panel>
   );
 }
 
@@ -722,6 +850,7 @@ function WorkersView({ state, updateState }: ScreenProps) {
 }
 
 function SessionsView({ state, updateState, helpers }: ScreenProps & { helpers: Helpers }) {
+  const [scheduleTab, setScheduleTab] = useState<"calendar" | "list">("calendar");
   const [form, setForm] = useState({
     clientId: state.clients[0]?.id ?? "",
     participantId: state.participants[0]?.id ?? "",
@@ -750,29 +879,58 @@ function SessionsView({ state, updateState, helpers }: ScreenProps & { helpers: 
   }
 
   return (
-    <TwoColumn
-      main={
-        <Panel title="授業一覧">
-          <div className="grid gap-3">
-            {state.sessions.map((session) => (
-              <SessionCard key={session.id} session={session} helpers={helpers} />
-            ))}
-          </div>
-        </Panel>
-      }
-      side={
-        <Panel title="授業を追加">
-          <SelectInput label="学校" value={form.clientId} onChange={(clientId) => setForm({ ...form, clientId })} options={state.clients.map((client) => ({ value: client.id, label: client.name }))} />
-          <SelectInput label="生徒またはクラス" value={form.participantId} onChange={(participantId) => setForm({ ...form, participantId })} options={state.participants.map((participant) => ({ value: participant.id, label: participant.name }))} />
-          <TextInput label="クラス名" value={form.className} onChange={(className) => setForm({ ...form, className })} />
-          <TextInput label="日時" value={form.startsAt} onChange={(startsAt) => setForm({ ...form, startsAt })} type="datetime-local" />
-          <TextInput label="授業時間（分）" value={form.durationMinutes} onChange={(durationMinutes) => setForm({ ...form, durationMinutes })} />
-          <TextInput label="Zoom URL" value={form.zoomUrl} onChange={(zoomUrl) => setForm({ ...form, zoomUrl })} />
-          <SelectInput label="担当パートナー" value={form.workerId} onChange={(workerId) => setForm({ ...form, workerId })} options={[{ value: "", label: "未割当" }, ...state.workers.map((worker) => ({ value: worker.id, label: worker.name }))]} />
-          <ActionButton label="授業を追加" onClick={addSession} icon="save" />
-        </Panel>
-      }
-    />
+    <div className="grid gap-4">
+      <div className="inline-flex w-fit rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-1">
+        <SegmentButton active={scheduleTab === "calendar"} onClick={() => setScheduleTab("calendar")}>
+          カレンダー
+        </SegmentButton>
+        <SegmentButton active={scheduleTab === "list"} onClick={() => setScheduleTab("list")}>
+          一覧
+        </SegmentButton>
+      </div>
+
+      {scheduleTab === "calendar" ? (
+        <SchoolCalendar state={state} updateState={updateState} />
+      ) : (
+        <TwoColumn
+          main={
+            <Panel title="授業一覧">
+              <div className="grid gap-3">
+                {state.sessions.map((session) => (
+                  <SessionCard key={session.id} session={session} helpers={helpers} />
+                ))}
+              </div>
+            </Panel>
+          }
+          side={
+            <Panel title="授業を追加">
+              <SelectInput label="学校" value={form.clientId} onChange={(clientId) => setForm({ ...form, clientId })} options={state.clients.map((client) => ({ value: client.id, label: client.name }))} />
+              <SelectInput label="生徒またはクラス" value={form.participantId} onChange={(participantId) => setForm({ ...form, participantId })} options={state.participants.map((participant) => ({ value: participant.id, label: participant.name }))} />
+              <TextInput label="クラス名" value={form.className} onChange={(className) => setForm({ ...form, className })} />
+              <TextInput label="日時" value={form.startsAt} onChange={(startsAt) => setForm({ ...form, startsAt })} type="datetime-local" />
+              <TextInput label="授業時間（分）" value={form.durationMinutes} onChange={(durationMinutes) => setForm({ ...form, durationMinutes })} />
+              <TextInput label="Zoom URL" value={form.zoomUrl} onChange={(zoomUrl) => setForm({ ...form, zoomUrl })} />
+              <SelectInput label="担当パートナー" value={form.workerId} onChange={(workerId) => setForm({ ...form, workerId })} options={[{ value: "", label: "未割当" }, ...state.workers.map((worker) => ({ value: worker.id, label: worker.name }))]} />
+              <ActionButton label="授業を追加" onClick={addSession} icon="save" />
+            </Panel>
+          }
+        />
+      )}
+    </div>
+  );
+}
+
+function SegmentButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-1.5 text-[length:var(--font-helper)] font-bold transition ${
+        active ? "bg-[var(--mikke-primary)] text-[var(--mikke-surface)]" : "text-[var(--mikke-muted)]"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -1879,12 +2037,15 @@ function normalizeState(saved: Partial<TeamWorksState>): TeamWorksState {
       ...client,
       preferredLanguage: client.preferredLanguage ?? "en"
     })),
+    groups: saved.groups ?? [],
+    holidays: saved.holidays ?? [],
     participants: (saved.participants ?? teamWorksInitialState.participants).map((participant) => ({
       ...participant,
       currentGuideItemId: participant.currentGuideItemId ?? fallbackGuideId,
       lastGuideItemId: participant.lastGuideItemId ?? "",
       lastMemo: participant.lastMemo ?? "",
-      nextMemo: participant.nextMemo ?? ""
+      nextMemo: participant.nextMemo ?? "",
+      groupId: participant.groupId ?? undefined
     })),
     guideItems: (saved.guideItems?.length ? saved.guideItems : teamWorksInitialState.guideItems).map((guide) => ({
       ...guide,

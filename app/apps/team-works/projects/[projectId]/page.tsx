@@ -2,16 +2,11 @@
 
 import { useParams } from "next/navigation";
 import { AuthGate } from "@/components/AuthGate";
-import { TeamWorksProjectDetail } from "@/components/team-works/projects/TeamWorksProjectDetail";
-import { TeamWorksProjectsShell } from "@/components/team-works/projects/TeamWorksProjectsShell";
+import { TeamWorksProjectDetailRoute } from "@/components/team-works/operations/TeamWorksOperationsProjectDetail";
 
 function TeamWorksProjectDetailContent() {
   const params = useParams<{ projectId: string }>();
-  return (
-    <TeamWorksProjectsShell title="プロジェクト詳細" subtitle="工程・タスク・成果物・メンバーを確認する">
-      <TeamWorksProjectDetail projectId={params.projectId} />
-    </TeamWorksProjectsShell>
-  );
+  return <TeamWorksProjectDetailRoute projectId={params.projectId} />;
 }
 
 export default function TeamWorksProjectDetailPage() {

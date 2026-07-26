@@ -1,0 +1,1901 @@
+"use client";
+
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BookOpen,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  CheckCircle2,
+  CircleDollarSign,
+  Clock3,
+  FileCheck2,
+  FolderKanban,
+  GraduationCap,
+  Landmark,
+  MessageSquare,
+  Plus,
+  Settings2,
+  Send,
+  Users,
+  WalletCards
+} from "lucide-react";
+import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
+import { MikkeSection } from "@/components/mikkeos/MikkeSection";
+import { TeamWorksProjectDetail } from "@/components/team-works/projects/TeamWorksProjectDetail";
+import {
+  TeamWorksProjectField,
+  TeamWorksProjectsShell,
+  teamWorksProjectInputClass
+} from "@/components/team-works/projects/TeamWorksProjectsShell";
+import { supabase } from "@/lib/supabase/client";
+import {
+  addOperationsClientToProject,
+  addOperationsPartnerToProject,
+  cancelOperationsSession,
+  createOperationsHoliday,
+  createOperationsGroup,
+  createOperationsManual,
+  createOperationsParticipant,
+  createOperationsSession,
+  deleteOperationsHoliday,
+  loadOperationsClientDirectory,
+  loadOperationsPartnerDirectory,
+  loadOperationsProjectPartnerSettings,
+  loadOperationsProjectPartnerOffers,
+  loadOperationsProjectDetail,
+  loadOperationsProjectMembers,
+  revokeOperationsProjectInvite,
+  sendOperationsDirectMessage,
+  updateOperationsProjectPartnerSetting,
+  updateOperationsProjectPartnerOffer,
+  updateOperationsSession,
+  updateOperationsParticipantProgress,
+  updateOperationsProjectContract,
+  updateOperationsProjectDescription,
+  updateOperationsProjectVisibility,
+  type OperationsClientDirectoryEntry,
+  type OperationsPartnerDirectoryEntry,
+  type OperationsPendingInvite,
+  type OperationsProjectDetailData,
+  type OperationsProjectPartnerSetting,
+  type OperationsProjectPartnerOffer,
+  type OperationsProjectMember
+} from "@/lib/team-works-operations-project";
+import { TeamWorksOperationsShell } from "./TeamWorksOperationsShell";
+
+type ProjectTab =
+  | "overview"
+  | "schedule"
+  | "messages"
+  | "partners"
+  | "roster"
+  | "reports"
+  | "manuals"
+  | "portal"
+  | "settings";
+
+const tabs: { id: ProjectTab; label: string }[] = [
+  { id: "overview", label: "概要" },
+  { id: "schedule", label: "スケジュール" },
+  { id: "messages", label: "メッセージ" },
+  { id: "partners", label: "パートナー" },
+  { id: "roster", label: "名簿" },
+  { id: "reports", label: "報告" },
+  { id: "manuals", label: "マニュアル" },
+  { id: "portal", label: "ポータル設定" },
+  { id: "settings", label: "プロジェクト設定" }
+];
+
+export function TeamWorksProjectDetailRoute({ projectId }: { projectId: string }) {
+  const [data, setData] = useState<OperationsProjectDetailData | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setData(await loadOperationsProjectDetail(supabase, projectId));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "プロジェクト詳細の読み込みに失敗しました。");
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (error) {
+    return (
+      <TeamWorksOperationsShell title="プロジェクト詳細">
+        <MikkeEmptyState title="読み込みに失敗しました" helper={error} />
+      </TeamWorksOperationsShell>
+    );
+  }
+
+  if (data === undefined) {
+    return (
+      <TeamWorksOperationsShell title="プロジェクト詳細">
+        <p className="text-sm font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>
+      </TeamWorksOperationsShell>
+    );
+  }
+
+  if (data === null) {
+    return (
+      <TeamWorksProjectsShell title="プロジェクト詳細" subtitle="工程・タスク・成果物・メンバーを確認する">
+        <TeamWorksProjectDetail projectId={projectId} />
+      </TeamWorksProjectsShell>
+    );
+  }
+
+  return <OperationsProjectDetail data={data} onReload={load} />;
+}
+
+function OperationsProjectDetail({
+  data,
+  onReload
+}: {
+  data: OperationsProjectDetailData;
+  onReload: () => Promise<void>;
+}) {
+  const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const mutate = useCallback(
+    async (action: () => Promise<void>, successMessage: string) => {
+      setSaving(true);
+      setMutationError(null);
+      setNotice(null);
+      try {
+        await action();
+        await onReload();
+        setNotice(successMessage);
+      } catch (actionError) {
+        setMutationError(actionError instanceof Error ? actionError.message : "保存に失敗しました。");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [onReload]
+  );
+
+  return (
+    <TeamWorksOperationsShell title={data.project.title}>
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/apps/team-works"
+            aria-label="本部ダッシュボードへ戻る"
+            className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"
+          >
+            <ArrowLeft size={17} />
+          </Link>
+          <h1 className="text-xl font-extrabold text-[var(--mikke-text)]">{data.project.title}</h1>
+          <span className="rounded-full bg-[var(--mikke-primary-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-primary)]">
+            運営型
+          </span>
+        </div>
+
+        <nav
+          aria-label={`${data.project.title}のメニュー`}
+          className="-mx-4 overflow-x-auto border-b border-[var(--mikke-line)] px-4"
+        >
+          <div className="flex min-w-max gap-1">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`border-b-2 px-3 py-2.5 text-xs font-bold transition ${
+                  activeTab === tab.id
+                    ? "border-[var(--mikke-accent)] text-[var(--mikke-primary)]"
+                    : "border-transparent text-[var(--mikke-muted)]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </nav>
+
+        {mutationError ? (
+          <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+            {mutationError}
+          </p>
+        ) : null}
+        {notice ? (
+          <p role="status" className="rounded-xl bg-[var(--mikke-primary-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">
+            {notice}
+          </p>
+        ) : null}
+
+        {activeTab === "overview" ? <OverviewTab data={data} saving={saving} mutate={mutate} onSelectTab={setActiveTab} /> : null}
+        {activeTab === "schedule" ? <ScheduleTab data={data} /> : null}
+        {activeTab === "roster" ? <RosterTab data={data} saving={saving} mutate={mutate} /> : null}
+        {activeTab === "partners" ? <PartnersTab data={data} onSelectTab={setActiveTab} /> : null}
+        {activeTab === "manuals" ? <ManualsTab data={data} saving={saving} mutate={mutate} /> : null}
+        {activeTab === "reports" ? <ReportsTab data={data} /> : null}
+        {activeTab === "portal" ? <PortalTab data={data} saving={saving} mutate={mutate} /> : null}
+        {activeTab === "settings" ? <ProjectSettingsTab data={data} saving={saving} mutate={mutate} /> : null}
+        {activeTab === "messages" ? <MessagesTab data={data} saving={saving} mutate={mutate} /> : null}
+      </div>
+    </TeamWorksOperationsShell>
+  );
+}
+
+function OverviewTab({
+  data,
+  saving,
+  mutate,
+  onSelectTab
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+  onSelectTab: (tab: ProjectTab) => void;
+}) {
+  const nowKey = toDateKey(new Date());
+  const activeSessions = data.sessions.filter((session) => session.status !== "cancelled");
+  const upcoming = activeSessions.filter((session) => session.sessionDate >= nowKey);
+  const todaySession = upcoming.find((session) => session.sessionDate === nowKey);
+  const startOfWeek = startOfMonday(new Date());
+  const endOfWeek = addDays(startOfWeek, 6);
+  const weekCount = activeSessions.filter((session) => {
+    const date = new Date(`${session.sessionDate}T00:00:00`);
+    return date >= startOfWeek && date <= endOfWeek;
+  }).length;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-[color-mix(in_srgb,var(--mikke-green)_55%,white)] bg-[color-mix(in_srgb,var(--mikke-green)_18%,white)] px-4 py-3">
+        <p className="flex items-center gap-2 text-sm font-bold text-[var(--mikke-text)]">
+          <Clock3 size={16} className="text-[var(--mikke-primary)]" />
+          {todaySession
+            ? `今日 ${todaySession.startTime} ${data.project.title} · ${todaySession.partnerName ?? "担当未定"}`
+            : "今日の予定はありません"}
+        </p>
+      </div>
+
+      <ProjectCalendarPanel data={data} saving={saving} mutate={mutate} />
+
+      <div className="grid grid-cols-3 gap-3">
+        <MetricCard icon={CalendarDays} tone="blue" label="今週のコマ" value={String(weekCount)} />
+        <MetricCard icon={Users} tone="green" label="パートナー" value={`${data.partners.length}名`} />
+        <MetricCard icon={GraduationCap} tone="pink" label="対象者" value={`${data.participants.length}名`} />
+      </div>
+      <p className="-mt-3 text-[11px] font-semibold text-[var(--mikke-muted)]">
+        パートナーはこのプロジェクトの参加人数、対象者はクライアント側の総登録者数です。
+      </p>
+
+      <OverviewListSection
+        icon={CalendarDays}
+        title="Upcoming"
+        subtitle="今後のスケジュール"
+        onViewAll={() => onSelectTab("schedule")}
+      >
+        {upcoming.length === 0 ? (
+          <MikkeEmptyState title="今後の予定はありません" />
+        ) : (
+          upcoming.slice(0, 3).map((session) => (
+            <ListRow
+              key={session.id}
+              title={`${formatDate(session.sessionDate)} ${session.startTime}〜${endTime(session.startTime, session.durationMin)}`}
+              helper={`担当 ${session.partnerName ?? "未定"}${session.roster.length ? ` · ${session.roster.length}名` : ""}`}
+            />
+          ))
+        )}
+      </OverviewListSection>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        <OverviewListSection
+          icon={MessageSquare}
+          title="Messages"
+          subtitle="新着メッセージ"
+          onViewAll={() => onSelectTab("messages")}
+        >
+          {data.comments.length === 0 ? (
+            <MikkeEmptyState title="新着メッセージはありません" />
+          ) : (
+            data.comments.slice(0, 3).map((comment) => (
+              <ListRow key={comment.id} title={comment.authorName} helper={comment.body} />
+            ))
+          )}
+        </OverviewListSection>
+
+        <OverviewListSection
+          icon={FileCheck2}
+          title="Reports"
+          subtitle="最近の報告"
+          onViewAll={() => onSelectTab("reports")}
+        >
+          {data.reports.length === 0 ? (
+            <MikkeEmptyState title="最近の報告はありません" />
+          ) : (
+            data.reports.slice(0, 3).map((report) => (
+              <ListRow
+                key={report.id}
+                title={`${report.submitterName} · ${report.formName}`}
+                helper={reportStatusLabel(report.status)}
+                badge={reportStatusLabel(report.status)}
+              />
+            ))
+          )}
+        </OverviewListSection>
+      </div>
+
+      <MikkeSection title="More" tone="editorial">
+        <p className="mb-3 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">その他</p>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
+          {[
+            ["overview", "概要", CalendarDays],
+            ["schedule", "スケジュール", CalendarDays],
+            ["messages", "メッセージ", MessageSquare],
+            ["partners", "パートナー", Clock3],
+            ["roster", "名簿", Users],
+            ["reports", "報告", FileCheck2],
+            ["manuals", "マニュアル", BookOpen],
+            ["portal", "ポータル設定", Settings2],
+            ["settings", "プロジェクト設定", FileCheck2]
+          ].map(([id, label, Icon]) => (
+            <button
+              key={String(id)}
+              type="button"
+              onClick={() => onSelectTab(id as ProjectTab)}
+              className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-2 py-3 text-xs font-bold"
+            >
+              <Icon size={19} className="text-[var(--mikke-primary)]" />
+              {String(label)}
+            </button>
+          ))}
+        </div>
+      </MikkeSection>
+    </div>
+  );
+}
+
+function ProjectCalendarPanel({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [monthDate, setMonthDate] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
+  const [adding, setAdding] = useState(false);
+  const [startTime, setStartTime] = useState("13:00");
+  const [durationMin, setDurationMin] = useState("60");
+  const [partnerMemberId, setPartnerMemberId] = useState("");
+  const [holidayMemo, setHolidayMemo] = useState("");
+  const calendarDates = useMemo(() => monthCalendarDates(monthDate), [monthDate]);
+  const sessionsByDate = useMemo(() => {
+    const result = new Map<string, OperationsProjectDetailData["sessions"]>();
+    data.sessions.filter((session) => session.status !== "cancelled").forEach((session) => {
+      result.set(session.sessionDate, [...(result.get(session.sessionDate) ?? []), session]);
+    });
+    return result;
+  }, [data.sessions]);
+  const holidaysByDate = useMemo(() => new Map(data.holidays.map((holiday) => [holiday.holidayDate, holiday])), [data.holidays]);
+  const selectedSessions = sessionsByDate.get(selectedDate) ?? [];
+  const selectedHoliday = holidaysByDate.get(selectedDate);
+
+  useEffect(() => {
+    if (selectedDate.slice(0, 7) !== `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`) {
+      setMonthDate(new Date(`${selectedDate}T00:00:00`));
+    }
+  }, [selectedDate, monthDate]);
+
+  const selectDate = (date: Date) => {
+    setSelectedDate(toDateKey(date));
+    setAdding(false);
+  };
+
+  const addSession = async (event: FormEvent) => {
+    event.preventDefault();
+    await mutate(
+      () => createOperationsSession(supabase, data.project.id, {
+        sessionDate: selectedDate,
+        startTime,
+        durationMin: Number(durationMin),
+        partnerMemberId: partnerMemberId || null
+      }),
+      "予定を登録しました。"
+    );
+    setAdding(false);
+  };
+
+  const addHoliday = async () => {
+    await mutate(
+      () => createOperationsHoliday(supabase, {
+        organizationId: data.project.organizationId,
+        projectId: data.project.id,
+        holidayDate: selectedDate,
+        memo: holidayMemo
+      }),
+      "休講日に設定しました。同日の生成済み予定は取り消しました。"
+    );
+    setHolidayMemo("");
+  };
+
+  return (
+    <section>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-extrabold uppercase tracking-[0.14em] text-[var(--mikke-primary)]">Calendar</h2>
+          <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">日付を押すと右側で予定詳細・登録・編集ができます。</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button type="button" aria-label="前の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white"><ChevronLeft size={15} /></button>
+          <span className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">月</span>
+          <span className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">週</span>
+          <span className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">日</span>
+          <button type="button" aria-label="次の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white"><ChevronRight size={15} /></button>
+        </div>
+      </div>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.8fr)]">
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+          <p className="mb-3 text-sm font-extrabold">{monthDate.getFullYear()}年 {monthDate.getMonth() + 1}月</p>
+          <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[var(--mikke-muted)]">{weekdays.map((day) => <span key={day}>{day}</span>)}</div>
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {calendarDates.map((date) => {
+              const key = toDateKey(date);
+              const inMonth = date.getMonth() === monthDate.getMonth();
+              const sessions = sessionsByDate.get(key) ?? [];
+              const holiday = holidaysByDate.get(key);
+              return <button key={key} type="button" onClick={() => selectDate(date)} className={`min-h-16 rounded-lg border p-1.5 text-left ${key === selectedDate ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"} ${inMonth ? "" : "opacity-40"}`}>
+                <span className="block text-[10px] font-bold">{date.getDate()}</span>
+                <span className="mt-1 flex flex-wrap gap-1">
+                  {sessions.slice(0, 2).map((session) => <span key={session.id} className="rounded bg-[var(--mikke-primary)] px-1 py-0.5 text-[8px] font-bold text-white">{session.startTime}</span>)}
+                  {holiday ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
+                </span>
+              </button>;
+            })}
+          </div>
+          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-pink)]" />休講 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />パートナー稼働可能日（接続準備中）</p>
+        </div>
+        <aside className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+          <h3 className="text-sm font-extrabold">{formatDate(selectedDate)} の予定詳細</h3>
+          <div className="mt-3 space-y-2">
+            {selectedSessions.map((session) => <CalendarSessionEditor key={session.id} session={session} partners={data.partners} saving={saving} mutate={mutate} />)}
+            {selectedHoliday ? <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs"><span><b>休講</b>{selectedHoliday.memo ? `　${selectedHoliday.memo}` : ""}</span><button type="button" disabled={saving} onClick={() => void mutate(() => deleteOperationsHoliday(supabase, selectedHoliday.id), "休講日を削除しました。")} className="rounded-lg border border-red-200 px-2 py-1 font-bold text-red-700">削除</button></div> : null}
+          </div>
+          {adding ? <form onSubmit={addSession} className="mt-3 space-y-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+            <p className="text-xs font-extrabold">この日に予定を追加</p>
+            <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} />
+            <input type="number" min={1} value={durationMin} onChange={(event) => setDurationMin(event.target.value)} className={teamWorksProjectInputClass} aria-label="時間（分）" />
+            <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{data.partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">登録</button>
+          </form> : <button type="button" onClick={() => setAdding(true)} className="mt-3 w-full rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-bold text-[var(--mikke-primary)]">＋ 予定追加</button>}
+          {!selectedHoliday ? <div className="mt-2 flex gap-2"><input value={holidayMemo} onChange={(event) => setHolidayMemo(event.target.value)} placeholder="休講メモ（任意）" className={teamWorksProjectInputClass} /><button type="button" disabled={saving} onClick={() => void addHoliday()} className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2 text-xs font-bold">休講</button></div> : null}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function CalendarSessionEditor({ session, partners, saving, mutate }: { session: OperationsProjectDetailData["sessions"][number]; partners: OperationsProjectDetailData["partners"]; saving: boolean; mutate: (action: () => Promise<void>, successMessage: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [startTime, setStartTime] = useState(session.startTime);
+  const [durationMin, setDurationMin] = useState(String(session.durationMin));
+  const [partnerMemberId, setPartnerMemberId] = useState(session.partnerMemberId ?? "");
+  return <div className="rounded-xl border border-[var(--mikke-line)] p-3"><button type="button" onClick={() => setOpen((value) => !value)} className="flex w-full items-center justify-between text-left text-xs font-bold"><span>{session.startTime}〜{endTime(session.startTime, session.durationMin)}　担当 {session.partnerName ?? "未定"}　名簿{session.roster.length}名</span><span className="text-[var(--mikke-primary)]">{open ? "閉じる" : "編集"}</span></button>{open ? <div className="mt-3 space-y-2"><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} /><input type="number" min={1} value={durationMin} onChange={(event) => setDurationMin(event.target.value)} className={teamWorksProjectInputClass} /><select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: Number(durationMin), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">保存</button><button type="button" disabled={saving} onClick={() => void mutate(() => cancelOperationsSession(supabase, session.id), "予定を削除しました。")} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">削除</button></div></div> : null}</div>;
+}
+
+function ScheduleTab({ data }: { data: OperationsProjectDetailData }) {
+  const upcoming = data.sessions.filter(
+    (session) => session.status !== "cancelled" && session.sessionDate >= toDateKey(new Date())
+  );
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={CalendarDays} title="スケジュール" description="このプロジェクト専用の予定です。週次パターンから生成されたコマもまとめて確認できます。" />
+      <MikkeSection title="Weekly rules" tone="editorial">
+        {data.rules.length === 0 ? (
+          <MikkeEmptyState title="週次パターンはまだありません" />
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {data.rules.map((rule) => (
+              <InfoCard
+                key={rule.id}
+                title={`毎週 ${weekdayLabel(rule.weekday)} ${rule.startTime}〜${endTime(rule.startTime, rule.durationMin)}`}
+                helper={`担当 ${rule.partnerName ?? "未定"} ／ ${rule.durationMin}分`}
+                badge={rule.status === "active" ? "有効" : "一時停止"}
+              />
+            ))}
+          </div>
+        )}
+      </MikkeSection>
+      <MikkeSection title="Upcoming" tone="editorial">
+        {upcoming.length === 0 ? (
+          <MikkeEmptyState title="今後のコマはありません" />
+        ) : (
+          <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+            {upcoming.slice(0, 30).map((session) => (
+              <ListRow
+                key={session.id}
+                title={`${formatDate(session.sessionDate)} ${session.startTime}〜${endTime(session.startTime, session.durationMin)}`}
+                helper={`担当 ${session.partnerName ?? "未定"} · 名簿 ${session.roster.length}名`}
+                badge={session.status === "completed" ? "完了" : "予定"}
+              />
+            ))}
+          </div>
+        )}
+      </MikkeSection>
+    </div>
+  );
+}
+
+function RosterTab({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [groupName, setGroupName] = useState("");
+  const [participantName, setParticipantName] = useState("");
+  const [groupId, setGroupId] = useState("");
+  const [level, setLevel] = useState("");
+  const [cautions, setCautions] = useState("");
+  const groupNameById = new Map(data.groups.map((group) => [group.id, group.name]));
+  const nextSession = data.sessions.find(
+    (session) => session.status === "scheduled" && session.sessionDate >= toDateKey(new Date())
+  );
+
+  async function submitGroup(event: FormEvent) {
+    event.preventDefault();
+    if (!groupName.trim()) return;
+    await mutate(
+      () => createOperationsGroup(supabase, data.project.id, groupName),
+      "グループを追加しました。"
+    );
+    setGroupName("");
+  }
+
+  async function submitParticipant(event: FormEvent) {
+    event.preventDefault();
+    if (!participantName.trim()) return;
+    await mutate(
+      () =>
+        createOperationsParticipant(supabase, data.project.id, {
+          name: participantName,
+          groupId: groupId || null,
+          level,
+          cautions
+        }),
+      "名簿に追加しました。"
+    );
+    setParticipantName("");
+    setLevel("");
+    setCautions("");
+  }
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={Users} title="名簿" description="グループと対象者をプロジェクト内で管理します。現在のマニュアル番号は手動で調整できます。" />
+      {nextSession ? (
+        <MikkeSection title="Next roster" tone="editorial">
+          <p className="mb-3 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">
+            {formatDate(nextSession.sessionDate)} {nextSession.startTime} · {nextSession.partnerName ?? "担当未定"}
+          </p>
+          {nextSession.roster.length === 0 ? (
+            <MikkeEmptyState title="このコマの名簿はまだありません" helper="出席順①②③は、コマ編集機能で設定予定です。" />
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {nextSession.roster.map((entry) => (
+                <InfoCard
+                  key={entry.id}
+                  title={`${orderNumber(entry.orderIndex)} ${entry.participantName}`}
+                  helper={attendanceLabel(entry.attendanceStatus)}
+                />
+              ))}
+            </div>
+          )}
+        </MikkeSection>
+      ) : null}
+
+      <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
+        <MikkeSection title="Participants" tone="editorial">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {data.groups.map((group) => (
+              <span key={group.id} className="rounded-full bg-[var(--mikke-primary-soft)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">
+                {group.name}
+              </span>
+            ))}
+          </div>
+          {data.participants.length === 0 ? (
+            <MikkeEmptyState title="名簿はまだ空です" />
+          ) : (
+            <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+              {data.participants.map((participant) => (
+                <div key={participant.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]">
+                    <GraduationCap size={17} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold">{participant.name}</span>
+                    <span className="block text-xs font-semibold text-[var(--mikke-muted)]">
+                      {participant.groupId ? groupNameById.get(participant.groupId) ?? "グループ" : "グループ未設定"}
+                      {participant.level ? ` ／ ${participant.level}` : ""}
+                    </span>
+                    {participant.cautions ? (
+                      <span className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-[var(--mikke-orange)]">
+                        <AlertTriangle size={12} /> {participant.cautions}
+                      </span>
+                    ) : null}
+                  </span>
+                  <label className="flex items-center gap-2 text-xs font-bold">
+                    進捗
+                    <input
+                      type="number"
+                      min={1}
+                      defaultValue={participant.currentManualNo}
+                      disabled={saving}
+                      onBlur={(event) => {
+                        const value = Number(event.currentTarget.value);
+                        if (Number.isFinite(value) && value !== participant.currentManualNo) {
+                          void mutate(
+                            () => updateOperationsParticipantProgress(supabase, participant.id, value),
+                            `${participant.name}さんの進捗を更新しました。`
+                          );
+                        }
+                      }}
+                      className="w-16 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5 text-center text-sm"
+                    />
+                    番
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+        </MikkeSection>
+
+        <div className="space-y-4">
+          <form onSubmit={submitGroup} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+            <h3 className="flex items-center gap-2 text-sm font-extrabold">
+              <Plus size={16} className="text-[var(--mikke-primary)]" /> グループ追加
+            </h3>
+            <TeamWorksProjectField label="グループ名" required className="mt-3">
+              <input value={groupName} onChange={(event) => setGroupName(event.target.value)} className={teamWorksProjectInputClass} />
+            </TeamWorksProjectField>
+            <SaveButton saving={saving} label="グループを追加" />
+          </form>
+
+          <form onSubmit={submitParticipant} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+            <h3 className="flex items-center gap-2 text-sm font-extrabold">
+              <Plus size={16} className="text-[var(--mikke-primary)]" /> 名簿に追加
+            </h3>
+            <TeamWorksProjectField label="名前" required className="mt-3">
+              <input value={participantName} onChange={(event) => setParticipantName(event.target.value)} className={teamWorksProjectInputClass} />
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="グループ" className="mt-3">
+              <select value={groupId} onChange={(event) => setGroupId(event.target.value)} className={teamWorksProjectInputClass}>
+                <option value="">未設定</option>
+                {data.groups.map((group) => (
+                  <option key={group.id} value={group.id}>{group.name}</option>
+                ))}
+              </select>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="レベル" className="mt-3">
+              <input value={level} onChange={(event) => setLevel(event.target.value)} className={teamWorksProjectInputClass} />
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="注意事項" className="mt-3">
+              <textarea value={cautions} onChange={(event) => setCautions(event.target.value)} rows={2} className={teamWorksProjectInputClass} />
+            </TeamWorksProjectField>
+            <SaveButton saving={saving} label="名簿に追加" />
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData; onSelectTab: (tab: ProjectTab) => void }) {
+  const [members, setMembers] = useState<OperationsProjectMember[]>([]);
+  const [allProjectMembers, setAllProjectMembers] = useState<OperationsProjectMember[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<OperationsPendingInvite[]>([]);
+  const [directory, setDirectory] = useState<OperationsPartnerDirectoryEntry[]>([]);
+  const [partnerSettings, setPartnerSettings] = useState<OperationsProjectPartnerSetting[]>([]);
+  const [partnerOffers, setPartnerOffers] = useState<OperationsProjectPartnerOffer[]>([]);
+  const [partnerId, setPartnerId] = useState("");
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const reloadMembers = useCallback(async () => {
+    setError(null);
+    try {
+      const [memberResult, partnerDirectory, settings, offers] = await Promise.all([
+        loadOperationsProjectMembers(supabase, data.project.id),
+        loadOperationsPartnerDirectory(supabase),
+        loadOperationsProjectPartnerSettings(supabase, data.project.id),
+        loadOperationsProjectPartnerOffers(supabase, data.project.id)
+      ]);
+      const removedMemberIds = new Set(settings.filter((setting) => setting.status === "removed").map((setting) => setting.organizationMemberId));
+      const waitingMemberIds = new Set(offers.filter((offer) => offer.status !== "accepted").map((offer) => offer.organizationMemberId));
+      setAllProjectMembers(memberResult.members);
+      setMembers(memberResult.members.filter((member) => member.projectRole === "worker" && member.status !== "archived" && !removedMemberIds.has(member.organizationMemberId) && !waitingMemberIds.has(member.organizationMemberId)));
+      setPendingInvites(memberResult.pendingInvites.filter((invite) => invite.role === "worker"));
+      setDirectory(partnerDirectory);
+      setPartnerSettings(settings);
+      setPartnerOffers(offers);
+      setPartnerId((current) => current || partnerDirectory[0]?.id || "");
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "パートナー情報を読み込めませんでした。");
+    }
+  }, [data.project.id]);
+
+  useEffect(() => {
+    void reloadMembers();
+  }, [reloadMembers]);
+
+  async function submitPartner(event: FormEvent) {
+    event.preventDefault();
+    if (!partnerId) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await addOperationsPartnerToProject(supabase, { projectId: data.project.id, partnerId });
+      if (result.status === "pending_approval") {
+        setMessage(`${result.displayName} さんへ参加依頼を送りました。パートナーポータルで承認されるまで Members には表示されません。`);
+        setPendingOpen(true);
+      } else if (result.status === "assigned") {
+        setMessage(`${result.displayName} さんをこのプロジェクトに追加しました。パートナーポータルには、このプロジェクトが表示されます。`);
+      } else {
+        setMessage(`${result.email} さんはまだポータルにログインしていません。「パートナー管理」の固定URLを渡してログインしてもらうと開通し、その後この追加が有効になります。`);
+        setPendingOpen(true);
+      }
+      await reloadMembers();
+    } catch (submitError) {
+      setMessage(submitError instanceof Error ? submitError.message : "パートナーをプロジェクトに追加できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeInvite(invite: OperationsPendingInvite) {
+    setBusy(true);
+    setMessage("");
+    try {
+      await revokeOperationsProjectInvite(supabase, invite.id);
+      setMessage(`${invite.email} への参加依頼を削除しました。`);
+      await reloadMembers();
+    } catch (revokeError) {
+      setMessage(revokeError instanceof Error ? revokeError.message : "参加依頼を削除できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function savePartnerSetting(member: OperationsProjectMember, hourlyWage: number | null) {
+    setBusy(true);
+    setMessage("");
+    try {
+      await updateOperationsProjectPartnerSetting(supabase, {
+        projectId: data.project.id,
+        organizationMemberId: member.organizationMemberId,
+        hourlyWage,
+        status: "active"
+      });
+      setMessage(`${member.displayName}さんのこのプロジェクト内の時給を保存しました。`);
+      await reloadMembers();
+    } catch (settingError) {
+      setMessage(settingError instanceof Error ? settingError.message : "パートナー設定を保存できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removePartner(member: OperationsProjectMember) {
+    if (!window.confirm(`${member.displayName}さんをこのプロジェクトから外しますか？ 過去の予定・メッセージは残ります。`)) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const current = partnerSettings.find((setting) => setting.organizationMemberId === member.organizationMemberId);
+      await updateOperationsProjectPartnerOffer(supabase, {
+        projectId: data.project.id,
+        organizationMemberId: member.organizationMemberId,
+        status: "removed"
+      });
+      await updateOperationsProjectPartnerSetting(supabase, {
+        projectId: data.project.id,
+        organizationMemberId: member.organizationMemberId,
+        hourlyWage: current?.hourlyWage ?? null,
+        status: "removed"
+      });
+      setMessage(`${member.displayName}さんをこのプロジェクトから外しました。`);
+      await reloadMembers();
+    } catch (removeError) {
+      setMessage(removeError instanceof Error ? removeError.message : "パートナーをプロジェクトから外せませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const unassigned = data.sessions.filter(
+    (session) => session.status === "scheduled" && !session.partnerMemberId && session.sessionDate >= toDateKey(new Date())
+  );
+  const currentMonthKey = toDateKey(new Date()).slice(0, 7);
+  const assignedSessionsByMemberId = useMemo(() => {
+    const map = new Map<string, OperationsProjectDetailData["sessions"]>();
+    for (const session of data.sessions) {
+      if (!session.partnerMemberId || session.status === "cancelled" || !session.sessionDate.startsWith(currentMonthKey)) continue;
+      const list = map.get(session.partnerMemberId) ?? [];
+      list.push(session);
+      map.set(session.partnerMemberId, list);
+    }
+    return map;
+  }, [data.sessions, currentMonthKey]);
+  const payoutsByMemberId = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const payout of data.payouts) {
+      const dueOrCurrent = payout.dueOn ?? toDateKey(new Date());
+      if (!dueOrCurrent.startsWith(currentMonthKey)) continue;
+      map.set(payout.payeeMemberId, (map.get(payout.payeeMemberId) ?? 0) + payout.amount);
+    }
+    return map;
+  }, [data.payouts, currentMonthKey]);
+  // Offers for an archived member are dead ends the member can never respond
+  // to (they no longer have portal access) — hide them instead of leaving a
+  // "承認待ち" ghost that archiving the partner directory can't clear.
+  const pendingOffers = partnerOffers.filter((offer) => {
+    if (offer.status !== "pending") return false;
+    const member = allProjectMembers.find((item) => item.organizationMemberId === offer.organizationMemberId);
+    return member?.status !== "archived";
+  });
+
+  async function cancelOffer(organizationMemberId: string) {
+    setBusy(true);
+    setMessage("");
+    try {
+      await updateOperationsProjectPartnerOffer(supabase, { projectId: data.project.id, organizationMemberId, status: "removed" });
+      setMessage("参加依頼をキャンセルしました。");
+      await reloadMembers();
+    } catch (cancelError) {
+      setMessage(cancelError instanceof Error ? cancelError.message : "参加依頼をキャンセルできませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <TabIntro
+        icon={Clock3}
+        title="パートナー"
+        description="登録済みパートナーをプロジェクトに追加します。開通済みの人は招待リンクなしで参加、未開通の人だけ Pending invites に残します。"
+      />
+
+      <MikkeSection title="Invite" tone="editorial">
+        <form onSubmit={submitPartner} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <TeamWorksProjectField label="追加するパートナー" required>
+            <select value={partnerId} onChange={(event) => setPartnerId(event.target.value)} className={teamWorksProjectInputClass}>
+              {directory.filter((partner) => partner.status === "active").map((partner) => (
+                <option key={partner.id} value={partner.id}>
+                  {partner.displayName} / {partner.email}
+                </option>
+              ))}
+            </select>
+          </TeamWorksProjectField>
+          <button
+            type="submit"
+            disabled={busy || !partnerId}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+          >
+            <Plus size={15} /> プロジェクトに追加
+          </button>
+        </form>
+        {directory.length === 0 ? (
+          <p className="mt-3 text-xs font-bold text-[var(--mikke-muted)]">
+            先に左メニューの「パートナー管理」で名簿登録してください。
+          </p>
+        ) : null}
+        {message ? (
+          <p role="status" className="mt-3 text-xs font-bold leading-5 text-[var(--mikke-muted)]">{message}</p>
+        ) : null}
+        {error ? (
+          <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{error}</p>
+        ) : null}
+      </MikkeSection>
+
+      <MikkeSection title="Pending invites" tone="editorial">
+        <button
+          type="button"
+          onClick={() => setPendingOpen((current) => !current)}
+          className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white px-4 py-3 text-left"
+        >
+          <span>
+            <span className="block text-sm font-extrabold">ポータル未開通 / 参加依頼中</span>
+            <span className="mt-1 block text-xs font-semibold text-[var(--mikke-muted)]">
+              {pendingInvites.length + pendingOffers.length === 0 ? "参加依頼中のパートナーはいません" : `${pendingInvites.length + pendingOffers.length}件の参加依頼があります`}
+            </span>
+          </span>
+          <span className="rounded-full bg-[var(--mikke-primary-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-primary)]">
+            {pendingOpen ? "閉じる" : "展開"}
+          </span>
+        </button>
+        {pendingOpen ? (
+          pendingInvites.length + pendingOffers.length === 0 ? (
+            <MikkeEmptyState title="参加依頼中のパートナーはいません" />
+          ) : (
+            <div className="grid gap-2 md:grid-cols-2">
+              {pendingOffers.map((offer) => {
+                const member = allProjectMembers.find((item) => item.organizationMemberId === offer.organizationMemberId) ?? data.partners.find((item) => item.memberId === offer.organizationMemberId);
+                return (
+                  <div key={offer.organizationMemberId} className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--mikke-line)] bg-white px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{member?.displayName ?? "パートナー"}</p>
+                      <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">パートナーポータルで承認待ち</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void cancelOffer(offer.organizationMemberId)}
+                      className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 disabled:opacity-50"
+                    >
+                      キャンセル
+                    </button>
+                  </div>
+                );
+              })}
+              {pendingInvites.map((invite) => (
+                <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--mikke-line)] bg-white px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold">{invite.email}</p>
+                    <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">未ログイン・「パートナー管理」の固定URLでログインすると開通します</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void revokeInvite(invite)}
+                    className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 disabled:opacity-50"
+                  >
+                    削除
+                  </button>
+                </div>
+              ))}
+            </div>
+          )
+        ) : null}
+      </MikkeSection>
+
+      <MikkeSection title="Members" tone="editorial">
+        {members.length === 0 ? (
+          <MikkeEmptyState title="参加メンバーはまだいません" helper="上のフォームから登録済みパートナーを追加できます。" />
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {members.map((member) => (
+              <PartnerMemberCard
+                key={member.organizationMemberId}
+                member={member}
+                hourlyWage={partnerSettings.find((setting) => setting.organizationMemberId === member.organizationMemberId)?.hourlyWage ?? null}
+                monthlyPayout={payoutsByMemberId.get(member.organizationMemberId) ?? 0}
+                assignedSessions={assignedSessionsByMemberId.get(member.organizationMemberId) ?? []}
+                onOpenMessages={() => onSelectTab("messages")}
+                saving={busy}
+                onSaveHourlyWage={(hourlyWage) => void savePartnerSetting(member, hourlyWage)}
+                onRemove={() => void removePartner(member)}
+              />
+            ))}
+          </div>
+        )}
+      </MikkeSection>
+
+      <MikkeSection title="Unassigned" tone="editorial">
+        {unassigned.length === 0 ? (
+          <MikkeEmptyState title="担当未定のコマはありません" />
+        ) : (
+          <div className="grid gap-2 md:grid-cols-2">
+            {unassigned.slice(0, 12).map((session) => (
+              <InfoCard key={session.id} title={`${formatDate(session.sessionDate)} ${session.startTime}`} helper={`${session.durationMin}分`} badge="未定" />
+            ))}
+          </div>
+        )}
+      </MikkeSection>
+    </div>
+  );
+}
+
+function PartnerMemberCard({
+  member,
+  hourlyWage,
+  monthlyPayout,
+  assignedSessions,
+  onOpenMessages,
+  saving,
+  onSaveHourlyWage,
+  onRemove
+}: {
+  member: OperationsProjectMember;
+  hourlyWage: number | null;
+  monthlyPayout: number;
+  assignedSessions: OperationsProjectDetailData["sessions"];
+  onOpenMessages: () => void;
+  saving: boolean;
+  onSaveHourlyWage: (hourlyWage: number | null) => void;
+  onRemove: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [hourlyWageValue, setHourlyWageValue] = useState(hourlyWage === null ? "" : String(hourlyWage));
+
+  useEffect(() => {
+    setHourlyWageValue(hourlyWage === null ? "" : String(hourlyWage));
+  }, [hourlyWage]);
+
+  return (
+    <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+      <button type="button" onClick={() => setOpen((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-extrabold">{member.displayName}</span>
+          <span className="mt-1 block text-[11px] font-semibold text-[var(--mikke-muted)]">{member.status === "active" ? "稼働中" : "停止中"}</span>
+        </span>
+        <span className="rounded-full bg-[var(--mikke-primary-soft)] px-2 py-1 text-[11px] font-bold text-[var(--mikke-primary)]">
+          {open ? "閉じる" : "詳細"}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="mt-3 space-y-3 border-t border-[var(--mikke-line)] pt-3 text-xs font-semibold text-[var(--mikke-muted)]">
+          <div className="grid gap-2 md:grid-cols-2">
+            <p>メール：{member.email ?? "未登録"}</p>
+            <p>当月報酬額：{formatCurrency(monthlyPayout)}</p>
+            <p>締め日：企業設定で編集</p>
+          </div>
+          <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-3">
+            <label className="block text-[11px] font-bold tracking-[0.16em] text-[var(--mikke-primary)]" htmlFor={`hourly-wage-${member.organizationMemberId}`}>このプロジェクト内の時給</label>
+            <div className="mt-2 flex items-center gap-2"><input id={`hourly-wage-${member.organizationMemberId}`} type="number" min={0} value={hourlyWageValue} onChange={(event) => setHourlyWageValue(event.target.value)} placeholder="未設定" className={teamWorksProjectInputClass} /><span className="shrink-0">円 / 時間</span><button type="button" disabled={saving} onClick={() => onSaveHourlyWage(hourlyWageValue.trim() ? Number(hourlyWageValue) : null)} className="shrink-0 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">保存</button></div>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.22em] text-[var(--mikke-primary)]">担当日1カ月分</p>
+            {assignedSessions.length === 0 ? (
+              <p className="mt-1">今月の担当日はありません。</p>
+            ) : (
+              <div className="mt-2 grid gap-1">
+                {assignedSessions.map((session) => (
+                  <p key={session.id} className="rounded-lg bg-[var(--mikke-surface)] px-2 py-1">
+                    {formatDate(session.sessionDate)} {session.startTime}〜
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <p className="text-[11px] font-bold tracking-[0.22em] text-[var(--mikke-primary)]">稼働可能日1カ月分</p>
+            <p className="mt-1">未接続です。後ほどパートナー登録ページ側で整理します。</p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenMessages}
+            className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]"
+          >
+            <MessageSquare size={14} /> メッセージを見る
+          </button>
+          <button type="button" disabled={saving} onClick={onRemove} className="ml-2 inline-flex rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">プロジェクトから外す</button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ManualsTab({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [manualNo, setManualNo] = useState(data.manuals.length ? Math.max(...data.manuals.map((manual) => manual.no)) + 1 : 1);
+  const [title, setTitle] = useState("");
+  const [materialUrl, setMaterialUrl] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!title.trim()) return;
+    await mutate(
+      () => createOperationsManual(supabase, data.project.id, { no: manualNo, title, materialUrl }),
+      "マニュアルを追加しました。"
+    );
+    setManualNo((current) => current + 1);
+    setTitle("");
+    setMaterialUrl("");
+  }
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={BookOpen} title="マニュアル" description="共通雛形から複製した内容を、このプロジェクト専用に育てます。" />
+      <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
+        <MikkeSection title="Manuals" tone="editorial">
+          {data.manuals.length === 0 ? (
+            <MikkeEmptyState title="マニュアルはまだありません" />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {data.manuals.map((manual) => (
+                <InfoCard
+                  key={manual.id}
+                  title={`${manual.no}番 · ${manual.title}`}
+                  helper={[
+                    manual.sourceTemplateManualId ? "共通雛形から複製" : "プロジェクトで作成",
+                    manual.materialUrl ? "教材リンクあり" : "教材なし",
+                    `質問 ${manual.questions.length}件`
+                  ].join(" ／ ")}
+                  badge={manual.status === "active" ? "公開中" : manual.status}
+                />
+              ))}
+            </div>
+          )}
+        </MikkeSection>
+        <form onSubmit={submit} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          <h3 className="flex items-center gap-2 text-sm font-extrabold">
+            <Plus size={16} className="text-[var(--mikke-primary)]" /> マニュアル追加
+          </h3>
+          <TeamWorksProjectField label="番号" required className="mt-3">
+            <input type="number" min={1} value={manualNo} onChange={(event) => setManualNo(Number(event.target.value))} className={teamWorksProjectInputClass} />
+          </TeamWorksProjectField>
+          <TeamWorksProjectField label="タイトル" required className="mt-3">
+            <input value={title} onChange={(event) => setTitle(event.target.value)} className={teamWorksProjectInputClass} />
+          </TeamWorksProjectField>
+          <TeamWorksProjectField label="教材リンク" helper="任意。ファイル教材はprivate storage対応時に追加します。" className="mt-3">
+            <input type="url" value={materialUrl} onChange={(event) => setMaterialUrl(event.target.value)} className={teamWorksProjectInputClass} />
+          </TeamWorksProjectField>
+          <SaveButton saving={saving} label="マニュアルを追加" />
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ReportsTab({ data }: { data: OperationsProjectDetailData }) {
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={FileCheck2} title="報告" description="既存のフォーム提出を、運営型プロジェクトの報告としてまとめて表示します。" />
+      {data.reports.length === 0 ? (
+        <MikkeEmptyState title="報告はまだありません" helper="R4のパートナーポータルから授業・業務報告を提出すると、ここに表示されます。" />
+      ) : (
+        <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+          {data.reports.map((report) => (
+            <ListRow
+              key={report.id}
+              title={`${report.submitterName} · ${report.formName}`}
+              helper={formatDateTime(report.submittedAt ?? report.updatedAt)}
+              badge={reportStatusLabel(report.status)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PayoutsTab({ data }: { data: OperationsProjectDetailData }) {
+  const total = data.payouts.reduce((sum, payout) => sum + payout.amount, 0);
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={CircleDollarSign} title="報酬" description="パートナーへの報酬記録です。本部だけが全体を確認できます。" />
+      <FinanceSummary label="記録合計" amount={total} enabled={data.project.payoutsEnabled} />
+      {data.payouts.length === 0 ? (
+        <MikkeEmptyState title="報酬記録はまだありません" />
+      ) : (
+        <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+          {data.payouts.map((payout) => (
+            <ListRow
+              key={payout.id}
+              title={`${payout.payeeName} · ${formatCurrency(payout.amount)}`}
+              helper={payout.dueOn ? `支払予定 ${formatDate(payout.dueOn)}` : payout.note ?? "支払日未設定"}
+              badge={financeStatusLabel(payout.status)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InvoicesTab({ data }: { data: OperationsProjectDetailData }) {
+  const total = data.invoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={Landmark} title="請求" description="振込額ベースの請求記録です。会計ソフトではなく、現場確認に必要な範囲だけを扱います。" />
+      <FinanceSummary label="請求合計" amount={total} enabled={data.project.invoicesEnabled} />
+      {data.invoices.length === 0 ? (
+        <MikkeEmptyState title="請求記録はまだありません" />
+      ) : (
+        <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+          {data.invoices.map((invoice) => (
+            <ListRow
+              key={invoice.id}
+              title={`${invoice.billedName} · ${formatCurrency(invoice.amount)}`}
+              helper={invoice.dueOn ? `期限 ${formatDate(invoice.dueOn)}` : invoice.note ?? "期限未設定"}
+              badge={financeStatusLabel(invoice.status)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContractTab({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [startedOn, setStartedOn] = useState(data.project.contractStartedOn ?? "");
+  const [endedOn, setEndedOn] = useState(data.project.contractEndedOn ?? "");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await mutate(
+      () =>
+        updateOperationsProjectContract(supabase, data.project.id, {
+          contractStartedOn: startedOn,
+          contractEndedOn: endedOn
+        }),
+      "契約期間を更新しました。"
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={FileCheck2} title="契約期間" description="運営型プロジェクトの開始・終了と、アーカイブ単位を管理します。" />
+      <form onSubmit={submit} className="max-w-2xl rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TeamWorksProjectField label="契約開始日">
+            <input type="date" value={startedOn} onChange={(event) => setStartedOn(event.target.value)} className={teamWorksProjectInputClass} />
+          </TeamWorksProjectField>
+          <TeamWorksProjectField label="契約終了日">
+            <input type="date" value={endedOn} min={startedOn || undefined} onChange={(event) => setEndedOn(event.target.value)} className={teamWorksProjectInputClass} />
+          </TeamWorksProjectField>
+        </div>
+        <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-3 text-xs leading-5 text-[var(--mikke-muted)]">
+          終了後はプロジェクト単位でアーカイブします。誤操作防止のため、アーカイブ実行ボタンは本番の確認フローと合わせて追加します。
+        </p>
+        <SaveButton saving={saving} label="契約期間を保存" />
+      </form>
+    </div>
+  );
+}
+
+function ProjectSettingsTab({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={Settings2} title="プロジェクト設定" description="プロジェクト登録時の情報、契約期間、クライアント連携をまとめて管理します。" />
+      <ProjectDescriptionPanel data={data} saving={saving} mutate={mutate} />
+      <ContractTab data={data} saving={saving} mutate={mutate} />
+      <ClientInvitePanel data={data} />
+    </div>
+  );
+}
+
+function ProjectDescriptionPanel({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [description, setDescription] = useState(data.project.description ?? "");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await mutate(() => updateOperationsProjectDescription(supabase, data.project.id, description), "プロジェクトの説明を保存しました。");
+  }
+
+  return (
+    <MikkeSection title="プロジェクトの説明" tone="editorial">
+      <p className="-mt-2 text-xs leading-6 text-[var(--mikke-muted)]">クライアントが承認する時に見える説明文です。プロジェクトの目的・進め方などを書いておきます。</p>
+      <form onSubmit={submit} className="mt-3">
+        <textarea
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+          rows={4}
+          className={teamWorksProjectInputClass}
+          placeholder="例：週1回のオンライン日本語レッスンを、契約期間中つづけて実施します。"
+        />
+        <SaveButton saving={saving} label="説明を保存" />
+      </form>
+    </MikkeSection>
+  );
+}
+
+function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
+  const [pendingInvites, setPendingInvites] = useState<OperationsPendingInvite[]>([]);
+  const [directory, setDirectory] = useState<OperationsClientDirectoryEntry[]>([]);
+  const [clientId, setClientId] = useState("");
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setError(null);
+    try {
+      const [memberResult, clientDirectory] = await Promise.all([
+        loadOperationsProjectMembers(supabase, data.project.id),
+        loadOperationsClientDirectory(supabase)
+      ]);
+      setPendingInvites(memberResult.pendingInvites.filter((invite) => invite.role === "client_user"));
+      setDirectory(clientDirectory);
+      setClientId((current) => current || clientDirectory[0]?.id || "");
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "クライアント情報を読み込めませんでした。");
+    }
+  }, [data.project.id]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!clientId) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await addOperationsClientToProject(supabase, { projectId: data.project.id, clientId });
+      if (result.status === "invited") {
+        setMessage(`${result.displayName} さんをこのプロジェクトに追加しました。クライアントのポータルに「承認のお知らせ」が届き、承認すると参加が有効になります。`);
+      } else {
+        setMessage(`${result.email} さんはまだポータルにログインしていません。「クライアント管理」の固定URLを渡してログインしてもらうと開通し、その後この追加が有効になります。`);
+        setPendingOpen(true);
+      }
+      await reload();
+    } catch (submitError) {
+      setMessage(submitError instanceof Error ? submitError.message : "クライアントをプロジェクトに追加できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeInvite(invite: OperationsPendingInvite) {
+    setBusy(true);
+    setMessage("");
+    try {
+      await revokeOperationsProjectInvite(supabase, invite.id);
+      setMessage(`${invite.email} への招待を削除しました。`);
+      await reload();
+    } catch (revokeError) {
+      setMessage(revokeError instanceof Error ? revokeError.message : "招待を削除できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <MikkeSection title="クライアント招待" tone="editorial">
+      <p className="-mt-2 text-xs leading-6 text-[var(--mikke-muted)]">
+        登録済みクライアントをプロジェクトに追加します。開通済みの人は招待なしで参加、未開通の人だけ Pending invites に残します。
+      </p>
+      <form onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <TeamWorksProjectField label="追加するクライアント" required>
+          <select value={clientId} onChange={(event) => setClientId(event.target.value)} className={teamWorksProjectInputClass}>
+            {directory.filter((client) => client.status === "active").map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.displayName} / {client.email}
+              </option>
+            ))}
+          </select>
+        </TeamWorksProjectField>
+        <button
+          type="submit"
+          disabled={busy || !clientId}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+        >
+          <Plus size={15} /> プロジェクトに追加
+        </button>
+      </form>
+      {directory.length === 0 ? (
+        <p className="mt-3 text-xs font-bold text-[var(--mikke-muted)]">
+          先に左メニューの「クライアント管理」で名簿登録してください。
+        </p>
+      ) : null}
+      {message ? <p role="status" className="mt-3 text-xs font-bold leading-5 text-[var(--mikke-muted)]">{message}</p> : null}
+      {error ? <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{error}</p> : null}
+
+      <button
+        type="button"
+        onClick={() => setPendingOpen((current) => !current)}
+        className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white px-4 py-3 text-left"
+      >
+        <span>
+          <span className="block text-sm font-extrabold">ポータル未開通 / 招待中</span>
+          <span className="mt-1 block text-xs font-semibold text-[var(--mikke-muted)]">
+            {pendingInvites.length === 0 ? "招待中のクライアントはいません" : `${pendingInvites.length}件の招待があります`}
+          </span>
+        </span>
+        <span className="rounded-full bg-[var(--mikke-primary-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-primary)]">
+          {pendingOpen ? "閉じる" : "展開"}
+        </span>
+      </button>
+      {pendingOpen ? (
+        pendingInvites.length === 0 ? (
+          <MikkeEmptyState title="招待中のクライアントはいません" />
+        ) : (
+          <div className="mt-2 grid gap-2 md:grid-cols-2">
+            {pendingInvites.map((invite) => (
+              <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--mikke-line)] bg-white px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold">{invite.email}</p>
+                  <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">未ログイン・「クライアント管理」の固定URLでログインすると開通します</p>
+                </div>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void revokeInvite(invite)}
+                  className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 disabled:opacity-50"
+                >
+                  削除
+                </button>
+              </div>
+            ))}
+          </div>
+        )
+      ) : null}
+    </MikkeSection>
+  );
+}
+
+function PortalTab({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [clientVisible, setClientVisible] = useState(data.project.clientVisible);
+  const [payoutsEnabled, setPayoutsEnabled] = useState(data.project.payoutsEnabled);
+  const [invoicesEnabled, setInvoicesEnabled] = useState(data.project.invoicesEnabled);
+  const [clientPartnerContactVisible, setClientPartnerContactVisible] = useState(data.project.clientPartnerContactVisible);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await mutate(
+      () =>
+        updateOperationsProjectVisibility(supabase, data.project.id, {
+          clientVisible,
+          payoutsEnabled,
+          invoicesEnabled,
+          clientPartnerContactVisible
+        }),
+      "ポータル設定を更新しました。"
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={Settings2} title="ポータル設定" description="このプロジェクトで使う機能をチェックリスト式で設定します。RLSによる認可はこの設定とは独立して常に適用されます。" />
+      <form onSubmit={submit} className="max-w-2xl rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+        <div className="space-y-3">
+          <FeatureCheck checked={clientVisible} onChange={setClientVisible} title="クライアントポータル" helper="自プロジェクトのスケジュール・提出物・メッセージを表示する" />
+          <FeatureCheck checked={clientPartnerContactVisible} onChange={setClientPartnerContactVisible} title="クライアントへパートナー連絡先を表示" helper="オフにすると、クライアントポータルの連絡先・メッセージから担当パートナーを外し、本部窓口のみにする" />
+          <FeatureCheck checked={payoutsEnabled} onChange={setPayoutsEnabled} title="報酬記録" helper="本部と対象パートナーに必要な報酬情報を表示する" />
+          <FeatureCheck checked={invoicesEnabled} onChange={setInvoicesEnabled} title="請求記録" helper="本部と請求先に必要な請求情報を表示する" />
+          <FeatureCheck checked title="名簿・進捗" helper="運営型の基幹機能のため常に有効" disabled />
+          <FeatureCheck checked title="マニュアル" helper="本部と担当パートナーだけに表示する" disabled />
+        </div>
+        <SaveButton saving={saving} label="設定を保存" />
+      </form>
+    </div>
+  );
+}
+
+function MessagesTab({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [members, setMembers] = useState<OperationsProjectMember[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const conversationRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void loadOperationsProjectMembers(supabase, data.project.id)
+      .then((result) => {
+        if (!active) return;
+        const conversationMembers = result.members.filter((member) => member.projectRole === "client" || member.projectRole === "worker");
+        setMembers(conversationMembers);
+        setSelectedMemberId((current) => current ?? conversationMembers[0]?.organizationMemberId ?? null);
+      })
+      .catch((error) => {
+        if (active) setLoadError(error instanceof Error ? error.message : "宛先の読み込みに失敗しました。");
+      });
+    return () => {
+      active = false;
+    };
+  }, [data.project.id]);
+
+  const clients = members.filter((member) => member.projectRole === "client");
+  const partners = members
+    .filter((member) => member.projectRole === "worker")
+    .sort((a, b) => latestConversationAt(data, b.organizationMemberId) - latestConversationAt(data, a.organizationMemberId));
+  const selectedMember = members.find((member) => member.organizationMemberId === selectedMemberId) ?? null;
+  const thread = selectedMember
+    ? data.comments
+        .filter((comment) => comment.authorMemberId === selectedMember.organizationMemberId || comment.recipientMemberId === selectedMember.organizationMemberId)
+        .slice()
+        .reverse()
+    : [];
+
+  const send = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!selectedMember) return;
+    await mutate(
+      () => sendOperationsDirectMessage(supabase, {
+        projectId: data.project.id,
+        recipientMemberId: selectedMember.organizationMemberId,
+        audience: selectedMember.projectRole === "client" ? "client" : "internal",
+        body: draft
+      }),
+      `${selectedMember.displayName}さんへメッセージを送りました。`
+    );
+    setDraft("");
+  };
+
+  const selectConversation = (memberId: string) => {
+    setSelectedMemberId(memberId);
+    window.setTimeout(() => {
+      conversationRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={MessageSquare} title="メッセージ" description="クライアントは上部に固定し、参加パートナーは最新のやり取り順に表示します。カードを選ぶと会話を開けます。" />
+      {loadError ? <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{loadError}</p> : null}
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)]">
+        <aside className="space-y-4">
+          <ConversationGroup title="クライアント" helper="プロジェクトの窓口" tone="client" members={clients} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="クライアントはまだ追加されていません" />
+          <ConversationGroup title="参加パートナー" helper="新着メッセージ順" tone="partner" members={partners} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="参加パートナーはまだいません" />
+        </aside>
+        <section ref={conversationRef} className="min-h-[420px] scroll-mt-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          {!selectedMember ? (
+            <MikkeEmptyState title="会話する相手を選択してください" helper="左の一覧からクライアントまたは参加パートナーを選びます。" />
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--mikke-line)] pb-3">
+                <div><p className="text-sm font-extrabold">{selectedMember.displayName}</p><p className="mt-0.5 text-[11px] font-semibold text-[var(--mikke-muted)]">{selectedMember.projectRole === "client" ? "クライアント" : "パートナー"}{selectedMember.email ? ` ・ ${selectedMember.email}` : ""}</p></div>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${selectedMember.projectRole === "client" ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-green)]"}`}>{selectedMember.projectRole === "client" ? "クライアント" : "パートナー"}</span>
+              </div>
+              <div className="max-h-[260px] space-y-3 overflow-y-auto py-4 lg:max-h-[420px]">
+                {thread.length === 0 ? <p className="py-16 text-center text-xs font-semibold text-[var(--mikke-muted)]">まだやり取りはありません。最初のメッセージを送れます。</p> : thread.map((comment) => {
+                  const received = comment.authorMemberId === selectedMember.organizationMemberId;
+                  return <article key={comment.id} className={`max-w-[88%] rounded-2xl px-3 py-2.5 text-sm leading-6 ${received ? "mr-auto bg-[var(--mikke-surface-soft)]" : "ml-auto bg-[var(--mikke-primary-soft)]"}`}><p className="mb-1 text-[10px] font-bold text-[var(--mikke-muted)]">{received ? selectedMember.displayName : "こちら"} ・ {formatDateTime(comment.createdAt)}</p><p className="whitespace-pre-wrap">{comment.body}</p></article>;
+                })}
+              </div>
+              <form onSubmit={send} className="border-t border-[var(--mikke-line)] pt-3">
+                <label className="sr-only" htmlFor="operations-direct-message">メッセージ</label>
+                <div className="flex items-end gap-2"><textarea id="operations-direct-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`${selectedMember.displayName}さんへメッセージを送る`} rows={3} className={`${teamWorksProjectInputClass} min-h-[78px] resize-y`} /><button disabled={saving || !draft.trim()} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[var(--mikke-primary)] px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"><Send size={14} />送信</button></div>
+              </form>
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function ConversationGroup({ title, helper, tone, members, data, selectedMemberId, onSelect, empty }: { title: string; helper: string; tone: "client" | "partner"; members: OperationsProjectMember[]; data: OperationsProjectDetailData; selectedMemberId: string | null; onSelect: (id: string) => void; empty: string }) {
+  return <section><div className="mb-2 flex items-baseline gap-2"><h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--mikke-primary)]">{title}</h2><span className="text-[10px] font-semibold text-[var(--mikke-muted)]">{helper}</span></div>{members.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-4 text-xs font-semibold text-[var(--mikke-muted)]">{empty}</div> : <div className="space-y-2">{members.map((member) => { const latest = latestConversation(data, member.organizationMemberId); return <button key={member.organizationMemberId} type="button" onClick={() => onSelect(member.organizationMemberId)} className={`w-full rounded-xl border p-3 text-left ${member.organizationMemberId === selectedMemberId ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}><span className="flex items-start justify-between gap-2"><span className="min-w-0"><span className="block truncate text-sm font-extrabold">{member.displayName}</span><span className="mt-1 block truncate text-[11px] font-semibold text-[var(--mikke-muted)]">{latest ? `${latest.authorName}：${latest.body}` : "メッセージはまだありません"}</span></span><span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${tone === "client" ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-green)]"}`} /></span></button>; })}</div>}</section>;
+}
+
+function latestConversation(data: OperationsProjectDetailData, memberId: string) {
+  return data.comments.find((comment) => comment.authorMemberId === memberId || comment.recipientMemberId === memberId) ?? null;
+}
+
+function latestConversationAt(data: OperationsProjectDetailData, memberId: string) {
+  const value = latestConversation(data, memberId)?.createdAt;
+  return value ? new Date(value).getTime() : 0;
+}
+
+function MetricCard({
+  icon: Icon,
+  tone,
+  label,
+  value
+}: {
+  icon: typeof CalendarDays;
+  tone: "blue" | "green" | "pink" | "yellow";
+  label: string;
+  value: string;
+}) {
+  const colors = {
+    blue: "var(--mikke-blue)",
+    green: "var(--mikke-green)",
+    pink: "var(--mikke-pink)",
+    yellow: "var(--mikke-yellow)"
+  };
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: colors[tone] }}>
+        <Icon size={19} color={tone === "blue" ? "#fff" : "#1b1b1f"} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">{label}</span>
+        <span className="mt-0.5 block truncate text-lg font-extrabold">{value}</span>
+      </span>
+    </div>
+  );
+}
+
+function OverviewListSection({
+  icon: Icon,
+  title,
+  subtitle,
+  onViewAll,
+  children
+}: {
+  icon: typeof CalendarDays;
+  title: string;
+  subtitle: string;
+  onViewAll: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--mikke-primary)]">
+          <Icon size={14} /> {title}
+          <span className="normal-case tracking-normal text-[var(--mikke-muted)]">{subtitle}</span>
+        </h2>
+        <button type="button" onClick={onViewAll} className="text-[10px] font-bold text-[var(--mikke-muted)]">
+          VIEW ALL
+        </button>
+      </div>
+      <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function ListRow({
+  title,
+  helper,
+  badge
+}: {
+  title: string;
+  helper: string;
+  badge?: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="h-8 w-1 shrink-0 rounded-full bg-[var(--mikke-green)]" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold">{title}</span>
+        <span className="mt-0.5 block truncate text-xs font-semibold text-[var(--mikke-muted)]">{helper}</span>
+      </span>
+      {badge ? (
+        <span className="shrink-0 rounded-full bg-[var(--mikke-primary-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-primary)]">
+          {badge}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function InfoCard({ title, helper, badge }: { title: string; helper: string; badge?: string }) {
+  return (
+    <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block text-sm font-bold">{title}</span>
+          <span className="mt-1 block text-xs leading-5 font-semibold text-[var(--mikke-muted)]">{helper}</span>
+        </span>
+        {badge ? (
+          <span className="shrink-0 rounded-full bg-[var(--mikke-primary-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-primary)]">
+            {badge}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function TabIntro({
+  icon: Icon,
+  title,
+  description
+}: {
+  icon: typeof CalendarDays;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex gap-3 rounded-2xl bg-[var(--mikke-surface-soft)] p-4">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--mikke-green)] text-[#1b1b1f]">
+        <Icon size={19} />
+      </span>
+      <span>
+        <span className="block text-sm font-extrabold">{title}</span>
+        <span className="mt-1 block text-xs leading-5 font-semibold text-[var(--mikke-muted)]">{description}</span>
+      </span>
+    </div>
+  );
+}
+
+function SaveButton({ saving, label }: { saving: boolean; label: string }) {
+  return (
+    <button
+      type="submit"
+      disabled={saving}
+      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+    >
+      <CheckCircle2 size={15} /> {saving ? "保存中…" : label}
+    </button>
+  );
+}
+
+function FeatureCheck({
+  checked,
+  onChange,
+  title,
+  helper,
+  disabled = false
+}: {
+  checked: boolean;
+  onChange?: (value: boolean) => void;
+  title: string;
+  helper: string;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="flex items-start gap-3 rounded-xl border border-[var(--mikke-line)] p-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange?.(event.target.checked)}
+        className="mt-0.5 h-4 w-4 accent-[var(--mikke-primary)]"
+      />
+      <span>
+        <span className="block text-sm font-bold">{title}</span>
+        <span className="mt-0.5 block text-xs leading-5 font-semibold text-[var(--mikke-muted)]">{helper}</span>
+      </span>
+    </label>
+  );
+}
+
+function FinanceSummary({ label, amount, enabled }: { label: string; amount: number; enabled: boolean }) {
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+      <span className="grid h-12 w-12 place-items-center rounded-xl bg-[var(--mikke-yellow)] text-[#1b1b1f]">
+        <WalletCards size={22} />
+      </span>
+      <span className="flex-1">
+        <span className="block text-xs font-semibold text-[var(--mikke-muted)]">{label}</span>
+        <span className="mt-1 block text-xl font-extrabold">{formatCurrency(amount)}</span>
+      </span>
+      <span className="rounded-full bg-[var(--mikke-surface-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--mikke-muted)]">
+        {enabled ? "有効" : "無効"}
+      </span>
+    </div>
+  );
+}
+
+const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+
+function weekdayLabel(weekday: number) {
+  return weekdays[weekday] ?? "?";
+}
+
+function formatDate(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00`);
+  return `${date.getMonth() + 1}/${date.getDate()}（${weekdayLabel(date.getDay())}）`;
+}
+
+function formatDateTime(iso: string) {
+  const date = new Date(iso);
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 }).format(value);
+}
+
+function formatInviteExpiry(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "numeric", day: "numeric" }).format(new Date(value));
+}
+
+function endTime(startTime: string, durationMin: number) {
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const totalMinutes = hours * 60 + minutes + durationMin;
+  return `${String(Math.floor(totalMinutes / 60) % 24).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function monthCalendarDates(monthDate: Date) {
+  const first = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const start = addDays(first, -first.getDay());
+  return Array.from({ length: 42 }, (_, index) => addDays(start, index));
+}
+
+function startOfMonday(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  return start;
+}
+
+function daysUntil(dateKey: string | null) {
+  if (!dateKey) return null;
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.ceil((new Date(`${dateKey}T00:00:00`).getTime() - start.getTime()) / 86_400_000);
+}
+
+function orderNumber(index: number) {
+  const labels = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"];
+  return labels[index - 1] ?? `${index}.`;
+}
+
+function attendanceLabel(status: string) {
+  return {
+    scheduled: "出席予定",
+    present: "出席",
+    absent: "欠席",
+    late: "遅刻",
+    excused: "連絡済み欠席"
+  }[status] ?? status;
+}
+
+function reportStatusLabel(status: string) {
+  return {
+    draft: "下書き",
+    submitted: "承認待ち",
+    revision_requested: "修正依頼",
+    approved: "承認済み"
+  }[status] ?? status;
+}
+
+function financeStatusLabel(status: string) {
+  return {
+    draft: "下書き",
+    approved: "承認済み",
+    scheduled: "支払予定",
+    paid: "支払済み",
+    issued: "発行済み",
+    overdue: "期限超過",
+    void: "無効"
+  }[status] ?? status;
+}

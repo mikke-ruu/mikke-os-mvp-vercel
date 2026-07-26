@@ -57,8 +57,8 @@ export function TeamWorksInviteAccept() {
             <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
               Team Worksのメンバー情報と案件権限が登録されました。
             </p>
-            <Link href="/apps/team-works/projects" className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">
-              案件一覧を開く
+            <Link href={postAcceptHref(role)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">
+              {postAcceptLabel(role)}
             </Link>
           </div>
         ) : (
@@ -96,8 +96,26 @@ function roleLabel(role: TeamWorksInviteRole) {
   return "担当メンバー";
 }
 
+// 受諾後の遷移先は役割で分ける。/apps/team-works/projects は本部(owner/manager)専用の
+// 管理画面のため、worker/client_user をそこへ送ると「まだありません」の空表示になり紛らわしい。
+function postAcceptHref(role: TeamWorksInviteRole | null) {
+  if (role === "worker") return "/apps/team-works/portal/worker";
+  if (role === "client_user") return "/apps/team-works/portal/client";
+  return "/apps/team-works/projects";
+}
+
+function postAcceptLabel(role: TeamWorksInviteRole | null) {
+  if (role === "worker") return "自分の担当を見る";
+  if (role === "client_user") return "学校ポータルを開く";
+  return "案件一覧を開く";
+}
+
 function toInviteErrorMessage(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === "object" && error && "message" in error && typeof (error as { message: unknown }).message === "string"
+      ? (error as { message: string }).message
+      : "";
   if (message.includes("row-level security") || message.includes("policy")) {
     return "このアカウントでは招待を受け取れません。招待メール、有効期限、利用済みでないことを確認してください。";
   }

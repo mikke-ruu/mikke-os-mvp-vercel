@@ -1,7 +1,7 @@
 "use client";
 
 import type { User } from "@supabase/supabase-js";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { ensureProfile } from "@/lib/profile";
 import { supabase } from "@/lib/supabase/client";
@@ -25,6 +25,9 @@ export function useAuth() {
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
+  const nextPath = search ? `${pathname}?${search}` : pathname;
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +51,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setUser(nextUser);
       if (!nextUser) {
         setLoading(false);
-        if (pathname !== "/login") router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        if (pathname !== "/login") router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
         return;
       }
       try {
@@ -63,7 +66,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       setUser(nextUser);
       if (!nextUser) {
         setProfile(null);
-        router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
       }
     });
 
@@ -71,7 +74,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [pathname, router]);
+  }, [nextPath, pathname, router]);
 
   const value = useMemo(() => {
     if (!user || !profile) return null;

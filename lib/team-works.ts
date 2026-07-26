@@ -113,6 +113,21 @@ export type TeamWorksClient = {
   preferredLanguage: "ja" | "en" | "id" | "vi";
 };
 
+export type TeamWorksGroup = {
+  id: string;
+  organizationId: string;
+  clientId: string;
+  name: string;
+};
+
+export type TeamWorksHoliday = {
+  id: string;
+  organizationId: string;
+  clientId?: string;
+  date: string;
+  memo?: string;
+};
+
 export type TeamWorksParticipant = {
   id: string;
   organizationId: string;
@@ -125,6 +140,7 @@ export type TeamWorksParticipant = {
   lastGuideItemId: string;
   lastMemo: string;
   nextMemo: string;
+  groupId?: string;
 };
 
 export type TeamWorksWorker = {
@@ -212,6 +228,8 @@ export type TeamWorksMessage = {
 
 export type TeamWorksState = {
   clients: TeamWorksClient[];
+  groups: TeamWorksGroup[];
+  holidays: TeamWorksHoliday[];
   participants: TeamWorksParticipant[];
   workers: TeamWorksWorker[];
   sessions: TeamWorksSession[];
@@ -336,6 +354,21 @@ export const teamWorksInitialState: TeamWorksState = {
       preferredLanguage: "id"
     }
   ],
+  groups: [
+    {
+      id: "group_mon",
+      organizationId: "org_rin_ring_demo",
+      clientId: "client_sakura",
+      name: "月曜クラス"
+    },
+    {
+      id: "group_thu",
+      organizationId: "org_rin_ring_demo",
+      clientId: "client_sakura",
+      name: "木曜クラス"
+    }
+  ],
+  holidays: [],
   participants: [
     {
       id: "part_suzan",
@@ -348,7 +381,8 @@ export const teamWorksInitialState: TeamWorksState = {
       currentGuideItemId: "guide_006",
       lastGuideItemId: "guide_005",
       lastMemo: "テーマ5まで完了。好きな食べ物は話しやすかった。",
-      nextMemo: "次はテーマ6。理由を一文で言う練習を入れる。"
+      nextMemo: "次はテーマ6。理由を一文で言う練習を入れる。",
+      groupId: "group_mon"
     },
     {
       id: "part_ayu",
@@ -374,7 +408,8 @@ export const teamWorksInitialState: TeamWorksState = {
       currentGuideItemId: "guide_006",
       lastGuideItemId: "guide_005",
       lastMemo: "テーマ5。友だちとの予定を話せた。",
-      nextMemo: "テーマ6で理由と感想を聞く。"
+      nextMemo: "テーマ6で理由と感想を聞く。",
+      groupId: "group_thu"
     }
   ],
   workers: [

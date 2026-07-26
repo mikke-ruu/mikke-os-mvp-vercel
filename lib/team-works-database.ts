@@ -105,7 +105,7 @@ async function ensureDatabaseContext(displayName: string): Promise<TeamWorksData
       role: "owner",
       status: "active",
       archived_at: null
-    }, { onConflict: "organization_id,user_id" })
+    }, { onConflict: "organization_id,source_local_id" })
     .select("id")
     .single();
   if (memberError) throw memberError;

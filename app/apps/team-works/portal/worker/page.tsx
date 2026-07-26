@@ -1,5 +1,10 @@
-import { TeamWorksScreen } from "@/components/team-works/TeamWorksScreen";
+import { AuthGate } from "@/components/AuthGate";
+import { TeamWorksOperationsPartnerPortal } from "@/components/team-works/operations/TeamWorksOperationsPartnerPortal";
 
 export default function TeamWorksWorkerPortalPage() {
-  return <TeamWorksScreen view="workerPortal" />;
+  return (
+    <AuthGate>
+      <TeamWorksOperationsPartnerPortal />
+    </AuthGate>
+  );
 }
