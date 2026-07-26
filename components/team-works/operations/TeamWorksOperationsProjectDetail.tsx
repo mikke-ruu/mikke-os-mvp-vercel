@@ -215,7 +215,7 @@ function OperationsProjectDetail({
         ) : null}
 
         {activeTab === "overview" ? <OverviewTab data={data} saving={saving} mutate={mutate} onSelectTab={setActiveTab} /> : null}
-        {activeTab === "schedule" ? <ScheduleTab data={data} /> : null}
+        {activeTab === "schedule" ? <ScheduleTab data={data} saving={saving} mutate={mutate} /> : null}
         {activeTab === "roster" ? <RosterTab data={data} saving={saving} mutate={mutate} /> : null}
         {activeTab === "partners" ? <PartnersTab data={data} onSelectTab={setActiveTab} /> : null}
         {activeTab === "manuals" ? <ManualsTab data={data} saving={saving} mutate={mutate} /> : null}
@@ -480,15 +480,23 @@ function ProjectCalendarPanel({
   );
 }
 
-function CalendarSessionEditor({ session, partners, saving, mutate }: { session: OperationsProjectDetailData["sessions"][number]; partners: OperationsProjectDetailData["partners"]; saving: boolean; mutate: (action: () => Promise<void>, successMessage: string) => Promise<void> }) {
+function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }: { session: OperationsProjectDetailData["sessions"][number]; partners: OperationsProjectDetailData["partners"]; saving: boolean; mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>; dateLabel?: string }) {
   const [open, setOpen] = useState(false);
   const [startTime, setStartTime] = useState(session.startTime);
   const [durationMin, setDurationMin] = useState(String(session.durationMin));
   const [partnerMemberId, setPartnerMemberId] = useState(session.partnerMemberId ?? "");
-  return <div className="rounded-xl border border-[var(--mikke-line)] p-3"><button type="button" onClick={() => setOpen((value) => !value)} className="flex w-full items-center justify-between text-left text-xs font-bold"><span>{session.startTime}〜{endTime(session.startTime, session.durationMin)}　担当 {session.partnerName ?? "未定"}　名簿{session.roster.length}名</span><span className="text-[var(--mikke-primary)]">{open ? "閉じる" : "編集"}</span></button>{open ? <div className="mt-3 space-y-2"><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} /><input type="number" min={1} value={durationMin} onChange={(event) => setDurationMin(event.target.value)} className={teamWorksProjectInputClass} /><select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: Number(durationMin), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">保存</button><button type="button" disabled={saving} onClick={() => void mutate(() => cancelOperationsSession(supabase, session.id), "予定を削除しました。")} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">削除</button></div></div> : null}</div>;
+  return <div className="rounded-xl border border-[var(--mikke-line)] p-3"><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 text-left text-xs font-bold"><span><span className={dateLabel ? "mr-2 text-[var(--mikke-primary)] underline decoration-[var(--mikke-line)] underline-offset-4" : ""}>{dateLabel}</span>{session.startTime}〜{endTime(session.startTime, session.durationMin)}　担当 {session.partnerName ?? "未定"}　名簿{session.roster.length}名</span><span className="shrink-0 text-[var(--mikke-primary)]">{open ? "閉じる" : "編集"}</span></button>{open ? <div className="mt-3 space-y-2"><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="開始時間" /><input type="number" min={1} value={durationMin} onChange={(event) => setDurationMin(event.target.value)} className={teamWorksProjectInputClass} aria-label="所要時間（分）" /><select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label="担当パートナー"><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: Number(durationMin), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">保存</button><button type="button" disabled={saving} onClick={() => void mutate(() => cancelOperationsSession(supabase, session.id), "予定を削除しました。")} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">削除</button></div></div> : null}</div>;
 }
 
-function ScheduleTab({ data }: { data: OperationsProjectDetailData }) {
+function ScheduleTab({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
   const upcoming = data.sessions.filter(
     (session) => session.status !== "cancelled" && session.sessionDate >= toDateKey(new Date())
   );
@@ -515,13 +523,15 @@ function ScheduleTab({ data }: { data: OperationsProjectDetailData }) {
         {upcoming.length === 0 ? (
           <MikkeEmptyState title="今後のコマはありません" />
         ) : (
-          <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+          <div className="space-y-2">
             {upcoming.slice(0, 30).map((session) => (
-              <ListRow
+              <CalendarSessionEditor
                 key={session.id}
-                title={`${formatDate(session.sessionDate)} ${session.startTime}〜${endTime(session.startTime, session.durationMin)}`}
-                helper={`担当 ${session.partnerName ?? "未定"} · 名簿 ${session.roster.length}名`}
-                badge={session.status === "completed" ? "完了" : "予定"}
+                session={session}
+                partners={data.partners}
+                saving={saving}
+                mutate={mutate}
+                dateLabel={formatDate(session.sessionDate)}
               />
             ))}
           </div>
@@ -1490,16 +1500,31 @@ function PortalTab({
   return (
     <div className="space-y-5">
       <TabIntro icon={Settings2} title="ポータル設定" description="このプロジェクトで使う機能をチェックリスト式で設定します。RLSによる認可はこの設定とは独立して常に適用されます。" />
-      <form onSubmit={submit} className="max-w-2xl rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-        <div className="space-y-3">
-          <FeatureCheck checked={clientVisible} onChange={setClientVisible} title="クライアントポータル" helper="自プロジェクトのスケジュール・提出物・メッセージを表示する" />
-          <FeatureCheck checked={clientPartnerContactVisible} onChange={setClientPartnerContactVisible} title="クライアントへパートナー連絡先を表示" helper="オフにすると、クライアントポータルの連絡先・メッセージから担当パートナーを外し、本部窓口のみにする" />
-          <FeatureCheck checked={payoutsEnabled} onChange={setPayoutsEnabled} title="報酬記録" helper="本部と対象パートナーに必要な報酬情報を表示する" />
-          <FeatureCheck checked={invoicesEnabled} onChange={setInvoicesEnabled} title="請求記録" helper="本部と請求先に必要な請求情報を表示する" />
-          <FeatureCheck checked title="名簿・進捗" helper="運営型の基幹機能のため常に有効" disabled />
-          <FeatureCheck checked title="マニュアル" helper="本部と担当パートナーだけに表示する" disabled />
+      <form onSubmit={submit} className="max-w-3xl space-y-4">
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+          <PortalFeatureHeading title="クライアントに表示" helper="クライアント担当者が使う画面に表示する内容" />
+          <div className="mt-3 space-y-3">
+            <FeatureCheck checked={clientVisible} onChange={setClientVisible} title="クライアントポータル全体" helper="自プロジェクトのスケジュール・提出物・メッセージを表示する" />
+            <FeatureCheck checked={clientPartnerContactVisible} onChange={setClientPartnerContactVisible} title="担当パートナー連絡先" helper="連絡先とメッセージに担当パートナーを表示する。オフの場合は本部窓口のみ" />
+            <FeatureCheck checked={invoicesEnabled} onChange={setInvoicesEnabled} title="請求記録" helper="クライアントの請求先画面に必要な請求情報を表示する" />
+          </div>
         </div>
-        <SaveButton saving={saving} label="設定を保存" />
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+          <PortalFeatureHeading title="パートナーに表示" helper="担当パートナーが使う画面に表示する内容" />
+          <div className="mt-3 space-y-3">
+            <FeatureCheck checked={payoutsEnabled} onChange={setPayoutsEnabled} title="報酬記録" helper="対象パートナーの報酬画面に必要な報酬情報を表示する" />
+            <FeatureCheck checked title="マニュアル" helper="本部と担当パートナーだけに常時表示し、クライアントには表示しない" disabled />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+          <PortalFeatureHeading title="共通・常時" helper="運営に必要なため両ポータルで常に使う内容" />
+          <div className="mt-3">
+            <FeatureCheck checked title="名簿・進捗" helper="クライアントと担当パートナーの名簿・進捗画面に常時表示する" disabled />
+          </div>
+        </div>
+        <div className="max-w-2xl">
+          <SaveButton saving={saving} label="設定を保存" />
+        </div>
       </form>
     </div>
   );
@@ -1526,8 +1551,9 @@ function MessagesTab({
       .then((result) => {
         if (!active) return;
         const conversationMembers = result.members.filter((member) => member.projectRole === "client" || member.projectRole === "worker");
+        const firstActiveMember = conversationMembers.find((member) => member.status === "active");
         setMembers(conversationMembers);
-        setSelectedMemberId((current) => current ?? conversationMembers[0]?.organizationMemberId ?? null);
+        setSelectedMemberId((current) => current ?? firstActiveMember?.organizationMemberId ?? conversationMembers[0]?.organizationMemberId ?? null);
       })
       .catch((error) => {
         if (active) setLoadError(error instanceof Error ? error.message : "宛先の読み込みに失敗しました。");
@@ -1537,9 +1563,13 @@ function MessagesTab({
     };
   }, [data.project.id]);
 
-  const clients = members.filter((member) => member.projectRole === "client");
-  const partners = members
-    .filter((member) => member.projectRole === "worker")
+  const activeClients = members.filter((member) => member.projectRole === "client" && member.status === "active");
+  const archivedClients = members.filter((member) => member.projectRole === "client" && member.status !== "active");
+  const activePartners = members
+    .filter((member) => member.projectRole === "worker" && member.status === "active")
+    .sort((a, b) => latestConversationAt(data, b.organizationMemberId) - latestConversationAt(data, a.organizationMemberId));
+  const archivedPartners = members
+    .filter((member) => member.projectRole === "worker" && member.status !== "active")
     .sort((a, b) => latestConversationAt(data, b.organizationMemberId) - latestConversationAt(data, a.organizationMemberId));
   const selectedMember = members.find((member) => member.organizationMemberId === selectedMemberId) ?? null;
   const thread = selectedMember
@@ -1577,8 +1607,8 @@ function MessagesTab({
       {loadError ? <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{loadError}</p> : null}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)]">
         <aside className="space-y-4">
-          <ConversationGroup title="クライアント" helper="プロジェクトの窓口" tone="client" members={clients} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="クライアントはまだ追加されていません" />
-          <ConversationGroup title="参加パートナー" helper="新着メッセージ順" tone="partner" members={partners} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="参加パートナーはまだいません" />
+          <ConversationGroup title="クライアント" helper="プロジェクトの窓口" tone="client" members={activeClients} archivedMembers={archivedClients} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="アクティブなクライアントはまだいません" />
+          <ConversationGroup title="参加パートナー" helper="新着メッセージ順" tone="partner" members={activePartners} archivedMembers={archivedPartners} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="アクティブな参加パートナーはまだいません" />
         </aside>
         <section ref={conversationRef} className="min-h-[420px] scroll-mt-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
           {!selectedMember ? (
@@ -1607,8 +1637,12 @@ function MessagesTab({
   );
 }
 
-function ConversationGroup({ title, helper, tone, members, data, selectedMemberId, onSelect, empty }: { title: string; helper: string; tone: "client" | "partner"; members: OperationsProjectMember[]; data: OperationsProjectDetailData; selectedMemberId: string | null; onSelect: (id: string) => void; empty: string }) {
-  return <section><div className="mb-2 flex items-baseline gap-2"><h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--mikke-primary)]">{title}</h2><span className="text-[10px] font-semibold text-[var(--mikke-muted)]">{helper}</span></div>{members.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-4 text-xs font-semibold text-[var(--mikke-muted)]">{empty}</div> : <div className="space-y-2">{members.map((member) => { const latest = latestConversation(data, member.organizationMemberId); return <button key={member.organizationMemberId} type="button" onClick={() => onSelect(member.organizationMemberId)} className={`w-full rounded-xl border p-3 text-left ${member.organizationMemberId === selectedMemberId ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}><span className="flex items-start justify-between gap-2"><span className="min-w-0"><span className="block truncate text-sm font-extrabold">{member.displayName}</span><span className="mt-1 block truncate text-[11px] font-semibold text-[var(--mikke-muted)]">{latest ? `${latest.authorName}：${latest.body}` : "メッセージはまだありません"}</span></span><span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${tone === "client" ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-green)]"}`} /></span></button>; })}</div>}</section>;
+function ConversationGroup({ title, helper, tone, members, archivedMembers, data, selectedMemberId, onSelect, empty }: { title: string; helper: string; tone: "client" | "partner"; members: OperationsProjectMember[]; archivedMembers: OperationsProjectMember[]; data: OperationsProjectDetailData; selectedMemberId: string | null; onSelect: (id: string) => void; empty: string }) {
+  return <section><div className="mb-2 flex items-baseline gap-2"><h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--mikke-primary)]">{title}</h2><span className="text-[10px] font-semibold text-[var(--mikke-muted)]">{helper}</span></div>{members.length === 0 ? <div className="rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-4 text-xs font-semibold text-[var(--mikke-muted)]">{empty}</div> : <div className="space-y-2"><ConversationButtons members={members} tone={tone} data={data} selectedMemberId={selectedMemberId} onSelect={onSelect} /></div>}{archivedMembers.length > 0 ? <details className="mt-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-2"><summary className="cursor-pointer px-1 py-1 text-[11px] font-bold text-[var(--mikke-muted)]">アーカイブ済み（{archivedMembers.length}）</summary><div className="mt-2 space-y-2"><ConversationButtons members={archivedMembers} tone={tone} data={data} selectedMemberId={selectedMemberId} onSelect={onSelect} /></div></details> : null}</section>;
+}
+
+function ConversationButtons({ members, tone, data, selectedMemberId, onSelect }: { members: OperationsProjectMember[]; tone: "client" | "partner"; data: OperationsProjectDetailData; selectedMemberId: string | null; onSelect: (id: string) => void }) {
+  return <>{members.map((member) => { const latest = latestConversation(data, member.organizationMemberId); return <button key={member.organizationMemberId} type="button" onClick={() => onSelect(member.organizationMemberId)} className={`w-full rounded-xl border p-3 text-left ${member.organizationMemberId === selectedMemberId ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}><span className="flex items-start justify-between gap-2"><span className="min-w-0"><span className="block truncate text-sm font-extrabold">{member.displayName}</span><span className="mt-1 block truncate text-[11px] font-semibold text-[var(--mikke-muted)]">{latest ? `${latest.authorName}：${latest.body}` : "メッセージはまだありません"}</span></span><span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${tone === "client" ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-green)]"}`} /></span></button>; })}</>;
 }
 
 function latestConversation(data: OperationsProjectDetailData, memberId: string) {
@@ -1785,6 +1819,15 @@ function FeatureCheck({
         <span className="mt-0.5 block text-xs leading-5 font-semibold text-[var(--mikke-muted)]">{helper}</span>
       </span>
     </label>
+  );
+}
+
+function PortalFeatureHeading({ title, helper }: { title: string; helper: string }) {
+  return (
+    <div className="border-b border-[var(--mikke-line)] pb-3">
+      <h2 className="text-sm font-extrabold text-[var(--mikke-primary)]">{title}</h2>
+      <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{helper}</p>
+    </div>
   );
 }
 
