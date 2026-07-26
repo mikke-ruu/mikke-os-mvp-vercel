@@ -242,3 +242,80 @@ where email='info.jsparts@gmail.com';
   - `npm.cmd run lint`（tsc --noEmit）success。
   - **未検証**（同上の理由でBrowserペイン不可）。あゆみ実機で: ①アーカイブ済みパートナーが連絡先に出ないこと②ポータル設定でパートナー連絡先表示をオフにするとクライアント側の連絡先から消えること③次回実施日/メッセージカードのリンクが正しい校・タブへ飛ぶこと、をご確認ください。migration `20260727100000` の実行が先です。
   - 未コミット。
+
+---
+
+## P6 本部調整計画（2026-07-27 Opus策定・実装はSonnet/codex）
+
+本番稼働中（`https://mikke-os-mvp-vercel.vercel.app`）の本部（HQ）画面を、あゆみの実機フィードバック6点で調整する。**実装はまだ。この計画に沿ってcodex/次セッションが進める**。あゆみの設計判断（2026-07-27の会話で確定）:
+- **Zoom**: 「プロジェクトに固定Zoom1つ＋各回で上書き可」。過去回の番号は書き換えない。
+- **マニュアル**: ファイルアップロードは不要。**テキスト本文＋リンク**で、パートナーポータル側が**生徒進捗に合わせてセクションごとにタブ切替**できる表示になればOK。
+- **プロジェクト設定**: ①クライアント承認を送る前に「ポータル利用規約への同意」を挟んでから承認、を将来入れたい ②契約書＝両者サイン済みPDF/電子契約書をここに置く（**クライアントには非表示**＝先方の担当者が契約担当と限らないため） ③請求書＝毎月請求用にあると良い（すぐでなくて可）。
+
+作業ディレクトリは複数セッション共有のため、**コミット前は必ず`git status`で無関係変更（ai-office/Academy等）を除外してから対象ファイルだけ`git add`**（[[teamworks-school-field]]の運用ルール）。検証は`npm.cmd run lint`＋あゆみ実機。あゆみ確認前にコミットしない。migrationはファイル作成→あゆみがSQL Editor実行→成功確認後にコードで前提化。
+
+### W1: migration不要・すぐ効く3点（最優先）
+
+**W1-1 メッセージのアクティブ/アーカイブ分離**（不具合: アーカイブ済みの重複メンバー＝「野田あゆみ」等がクライアント/パートナー欄に混在）
+- `loadOperationsProjectMembers`（[lib/team-works-operations-project.ts](../lib/team-works-operations-project.ts)）は各メンバーの`status`を既に返している。
+- [TeamWorksOperationsProjectDetail.tsx](../components/team-works/operations/TeamWorksOperationsProjectDetail.tsx)の`MessagesTab`で、`clients`/`partners`をそれぞれ`status==="active"`と`!=="active"`に分割。アクティブは従来通り`ConversationGroup`で上部表示。アーカイブは各グループ末尾に`<details>`（既定折り畳み・「アーカイブ済み(N)」ラベル）でまとめる。会話自体は選べるが既定で隠す。
+- コンポーネントのみ。migration不要。
+
+**W1-2 スケジュールページの日付クリックで展開編集**（現状`ScheduleTab`はUPCOMINGが読み取り専用リスト）
+- `ScheduleTab`（同ファイル491行）のUPCOMING各行を、クリックで展開するアコーディオンに。展開部は既存`CalendarSessionEditor`（483行・時間/長さ/担当の編集＋削除）を流用。`data.partners`を渡す。
+- WEEKLY RULESはそのまま。migration不要。
+- 補足: 本部の月カレンダー（`ProjectCalendarPanel`）は既に日付クリック→右側で編集できる。ScheduleTabはリスト派の入口なので、そこにも編集を付ける形。
+
+**W1-3 ポータル設定をクライアント/パートナーで2分割表示**
+- `PortalTab`（同ファイル1462行）の1枚チェックリストを、見出し付き2グループに再編。既存フラグの割り当てを明示:
+  - 「クライアントポータルに表示」: クライアントポータル全体(`clientVisible`)／担当パートナー連絡先(`clientPartnerContactVisible`)／請求記録(`invoicesEnabled`＝請求先)
+  - 「パートナーポータルに表示」: 報酬記録(`payoutsEnabled`)／マニュアル(常時ON・client非表示の注記)
+  - 「両ポータル共通・常時」: 名簿・進捗
+- 各項目に「どこに何が出るか」の一言を添える。**フラグは既存のまま・追加なし**＝migration不要。純UI再構成。
+
+### W2: Zoom情報（migration小・7/28以降の実運用で重要）
+
+方針=**プロジェクト固定1つ＋各セッション上書き可**。
+- migration（新規・あゆみSQL Editor実行待ち）: `team_works_projects`に`zoom_url text`／`zoom_meeting_id text`／`zoom_passcode text`を追加。`team_works_op_sessions`に`zoom_url text`（nullable上書き・nullならプロジェクト値にフォールバック。IDやパスコードもまとめて`zoom_url`1本に寄せるか3列持つかは実装時判断。MVPはURL1本で可）。
+- lib:
+  - [lib/team-works-operations-project.ts](../lib/team-works-operations-project.ts): `OperationsProject`型・`ProjectRow`・selectにzoom列追加。`updateOperationsProjectVisibility`とは別に`updateOperationsProjectZoom`を新設（プロジェクト既定Zoom保存）。`updateOperationsSession`（セッション編集）に`zoomUrl`上書きを追加。`loadOperationsProjectDetail`のsession整形にzoom（session上書き優先・なければproject既定）を含める。
+  - [lib/team-works-operations-partner.ts]・[lib/team-works-operations-client.ts]: 各ポータルのsession取得にzoom（同フォールバック）を含める。パートナーは実際にZoomを開く人なので必須表示、クライアントにも表示（Zoom参加のため）。
+- UI:
+  - `ProjectSettingsTab`（または新規Zoomパネル）に「Zoom設定」フォーム（URL/ID/パスコード・保存）。
+  - `CalendarSessionEditor`・`ProjectCalendarPanel`の予定詳細・パートナーポータル`SessionCard`・クライアントポータルのセッション詳細に、Zoomリンク表示＋「この回だけ変更」の上書き入力（本部/パートナーは編集可、クライアントは表示のみ）。
+- 注意: `partner_member_id`同様、session編集は`updateOperationsSession`経由。RLSは既存のsession update（本部＋担当worker）を流用でzoom上書きも通る（列追加のみでポリシー変更不要のはず・要確認）。
+
+### W3: 名簿グループをクライアントへ移管（migration小）
+
+あゆみ「本部ではグループ分けしない。クライアントポータル側でグループを作れるように。名簿追加(紙ベース入力)は本部でも可のまま」。
+- 本部 `RosterTab`（同ファイル534行付近）: 「グループ追加」フォームを撤去。グループの**表示**（誰がどのグループか）は残す。生徒（participant）追加フォームは残す（グループ選択は任意/未設定でOK、あるいは撤去）。
+- クライアントポータル [TeamWorksOperationsClientPortal.tsx](../components/team-works/operations/TeamWorksOperationsClientPortal.tsx)の`ProjectRosterTab`に、グループ作成＋生徒へのグループ割当UIを追加。
+- lib [lib/team-works-operations-client.ts](../lib/team-works-operations-client.ts): `loadOperationsClientPortal`に`groups[]`（team_works_groups）とparticipant.groupIdを追加。`saveOperationsClientParticipant`に`groupId`を追加。新規`saveOperationsClientGroup`（グループ作成/リネーム）。
+- migration（RLS・あゆみSQL Editor実行待ち）: `team_works_groups`のinsert/updateが現状**本部staffのみ**（[20260724060000](../supabase/migrations/20260724060000_team_works_r1_operations_foundation.sql):223-227）。client（`private.team_works_has_project_role(project_id,'client')`＝[20260726190000](../supabase/migrations/20260726190000_team_works_r6_multi_role_rls.sql)の新ヘルパー）にもgroups insert/updateを許可するポリシーを追加。participant.group_idのclient更新は既存のclient participant updateポリシーで通るか要確認（通らなければgroup_id更新を許すよう調整）。
+
+### W4: マニュアル表示方式＋プロジェクト設定拡充（設計先行・段階実装）
+
+**W4-1 マニュアル（テキスト本文＋リンク／進捗連動セクションタブ）**
+- あゆみの狙い: パートナーポータルで、担当生徒の進捗(current_manual_no)に合わせ、マニュアルを**セクションごとにタブ切替**して見たい。ファイルは不要、テキスト＋リンクで表示できればOK。
+- データ: `team_works_manuals`は既に`no`(=進捗番号)/`title`/`material_url`(link)/`questions`/`expressions`/`cautions`(jsonb/text)を持つ。**本文用に`body text`列を追加**（コピペ長文用）。material_type=`link`で外部リンク（Googleドキュメント/スプレッドシート等）。
+- 本部 `ManualsTab`（同1089行）: 追加/編集フォームを拡張し「番号・タイトル・本文(テキストエリア)・教材リンク(URL)」を編集可能に。既存は番号/タイトル/リンクのみ＝本文欄を足す。編集（既存マニュアルのupdate）UIも追加（現状は追加のみ）。
+- パートナーポータル [TeamWorksOperationsPartnerPortal.tsx](../components/team-works/operations/TeamWorksOperationsPartnerPortal.tsx)の`SessionCard`: 現状は生徒ごとに`currentManualNo`の1件だけ表示。これを**マニュアル番号のタブ（例: No.5 / No.6 / No.7…＝担当生徒たちの進捗レンジ）**で切替表示に。各タブで本文＋リンク＋質問/表現/注意を表示。生徒カードから「この生徒の番号へジャンプ」も。
+- migration: `team_works_manuals`に`body text`追加のみ（RLSは既存のmanuals select=本部＋workerのままで足りる。clientには従来通り非表示）。
+
+**W4-2 プロジェクト設定の拡充**
+現状`ProjectSettingsTab`=説明＋契約期間＋クライアント招待。以下を段階追加:
+- **(a) クライアント情報の表示**（今回実装対象）: 割当済みclientメンバーの氏名/メール/会社名を`ProjectSettingsTab`に表示（`loadOperationsProjectMembers`のclient行＋directory名から。read中心）。migration不要。
+- **(b) 契約書（HQ限定・クライアント非表示）**（次段）: 両者サイン済みPDF/電子契約書の**URLを貼る欄**をまず用意（`team_works_projects`に`contract_doc_url text`追加）。表示は本部のみ（プロジェクト設定内＝staffしか開けない画面なので自然にHQ限定）。ファイル実アップロードはSupabase Storage設計が要るため後回し、当面はURL参照。
+- **(c) 規約同意を承認フローに**（次段）: クライアント承認（`team_works_approve_client_project`）の前に「ポータル利用規約に同意」を必須化。規約テキスト（org単位で保持）＋同意記録（いつ/どの版に同意したか）を新テーブル`team_works_terms_acceptances`等で。承認RPC/`PendingApprovals`UIに同意チェックを追加。→[[teamworks-school-field]]末尾の「規約同意はいつ・どの版に同意したか記録」方針と整合。設計のみ先行、実装は7/28運用後で可。
+- **(d) 請求書作成**（将来）: 毎月の請求レコード作成フォーム＋PDF出力。既存`InvoicesTab`は読み取り専用なので、作成UI＋（将来）PDF。会計連携ではなく現場確認用の簡易版。あゆみ「すぐでなくて良い」。
+- **追加アイデア（提案）**: ①契約終了時のプロジェクトアーカイブ実行ボタン（`ContractTab`に確認ダイアログ付きで。現状は「本番確認フローと合わせて追加」と保留中）②本部窓口担当（クライアントから見た連絡先名）の設定③P4ポータルカスタム（呼び名ラベル）との合流。
+
+### 実装順の推奨（節約優先・7/28運用重視）
+1. **W1（3点・migration不要）**を最初に一括（すぐ効く・リスク低）。
+2. **W2 Zoom**（migration1本）— 8月レッスン運用に効く。
+3. **W3 名簿グループ移管**（migration=groups RLS）。
+4. **W4-1 マニュアル本文＋進捗タブ**（migration=body列）。
+5. **W4-2**は(a)クライアント情報表示のみ今回、(b)契約書URL・(c)規約同意・(d)請求書は設計を残して段階実装。
+
+### 検証（各Wごと）
+`npm.cmd run lint`→あゆみ実機。W2/W3/W4はmigrationをあゆみがSQL Editorで実行後にコード前提化。あゆみ確認→無関係変更を除外して`git add`→コミット→push（Vercel自動デプロイ）。
