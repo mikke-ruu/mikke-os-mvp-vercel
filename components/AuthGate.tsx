@@ -2,7 +2,7 @@
 
 import type { User } from "@supabase/supabase-js";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import { ensureProfile } from "@/lib/profile";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile } from "@/types/database";
@@ -22,7 +22,18 @@ export function useAuth() {
   return value;
 }
 
+// useSearchParams() requires a Suspense boundary during build-time
+// prerendering, or every page that renders AuthGate fails the production
+// build. AuthGate itself provides that boundary so no caller has to.
 export function AuthGate({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<LoadingScreen />}>
+      <AuthGateInner>{children}</AuthGateInner>
+    </Suspense>
+  );
+}
+
+function AuthGateInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
