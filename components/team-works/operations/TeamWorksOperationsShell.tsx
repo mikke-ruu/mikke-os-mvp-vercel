@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Briefcase, CalendarDays, Folder, Home, Plus, Settings, Users } from "lucide-react";
+import { BookOpen, Briefcase, CalendarDays, Folder, Home, MessageSquare, Plus, Settings, Users } from "lucide-react";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 
 /**
@@ -11,6 +11,7 @@ import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } f
 const teamWorksNavItems: MikkeShellNavItem[] = [
   { label: "ホーム", href: "/apps/team-works", icon: Home },
   { label: "スケジュール管理", href: "/apps/team-works/schedule", icon: CalendarDays, section: "運営" },
+  { label: "メッセージ管理", href: "/apps/team-works/messages", icon: MessageSquare, section: "運営" },
   { label: "プロジェクト管理", href: "/apps/team-works/projects", icon: Folder, section: "運営" },
   { label: "パートナー管理", href: "/apps/team-works/partners", icon: Users, section: "運営" },
   { label: "クライアント管理", href: "/apps/team-works/clients", icon: Briefcase, section: "運営" },
@@ -27,7 +28,7 @@ const teamWorksNavItems: MikkeShellNavItem[] = [
 const teamWorksBottomNavItems: MikkeShellBottomNavItem[] = [
   { label: "ホーム", href: "/apps/team-works", icon: Home },
   { label: "プロジェクト管理", href: "/apps/team-works/projects", icon: Folder },
-  { label: "新規プロジェクト", href: "/apps/team-works/projects", icon: Plus, primary: true },
+  { label: "新規プロジェクト", href: "/apps/team-works/projects/new", icon: Plus, primary: true },
   { label: "マニュアル管理", href: "/apps/team-works/manuals", icon: BookOpen },
   { label: "パートナー管理", href: "/apps/team-works/partners", icon: Users }
 ];

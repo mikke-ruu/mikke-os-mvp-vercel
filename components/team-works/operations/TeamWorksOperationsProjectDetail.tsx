@@ -19,9 +19,11 @@ import {
   Settings2,
   Send,
   Users,
+  Video,
   WalletCards
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
@@ -32,12 +34,12 @@ import {
   teamWorksProjectInputClass
 } from "@/components/team-works/projects/TeamWorksProjectsShell";
 import { supabase } from "@/lib/supabase/client";
+import { supabaseErrorMessage } from "@/lib/supabase-schema-compat";
 import {
   addOperationsClientToProject,
   addOperationsPartnerToProject,
   cancelOperationsSession,
   createOperationsHoliday,
-  createOperationsGroup,
   createOperationsManual,
   createOperationsParticipant,
   createOperationsSession,
@@ -52,11 +54,15 @@ import {
   sendOperationsDirectMessage,
   updateOperationsProjectPartnerSetting,
   updateOperationsProjectPartnerOffer,
+  updateOperationsManual,
   updateOperationsSession,
   updateOperationsParticipantProgress,
   updateOperationsProjectContract,
   updateOperationsProjectDescription,
+  updateOperationsProjectTitle,
+  updateOperationsProjectZoom,
   updateOperationsProjectVisibility,
+  updateOperationsSessionZoom,
   type OperationsClientDirectoryEntry,
   type OperationsPartnerDirectoryEntry,
   type OperationsPendingInvite,
@@ -99,7 +105,7 @@ export function TeamWorksProjectDetailRoute({ projectId }: { projectId: string }
     try {
       setData(await loadOperationsProjectDetail(supabase, projectId));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "プロジェクト詳細の読み込みに失敗しました。");
+      setError(supabaseErrorMessage(loadError, "プロジェクト詳細の読み込みに失敗しました。"));
     }
   }, [projectId]);
 
@@ -141,7 +147,11 @@ function OperationsProjectDetail({
   data: OperationsProjectDetailData;
   onReload: () => Promise<void>;
 }) {
-  const [activeTab, setActiveTab] = useState<ProjectTab>("overview");
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<ProjectTab>(
+    tabs.some((tab) => tab.id === requestedTab) ? requestedTab as ProjectTab : "overview"
+  );
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -252,21 +262,25 @@ function OverviewTab({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-[color-mix(in_srgb,var(--mikke-green)_55%,white)] bg-[color-mix(in_srgb,var(--mikke-green)_18%,white)] px-4 py-3">
-        <p className="flex items-center gap-2 text-sm font-bold text-[var(--mikke-text)]">
+      <button
+        type="button"
+        onClick={() => onSelectTab("schedule")}
+        className="w-full rounded-2xl border border-[color-mix(in_srgb,var(--mikke-green)_55%,white)] bg-[color-mix(in_srgb,var(--mikke-green)_18%,white)] px-4 py-3 text-left transition hover:border-[var(--mikke-primary)]"
+      >
+        <span className="flex items-center gap-2 text-sm font-bold text-[var(--mikke-text)]">
           <Clock3 size={16} className="text-[var(--mikke-primary)]" />
           {todaySession
             ? `今日 ${todaySession.startTime} ${data.project.title} · ${todaySession.partnerName ?? "担当未定"}`
             : "今日の予定はありません"}
-        </p>
-      </div>
+        </span>
+      </button>
 
       <ProjectCalendarPanel data={data} saving={saving} mutate={mutate} />
 
       <div className="grid grid-cols-3 gap-3">
-        <MetricCard icon={CalendarDays} tone="blue" label="今週のコマ" value={String(weekCount)} />
-        <MetricCard icon={Users} tone="green" label="パートナー" value={`${data.partners.length}名`} />
-        <MetricCard icon={GraduationCap} tone="pink" label="対象者" value={`${data.participants.length}名`} />
+        <MetricCard icon={CalendarDays} tone="blue" label="今週のコマ" value={String(weekCount)} onClick={() => onSelectTab("schedule")} />
+        <MetricCard icon={Users} tone="green" label="パートナー" value={`${data.partners.length}名`} onClick={() => onSelectTab("partners")} />
+        <MetricCard icon={GraduationCap} tone="pink" label="対象者" value={`${data.participants.length}名`} onClick={() => onSelectTab("roster")} />
       </div>
       <p className="-mt-3 text-[11px] font-semibold text-[var(--mikke-muted)]">
         パートナーはこのプロジェクトの参加人数、対象者はクライアント側の総登録者数です。
@@ -285,7 +299,8 @@ function OverviewTab({
             <ListRow
               key={session.id}
               title={`${formatDate(session.sessionDate)} ${session.startTime}〜${endTime(session.startTime, session.durationMin)}`}
-              helper={`担当 ${session.partnerName ?? "未定"}${session.roster.length ? ` · ${session.roster.length}名` : ""}`}
+              helper={`担当 ${session.partnerName ?? "未定"}${session.roster.length ? ` · ${session.roster.length}名` : ""} · Zoom ID ${session.zoomMeetingId ?? "未設定"}`}
+              onClick={() => onSelectTab("schedule")}
             />
           ))
         )}
@@ -302,7 +317,7 @@ function OverviewTab({
             <MikkeEmptyState title="新着メッセージはありません" />
           ) : (
             data.comments.slice(0, 3).map((comment) => (
-              <ListRow key={comment.id} title={comment.authorName} helper={comment.body} />
+              <ListRow key={comment.id} title={comment.authorName} helper={comment.body} onClick={() => onSelectTab("messages")} />
             ))
           )}
         </OverviewListSection>
@@ -322,6 +337,7 @@ function OverviewTab({
                 title={`${report.submitterName} · ${report.formName}`}
                 helper={reportStatusLabel(report.status)}
                 badge={reportStatusLabel(report.status)}
+                onClick={() => onSelectTab("reports")}
               />
             ))
           )}
@@ -371,7 +387,7 @@ function ProjectCalendarPanel({
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const [adding, setAdding] = useState(false);
   const [startTime, setStartTime] = useState("13:00");
-  const [durationMin, setDurationMin] = useState("60");
+  const [finishTime, setFinishTime] = useState("14:00");
   const [partnerMemberId, setPartnerMemberId] = useState("");
   const [holidayMemo, setHolidayMemo] = useState("");
   const calendarDates = useMemo(() => monthCalendarDates(monthDate), [monthDate]);
@@ -403,7 +419,7 @@ function ProjectCalendarPanel({
       () => createOperationsSession(supabase, data.project.id, {
         sessionDate: selectedDate,
         startTime,
-        durationMin: Number(durationMin),
+        durationMin: durationBetweenTimes(startTime, finishTime),
         partnerMemberId: partnerMemberId || null
       }),
       "予定を登録しました。"
@@ -468,8 +484,10 @@ function ProjectCalendarPanel({
           </div>
           {adding ? <form onSubmit={addSession} className="mt-3 space-y-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
             <p className="text-xs font-extrabold">この日に予定を追加</p>
-            <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} />
-            <input type="number" min={1} value={durationMin} onChange={(event) => setDurationMin(event.target.value)} className={teamWorksProjectInputClass} aria-label="時間（分）" />
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[11px] font-bold text-[var(--mikke-muted)]">開始時間<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} /></label>
+              <label className="text-[11px] font-bold text-[var(--mikke-muted)]">終了時間<input type="time" value={finishTime} onChange={(event) => setFinishTime(event.target.value)} className={teamWorksProjectInputClass} /></label>
+            </div>
             <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{data.partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
             <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">登録</button>
           </form> : <button type="button" onClick={() => setAdding(true)} className="mt-3 w-full rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-bold text-[var(--mikke-primary)]">＋ 予定追加</button>}
@@ -483,9 +501,64 @@ function ProjectCalendarPanel({
 function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }: { session: OperationsProjectDetailData["sessions"][number]; partners: OperationsProjectDetailData["partners"]; saving: boolean; mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>; dateLabel?: string }) {
   const [open, setOpen] = useState(false);
   const [startTime, setStartTime] = useState(session.startTime);
-  const [durationMin, setDurationMin] = useState(String(session.durationMin));
+  const [finishTime, setFinishTime] = useState(endTime(session.startTime, session.durationMin));
   const [partnerMemberId, setPartnerMemberId] = useState(session.partnerMemberId ?? "");
-  return <div className="rounded-xl border border-[var(--mikke-line)] p-3"><button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 text-left text-xs font-bold"><span><span className={dateLabel ? "mr-2 text-[var(--mikke-primary)] underline decoration-[var(--mikke-line)] underline-offset-4" : ""}>{dateLabel}</span>{session.startTime}〜{endTime(session.startTime, session.durationMin)}　担当 {session.partnerName ?? "未定"}　名簿{session.roster.length}名</span><span className="shrink-0 text-[var(--mikke-primary)]">{open ? "閉じる" : "編集"}</span></button>{open ? <div className="mt-3 space-y-2"><input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="開始時間" /><input type="number" min={1} value={durationMin} onChange={(event) => setDurationMin(event.target.value)} className={teamWorksProjectInputClass} aria-label="所要時間（分）" /><select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label="担当パートナー"><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: Number(durationMin), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">保存</button><button type="button" disabled={saving} onClick={() => void mutate(() => cancelOperationsSession(supabase, session.id), "予定を削除しました。")} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">削除</button></div></div> : null}</div>;
+  const [useProjectDefault, setUseProjectDefault] = useState(session.zoomUsesProjectDefault);
+  const [zoomUrl, setZoomUrl] = useState(session.zoomUrl ?? "");
+  const [zoomMeetingId, setZoomMeetingId] = useState(session.zoomMeetingId ?? "");
+  const [zoomPasscode, setZoomPasscode] = useState(session.zoomPasscode ?? "");
+  const isPast = session.sessionDate < toDateKey(new Date());
+
+  return (
+    <div className="rounded-xl border border-[var(--mikke-line)] p-3">
+      <div className="flex items-start gap-2">
+        <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left text-xs font-bold">
+          <span className="min-w-0">
+            <span className="flex flex-wrap items-center gap-2"><span><span className={dateLabel ? "mr-2 text-[var(--mikke-primary)] underline decoration-[var(--mikke-line)] underline-offset-4" : ""}>{dateLabel}</span>{session.startTime}〜{endTime(session.startTime, session.durationMin)}　担当 {session.partnerName ?? "未定"}　名簿{session.roster.length}名</span><PartnerPresenceBadge status={session.partnerPresenceStatus} /></span>
+            <span className="mt-1 block text-[11px] font-semibold text-[var(--mikke-muted)]">Zoom ID：{session.zoomMeetingId ?? "未設定"}</span>
+          </span>
+          <span className="shrink-0 text-[var(--mikke-primary)]">{open ? "閉じる" : "編集"}</span>
+        </button>
+        {session.zoomUrl ? (
+          <a
+            href={session.zoomUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="shrink-0 rounded-lg border border-[var(--mikke-primary)] px-2 py-1 text-[11px] font-bold text-[var(--mikke-primary)]"
+          >
+            Zoomを開く
+          </a>
+        ) : null}
+      </div>
+      {open ? (
+        <div className="mt-3 space-y-4">
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[11px] font-bold text-[var(--mikke-muted)]">開始時間<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="開始時間" /></label>
+              <label className="text-[11px] font-bold text-[var(--mikke-muted)]">終了時間<input type="time" value={finishTime} onChange={(event) => setFinishTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="終了時間" /></label>
+            </div>
+            <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label="担当パートナー"><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            <div className="flex gap-2">
+              <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">予定を保存</button>
+              <button type="button" disabled={saving} onClick={() => void mutate(() => cancelOperationsSession(supabase, session.id), "予定を削除しました。")} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">削除</button>
+            </div>
+          </div>
+          <div className="space-y-2 border-t border-[var(--mikke-line)] pt-3">
+            <p className="inline-flex items-center gap-1.5 text-xs font-extrabold text-[var(--mikke-primary)]"><Video size={14} />この回のZoom</p>
+            {session.zoomUrl ? <a href={session.zoomUrl} target="_blank" rel="noreferrer" className="block truncate text-xs font-bold text-[var(--mikke-primary)] underline underline-offset-2">現在のZoomを開く</a> : <p className="text-xs font-semibold text-[var(--mikke-muted)]">Zoomはまだ設定されていません。</p>}
+            <label className="flex items-center gap-2 text-xs font-bold"><input type="checkbox" checked={useProjectDefault} disabled={isPast} onChange={(event) => setUseProjectDefault(event.target.checked)} />プロジェクト既定を使う</label>
+            {!useProjectDefault ? (
+              <div className="grid gap-2">
+                <input type="url" value={zoomUrl} disabled={isPast} onChange={(event) => setZoomUrl(event.target.value)} placeholder="Zoom URL" className={teamWorksProjectInputClass} />
+                <div className="grid gap-2 sm:grid-cols-2"><input value={zoomMeetingId} disabled={isPast} onChange={(event) => setZoomMeetingId(event.target.value)} placeholder="ミーティングID" className={teamWorksProjectInputClass} /><input value={zoomPasscode} disabled={isPast} onChange={(event) => setZoomPasscode(event.target.value)} placeholder="パスコード" className={teamWorksProjectInputClass} /></div>
+              </div>
+            ) : null}
+            {isPast ? <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">過去回のZoom情報は変更できません。</p> : <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSessionZoom(supabase, session.id, { useProjectDefault, zoomUrl, zoomMeetingId, zoomPasscode }), "この回のZoom設定を更新しました。")} className="rounded-lg border border-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">Zoom設定を保存</button>}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function ScheduleTab({
@@ -550,7 +623,6 @@ function RosterTab({
   saving: boolean;
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
-  const [groupName, setGroupName] = useState("");
   const [participantName, setParticipantName] = useState("");
   const [groupId, setGroupId] = useState("");
   const [level, setLevel] = useState("");
@@ -559,16 +631,6 @@ function RosterTab({
   const nextSession = data.sessions.find(
     (session) => session.status === "scheduled" && session.sessionDate >= toDateKey(new Date())
   );
-
-  async function submitGroup(event: FormEvent) {
-    event.preventDefault();
-    if (!groupName.trim()) return;
-    await mutate(
-      () => createOperationsGroup(supabase, data.project.id, groupName),
-      "グループを追加しました。"
-    );
-    setGroupName("");
-  }
 
   async function submitParticipant(event: FormEvent) {
     event.preventDefault();
@@ -590,7 +652,7 @@ function RosterTab({
 
   return (
     <div className="space-y-5">
-      <TabIntro icon={Users} title="名簿" description="グループと対象者をプロジェクト内で管理します。現在のマニュアル番号は手動で調整できます。" />
+      <TabIntro icon={Users} title="名簿" description="紙の名簿から対象者を追加し、グループと進捗を確認します。グループの作成・編集はクライアントポータルで行います。" />
       {nextSession ? (
         <MikkeSection title="Next roster" tone="editorial">
           <p className="mb-3 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">
@@ -669,16 +731,6 @@ function RosterTab({
         </MikkeSection>
 
         <div className="space-y-4">
-          <form onSubmit={submitGroup} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
-            <h3 className="flex items-center gap-2 text-sm font-extrabold">
-              <Plus size={16} className="text-[var(--mikke-primary)]" /> グループ追加
-            </h3>
-            <TeamWorksProjectField label="グループ名" required className="mt-3">
-              <input value={groupName} onChange={(event) => setGroupName(event.target.value)} className={teamWorksProjectInputClass} />
-            </TeamWorksProjectField>
-            <SaveButton saving={saving} label="グループを追加" />
-          </form>
-
           <form onSubmit={submitParticipant} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
             <h3 className="flex items-center gap-2 text-sm font-extrabold">
               <Plus size={16} className="text-[var(--mikke-primary)]" /> 名簿に追加
@@ -831,9 +883,6 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
     }
   }
 
-  const unassigned = data.sessions.filter(
-    (session) => session.status === "scheduled" && !session.partnerMemberId && session.sessionDate >= toDateKey(new Date())
-  );
   const currentMonthKey = toDateKey(new Date()).slice(0, 7);
   const assignedSessionsByMemberId = useMemo(() => {
     const map = new Map<string, OperationsProjectDetailData["sessions"]>();
@@ -1000,17 +1049,6 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
         )}
       </MikkeSection>
 
-      <MikkeSection title="Unassigned" tone="editorial">
-        {unassigned.length === 0 ? (
-          <MikkeEmptyState title="担当未定のコマはありません" />
-        ) : (
-          <div className="grid gap-2 md:grid-cols-2">
-            {unassigned.slice(0, 12).map((session) => (
-              <InfoCard key={session.id} title={`${formatDate(session.sessionDate)} ${session.startTime}`} helper={`${session.durationMin}分`} badge="未定" />
-            ))}
-          </div>
-        )}
-      </MikkeSection>
     </div>
   );
 }
@@ -1105,20 +1143,43 @@ function ManualsTab({
   saving: boolean;
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [manualNo, setManualNo] = useState(data.manuals.length ? Math.max(...data.manuals.map((manual) => manual.no)) + 1 : 1);
   const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
   const [materialUrl, setMaterialUrl] = useState("");
+
+  function edit(manual?: OperationsProjectDetailData["manuals"][number]) {
+    setEditingId(manual?.id ?? null);
+    setManualNo(manual?.no ?? (data.manuals.length ? Math.max(...data.manuals.map((item) => item.no)) + 1 : 1));
+    setTitle(manual?.title ?? "");
+    setBody(manual?.body ?? "");
+    setMaterialUrl(manual?.materialUrl ?? "");
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) return;
-    await mutate(
-      () => createOperationsManual(supabase, data.project.id, { no: manualNo, title, materialUrl }),
-      "マニュアルを追加しました。"
-    );
-    setManualNo((current) => current + 1);
-    setTitle("");
-    setMaterialUrl("");
+    const editingManual = data.manuals.find((manual) => manual.id === editingId);
+    if (editingManual) {
+      await mutate(
+        () => updateOperationsManual(supabase, editingManual.id, {
+          title,
+          body,
+          materialUrl,
+          questions: editingManual.questions.filter((value): value is string => typeof value === "string"),
+          expressions: editingManual.expressions.filter((value): value is string => typeof value === "string"),
+          cautions: editingManual.cautions ?? ""
+        }),
+        "マニュアルを更新しました。"
+      );
+    } else {
+      await mutate(
+        () => createOperationsManual(supabase, data.project.id, { no: manualNo, title, body, materialUrl }),
+        "マニュアルを追加しました。"
+      );
+    }
+    edit();
   }
 
   return (
@@ -1131,34 +1192,38 @@ function ManualsTab({
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {data.manuals.map((manual) => (
-                <InfoCard
+                <button
                   key={manual.id}
-                  title={`${manual.no}番 · ${manual.title}`}
-                  helper={[
-                    manual.sourceTemplateManualId ? "共通雛形から複製" : "プロジェクトで作成",
-                    manual.materialUrl ? "教材リンクあり" : "教材なし",
-                    `質問 ${manual.questions.length}件`
-                  ].join(" ／ ")}
-                  badge={manual.status === "active" ? "公開中" : manual.status}
-                />
+                  type="button"
+                  onClick={() => edit(manual)}
+                  className={`rounded-2xl border p-4 text-left ${editingId === manual.id ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}
+                >
+                  <span className="text-sm font-extrabold">{manual.no}番 · {manual.title}</span>
+                  <span className="mt-2 block text-xs font-semibold text-[var(--mikke-muted)]">{manual.body ? "本文あり" : "本文なし"} ／ {manual.materialUrl ? "教材リンクあり" : "教材なし"}</span>
+                  <span className="mt-2 block text-[11px] font-bold text-[var(--mikke-primary)]">編集する</span>
+                </button>
               ))}
             </div>
           )}
         </MikkeSection>
         <form onSubmit={submit} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
           <h3 className="flex items-center gap-2 text-sm font-extrabold">
-            <Plus size={16} className="text-[var(--mikke-primary)]" /> マニュアル追加
+            <Plus size={16} className="text-[var(--mikke-primary)]" /> {editingId ? "マニュアル編集" : "マニュアル追加"}
           </h3>
           <TeamWorksProjectField label="番号" required className="mt-3">
-            <input type="number" min={1} value={manualNo} onChange={(event) => setManualNo(Number(event.target.value))} className={teamWorksProjectInputClass} />
+            <input type="number" min={1} value={manualNo} disabled={Boolean(editingId)} onChange={(event) => setManualNo(Number(event.target.value))} className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
           <TeamWorksProjectField label="タイトル" required className="mt-3">
             <input value={title} onChange={(event) => setTitle(event.target.value)} className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
+          <TeamWorksProjectField label="本文" helper="パートナーポータルのセクションタブに表示します。" className="mt-3">
+            <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={8} className={teamWorksProjectInputClass} />
+          </TeamWorksProjectField>
           <TeamWorksProjectField label="教材リンク" helper="任意。ファイル教材はprivate storage対応時に追加します。" className="mt-3">
             <input type="url" value={materialUrl} onChange={(event) => setMaterialUrl(event.target.value)} className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
-          <SaveButton saving={saving} label="マニュアルを追加" />
+          <SaveButton saving={saving} label={editingId ? "マニュアルを更新" : "マニュアルを追加"} />
+          {editingId ? <button type="button" onClick={() => edit()} className="mt-2 w-full rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold">編集を取り消す</button> : null}
         </form>
       </div>
     </div>
@@ -1292,10 +1357,117 @@ function ProjectSettingsTab({
   return (
     <div className="space-y-5">
       <TabIntro icon={Settings2} title="プロジェクト設定" description="プロジェクト登録時の情報、契約期間、クライアント連携をまとめて管理します。" />
+      <ProjectNamePanel data={data} saving={saving} mutate={mutate} />
       <ProjectDescriptionPanel data={data} saving={saving} mutate={mutate} />
+      <ProjectZoomPanel data={data} saving={saving} mutate={mutate} />
       <ContractTab data={data} saving={saving} mutate={mutate} />
+      <ProjectClientInfoPanel data={data} />
       <ClientInvitePanel data={data} />
     </div>
+  );
+}
+
+function ProjectNamePanel({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [title, setTitle] = useState(data.project.title);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await mutate(() => updateOperationsProjectTitle(supabase, data.project.id, title), "プロジェクト名を保存しました。");
+  }
+
+  return (
+    <MikkeSection title="プロジェクト名" tone="editorial">
+      <form onSubmit={submit} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+        <TeamWorksProjectField label="表示名" required>
+          <input value={title} onChange={(event) => setTitle(event.target.value)} className={teamWorksProjectInputClass} required />
+        </TeamWorksProjectField>
+        <SaveButton saving={saving} label="プロジェクト名を保存" />
+      </form>
+    </MikkeSection>
+  );
+}
+
+function ProjectClientInfoPanel({ data }: { data: OperationsProjectDetailData }) {
+  const [clients, setClients] = useState<OperationsProjectMember[]>([]);
+  const [directory, setDirectory] = useState<OperationsClientDirectoryEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      loadOperationsProjectMembers(supabase, data.project.id),
+      loadOperationsClientDirectory(supabase)
+    ]).then(([members, clientDirectory]) => {
+      if (!active) return;
+      setClients(members.members.filter((member) => member.projectRole === "client" && member.status === "active"));
+      setDirectory(clientDirectory);
+    }).catch((loadError) => {
+      if (active) setError(loadError instanceof Error ? loadError.message : "クライアント情報を読み込めませんでした。");
+    });
+    return () => { active = false; };
+  }, [data.project.id]);
+
+  return (
+    <MikkeSection title="クライアント情報" tone="editorial">
+      <p className="-mt-2 mb-3 text-xs leading-6 text-[var(--mikke-muted)]">このプロジェクトで現在有効な担当者のみ表示します。会社名の専用項目はまだないため、登録時の「会社・補足」を表示します。</p>
+      {error ? <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{error}</p> : null}
+      {clients.length ? <div className="grid gap-3 sm:grid-cols-2">{clients.map((client) => {
+        const directoryEntry = directory.find((entry) => entry.email.toLowerCase() === client.email?.toLowerCase());
+        return <article key={client.organizationMemberId} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4"><div className="flex items-center justify-between gap-2"><p className="font-extrabold">{client.displayName}</p><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${client.status === "active" ? "bg-[var(--mikke-green)]" : "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]"}`}>{client.status === "active" ? "有効" : "停止・アーカイブ"}</span></div><p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">メール：{client.email ?? "未登録"}</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">会社・補足：{directoryEntry?.note ?? "未設定"}</p></article>;
+      })}</div> : !error ? <MikkeEmptyState title="割り当て済みクライアントはいません" /> : null}
+    </MikkeSection>
+  );
+}
+
+function ProjectZoomPanel({
+  data,
+  saving,
+  mutate
+}: {
+  data: OperationsProjectDetailData;
+  saving: boolean;
+  mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
+}) {
+  const [zoomUrl, setZoomUrl] = useState(data.project.zoomUrl ?? "");
+  const [zoomMeetingId, setZoomMeetingId] = useState(data.project.zoomMeetingId ?? "");
+  const [zoomPasscode, setZoomPasscode] = useState(data.project.zoomPasscode ?? "");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await mutate(
+      () => updateOperationsProjectZoom(supabase, data.project.id, { zoomUrl, zoomMeetingId, zoomPasscode }),
+      "プロジェクト既定のZoomを保存しました。今後の既定使用中の予定へ反映しました。"
+    );
+  }
+
+  return (
+    <MikkeSection title="Zoom設定" tone="editorial">
+      <p className="-mt-2 text-xs leading-6 text-[var(--mikke-muted)]">通常使うZoomを1つ設定します。今後の各回へ反映され、必要な回だけ予定詳細から上書きできます。過去回は変更されません。</p>
+      <form onSubmit={submit} className="mt-3 grid gap-3">
+        <TeamWorksProjectField label="Zoom URL">
+          <input type="url" value={zoomUrl} onChange={(event) => setZoomUrl(event.target.value)} placeholder="https://zoom.us/j/..." className={teamWorksProjectInputClass} />
+        </TeamWorksProjectField>
+        <div className="grid gap-3 md:grid-cols-2">
+          <TeamWorksProjectField label="ミーティングID">
+            <input value={zoomMeetingId} onChange={(event) => setZoomMeetingId(event.target.value)} placeholder="123 456 7890" className={teamWorksProjectInputClass} />
+          </TeamWorksProjectField>
+          <TeamWorksProjectField label="パスコード">
+            <input value={zoomPasscode} onChange={(event) => setZoomPasscode(event.target.value)} placeholder="任意" className={teamWorksProjectInputClass} />
+          </TeamWorksProjectField>
+        </div>
+        <div className="justify-self-start">
+          <SaveButton saving={saving} label="Zoom既定を保存" />
+        </div>
+      </form>
+    </MikkeSection>
   );
 }
 
@@ -1658,12 +1830,14 @@ function MetricCard({
   icon: Icon,
   tone,
   label,
-  value
+  value,
+  onClick
 }: {
   icon: typeof CalendarDays;
   tone: "blue" | "green" | "pink" | "yellow";
   label: string;
   value: string;
+  onClick: () => void;
 }) {
   const colors = {
     blue: "var(--mikke-blue)",
@@ -1672,7 +1846,7 @@ function MetricCard({
     yellow: "var(--mikke-yellow)"
   };
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+    <button type="button" onClick={onClick} className="flex items-center gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-3 text-left transition hover:border-[var(--mikke-primary)]">
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: colors[tone] }}>
         <Icon size={19} color={tone === "blue" ? "#fff" : "#1b1b1f"} />
       </span>
@@ -1680,7 +1854,7 @@ function MetricCard({
         <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">{label}</span>
         <span className="mt-0.5 block truncate text-lg font-extrabold">{value}</span>
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -1718,14 +1892,16 @@ function OverviewListSection({
 function ListRow({
   title,
   helper,
-  badge
+  badge,
+  onClick
 }: {
   title: string;
   helper: string;
   badge?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
+  const content = (
+    <>
       <span className="h-8 w-1 shrink-0 rounded-full bg-[var(--mikke-green)]" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-bold">{title}</span>
@@ -1736,7 +1912,14 @@ function ListRow({
           {badge}
         </span>
       ) : null}
-    </div>
+    </>
+  );
+  return onClick ? (
+    <button type="button" onClick={onClick} className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-[var(--mikke-surface-soft)]">
+      {content}
+    </button>
+  ) : (
+    <div className="flex items-center gap-3 px-4 py-3">{content}</div>
   );
 }
 
@@ -1876,6 +2059,22 @@ function endTime(startTime: string, durationMin: number) {
   const [hours, minutes] = startTime.split(":").map(Number);
   const totalMinutes = hours * 60 + minutes + durationMin;
   return `${String(Math.floor(totalMinutes / 60) % 24).padStart(2, "0")}:${String(totalMinutes % 60).padStart(2, "0")}`;
+}
+
+function PartnerPresenceBadge({ status }: { status: "not_started" | "standby" | "in_progress" | "ended" }) {
+  if (status === "not_started") return null;
+  const labels = { standby: "スタンバイ", in_progress: "実施中", ended: "終了" };
+  const tone = status === "standby" ? "bg-amber-100 text-amber-800" : status === "in_progress" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700";
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${tone}`}>{labels[status]}</span>;
+}
+
+function durationBetweenTimes(startTime: string, finishTime: string) {
+  const [startHours, startMinutes] = startTime.split(":").map(Number);
+  const [finishHours, finishMinutes] = finishTime.split(":").map(Number);
+  const startTotal = startHours * 60 + startMinutes;
+  let finishTotal = finishHours * 60 + finishMinutes;
+  if (finishTotal <= startTotal) finishTotal += 24 * 60;
+  return finishTotal - startTotal;
 }
 
 function toDateKey(date: Date) {

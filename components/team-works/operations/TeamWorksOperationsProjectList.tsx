@@ -1,15 +1,22 @@
 "use client";
 
-import { CalendarDays, FolderKanban, Users } from "lucide-react";
+import { FolderKanban, Plus, Users } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { supabase } from "@/lib/supabase/client";
-import { fetchOperationsProjects, type OperationsProjectSummary } from "@/lib/team-works-operations";
+import { createOperationsProject } from "@/lib/team-works-operations-project";
+import { fetchOperationsProjects, formatDateKey, type OperationsProjectSummary } from "@/lib/team-works-operations";
 
 export function TeamWorksOperationsProjectList() {
+  const router = useRouter();
   const [projects, setProjects] = useState<OperationsProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [title, setTitle] = useState("");
+  const [contractStartedOn, setContractStartedOn] = useState(formatDateKey(new Date()));
+  const [contractEndedOn, setContractEndedOn] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -25,7 +32,52 @@ export function TeamWorksOperationsProjectList() {
     void load();
   }, [load]);
 
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!title.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const projectId = await createOperationsProject(supabase, {
+        organizationName: "日本語レッスン",
+        title,
+        contractStartedOn,
+        contractEndedOn
+      });
+      router.push(`/apps/team-works/projects/${projectId}`);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "プロジェクトを作成できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--mikke-green)]"><Plus size={19} /></span>
+          <div>
+            <h2 className="text-base font-extrabold">日本語レッスンのプロジェクトを立ち上げる</h2>
+            <p className="mt-1 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">テンプレート選択は保留し、必要な基本情報だけで始められます。</p>
+          </div>
+        </div>
+        <form onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_180px_auto] md:items-end">
+          <label className="block text-xs font-bold">プロジェクト名
+            <input value={title} onChange={(event) => setTitle(event.target.value)} required placeholder="例：スリランカ校" className="mt-1.5 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-primary)]" />
+          </label>
+          <label className="block text-xs font-bold">契約開始日
+            <input type="date" value={contractStartedOn} onChange={(event) => setContractStartedOn(event.target.value)} className="mt-1.5 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
+          </label>
+          <label className="block text-xs font-bold">契約終了日
+            <input type="date" value={contractEndedOn} min={contractStartedOn || undefined} onChange={(event) => setContractEndedOn(event.target.value)} className="mt-1.5 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
+          </label>
+          <button type="submit" disabled={saving || !title.trim()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+            <Plus size={16} /> {saving ? "作成中…" : "作成"}
+          </button>
+        </form>
+      </section>
+
     <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4 sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -35,12 +87,6 @@ export function TeamWorksOperationsProjectList() {
             契約期間中、予定・名簿・シフト・報告を繰り返し運営するプロジェクトです。
           </p>
         </div>
-        <Link
-          href="/apps/team-works"
-          className="inline-flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]"
-        >
-          <CalendarDays size={15} /> 本部を開く
-        </Link>
       </div>
 
       {error ? (
@@ -73,5 +119,6 @@ export function TeamWorksOperationsProjectList() {
         </div>
       )}
     </section>
+    </div>
   );
 }

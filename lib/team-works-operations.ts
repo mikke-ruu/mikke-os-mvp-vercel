@@ -30,6 +30,10 @@ export type OperationsCalendarEvent = {
   durationMin: number;
   partnerName: string | null;
   participantCount: number;
+  zoomUrl: string | null;
+  zoomMeetingId: string | null;
+  zoomPasscode: string | null;
+  partnerPresenceStatus: "not_started" | "standby" | "in_progress" | "ended";
   status: "scheduled" | "completed" | "cancelled";
 };
 
@@ -43,6 +47,7 @@ export type OperationsHoliday = {
 
 export type RecentOperationsComment = {
   id: string;
+  projectId: string;
   projectTitle: string;
   authorName: string;
   body: string;
@@ -57,6 +62,7 @@ export type OperationsDashboardData = {
   monthHolidays: OperationsHoliday[];
   todayEvents: OperationsCalendarEvent[];
   needsAttentionUnassigned: OperationsCalendarEvent[];
+  upcomingEvents: OperationsCalendarEvent[];
   recentComments: RecentOperationsComment[];
 };
 
@@ -64,6 +70,11 @@ export type OperationsScheduleGroup = {
   dateKey: string;
   label: string;
   events: OperationsCalendarEvent[];
+};
+
+export type OperationsMessagesOverview = {
+  projects: OperationsProjectSummary[];
+  recentComments: RecentOperationsComment[];
 };
 
 export type GenerateSessionsSummary = {
@@ -189,6 +200,32 @@ export async function fetchOperationsProjects(client: SupabaseClient): Promise<{
   return { organizationIds, projects: toProjectSummaries(rows) };
 }
 
+export async function loadOperationsMessagesOverview(client: SupabaseClient): Promise<OperationsMessagesOverview> {
+  const organizationIds = await resolveStaffOrganizationIds(client);
+  if (organizationIds.length === 0) return { projects: [], recentComments: [] };
+  const projectRows = await fetchOperationsProjectRows(client, organizationIds);
+  const projects = toProjectSummaries(projectRows);
+  if (projects.length === 0) return { projects, recentComments: [] };
+  const projectById = new Map(projects.map((project) => [project.id, project]));
+  const [memberNameById, commentRows] = await Promise.all([
+    fetchOrganizationMemberNames(client, organizationIds),
+    fetchRecentCommentRows(client, projects.map((project) => project.id), 20)
+  ]);
+  const recentComments = commentRows.flatMap((row) => {
+    const project = projectById.get(row.project_id);
+    if (!project) return [];
+    return [{
+      id: row.id,
+      projectId: row.project_id,
+      projectTitle: project.title,
+      authorName: memberNameById.get(row.author_member_id) ?? "メンバー",
+      body: row.body,
+      createdAt: row.created_at
+    }];
+  });
+  return { projects, recentComments };
+}
+
 async function fetchOrganizationMemberNames(client: SupabaseClient, organizationIds: string[]): Promise<Map<string, string>> {
   if (organizationIds.length === 0) return new Map();
   const { data, error } = await client
@@ -203,7 +240,7 @@ async function fetchSessionRows(client: SupabaseClient, projectIds: string[], fr
   if (projectIds.length === 0) return [];
   const { data, error } = await client
     .from("team_works_op_sessions")
-    .select("id,project_id,session_date,start_time,duration_min,status,partner_member_id")
+    .select("id,project_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,partner_presence_status")
     .in("project_id", projectIds)
     .gte("session_date", fromKey)
     .lte("session_date", toKey)
@@ -218,6 +255,10 @@ async function fetchSessionRows(client: SupabaseClient, projectIds: string[], fr
     duration_min: number;
     status: "scheduled" | "completed" | "cancelled";
     partner_member_id: string | null;
+    zoom_url: string | null;
+    zoom_meeting_id: string | null;
+    zoom_passcode: string | null;
+    partner_presence_status: "not_started" | "standby" | "in_progress" | "ended";
   }[];
 }
 
@@ -292,7 +333,7 @@ async function fetchRecentCommentRows(client: SupabaseClient, projectIds: string
 }
 
 function assembleEvent(
-  row: { id: string; project_id: string; session_date: string; start_time: string; duration_min: number; status: "scheduled" | "completed" | "cancelled"; partner_member_id: string | null },
+  row: { id: string; project_id: string; session_date: string; start_time: string; duration_min: number; status: "scheduled" | "completed" | "cancelled"; partner_member_id: string | null; zoom_url: string | null; zoom_meeting_id: string | null; zoom_passcode: string | null; partner_presence_status: "not_started" | "standby" | "in_progress" | "ended" },
   projectById: Map<string, OperationsProjectSummary>,
   memberNameById: Map<string, string>,
   rosterCounts: Map<string, number>
@@ -310,6 +351,10 @@ function assembleEvent(
     durationMin: row.duration_min,
     partnerName: row.partner_member_id ? memberNameById.get(row.partner_member_id) ?? "担当未設定" : null,
     participantCount: rosterCounts.get(row.id) ?? 0,
+    zoomUrl: row.zoom_url,
+    zoomMeetingId: row.zoom_meeting_id,
+    zoomPasscode: row.zoom_passcode,
+    partnerPresenceStatus: row.partner_presence_status ?? "not_started",
     status: row.status
   };
 }
@@ -324,6 +369,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
     monthHolidays: [],
     todayEvents: [],
     needsAttentionUnassigned: [],
+    upcomingEvents: [],
     recentComments: []
   };
 
@@ -344,18 +390,19 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
   const today = new Date();
   const todayKey = formatDateKey(today);
   const attentionEndKey = formatDateKey(addDays(today, 6));
+  const upcomingEndKey = formatDateKey(addDays(today, 60));
 
-  const [memberNameById, sessionRows, holidayRows, unassignedRows, commentRows] = await Promise.all([
+  const [memberNameById, sessionRows, holidayRows, unassignedRows, upcomingRows, commentRows] = await Promise.all([
     fetchOrganizationMemberNames(client, organizationIds),
     fetchSessionRows(client, projectIds, gridStartKey, gridEndKey),
     fetchHolidayRows(client, organizationIds, projectIds, gridStartKey, gridEndKey),
     fetchUnassignedUpcomingSessionRows(client, projectIds, todayKey, attentionEndKey),
+    fetchSessionRows(client, projectIds, todayKey, upcomingEndKey),
     fetchRecentCommentRows(client, projectIds, 6)
   ]);
 
   const sessionIds = sessionRows.map((row) => row.id);
-  const unassignedIds = unassignedRows.map((row) => row.id);
-  const rosterCounts = await fetchRosterCounts(client, [...sessionIds, ...unassignedIds]);
+  const rosterCounts = await fetchRosterCounts(client, [...new Set([...sessionIds, ...unassignedRows.map((row) => row.id), ...upcomingRows.map((row) => row.id)])]);
 
   const monthEvents = sessionRows
     .filter((row) => row.status !== "cancelled")
@@ -375,11 +422,20 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
     })
     .sort((a, b) => (a.sessionDate + a.startTime).localeCompare(b.sessionDate + b.startTime));
 
+  const upcomingEvents = upcomingRows
+    .filter((row) => row.status === "scheduled")
+    .flatMap((row) => {
+      const event = assembleEvent(row, projectById, memberNameById, rosterCounts);
+      return event ? [event] : [];
+    })
+    .slice(0, 3);
+
   const recentComments: RecentOperationsComment[] = commentRows.flatMap((row) => {
     const project = projectById.get(row.project_id);
     if (!project) return [];
     return [{
       id: row.id,
+      projectId: row.project_id,
       projectTitle: project.title,
       authorName: memberNameById.get(row.author_member_id) ?? "メンバー",
       body: row.body,
@@ -395,6 +451,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
     monthHolidays: holidayRows,
     todayEvents,
     needsAttentionUnassigned,
+    upcomingEvents,
     recentComments
   };
 }
@@ -403,7 +460,7 @@ async function fetchUnassignedUpcomingSessionRows(client: SupabaseClient, projec
   if (projectIds.length === 0) return [];
   const { data, error } = await client
     .from("team_works_op_sessions")
-    .select("id,project_id,session_date,start_time,duration_min,status,partner_member_id")
+    .select("id,project_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,partner_presence_status")
     .in("project_id", projectIds)
     .is("partner_member_id", null)
     .eq("status", "scheduled")
@@ -420,6 +477,10 @@ async function fetchUnassignedUpcomingSessionRows(client: SupabaseClient, projec
     duration_min: number;
     status: "scheduled" | "completed" | "cancelled";
     partner_member_id: string | null;
+    zoom_url: string | null;
+    zoom_meeting_id: string | null;
+    zoom_passcode: string | null;
+    partner_presence_status: "not_started" | "standby" | "in_progress" | "ended";
   }[];
 }
 

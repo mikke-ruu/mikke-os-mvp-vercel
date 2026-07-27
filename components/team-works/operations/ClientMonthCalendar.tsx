@@ -2,7 +2,18 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { OperationsClientHoliday, OperationsClientSession } from "@/lib/team-works-operations-client";
+
+type CalendarSession = {
+  id: string;
+  projectId: string;
+  sessionDate: string;
+  startTime: string;
+  status: string;
+};
+
+type CalendarHoliday = {
+  date: string;
+};
 
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -37,8 +48,8 @@ export function ClientMonthCalendar({
   selectedDate,
   onSelectDate
 }: {
-  sessions: OperationsClientSession[];
-  holidays: OperationsClientHoliday[];
+  sessions: CalendarSession[];
+  holidays: CalendarHoliday[];
   selectedDate: string | null;
   onSelectDate: (dateKey: string) => void;
 }) {
@@ -53,7 +64,7 @@ export function ClientMonthCalendar({
   );
 
   const sessionsByDate = useMemo(() => {
-    const result = new Map<string, OperationsClientSession[]>();
+    const result = new Map<string, CalendarSession[]>();
     for (const session of sessions) {
       if (session.status === "cancelled") continue;
       result.set(session.sessionDate, [...(result.get(session.sessionDate) ?? []), session]);
@@ -62,7 +73,7 @@ export function ClientMonthCalendar({
   }, [sessions]);
 
   const holidaysByDate = useMemo(() => {
-    const result = new Map<string, OperationsClientHoliday[]>();
+    const result = new Map<string, CalendarHoliday[]>();
     for (const holiday of holidays) {
       result.set(holiday.date, [...(result.get(holiday.date) ?? []), holiday]);
     }

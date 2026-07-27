@@ -1,15 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { LoaderCircle, Mail, UserCog } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Clipboard, LoaderCircle, Mail, UserCog, UserPlus } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { TeamWorksOperationsShell } from "@/components/team-works/operations/TeamWorksOperationsShell";
+import { TeamWorksProjectField, teamWorksProjectInputClass } from "@/components/team-works/projects/TeamWorksProjectsShell";
 import { supabase } from "@/lib/supabase/client";
 import {
   archiveOperationsOrganizationMember,
+  createOperationsStaffInvite,
+  loadOperationsOrganizationProfile,
   loadOperationsOrganizationMembers,
+  updateOperationsOrganizationProfile,
+  type OperationsOrganizationProfile,
   type OperationsOrganizationMemberEntry
 } from "@/lib/team-works-operations-project";
 
@@ -23,6 +28,12 @@ function roleLabel(role: string) {
 
 function TeamWorksSettingsContent() {
   const [members, setMembers] = useState<OperationsOrganizationMemberEntry[]>([]);
+  const [organization, setOrganization] = useState<OperationsOrganizationProfile | null>(null);
+  const [organizationForm, setOrganizationForm] = useState({ name: "", email: "", phone: "", address: "" });
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteUrl, setInviteUrl] = useState("");
+  const [savingOrganization, setSavingOrganization] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -32,7 +43,18 @@ function TeamWorksSettingsContent() {
     setLoading(true);
     setError("");
     try {
-      setMembers(await loadOperationsOrganizationMembers(supabase));
+      const [memberRows, organizationProfile] = await Promise.all([
+        loadOperationsOrganizationMembers(supabase),
+        loadOperationsOrganizationProfile(supabase)
+      ]);
+      setMembers(memberRows);
+      setOrganization(organizationProfile);
+      if (organizationProfile) setOrganizationForm({
+        name: organizationProfile.name,
+        email: organizationProfile.email ?? "",
+        phone: organizationProfile.phone ?? "",
+        address: organizationProfile.address ?? ""
+      });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "組織メンバーを読み込めませんでした。");
     } finally {
@@ -43,6 +65,42 @@ function TeamWorksSettingsContent() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  async function saveOrganization(event: FormEvent) {
+    event.preventDefault();
+    if (!organization) return;
+    setSavingOrganization(true);
+    setMessage("");
+    setError("");
+    try {
+      await updateOperationsOrganizationProfile(supabase, { id: organization.id, ...organizationForm });
+      setMessage("企業情報を保存しました。");
+      await reload();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "企業情報を保存できませんでした。");
+    } finally {
+      setSavingOrganization(false);
+    }
+  }
+
+  async function createInvite(event: FormEvent) {
+    event.preventDefault();
+    setInviting(true);
+    setMessage("");
+    setError("");
+    try {
+      const invite = await createOperationsStaffInvite(supabase, inviteEmail);
+      const url = new URL(`/apps/team-works/invite/${invite.id}`, window.location.origin);
+      url.searchParams.set("organization", invite.organizationId);
+      url.searchParams.set("role", invite.role);
+      setInviteUrl(url.toString());
+      setMessage("本部メンバーの招待リンクを作成しました。");
+    } catch (inviteError) {
+      setError(inviteError instanceof Error ? inviteError.message : "招待リンクを作成できませんでした。");
+    } finally {
+      setInviting(false);
+    }
+  }
 
   async function archive(member: OperationsOrganizationMemberEntry) {
     if (!window.confirm(`${member.displayName}さん（${roleLabel(member.role)}）をアーカイブしますか？\n過去の予定・報告・支払などの記録は残ります。同じメールアドレスで新しい招待を受け直せるようになります。`)) return;
@@ -63,9 +121,28 @@ function TeamWorksSettingsContent() {
   return (
     <TeamWorksOperationsShell title="企業設定" subtitle="組織メンバーの管理">
       <div className="space-y-5">
+        <MikkeSection title="企業情報" tone="editorial">
+          <form onSubmit={saveOrganization} className="grid gap-3 sm:grid-cols-2">
+            <TeamWorksProjectField label="企業名" required><input value={organizationForm.name} onChange={(event) => setOrganizationForm({ ...organizationForm, name: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
+            <TeamWorksProjectField label="代表メール"><input type="email" value={organizationForm.email} onChange={(event) => setOrganizationForm({ ...organizationForm, email: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
+            <TeamWorksProjectField label="電話番号"><input value={organizationForm.phone} onChange={(event) => setOrganizationForm({ ...organizationForm, phone: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
+            <TeamWorksProjectField label="住所"><input value={organizationForm.address} onChange={(event) => setOrganizationForm({ ...organizationForm, address: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
+            <div className="sm:col-span-2"><button disabled={savingOrganization || !organization} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{savingOrganization ? "保存中…" : "企業情報を保存"}</button></div>
+          </form>
+        </MikkeSection>
+
+        <MikkeSection title="本部メンバーを招待" tone="editorial">
+          <p className="-mt-2 mb-3 text-xs leading-6 text-[var(--mikke-muted)]">この本部のホーム・プロジェクト・名簿を管理できるマネージャーを招待します。</p>
+          <form onSubmit={createInvite} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+            <TeamWorksProjectField label="メールアドレス" required><input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
+            <button disabled={inviting || !inviteEmail.trim()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"><UserPlus size={15} />{inviting ? "作成中…" : "招待リンクを作成"}</button>
+          </form>
+          {inviteUrl ? <div className="mt-3 flex gap-2"><input readOnly value={inviteUrl} className={teamWorksProjectInputClass} /><button type="button" onClick={() => void navigator.clipboard.writeText(inviteUrl)} className="shrink-0 rounded-xl border border-[var(--mikke-line)] px-3 text-xs font-bold"><Clipboard size={15} /></button></div> : null}
+        </MikkeSection>
+
         <MikkeSection title="組織メンバー" tone="editorial">
           <p className="-mt-2 text-xs leading-6 text-[var(--mikke-muted)]">
-            この組織に登録されている全メンバー（役割問わず）です。招待を受け直せない・ログインできないなどの不具合が出た場合、対象をアーカイブすると同じメールアドレスで新しい招待を受け直せます。過去の予定・報告・支払などの記録は保持されます。オーナーはアーカイブできません。
+            ここに表示されるのは現在アクティブなメンバーです。アーカイブすると本部・各ポータルへのアクセスを止めてこの一覧から隠しますが、過去の予定・報告・支払記録は保持します。同じメールアドレスで再招待できます。オーナーはアーカイブできません。
           </p>
           {message ? <p role="status" className="mt-3 text-xs font-bold text-[var(--mikke-primary)]">{message}</p> : null}
           {error ? <p role="alert" className="mt-3 text-xs font-bold text-red-600">{error}</p> : null}
@@ -91,6 +168,7 @@ function TeamWorksSettingsContent() {
                       <span className="mt-2 inline-block rounded-full bg-[var(--mikke-primary-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--mikke-primary)]">
                         {roleLabel(member.role)}
                       </span>
+                      <span className="ml-2 mt-2 inline-block rounded-full bg-[var(--mikke-green)] px-2.5 py-1 text-[10px] font-bold">アクティブ</span>
                     </div>
                     {member.role === "owner" ? null : (
                       <button

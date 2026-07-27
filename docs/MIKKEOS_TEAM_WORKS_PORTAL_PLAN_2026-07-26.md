@@ -292,6 +292,14 @@ where email='info.jsparts@gmail.com';
   - `CalendarSessionEditor`・`ProjectCalendarPanel`の予定詳細・パートナーポータル`SessionCard`・クライアントポータルのセッション詳細に、Zoomリンク表示＋「この回だけ変更」の上書き入力（本部/パートナーは編集可、クライアントは表示のみ）。
 - 注意: `partner_member_id`同様、session編集は`updateOperationsSession`経由。RLSは既存のsession update（本部＋担当worker）を流用でzoom上書きも通る（列追加のみでポリシー変更不要のはず・要確認）。
 
+#### W2 実装記録（2026-07-27 codex）
+
+- **ローカル実装済み・migration実行／実機確認待ち**: `20260727110000_team_works_project_and_session_zoom.sql`を追加。project既定とsessionスナップショットにURL／ミーティングID／パスコードを保持し、各sessionに「プロジェクト既定を使用」状態を持たせた。
+- 本部のプロジェクト設定に既定Zoomフォーム、各予定編集に「この回のZoom」フォームを追加。パートナーは担当する未来の回だけ上書き／既定へ戻す操作ができ、クライアントは予定詳細から表示・参加のみ。
+- 「過去回の番号は書き換えない」を保証するため、既定変更時に更新するのは未来かつ既定使用中のsessionだけ。過去sessionのZoom更新は認可RPC側でも拒否する。
+- RLS確認結果: 既存`team_works_op_sessions_update`はstaff限定だった。worker向けにテーブルUPDATE policyを広げると日時・担当・statusまで更新可能になるため、Zoom列だけを書き換える認可付きRPCを追加。関数のPUBLIC実行権限はrevokeし、authenticatedだけへgrant。
+- 検証: `npm.cmd run lint`（`tsc --noEmit`）success、`git diff --check` success。ローカルDockerが起動していないためmigrationのDB適用テストは未実施。本番・リモートDBへの適用は未実施。
+
 ### W3: 名簿グループをクライアントへ移管（migration小）
 
 あゆみ「本部ではグループ分けしない。クライアントポータル側でグループを作れるように。名簿追加(紙ベース入力)は本部でも可のまま」。
@@ -299,6 +307,14 @@ where email='info.jsparts@gmail.com';
 - クライアントポータル [TeamWorksOperationsClientPortal.tsx](../components/team-works/operations/TeamWorksOperationsClientPortal.tsx)の`ProjectRosterTab`に、グループ作成＋生徒へのグループ割当UIを追加。
 - lib [lib/team-works-operations-client.ts](../lib/team-works-operations-client.ts): `loadOperationsClientPortal`に`groups[]`（team_works_groups）とparticipant.groupIdを追加。`saveOperationsClientParticipant`に`groupId`を追加。新規`saveOperationsClientGroup`（グループ作成/リネーム）。
 - migration（RLS・あゆみSQL Editor実行待ち）: `team_works_groups`のinsert/updateが現状**本部staffのみ**（[20260724060000](../supabase/migrations/20260724060000_team_works_r1_operations_foundation.sql):223-227）。client（`private.team_works_has_project_role(project_id,'client')`＝[20260726190000](../supabase/migrations/20260726190000_team_works_r6_multi_role_rls.sql)の新ヘルパー）にもgroups insert/updateを許可するポリシーを追加。participant.group_idのclient更新は既存のclient participant updateポリシーで通るか要確認（通らなければgroup_id更新を許すよう調整）。
+
+#### W3 実装記録（2026-07-27 codex）
+
+- **ローカル実装済み・migration実行／実機確認待ち**: `20260727120000_team_works_client_roster_groups.sql`で、既存staff権限を維持しつつclient project roleへgroupsのinsert/updateを許可。
+- 本部名簿から「グループ追加」を撤去。グループ表示と紙名簿からの対象者追加は維持し、既存グループへの任意割当も残した。
+- クライアントポータル名簿にグループ追加／名前変更を追加。対象者の新規登録・編集時にグループを選択でき、一覧にも所属グループを表示。
+- `team_works_participants`のclient update policyは既に行全体のupdateを許可し、`(group_id, project_id)`複合FKもあるため、追加policyなしで安全に同一プロジェクト内のgroup_idを更新できることを確認。
+- 検証: `npm.cmd run lint`（`tsc --noEmit`）success、`git diff --check` success。本番・リモートDBへの適用は未実施。
 
 ### W4: マニュアル表示方式＋プロジェクト設定拡充（設計先行・段階実装）
 
@@ -309,6 +325,13 @@ where email='info.jsparts@gmail.com';
 - パートナーポータル [TeamWorksOperationsPartnerPortal.tsx](../components/team-works/operations/TeamWorksOperationsPartnerPortal.tsx)の`SessionCard`: 現状は生徒ごとに`currentManualNo`の1件だけ表示。これを**マニュアル番号のタブ（例: No.5 / No.6 / No.7…＝担当生徒たちの進捗レンジ）**で切替表示に。各タブで本文＋リンク＋質問/表現/注意を表示。生徒カードから「この生徒の番号へジャンプ」も。
 - migration: `team_works_manuals`に`body text`追加のみ（RLSは既存のmanuals select=本部＋workerのままで足りる。clientには従来通り非表示）。
 
+#### W4-1 実装記録（2026-07-27 codex）
+
+- **ローカル実装済み・migration実行／実機確認待ち**: `20260727130000_team_works_manual_body.sql`で`team_works_manuals.body text`を追加。
+- 本部Manualsで番号・タイトル・本文・教材リンクの新規追加と既存マニュアル編集を実装。既存の質問・表現・注意事項は編集時も保持する。
+- パートナーの各sessionに、担当生徒の`current_manual_no`最小〜最大範囲を基準にしたNo.タブを追加。本文・教材リンク・質問・表現・注意事項を1つのセクションで切替表示し、生徒カードから対象No.へ移動できる。
+- client向けquery/UIにはmanual bodyを追加しておらず、従来どおりクライアント非表示。
+
 **W4-2 プロジェクト設定の拡充**
 現状`ProjectSettingsTab`=説明＋契約期間＋クライアント招待。以下を段階追加:
 - **(a) クライアント情報の表示**（今回実装対象）: 割当済みclientメンバーの氏名/メール/会社名を`ProjectSettingsTab`に表示（`loadOperationsProjectMembers`のclient行＋directory名から。read中心）。migration不要。
@@ -316,6 +339,29 @@ where email='info.jsparts@gmail.com';
 - **(c) 規約同意を承認フローに**（次段）: クライアント承認（`team_works_approve_client_project`）の前に「ポータル利用規約に同意」を必須化。規約テキスト（org単位で保持）＋同意記録（いつ/どの版に同意したか）を新テーブル`team_works_terms_acceptances`等で。承認RPC/`PendingApprovals`UIに同意チェックを追加。→[[teamworks-school-field]]末尾の「規約同意はいつ・どの版に同意したか記録」方針と整合。設計のみ先行、実装は7/28運用後で可。
 - **(d) 請求書作成**（将来）: 毎月の請求レコード作成フォーム＋PDF出力。既存`InvoicesTab`は読み取り専用なので、作成UI＋（将来）PDF。会計連携ではなく現場確認用の簡易版。あゆみ「すぐでなくて良い」。
 - **追加アイデア（提案）**: ①契約終了時のプロジェクトアーカイブ実行ボタン（`ContractTab`に確認ダイアログ付きで。現状は「本番確認フローと合わせて追加」と保留中）②本部窓口担当（クライアントから見た連絡先名）の設定③P4ポータルカスタム（呼び名ラベル）との合流。
+
+#### W4-2(a) 実装記録（2026-07-27 codex）
+
+- **ローカル実装済み・migration不要・実機確認待ち**: 本部のプロジェクト設定に「クライアント情報」を追加し、割当済みclientの氏名・メール・状態・クライアント台帳の会社／補足を表示。
+- 現行`team_works_clients`には会社名専用列がないため、今回は既存`note`を「会社・補足」として表示。契約書URL・規約同意・請求書作成は計画どおり未着手。
+- W2〜W4全体検証: `npm.cmd run lint`（`tsc --noEmit`）success、`git diff --check` success。migration 3本はローカルファイルのみで、本番・リモートDBへ未適用。
+- **migration未適用のローカル表示互換（2026-07-27追加）**: 新しいZoom列／manual body列がPostgRESTにまだ無い場合は旧selectへ自動フォールバックする。これにより既存のプロジェクト詳細・パートナー・クライアント画面は開ける。新項目の保存と実データ表示はmigration適用後に有効化される。
+
+#### W2〜W4 DB反映・保存確認（2026-07-27 codex）
+
+- 開発用Supabase `mikke-os-dev`へ `team_works_project_and_session_zoom`、`team_works_client_roster_groups`、`team_works_manual_body` を順番に適用。Zoom 8列、保存RPC 2本、manual body列、groups insert/updateポリシーの存在を確認。
+- Zoom保存RPCは`authenticated`のみ実行可、`anon`は実行不可。既定Zoomを空値のまま保存し、画面の成功メッセージまで実機確認（既存の実データは変更なし）。
+- マニュアルは確認用1件を本部画面から追加できることを確認し、確認後にその1件だけ削除。再読込後に確認データが残っていないことも確認。
+- プロジェクト設定内で横いっぱいに伸びていた「Zoom既定を保存」を、説明・契約期間と同じ内容幅へ修正。モバイル下部メニューの重複URLも新規作成画面へ修正。
+- 検証: `npm.cmd run lint`（`tsc --noEmit`）success、`git diff --check` success。テーマ別ボタン色は保存不具合と切り分け、次の共通UIトークン調整として扱う。
+
+#### 本部概要・クライアント表示調整（2026-07-27 codex）
+
+- 概要カレンダーとUpcomingに各回のZoom IDを表示。Zoom URLがある回は予定詳細から直接開ける。
+- 今日の予定、今週のコマ、パートナー、対象者、Upcoming、Messages、Reportsを、それぞれ対応するプロジェクト内タブへ遷移するボタンに変更。
+- プロジェクト設定の「クライアント情報」は、停止・アーカイブを除外してactiveのみ表示。
+- `info.jsparts@gmail.com`のPending 1件をDB照合。同じプロジェクトにactiveのクライアント割当と過去のaccepted招待が存在するため、現在の有効クライアント本体ではなく重複した未処理招待。画面の「削除」でrevokeしてよいが、この確認時点ではDB変更していない。
+- 実機確認: Zoom ID表示、Upcoming→スケジュール、Message行→メッセージ、activeクライアント1件表示をlocalhostで確認。`npm.cmd run lint`（`tsc --noEmit`）success、`git diff --check` success。
 
 ### 実装順の推奨（節約優先・7/28運用重視）
 1. **W1（3点・migration不要）**を最初に一括（すぐ効く・リスク低）。
@@ -326,3 +372,65 @@ where email='info.jsparts@gmail.com';
 
 ### 検証（各Wごと）
 `npm.cmd run lint`→あゆみ実機。W2/W3/W4はmigrationをあゆみがSQL Editorで実行後にコード前提化。あゆみ確認→無関係変更を除外して`git add`→コミット→push（Vercel自動デプロイ）。
+
+#### 本部管理・プロフィール基盤の追加調整（2026-07-27 codex）
+
+- プロジェクトのパートナータブから`Unassigned`を撤去。担当未定コマは本部ホームのNeeds attentionと総合スケジュールで管理し、パートナータブは人物情報・参加依頼・報酬設定に限定。
+- プロジェクト設定へプロジェクト名の編集・保存を追加。
+- 本部ホームでFinance、Messages、Today、Needs attention、今後3件の予定を対応画面へリンク。予定にはZoom IDを表示。
+- 総合スケジュールから「次の4週間分のコマを生成」を撤去し、日付ボックス＋コンパクトな時系列一覧へ整理。各行は対象プロジェクトのスケジュールタブを開く。
+- プロジェクト管理を運営型の日本語レッスン専用に整理。「新規立ち上げ＋既存一覧」を共通の本部左メニュー内に統合し、納品型・テンプレートジェネレーターの混在表示を保留。
+- `20260727005537_team_works_directory_profiles_manual_scope.sql`を開発Supabaseへ適用。
+  - パートナー本人: 名前／電話／住所／スキル／自己紹介。
+  - クライアント本人: 企業名／担当者／部署／メール／電話／住所。
+  - ログインメール＋activeロールが一致する本人行だけを取得・更新する認可RPCを追加。`anon`実行権限はrevoke、`authenticated`だけへgrant。
+  - 企業情報: 企業名／代表メール／電話／住所。
+  - マニュアル: `project`（プロジェクト限定）／`organization`（組織共有マスター）の共有範囲。
+- 本部のパートナー／クライアント管理に本人入力結果を表示。企業設定に企業情報フォーム、本部マネージャー招待リンク作成、アクティブ／アーカイブの説明を追加。
+- マニュアル管理を実装し、プロジェクト別一覧、各プロジェクトの編集タブへのリンク、組織共有チェックを追加。共有は「他プロジェクトへ複製して使うマスター」として扱い、プロジェクト固有の編集内容を意図せず同期しない。
+- クライアントの追加提案: 請求書段階で「請求先名・請求先メール・締日」を別項目として追加する。通常の担当者情報と請求担当を分けられるため、今回の基本プロフィールには混ぜない。
+- 実機確認: 本部ホームのZoom ID／3予定／リンク、プロジェクト作成＋一覧、総合スケジュール、プロジェクト名フォーム、企業設定、マニュアル一覧をlocalhostで確認。`npm.cmd run lint`（`tsc --noEmit`）success。
+
+#### 実機フィードバック微調整（2026-07-27 codex）
+
+- 総合スケジュールの日付欄をPC・スマホ共通の固定88px列／高さ56pxカードへ変更。予定行も最小高さ72pxへ揃え、スマホで日付カードだけ横長になる配置を廃止。
+- クライアントの企業・担当者情報フォームをポータル上部から撤去し、総合ホーム最下部の折り畳みへ移動。
+- パートナー／クライアントのプロフィール保存結果を、フォーム下の離れた文章ではなく保存ボタン横のチェック付きステータスへ変更。失敗時は赤いエラー表示に切り替える。
+- 検証: `npm.cmd run lint` success。localhostの総合スケジュールを目視確認し、日付カードと予定行の整列を確認。
+
+#### 予定時刻・総合メッセージ管理（2026-07-27 codex）
+
+- 予定編集の「所要時間（分）」を終了時間のtime入力へ変更。開始／終了を同じUIで入力し、保存時に内部の`duration_min`へ自動変換するためmigration不要。
+- カレンダーからの新規予定追加も「開始時間／終了時間」に統一。日をまたぐ入力は翌日の終了時刻として計算する。
+- 本部左メニューの「スケジュール管理」直下へ「メッセージ管理」を追加。
+- `/apps/team-works/messages`を新設し、左カラムに全プロジェクト、右カラムに直近20件の新着メッセージを表示。各行から対象プロジェクトのメッセージタブへ遷移する。
+- 検証: `npm.cmd run lint` success。localhostでメッセージ管理の2カラム／リンク、予定編集の開始13:00・終了14:00入力を確認。
+
+#### パートナー・レッスン操作卓（2026-07-27 codex）
+
+- パートナーポータルを「全コマを縦に展開」から「選択中の1レッスンを操作」に再構成。担当予定は上部セレクトで切替え、PCでは左に出席順名簿、右に選択中の生徒の進捗マニュアルを固定表示する。
+- レッスン上部にスタンバイ／開始／Zoom起動／終了を集約。`team_works_op_sessions.partner_presence_status`と時刻列を追加し、本部ホームとプロジェクト内スケジュールにもスタンバイ・実施中・終了を表示する。
+- 生徒は既存`order_index`順。1人だけ展開し、出欠、受け答え・理解度・発話の自信（各5段階）、次回担当への引継ぎを保存できる。
+- 「この生徒を完了して次へ」で、初回だけ`current_manual_no`を1つ進め、次の未完了生徒を自動選択。完了済み行の再保存では進捗を二重加算しない。
+- Zoom設定、参加依頼、生徒別記録、レッスン全体報告の成功／失敗は、各ボタン横へチェック／エラーアイコン付きで表示。クライアントポータルも出席順、グループ、名簿、メッセージの保存結果を各ボタン横へ移動。
+- migration `20260727022357_team_works_partner_lesson_console.sql`を開発Supabaseへ適用。2本の更新RPCは割当済みworker本人だけを関数内で照合し、`anon`権限をrevoke、`authenticated`と`service_role`だけへgrant。
+- 検証: 開発DBで6列とRPC権限を確認。`npm.cmd run lint`、`git diff --check`、`npm.cmd run build` success。ブラウザの未ログイン空状態を確認（実データ入りパートナーアカウントでの操作確認は次の実機確認）。
+
+#### パートナーポータル情報設計・独立レッスン画面（2026-07-27 codex）
+
+- 通常のパートナーポータルをクライアントポータルと同じ階層へ再編。上段を「総合ホーム／プロジェクト名」タブ、プロジェクト内を「カレンダー／スケジュール」タブとした。旧「運営業務／プロジェクト」のモード切替は通常運営画面から撤去。
+- 総合ホームは全担当プロジェクトの月間カレンダー、本日の担当、次回レッスン、30日以内の件数を表示。プロジェクト別画面はそのプロジェクトの担当コマだけを表示する。
+- 各予定の「レッスン画面」から`/apps/team-works/portal/worker/lesson/[sessionId]`を別窓で開く。アプリメニュー、プロフィール、他プロジェクト等を載せず、レッスン進行だけに限定。
+- 独立画面は画面全体を`100dvh`に固定。PC広幅は名簿／マニュアルの2列、Zoom横の半幅・タブレット・スマホは「選択中の生徒・タイマー・出席順」を上部へ常設し、その下に進捗マニュアルを常時表示する。記録フォームだけを下から開くため、画面切替やページ全体スクロールでタイマー／マニュアルを見失わない。
+- 生徒ごとにローカル目安タイマーを追加。1人あたりの目安は`コマ時間÷名簿人数`、スタート／一時停止／再開／リセットはパートナーが任意操作する。休憩を含む厳密な勤怠時計には使わず、レッスン中の配分目安とする。
+- マニュアル見出し（選択中生徒名・現在No.）を固定し、登録済みNo.を横タブで任意切替できるようにした。生徒の正本進捗は「完了」でのみ更新され、タブ閲覧だけでは変わらない。
+- 画像で確認された生徒記録の保存失敗は、RPCの戻り値`current_manual_no`とUPDATE列名の曖昧参照が原因。`20260727031109_team_works_partner_handoff_rpc_fix.sql`で列をテーブルalias付きへ修正し、開発Supabaseへ適用。失敗した操作はトランザクション全体がロールバックされており、途中データは残っていない。
+- エラー表示はPostgRESTのplain objectからも具体的なmessageを取得するよう修正。DB関数定義のalias反映、`anon=false`／`authenticated=true`を確認。
+- 検証: `npm.cmd run lint`、`git diff --check`、`npm.cmd run build` success。build routeに独立レッスン画面を確認。
+
+#### 狭幅レッスン画面の一画面化（2026-07-27 codex）
+
+- 下部の「名簿・記録／マニュアル」切替を撤去し、マニュアルを常時表示へ変更。
+- 上部のコンパクト操作帯に、選択中の生徒、進捗No.、1人あたりの目安、経過タイマー、開始／停止／再開／リセットを固定。
+- 出席順の生徒チップを横スクロールで常設。生徒を選ぶとタイマーをリセットし、その生徒の現在マニュアルへ連動する。
+- 「記録を開く」で評価・出欠・引継ぎを下部ドロワー表示。保存後や「完了して次へ」後は同じ位置のマニュアルへ戻り、次の生徒を自動選択する。

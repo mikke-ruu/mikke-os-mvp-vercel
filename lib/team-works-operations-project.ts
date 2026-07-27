@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { resolveStaffOrganizationIds } from "@/lib/team-works-operations";
+import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
+import { fetchOperationsProjects, resolveStaffOrganizationIds } from "@/lib/team-works-operations";
 
 export type OperationsProject = {
   id: string;
@@ -13,6 +14,9 @@ export type OperationsProject = {
   payoutsEnabled: boolean;
   invoicesEnabled: boolean;
   clientPartnerContactVisible: boolean;
+  zoomUrl: string | null;
+  zoomMeetingId: string | null;
+  zoomPasscode: string | null;
 };
 
 export type OperationsGroup = {
@@ -36,6 +40,7 @@ export type OperationsManual = {
   id: string;
   no: number;
   title: string;
+  body: string | null;
   materialType: "none" | "link" | "file";
   materialUrl: string | null;
   questions: unknown[];
@@ -43,6 +48,7 @@ export type OperationsManual = {
   cautions: string | null;
   status: string;
   sourceTemplateManualId: string | null;
+  sharingScope: "project" | "organization";
 };
 
 export type OperationsPartner = {
@@ -69,6 +75,11 @@ export type OperationsProjectSession = {
   status: string;
   partnerMemberId: string | null;
   partnerName: string | null;
+  zoomUrl: string | null;
+  zoomMeetingId: string | null;
+  zoomPasscode: string | null;
+  zoomUsesProjectDefault: boolean;
+  partnerPresenceStatus: "not_started" | "standby" | "in_progress" | "ended";
   roster: {
     id: string;
     participantId: string;
@@ -143,6 +154,10 @@ export type OperationsPartnerDirectoryEntry = {
   displayName: string;
   email: string;
   note: string | null;
+  phone: string | null;
+  address: string | null;
+  skills: string | null;
+  bio: string | null;
   status: string;
 };
 
@@ -159,6 +174,9 @@ type ProjectRow = {
   payouts_enabled: boolean;
   invoices_enabled: boolean;
   client_partner_contact_visible: boolean;
+  zoom_url: string | null;
+  zoom_meeting_id: string | null;
+  zoom_passcode: string | null;
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -177,22 +195,36 @@ export async function loadOperationsProjectDetail(
 ): Promise<OperationsProjectDetailData | null> {
   if (!isDatabaseProjectId(projectId)) return null;
 
-  const projectResult = await client
+  let projectResult = await client
     .from("team_works_projects")
     .select(
-      "id,organization_id,title,description,status,style,contract_started_on,contract_ended_on,client_visible,payouts_enabled,invoices_enabled,client_partner_contact_visible"
+      "id,organization_id,title,description,status,style,contract_started_on,contract_ended_on,client_visible,payouts_enabled,invoices_enabled,client_partner_contact_visible,zoom_url,zoom_meeting_id,zoom_passcode"
     )
     .eq("id", projectId)
     .maybeSingle();
+  if (projectResult.error && isMissingSupabaseField(projectResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode"])) {
+    projectResult = await client
+      .from("team_works_projects")
+      .select("id,organization_id,title,description,status,style,contract_started_on,contract_ended_on,client_visible,payouts_enabled,invoices_enabled,client_partner_contact_visible")
+      .eq("id", projectId)
+      .maybeSingle() as typeof projectResult;
+  }
   if (projectResult.error) throw projectResult.error;
-  const projectRow = projectResult.data as ProjectRow | null;
+  const projectRow = projectResult.data
+    ? {
+        ...(projectResult.data as Omit<ProjectRow, "zoom_url" | "zoom_meeting_id" | "zoom_passcode">),
+        zoom_url: (projectResult.data as Partial<ProjectRow>).zoom_url ?? null,
+        zoom_meeting_id: (projectResult.data as Partial<ProjectRow>).zoom_meeting_id ?? null,
+        zoom_passcode: (projectResult.data as Partial<ProjectRow>).zoom_passcode ?? null
+      }
+    : null;
   if (!projectRow || projectRow.style !== "operations") return null;
   const staffOrganizationIds = await resolveStaffOrganizationIds(client);
   if (!staffOrganizationIds.includes(projectRow.organization_id)) {
     throw new Error("この運営型プロジェクトの本部画面を開く権限がありません。");
   }
 
-  const [
+  let [
     groupResult,
     participantResult,
     manualResult,
@@ -220,7 +252,7 @@ export async function loadOperationsProjectDetail(
       .order("name"),
     client
       .from("team_works_manuals")
-      .select("id,no,title,material_type,material_url,questions,expressions,cautions,status,source_template_manual_id")
+      .select("id,no,title,body,material_type,material_url,questions,expressions,cautions,status,source_template_manual_id,sharing_scope")
       .eq("project_id", projectId)
       .is("archived_at", null)
       .order("no"),
@@ -237,7 +269,7 @@ export async function loadOperationsProjectDetail(
       .order("start_time"),
     client
       .from("team_works_op_sessions")
-      .select("id,session_date,start_time,duration_min,status,partner_member_id")
+      .select("id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status")
       .eq("project_id", projectId)
       .gte("session_date", dateKey(addDays(new Date(), -14)))
       .lte("session_date", dateKey(addDays(new Date(), 90)))
@@ -278,6 +310,25 @@ export async function loadOperationsProjectDetail(
       .eq("project_id", projectId)
       .order("created_at", { ascending: false })
   ]);
+
+  if (manualResult.error && isMissingSupabaseField(manualResult.error, ["body", "sharing_scope"])) {
+    manualResult = await client
+      .from("team_works_manuals")
+      .select("id,no,title,material_type,material_url,questions,expressions,cautions,status,source_template_manual_id")
+      .eq("project_id", projectId)
+      .is("archived_at", null)
+      .order("no") as typeof manualResult;
+  }
+  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default", "partner_presence_status"])) {
+    sessionResult = await client
+      .from("team_works_op_sessions")
+      .select("id,session_date,start_time,duration_min,status,partner_member_id")
+      .eq("project_id", projectId)
+      .gte("session_date", dateKey(addDays(new Date(), -14)))
+      .lte("session_date", dateKey(addDays(new Date(), 90)))
+      .order("session_date")
+      .order("start_time") as typeof sessionResult;
+  }
 
   for (const result of [
     groupResult,
@@ -326,6 +377,11 @@ export async function loadOperationsProjectDetail(
     duration_min: number;
     status: string;
     partner_member_id: string | null;
+    zoom_url: string | null;
+    zoom_meeting_id: string | null;
+    zoom_passcode: string | null;
+    zoom_uses_project_default: boolean;
+    partner_presence_status: "not_started" | "standby" | "in_progress" | "ended";
   }[];
   const sessionIds = sessionRows.map((row) => row.id);
   const rosterRows: {
@@ -381,7 +437,10 @@ export async function loadOperationsProjectDetail(
       clientVisible: projectRow.client_visible,
       payoutsEnabled: projectRow.payouts_enabled,
       invoicesEnabled: projectRow.invoices_enabled,
-      clientPartnerContactVisible: projectRow.client_partner_contact_visible
+      clientPartnerContactVisible: projectRow.client_partner_contact_visible,
+      zoomUrl: projectRow.zoom_url,
+      zoomMeetingId: projectRow.zoom_meeting_id,
+      zoomPasscode: projectRow.zoom_passcode
     },
     groups: ((groupResult.data ?? []) as { id: string; name: string; status: string }[]).map((row) => ({
       id: row.id,
@@ -393,6 +452,7 @@ export async function loadOperationsProjectDetail(
       id: string;
       no: number;
       title: string;
+      body: string | null;
       material_type: "none" | "link" | "file";
       material_url: string | null;
       questions: unknown;
@@ -400,17 +460,20 @@ export async function loadOperationsProjectDetail(
       cautions: string | null;
       status: string;
       source_template_manual_id: string | null;
+      sharing_scope?: "project" | "organization";
     }[]).map((row) => ({
       id: row.id,
       no: row.no,
       title: row.title,
+      body: row.body ?? null,
       materialType: row.material_type,
       materialUrl: row.material_url,
       questions: asUnknownArray(row.questions),
       expressions: asUnknownArray(row.expressions),
       cautions: row.cautions,
       status: row.status,
-      sourceTemplateManualId: row.source_template_manual_id
+      sourceTemplateManualId: row.source_template_manual_id,
+      sharingScope: row.sharing_scope ?? "project"
     })),
     partners: projectMemberRows
       .filter((row) => row.project_role === "worker" && activeMemberIds.has(row.organization_member_id))
@@ -443,6 +506,11 @@ export async function loadOperationsProjectDetail(
       status: row.status,
       partnerMemberId: row.partner_member_id,
       partnerName: row.partner_member_id ? memberNameById.get(row.partner_member_id) ?? "パートナー" : null,
+      zoomUrl: row.zoom_url ?? null,
+      zoomMeetingId: row.zoom_meeting_id ?? null,
+      zoomPasscode: row.zoom_passcode ?? null,
+      zoomUsesProjectDefault: row.zoom_uses_project_default ?? true,
+      partnerPresenceStatus: row.partner_presence_status ?? "not_started",
       roster: rosterRows
         .filter((roster) => roster.session_id === row.id)
         .sort((a, b) => a.order_index - b.order_index)
@@ -661,7 +729,7 @@ export async function loadOperationsPartnerDirectory(client: SupabaseClient): Pr
 
   const { data, error } = await client
     .from("team_works_partners")
-    .select("id,organization_id,display_name,email,note,status")
+    .select("id,organization_id,display_name,email,note,phone,address,skills,bio,status")
     .in("organization_id", organizationIds)
     .neq("status", "archived")
     .order("display_name");
@@ -673,6 +741,10 @@ export async function loadOperationsPartnerDirectory(client: SupabaseClient): Pr
     display_name: string;
     email: string;
     note: string | null;
+    phone: string | null;
+    address: string | null;
+    skills: string | null;
+    bio: string | null;
     status: string;
   }[]).map((row) => ({
     id: row.id,
@@ -680,6 +752,10 @@ export async function loadOperationsPartnerDirectory(client: SupabaseClient): Pr
     displayName: row.display_name,
     email: row.email,
     note: row.note,
+    phone: row.phone,
+    address: row.address,
+    skills: row.skills,
+    bio: row.bio,
     status: row.status
   }));
 }
@@ -759,6 +835,10 @@ export type OperationsClientDirectoryEntry = {
   displayName: string;
   email: string;
   note: string | null;
+  contactName: string | null;
+  department: string | null;
+  phone: string | null;
+  address: string | null;
   status: string;
 };
 
@@ -768,7 +848,7 @@ export async function loadOperationsClientDirectory(client: SupabaseClient): Pro
 
   const { data, error } = await client
     .from("team_works_clients")
-    .select("id,organization_id,display_name,email,note,status")
+    .select("id,organization_id,display_name,email,note,contact_name,department,phone,address,status")
     .in("organization_id", organizationIds)
     .neq("status", "archived")
     .order("display_name");
@@ -780,6 +860,10 @@ export async function loadOperationsClientDirectory(client: SupabaseClient): Pro
     display_name: string;
     email: string;
     note: string | null;
+    contact_name: string | null;
+    department: string | null;
+    phone: string | null;
+    address: string | null;
     status: string;
   }[]).map((row) => ({
     id: row.id,
@@ -787,6 +871,10 @@ export async function loadOperationsClientDirectory(client: SupabaseClient): Pro
     displayName: row.display_name,
     email: row.email,
     note: row.note,
+    contactName: row.contact_name,
+    department: row.department,
+    phone: row.phone,
+    address: row.address,
     status: row.status
   }));
 }
@@ -907,6 +995,211 @@ export async function archiveOperationsOrganizationMember(client: SupabaseClient
   if (!data) throw new Error("オーナーはアーカイブできません。");
 }
 
+export type OperationsPartnerSelfProfile = {
+  id: string;
+  organizationId: string;
+  displayName: string;
+  email: string;
+  phone: string | null;
+  address: string | null;
+  skills: string | null;
+  bio: string | null;
+};
+
+export async function loadMyOperationsPartnerProfile(client: SupabaseClient): Promise<OperationsPartnerSelfProfile | null> {
+  const { data, error } = await client.rpc("team_works_get_my_partner_profile");
+  if (error) throw error;
+  const row = ((data ?? []) as {
+    id: string; organization_id: string; display_name: string; email: string;
+    phone: string | null; address: string | null; skills: string | null; bio: string | null;
+  }[])[0];
+  return row ? {
+    id: row.id,
+    organizationId: row.organization_id,
+    displayName: row.display_name,
+    email: row.email,
+    phone: row.phone,
+    address: row.address,
+    skills: row.skills,
+    bio: row.bio
+  } : null;
+}
+
+export async function updateMyOperationsPartnerProfile(
+  client: SupabaseClient,
+  input: { displayName: string; phone: string; address: string; skills: string; bio: string }
+) {
+  const { error } = await client.rpc("team_works_update_my_partner_profile", {
+    p_display_name: input.displayName,
+    p_phone: input.phone,
+    p_address: input.address,
+    p_skills: input.skills,
+    p_bio: input.bio
+  });
+  if (error) throw error;
+}
+
+export type OperationsClientSelfProfile = {
+  id: string;
+  organizationId: string;
+  companyName: string;
+  contactName: string | null;
+  department: string | null;
+  email: string;
+  phone: string | null;
+  address: string | null;
+};
+
+export async function loadMyOperationsClientProfile(client: SupabaseClient): Promise<OperationsClientSelfProfile | null> {
+  const { data, error } = await client.rpc("team_works_get_my_client_profile");
+  if (error) throw error;
+  const row = ((data ?? []) as {
+    id: string; organization_id: string; company_name: string; contact_name: string | null;
+    department: string | null; email: string; phone: string | null; address: string | null;
+  }[])[0];
+  return row ? {
+    id: row.id,
+    organizationId: row.organization_id,
+    companyName: row.company_name,
+    contactName: row.contact_name,
+    department: row.department,
+    email: row.email,
+    phone: row.phone,
+    address: row.address
+  } : null;
+}
+
+export async function updateMyOperationsClientProfile(
+  client: SupabaseClient,
+  input: { companyName: string; contactName: string; department: string; phone: string; address: string }
+) {
+  const { error } = await client.rpc("team_works_update_my_client_profile", {
+    p_company_name: input.companyName,
+    p_contact_name: input.contactName,
+    p_department: input.department,
+    p_phone: input.phone,
+    p_address: input.address
+  });
+  if (error) throw error;
+}
+
+export type OperationsOrganizationProfile = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+};
+
+export async function loadOperationsOrganizationProfile(client: SupabaseClient): Promise<OperationsOrganizationProfile | null> {
+  const organizationIds = await resolveStaffOrganizationIds(client);
+  if (!organizationIds[0]) return null;
+  const { data, error } = await client
+    .from("team_works_organizations")
+    .select("id,name,email,phone,address")
+    .eq("id", organizationIds[0])
+    .maybeSingle();
+  if (error) throw error;
+  return data as OperationsOrganizationProfile | null;
+}
+
+export async function updateOperationsOrganizationProfile(
+  client: SupabaseClient,
+  input: { id: string; name: string; email: string; phone: string; address: string }
+) {
+  if (!input.name.trim()) throw new Error("企業名を入力してください。");
+  const { data, error } = await client
+    .from("team_works_organizations")
+    .update({
+      name: input.name.trim(),
+      email: input.email.trim() || null,
+      phone: input.phone.trim() || null,
+      address: input.address.trim() || null,
+      updated_at: new Date().toISOString()
+    })
+    .eq("id", input.id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("企業情報を保存できませんでした。オーナー権限を確認してください。");
+}
+
+export async function createOperationsStaffInvite(
+  client: SupabaseClient,
+  email: string
+): Promise<{ id: string; organizationId: string; role: "manager"; expiresAt: string }> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail.includes("@")) throw new Error("有効なメールアドレスを入力してください。");
+  const organizationId = await resolveFirstStaffOrganizationId(client);
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError) throw userError;
+  if (!userData.user) throw new Error("ログインが必要です。");
+  const { data, error } = await client
+    .from("team_works_member_invites")
+    .insert({
+      organization_id: organizationId,
+      project_id: null,
+      email: normalizedEmail,
+      role: "manager",
+      created_by_user_id: userData.user.id
+    })
+    .select("id,organization_id,role,expires_at")
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id as string,
+    organizationId: data.organization_id as string,
+    role: "manager",
+    expiresAt: data.expires_at as string
+  };
+}
+
+export type OperationsManualDirectoryEntry = {
+  id: string;
+  projectId: string;
+  projectTitle: string;
+  no: number;
+  title: string;
+  sharingScope: "project" | "organization";
+};
+
+export async function loadOperationsManualDirectory(client: SupabaseClient): Promise<OperationsManualDirectoryEntry[]> {
+  const { projects } = await fetchOperationsProjects(client);
+  if (projects.length === 0) return [];
+  const projectById = new Map(projects.map((project) => [project.id, project.title]));
+  const { data, error } = await client
+    .from("team_works_manuals")
+    .select("id,project_id,no,title,sharing_scope")
+    .in("project_id", projects.map((project) => project.id))
+    .is("archived_at", null)
+    .order("no");
+  if (error) throw error;
+  return ((data ?? []) as { id: string; project_id: string; no: number; title: string; sharing_scope: "project" | "organization" }[])
+    .map((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      projectTitle: projectById.get(row.project_id) ?? "プロジェクト",
+      no: row.no,
+      title: row.title,
+      sharingScope: row.sharing_scope
+    }));
+}
+
+export async function updateOperationsManualSharingScope(
+  client: SupabaseClient,
+  manualId: string,
+  sharingScope: "project" | "organization"
+) {
+  const { data, error } = await client
+    .from("team_works_manuals")
+    .update({ sharing_scope: sharingScope, updated_at: new Date().toISOString() })
+    .eq("id", manualId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("マニュアルの共有範囲を保存できませんでした。");
+}
+
 export async function createOperationsGroup(client: SupabaseClient, projectId: string, name: string) {
   const { error } = await client.from("team_works_groups").insert({ project_id: projectId, name: name.trim() });
   if (error) throw error;
@@ -984,6 +1277,26 @@ export async function updateOperationsSession(
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("予定を更新できませんでした。権限と対象を確認してください。");
+}
+
+export async function updateOperationsSessionZoom(
+  client: SupabaseClient,
+  sessionId: string,
+  input: {
+    useProjectDefault: boolean;
+    zoomUrl: string;
+    zoomMeetingId: string;
+    zoomPasscode: string;
+  }
+) {
+  const { error } = await client.rpc("team_works_update_session_zoom", {
+    p_session_id: sessionId,
+    p_use_project_default: input.useProjectDefault,
+    p_zoom_url: input.zoomUrl,
+    p_zoom_meeting_id: input.zoomMeetingId,
+    p_zoom_passcode: input.zoomPasscode
+  });
+  if (error) throw error;
 }
 
 export async function cancelOperationsSession(client: SupabaseClient, sessionId: string) {
@@ -1145,13 +1458,14 @@ export async function updateOperationsRosterAttendance(
 export async function createOperationsManual(
   client: SupabaseClient,
   projectId: string,
-  input: { no: number; title: string; materialUrl: string }
+  input: { no: number; title: string; body: string; materialUrl: string }
 ) {
   const materialUrl = input.materialUrl.trim();
   const { error } = await client.from("team_works_manuals").insert({
     project_id: projectId,
     no: Math.max(1, Math.round(input.no)),
     title: input.title.trim(),
+    body: input.body.trim() || null,
     material_type: materialUrl ? "link" : "none",
     material_url: materialUrl || null
   });
@@ -1163,6 +1477,7 @@ export async function updateOperationsManual(
   manualId: string,
   input: {
     title: string;
+    body: string;
     materialUrl: string;
     questions: string[];
     expressions: string[];
@@ -1174,6 +1489,7 @@ export async function updateOperationsManual(
     .from("team_works_manuals")
     .update({
       title: input.title.trim(),
+      body: input.body.trim() || null,
       material_type: materialUrl ? "link" : "none",
       material_url: materialUrl || null,
       questions: input.questions.map((value) => value.trim()).filter(Boolean),
@@ -1201,6 +1517,23 @@ export async function updateOperationsProjectDescription(
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("プロジェクトの説明を更新できませんでした。権限とプロジェクトを確認してください。");
+}
+
+export async function updateOperationsProjectTitle(
+  client: SupabaseClient,
+  projectId: string,
+  title: string
+) {
+  const normalizedTitle = title.trim();
+  if (!normalizedTitle) throw new Error("プロジェクト名を入力してください。");
+  const { data, error } = await client
+    .from("team_works_projects")
+    .update({ title: normalizedTitle, updated_at: new Date().toISOString() })
+    .eq("id", projectId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("プロジェクト名を更新できませんでした。権限とプロジェクトを確認してください。");
 }
 
 export async function updateOperationsProjectContract(
@@ -1241,6 +1574,20 @@ export async function updateOperationsProjectVisibility(
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("ポータル設定を更新できませんでした。権限とプロジェクトを確認してください。");
+}
+
+export async function updateOperationsProjectZoom(
+  client: SupabaseClient,
+  projectId: string,
+  input: { zoomUrl: string; zoomMeetingId: string; zoomPasscode: string }
+) {
+  const { error } = await client.rpc("team_works_update_project_zoom", {
+    p_project_id: projectId,
+    p_zoom_url: input.zoomUrl,
+    p_zoom_meeting_id: input.zoomMeetingId,
+    p_zoom_passcode: input.zoomPasscode
+  });
+  if (error) throw error;
 }
 
 // --- R5: 運営型プロジェクトへのメンバー招待・割当 -------------------------------

@@ -161,6 +161,10 @@ function TeamWorksPartnersContent() {
                         <Mail size={13} /> {partner.email}
                       </p>
                       {partner.note ? <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">{partner.note}</p> : null}
+                      {partner.phone ? <p className="mt-1 text-xs text-[var(--mikke-muted)]">電話：{partner.phone}</p> : null}
+                      {partner.address ? <p className="mt-1 text-xs text-[var(--mikke-muted)]">住所：{partner.address}</p> : null}
+                      {partner.skills ? <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]"><span className="font-bold">スキル：</span>{partner.skills}</p> : null}
+                      {partner.bio ? <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]"><span className="font-bold">自己紹介：</span>{partner.bio}</p> : null}
                     </div>
                     <span className="rounded-full bg-[var(--mikke-primary-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--mikke-primary)]">
                       {partner.status === "active" ? "稼働中" : "一時停止"}

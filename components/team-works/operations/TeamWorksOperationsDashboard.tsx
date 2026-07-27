@@ -96,16 +96,18 @@ export function TeamWorksOperationsDashboard() {
                   </span>
                   <span className="mt-0.5 flex items-center gap-2 text-xs font-semibold text-[var(--mikke-muted)]">
                     {event.partnerName ? <span>担当 {event.partnerName}</span> : <span className="text-[var(--mikke-accent)]">担当未定</span>}
+                    <PartnerPresenceLabel status={event.partnerPresenceStatus} />
                     <span className="inline-flex items-center gap-1">
                       <Clock size={12} /> {event.durationMin}分
                     </span>
+                    {event.zoomMeetingId ? <span>Zoom ID {event.zoomMeetingId}</span> : null}
                   </span>
                 </span>
                 <Link
-                  href={`/apps/team-works/projects/${event.projectId}`}
+                  href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
                   className="shrink-0 rounded-full border border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)]"
                 >
-                  名簿
+                  スケジュール
                 </Link>
               </div>
             ))}
@@ -122,7 +124,7 @@ export function TeamWorksOperationsDashboard() {
             {data.needsAttentionUnassigned.map((event) => (
               <Link
                 key={event.id}
-                href={`/apps/team-works/projects/${event.projectId}`}
+                href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
                 className="rounded-xl border border-l-4 border-[var(--mikke-line)] p-3 text-left"
                 style={{ borderLeftColor: "var(--mikke-orange)" }}
               >
@@ -135,6 +137,38 @@ export function TeamWorksOperationsDashboard() {
             ))}
           </div>
         )}
+        <div className="mt-4 border-t border-[var(--mikke-line)] pt-4">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-xs font-extrabold text-[var(--mikke-primary)]">今後のスケジュール（3件）</p>
+            <Link href="/apps/team-works/schedule" className="text-xs font-bold text-[var(--mikke-primary)]">すべて見る</Link>
+          </div>
+          {data.upcomingEvents.length === 0 ? (
+            <p className="text-xs font-semibold text-[var(--mikke-muted)]">今後の予定はありません。</p>
+          ) : (
+            <div className="grid gap-2">
+              {data.upcomingEvents.map((event) => (
+                <Link
+                  key={event.id}
+                  href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
+                  className="grid gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3 sm:grid-cols-[90px_1fr_auto] sm:items-center"
+                >
+                  <span className="rounded-lg bg-[var(--mikke-surface-soft)] px-2 py-2 text-center text-xs font-extrabold">
+                    {formatShortDate(event.sessionDate, todayKey)} {event.startTime}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold">{event.projectTitle}</span>
+                    <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">
+                      {event.partnerName ? `担当 ${event.partnerName}` : "担当未定"}
+                      {event.zoomMeetingId ? ` · Zoom ID ${event.zoomMeetingId}` : ""}
+                    </span>
+                  </span>
+                  <PartnerPresenceLabel status={event.partnerPresenceStatus} />
+                  <span className="text-xs font-bold text-[var(--mikke-primary)]">開く</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </MikkeSection>
 
       {selectedDayKey ? (
@@ -147,6 +181,13 @@ export function TeamWorksOperationsDashboard() {
       ) : null}
     </div>
   );
+}
+
+function PartnerPresenceLabel({ status }: { status: "not_started" | "standby" | "in_progress" | "ended" }) {
+  if (status === "not_started") return null;
+  const labels = { standby: "スタンバイ", in_progress: "実施中", ended: "終了" };
+  const tone = status === "standby" ? "bg-amber-100 text-amber-800" : status === "in_progress" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700";
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${tone}`}>{labels[status]}</span>;
 }
 
 function FirstOperationsProjectSetup() {
@@ -266,7 +307,7 @@ function formatShortDate(dateKey: string, todayKey: string): string {
 
 function FinanceCard() {
   return (
-    <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+    <Link href="/apps/team-works/projects" className="block rounded-2xl border border-[var(--mikke-line)] bg-white p-4 transition hover:border-[var(--mikke-primary)]">
       <div className="mb-3 flex items-baseline justify-between">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--mikke-primary)]">
           <Wallet size={13} /> Finance
@@ -296,7 +337,7 @@ function FinanceCard() {
       <p className="mt-3 text-[10.5px] leading-5 text-[var(--mikke-muted-light)]">
         パートナー報酬・請求のレートがまだ設定されていないため集計できません。レート項目を追加すると自動で表示されます。
       </p>
-    </div>
+    </Link>
   );
 }
 
@@ -314,7 +355,7 @@ function MessagesCard({ comments }: { comments: OperationsDashboardData["recentC
         ) : (
           <div className="divide-y divide-[var(--mikke-line)]">
             {comments.map((comment) => (
-              <div key={comment.id} className="flex items-center gap-3 px-4 py-3">
+              <Link key={comment.id} href={`/apps/team-works/projects/${comment.projectId}?tab=messages`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--mikke-surface-soft)]">
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]">
                   <Users size={14} />
                 </span>
@@ -325,7 +366,7 @@ function MessagesCard({ comments }: { comments: OperationsDashboardData["recentC
                   <span className="block truncate text-[11px] font-semibold text-[var(--mikke-muted)]">{comment.body}</span>
                 </span>
                 <span className="shrink-0 text-[10px] font-semibold text-[var(--mikke-muted-light)]">{formatRelativeTime(comment.createdAt)}</span>
-              </div>
+              </Link>
             ))}
           </div>
         )}

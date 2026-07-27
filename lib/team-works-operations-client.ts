@@ -1,10 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 
 export type OperationsClientParticipant = {
   id: string;
   projectId: string;
+  groupId: string | null;
   name: string;
   level: string | null;
+};
+
+export type OperationsClientGroup = {
+  id: string;
+  projectId: string;
+  name: string;
 };
 
 export type OperationsClientSession = {
@@ -16,6 +24,9 @@ export type OperationsClientSession = {
   durationMin: number;
   status: string;
   partnerName: string | null;
+  zoomUrl: string | null;
+  zoomMeetingId: string | null;
+  zoomPasscode: string | null;
   roster: {
     id: string;
     participantId: string;
@@ -53,6 +64,7 @@ export type OperationsClientPortalData = {
   memberName: string | null;
   projectCount: number;
   projects: { id: string; title: string; clientMemberId: string; organizationId: string; organizationName: string }[];
+  groups: OperationsClientGroup[];
   participants: OperationsClientParticipant[];
   sessions: OperationsClientSession[];
   holidays: OperationsClientHoliday[];
@@ -141,19 +153,31 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
   });
   const today = dateKey(new Date());
   const through = dateKey(addDays(new Date(), 60));
-  const [sessionResult, participantResult, projectMemberResult, messageResult, holidayResult] = await Promise.all([
-    client.from("team_works_op_sessions").select("id,project_id,session_date,start_time,duration_min,status,partner_member_id").in("project_id", operationsProjectIds).gte("session_date", today).lte("session_date", through).order("session_date").order("start_time"),
-    client.from("team_works_participants").select("id,project_id,name,level").in("project_id", operationsProjectIds).neq("status", "archived").is("archived_at", null).order("name"),
+  let [sessionResult, groupResult, participantResult, projectMemberResult, messageResult, holidayResult] = await Promise.all([
+    client.from("team_works_op_sessions").select("id,project_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode").in("project_id", operationsProjectIds).gte("session_date", today).lte("session_date", through).order("session_date").order("start_time"),
+    client.from("team_works_groups").select("id,project_id,name").in("project_id", operationsProjectIds).neq("status", "archived").is("archived_at", null).order("name"),
+    client.from("team_works_participants").select("id,project_id,group_id,name,level").in("project_id", operationsProjectIds).neq("status", "archived").is("archived_at", null).order("name"),
     client.from("team_works_project_members").select("project_id,organization_member_id,project_role").in("project_id", operationsProjectIds),
     client.from("team_works_project_comments").select("id,project_id,author_member_id,recipient_member_id,body,created_at").in("project_id", operationsProjectIds).eq("audience", "client").order("created_at", { ascending: false }).limit(100),
     client.from("team_works_holidays").select("id,project_id,organization_id,holiday_date,memo").in("organization_id", organizationIds).or(`project_id.in.(${operationsProjectIds.join(",")}),project_id.is.null`)
   ]);
-  for (const result of [sessionResult, participantResult, projectMemberResult, messageResult, holidayResult]) {
+  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode"])) {
+    sessionResult = await client
+      .from("team_works_op_sessions")
+      .select("id,project_id,session_date,start_time,duration_min,status,partner_member_id")
+      .in("project_id", operationsProjectIds)
+      .gte("session_date", today)
+      .lte("session_date", through)
+      .order("session_date")
+      .order("start_time") as typeof sessionResult;
+  }
+  for (const result of [sessionResult, groupResult, participantResult, projectMemberResult, messageResult, holidayResult]) {
     if (result.error) throw result.error;
   }
 
-  const sessions = (sessionResult.data ?? []) as { id: string; project_id: string; session_date: string; start_time: string; duration_min: number; status: string; partner_member_id: string | null }[];
-  const participants = (participantResult.data ?? []) as { id: string; project_id: string; name: string; level: string | null }[];
+  const sessions = (sessionResult.data ?? []) as { id: string; project_id: string; session_date: string; start_time: string; duration_min: number; status: string; partner_member_id: string | null; zoom_url: string | null; zoom_meeting_id: string | null; zoom_passcode: string | null }[];
+  const groups = (groupResult.data ?? []) as { id: string; project_id: string; name: string }[];
+  const participants = (participantResult.data ?? []) as { id: string; project_id: string; group_id: string | null; name: string; level: string | null }[];
   const projectMembers = (projectMemberResult.data ?? []) as { project_id: string; organization_member_id: string; project_role: string }[];
   const otherMemberIds = [...new Set(projectMembers.map((row) => row.organization_member_id))];
   const namesResult = otherMemberIds.length
@@ -194,7 +218,8 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
     memberName: members[0]?.display_name ?? null,
     projectCount: projects.length,
     projects,
-    participants: participants.map((participant) => ({ id: participant.id, projectId: participant.project_id, name: participant.name, level: participant.level })),
+    groups: groups.map((group) => ({ id: group.id, projectId: group.project_id, name: group.name })),
+    participants: participants.map((participant) => ({ id: participant.id, projectId: participant.project_id, groupId: participant.group_id, name: participant.name, level: participant.level })),
     sessions: sessions.map((session) => ({
       id: session.id,
       projectId: session.project_id,
@@ -204,6 +229,9 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
       durationMin: session.duration_min,
       status: session.status,
       partnerName: session.partner_member_id ? nameByMemberId.get(session.partner_member_id) ?? "担当未定" : "担当未定",
+      zoomUrl: session.zoom_url ?? null,
+      zoomMeetingId: session.zoom_meeting_id ?? null,
+      zoomPasscode: session.zoom_passcode ?? null,
       roster: rosterRows.filter((row) => row.session_id === session.id).flatMap((row) => {
         const participant = participantById.get(row.participant_id);
         return participant ? [{ id: row.id, participantId: row.participant_id, orderIndex: row.order_index, participantName: participant.name }] : [];
@@ -229,7 +257,7 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
 }
 
 function emptyClientPortalData(memberName: string | null): OperationsClientPortalData {
-  return { memberName, projectCount: 0, projects: [], participants: [], sessions: [], holidays: [], contacts: [], messages: [] };
+  return { memberName, projectCount: 0, projects: [], groups: [], participants: [], sessions: [], holidays: [], contacts: [], messages: [] };
 }
 
 export type OperationsClientPendingProject = {
@@ -281,16 +309,38 @@ async function requireClientProjectMembership(client: SupabaseClient, projectId:
   return projectMemberResult.data.organization_member_id as string;
 }
 
-export async function saveOperationsClientParticipant(client: SupabaseClient, input: { projectId: string; participantId?: string; name: string; level: string }) {
+export async function saveOperationsClientParticipant(client: SupabaseClient, input: { projectId: string; participantId?: string; groupId: string | null; name: string; level: string }) {
   await requireClientProjectMembership(client, input.projectId);
   const name = input.name.trim();
   if (!name) throw new Error("対象者名を入力してください。");
   if (input.participantId) {
-    const { error } = await client.from("team_works_participants").update({ name, level: input.level.trim() || null }).eq("id", input.participantId).eq("project_id", input.projectId);
+    const { error } = await client.from("team_works_participants").update({ name, level: input.level.trim() || null, group_id: input.groupId || null }).eq("id", input.participantId).eq("project_id", input.projectId);
     if (error) throw error;
     return;
   }
-  const { error } = await client.from("team_works_participants").insert({ project_id: input.projectId, name, level: input.level.trim() || null, status: "active" });
+  const { error } = await client.from("team_works_participants").insert({ project_id: input.projectId, name, level: input.level.trim() || null, group_id: input.groupId || null, status: "active" });
+  if (error) throw error;
+}
+
+export async function saveOperationsClientGroup(
+  client: SupabaseClient,
+  input: { projectId: string; groupId?: string; name: string }
+) {
+  await requireClientProjectMembership(client, input.projectId);
+  const name = input.name.trim();
+  if (!name) throw new Error("グループ名を入力してください。");
+  if (input.groupId) {
+    const { error } = await client
+      .from("team_works_groups")
+      .update({ name, updated_at: new Date().toISOString() })
+      .eq("id", input.groupId)
+      .eq("project_id", input.projectId);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await client
+    .from("team_works_groups")
+    .insert({ project_id: input.projectId, name, status: "active" });
   if (error) throw error;
 }
 

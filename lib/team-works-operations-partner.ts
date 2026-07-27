@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 
 export type OperationsPartnerManual = {
   no: number;
   title: string;
+  body: string | null;
   materialType: "none" | "link" | "file";
   materialUrl: string | null;
   questions: string[];
@@ -20,6 +22,15 @@ export type OperationsPartnerRosterItem = {
   cautions: string | null;
   currentManualNo: number;
   manual: OperationsPartnerManual | null;
+  assessment: OperationsPartnerAssessment;
+  handoffNote: string;
+  completedAt: string | null;
+};
+
+export type OperationsPartnerAssessment = {
+  responseSmoothness: number;
+  comprehension: number;
+  speakingConfidence: number;
 };
 
 export type OperationsPartnerSession = {
@@ -30,7 +41,15 @@ export type OperationsPartnerSession = {
   startTime: string;
   durationMin: number;
   status: string;
+  zoomUrl: string | null;
+  zoomMeetingId: string | null;
+  zoomPasscode: string | null;
+  zoomUsesProjectDefault: boolean;
+  partnerPresenceStatus: "not_started" | "standby" | "in_progress" | "ended";
+  partnerStandbyAt: string | null;
+  partnerEndedAt: string | null;
   reportSubmitted: boolean;
+  manuals: OperationsPartnerManual[];
   roster: OperationsPartnerRosterItem[];
 };
 
@@ -52,6 +71,13 @@ type SessionRow = {
   start_time: string;
   duration_min: number;
   status: string;
+  zoom_url: string | null;
+  zoom_meeting_id: string | null;
+  zoom_passcode: string | null;
+  zoom_uses_project_default: boolean;
+  partner_presence_status: "not_started" | "standby" | "in_progress" | "ended";
+  partner_standby_at: string | null;
+  partner_ended_at: string | null;
 };
 type RosterRow = {
   id: string;
@@ -59,6 +85,9 @@ type RosterRow = {
   participant_id: string;
   order_index: number;
   attendance_status: string;
+  partner_assessment: unknown;
+  handoff_note: string | null;
+  partner_completed_at: string | null;
 };
 type ParticipantRow = {
   id: string;
@@ -72,6 +101,7 @@ type ManualRow = {
   project_id: string;
   no: number;
   title: string;
+  body: string | null;
   material_type: "none" | "link" | "file";
   material_url: string | null;
   questions: unknown;
@@ -94,6 +124,19 @@ function addDays(date: Date, days: number): Date {
 
 function stringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function assessment(value: unknown): OperationsPartnerAssessment {
+  const source = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const rating = (key: string) => {
+    const numeric = Number(source[key]);
+    return Number.isFinite(numeric) && numeric >= 1 && numeric <= 5 ? numeric : 3;
+  };
+  return {
+    responseSmoothness: rating("responseSmoothness"),
+    comprehension: rating("comprehension"),
+    speakingConfidence: rating("speakingConfidence")
+  };
 }
 
 export async function loadOperationsPartnerPortal(
@@ -167,15 +210,26 @@ export async function loadOperationsPartnerPortal(
 
   const today = dateKey(new Date());
   const through = dateKey(addDays(new Date(), 30));
-  const sessionResult = await client
+  let sessionResult = await client
     .from("team_works_op_sessions")
-    .select("id,project_id,session_date,start_time,duration_min,status")
+    .select("id,project_id,session_date,start_time,duration_min,status,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,partner_standby_at,partner_ended_at")
     .in("project_id", operationsProjectIds)
     .gte("session_date", today)
     .lte("session_date", through)
     .neq("status", "cancelled")
     .order("session_date")
     .order("start_time");
+  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default"])) {
+    sessionResult = await client
+      .from("team_works_op_sessions")
+      .select("id,project_id,session_date,start_time,duration_min,status")
+      .in("project_id", operationsProjectIds)
+      .gte("session_date", today)
+      .lte("session_date", through)
+      .neq("status", "cancelled")
+      .order("session_date")
+      .order("start_time") as typeof sessionResult;
+  }
   if (sessionResult.error) throw sessionResult.error;
   const sessions = (sessionResult.data ?? []) as SessionRow[];
   if (sessions.length === 0) {
@@ -190,7 +244,7 @@ export async function loadOperationsPartnerPortal(
   const sessionIds = sessions.map((session) => session.id);
   const rosterResult = await client
     .from("team_works_session_roster")
-    .select("id,session_id,participant_id,order_index,attendance_status")
+    .select("id,session_id,participant_id,order_index,attendance_status,partner_assessment,handoff_note,partner_completed_at")
     .in("session_id", sessionIds)
     .order("order_index");
   if (rosterResult.error) throw rosterResult.error;
@@ -215,12 +269,20 @@ export async function loadOperationsPartnerPortal(
     participants = (participantResult.data ?? []) as ParticipantRow[];
   }
 
-  const manualResult = await client
+  let manualResult = await client
     .from("team_works_manuals")
-    .select("project_id,no,title,material_type,material_url,questions,expressions,cautions")
+    .select("project_id,no,title,body,material_type,material_url,questions,expressions,cautions")
     .in("project_id", operationsProjectIds)
     .eq("status", "active")
     .is("archived_at", null);
+  if (manualResult.error && isMissingSupabaseField(manualResult.error, ["body"])) {
+    manualResult = await client
+      .from("team_works_manuals")
+      .select("project_id,no,title,material_type,material_url,questions,expressions,cautions")
+      .in("project_id", operationsProjectIds)
+      .eq("status", "active")
+      .is("archived_at", null) as typeof manualResult;
+  }
   if (manualResult.error) throw manualResult.error;
   const manuals = (manualResult.data ?? []) as ManualRow[];
   const participantById = new Map(participants.map((participant) => [participant.id, participant]));
@@ -233,7 +295,27 @@ export async function loadOperationsPartnerPortal(
     startTime: session.start_time.slice(0, 5),
     durationMin: session.duration_min,
     status: session.status,
+    zoomUrl: session.zoom_url ?? null,
+    zoomMeetingId: session.zoom_meeting_id ?? null,
+    zoomPasscode: session.zoom_passcode ?? null,
+    zoomUsesProjectDefault: session.zoom_uses_project_default ?? true,
+    partnerPresenceStatus: session.partner_presence_status ?? "not_started",
+    partnerStandbyAt: session.partner_standby_at ?? null,
+    partnerEndedAt: session.partner_ended_at ?? null,
     reportSubmitted: reportedSessionIds.has(session.id),
+    manuals: manuals
+      .filter((manual) => manual.project_id === session.project_id)
+      .sort((left, right) => left.no - right.no)
+      .map((manual) => ({
+        no: manual.no,
+        title: manual.title,
+        body: manual.body ?? null,
+        materialType: manual.material_type,
+        materialUrl: manual.material_url,
+        questions: stringArray(manual.questions),
+        expressions: stringArray(manual.expressions),
+        cautions: manual.cautions
+      })),
     roster: rosterRows
       .filter((row) => row.session_id === session.id)
       .sort((left, right) => left.order_index - right.order_index)
@@ -253,10 +335,14 @@ export async function loadOperationsPartnerPortal(
           level: participant.level,
           cautions: participant.cautions,
           currentManualNo: participant.current_manual_no,
+          assessment: assessment(row.partner_assessment),
+          handoffNote: row.handoff_note ?? "",
+          completedAt: row.partner_completed_at ?? null,
           manual: manualRow
             ? {
-                no: manualRow.no,
-                title: manualRow.title,
+            no: manualRow.no,
+            title: manualRow.title,
+            body: manualRow.body ?? null,
                 materialType: manualRow.material_type,
                 materialUrl: manualRow.material_url,
                 questions: stringArray(manualRow.questions),
@@ -342,4 +428,61 @@ export async function submitOperationsPartnerReport(
     if (error.code === "23505") throw new Error("このコマの報告はすでに提出済みです。");
     throw error;
   }
+}
+
+export async function updateOperationsPartnerSessionZoom(
+  client: SupabaseClient,
+  sessionId: string,
+  input: {
+    useProjectDefault: boolean;
+    zoomUrl: string;
+    zoomMeetingId: string;
+    zoomPasscode: string;
+  }
+) {
+  const { error } = await client.rpc("team_works_update_session_zoom", {
+    p_session_id: sessionId,
+    p_use_project_default: input.useProjectDefault,
+    p_zoom_url: input.zoomUrl,
+    p_zoom_meeting_id: input.zoomMeetingId,
+    p_zoom_passcode: input.zoomPasscode
+  });
+  if (error) throw error;
+}
+
+export async function updateOperationsPartnerPresence(
+  client: SupabaseClient,
+  sessionId: string,
+  status: "standby" | "in_progress" | "ended"
+) {
+  const { error } = await client.rpc("team_works_update_partner_presence", {
+    p_session_id: sessionId,
+    p_status: status
+  });
+  if (error) throw error;
+}
+
+export async function saveOperationsPartnerStudentHandoff(
+  client: SupabaseClient,
+  input: {
+    rosterId: string;
+    attendanceStatus: string;
+    assessment: OperationsPartnerAssessment;
+    handoffNote: string;
+    complete: boolean;
+  }
+): Promise<{ currentManualNo: number; completedAt: string | null }> {
+  const { data, error } = await client.rpc("team_works_save_partner_student_handoff", {
+    p_roster_id: input.rosterId,
+    p_attendance_status: input.attendanceStatus,
+    p_assessment: input.assessment,
+    p_handoff_note: input.handoffNote,
+    p_complete: input.complete
+  });
+  if (error) throw error;
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    currentManualNo: Number(row?.current_manual_no ?? 1),
+    completedAt: typeof row?.completed_at === "string" ? row.completed_at : null
+  };
 }

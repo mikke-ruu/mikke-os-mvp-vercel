@@ -161,6 +161,10 @@ function TeamWorksClientsContent() {
                         <Mail size={13} /> {client.email}
                       </p>
                       {client.note ? <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">{client.note}</p> : null}
+                      {client.contactName ? <p className="mt-2 text-xs text-[var(--mikke-muted)]">担当者：{client.contactName}</p> : null}
+                      {client.department ? <p className="mt-1 text-xs text-[var(--mikke-muted)]">部署：{client.department}</p> : null}
+                      {client.phone ? <p className="mt-1 text-xs text-[var(--mikke-muted)]">電話：{client.phone}</p> : null}
+                      {client.address ? <p className="mt-1 text-xs text-[var(--mikke-muted)]">住所：{client.address}</p> : null}
                     </div>
                     <span className="rounded-full bg-[var(--mikke-primary-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--mikke-primary)]">
                       {client.status === "active" ? "稼働中" : "一時停止"}
