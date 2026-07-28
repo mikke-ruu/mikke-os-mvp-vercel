@@ -57,7 +57,7 @@ export type OperationsPartnerSession = {
 export type OperationsPartnerPortalData = {
   memberName: string | null;
   projectCount: number;
-  projects: { id: string; title: string }[];
+  projects: { id: string; title: string; manuals: OperationsPartnerManual[] }[];
   offers: { projectId: string; projectTitle: string; organizationMemberId: string; requestedAt: string }[];
   today: OperationsPartnerSession[];
   upcoming: OperationsPartnerSession[];
@@ -212,7 +212,7 @@ export async function loadOperationsPartnerPortal(
   const acceptedProjectIds = new Set(acceptedProjectMembers.map((membership) => membership.project_id));
   const portalProjects = projects
     .filter((project) => acceptedProjectIds.has(project.id))
-    .map((project) => ({ id: project.id, title: project.title }));
+    .map((project) => ({ id: project.id, title: project.title, manuals: [] as OperationsPartnerManual[] }));
   const operationsProjectIds = portalProjects.map((project) => project.id);
   const offers = waitingOffers.flatMap((offer) => {
     const projectTitle = projectTitleById.get(offer.project_id);
@@ -221,6 +221,39 @@ export async function loadOperationsPartnerPortal(
   if (operationsProjectIds.length === 0) {
     return { memberName: members[0]?.display_name ?? null, projectCount: 0, projects: [], offers, today: [], upcoming: [] };
   }
+
+  let manualResult = await client
+    .from("team_works_manuals")
+    .select("project_id,no,title,body,material_type,material_url,questions,expressions,cautions")
+    .in("project_id", operationsProjectIds)
+    .eq("status", "active")
+    .is("archived_at", null)
+    .order("no");
+  if (manualResult.error && isMissingSupabaseField(manualResult.error, ["body"])) {
+    manualResult = await client
+      .from("team_works_manuals")
+      .select("project_id,no,title,material_type,material_url,questions,expressions,cautions")
+      .in("project_id", operationsProjectIds)
+      .eq("status", "active")
+      .is("archived_at", null)
+      .order("no") as typeof manualResult;
+  }
+  if (manualResult.error) throw manualResult.error;
+  const manuals = (manualResult.data ?? []) as ManualRow[];
+  const mapManual = (manual: ManualRow): OperationsPartnerManual => ({
+    no: manual.no,
+    title: manual.title,
+    body: manual.body ?? null,
+    materialType: manual.material_type,
+    materialUrl: manual.material_url,
+    questions: stringArray(manual.questions),
+    expressions: stringArray(manual.expressions),
+    cautions: manual.cautions
+  });
+  const projectsWithManuals = portalProjects.map((project) => ({
+    ...project,
+    manuals: manuals.filter((manual) => manual.project_id === project.id).map(mapManual)
+  }));
 
   const today = dateKey(new Date());
   const through = dateKey(addDays(new Date(), 30));
@@ -254,7 +287,7 @@ export async function loadOperationsPartnerPortal(
     return {
       memberName: members[0]?.display_name ?? null,
       projectCount: operationsProjectIds.length,
-      projects: portalProjects,
+      projects: projectsWithManuals,
       offers,
       today: [],
       upcoming: []
@@ -289,22 +322,6 @@ export async function loadOperationsPartnerPortal(
     participants = (participantResult.data ?? []) as ParticipantRow[];
   }
 
-  let manualResult = await client
-    .from("team_works_manuals")
-    .select("project_id,no,title,body,material_type,material_url,questions,expressions,cautions")
-    .in("project_id", operationsProjectIds)
-    .eq("status", "active")
-    .is("archived_at", null);
-  if (manualResult.error && isMissingSupabaseField(manualResult.error, ["body"])) {
-    manualResult = await client
-      .from("team_works_manuals")
-      .select("project_id,no,title,material_type,material_url,questions,expressions,cautions")
-      .in("project_id", operationsProjectIds)
-      .eq("status", "active")
-      .is("archived_at", null) as typeof manualResult;
-  }
-  if (manualResult.error) throw manualResult.error;
-  const manuals = (manualResult.data ?? []) as ManualRow[];
   const participantById = new Map(participants.map((participant) => [participant.id, participant]));
 
   const mapped = sessions.map<OperationsPartnerSession>((session) => ({
@@ -323,19 +340,7 @@ export async function loadOperationsPartnerPortal(
     partnerStandbyAt: session.partner_standby_at ?? null,
     partnerEndedAt: session.partner_ended_at ?? null,
     reportSubmitted: reportedSessionIds.has(session.id),
-    manuals: manuals
-      .filter((manual) => manual.project_id === session.project_id)
-      .sort((left, right) => left.no - right.no)
-      .map((manual) => ({
-        no: manual.no,
-        title: manual.title,
-        body: manual.body ?? null,
-        materialType: manual.material_type,
-        materialUrl: manual.material_url,
-        questions: stringArray(manual.questions),
-        expressions: stringArray(manual.expressions),
-        cautions: manual.cautions
-      })),
+    manuals: projectsWithManuals.find((project) => project.id === session.project_id)?.manuals ?? [],
     roster: rosterRows
       .filter((row) => row.session_id === session.id)
       .sort((left, right) => left.order_index - right.order_index)
@@ -377,7 +382,7 @@ export async function loadOperationsPartnerPortal(
   return {
     memberName: members[0]?.display_name ?? null,
     projectCount: operationsProjectIds.length,
-    projects: portalProjects,
+    projects: projectsWithManuals,
     offers,
     today: mapped.filter((session) => session.sessionDate === today),
     upcoming: mapped.filter((session) => session.sessionDate !== today)

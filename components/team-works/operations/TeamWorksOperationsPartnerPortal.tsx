@@ -124,7 +124,7 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
   const sessions = useMemo(() => [...data.today, ...data.upcoming], [data.today, data.upcoming]);
   const projects = data.projects;
   const [activeView, setActiveView] = useState("home");
-  const [projectTab, setProjectTab] = useState<"calendar" | "schedule">("calendar");
+  const [projectTab, setProjectTab] = useState<"calendar" | "schedule" | "manuals">("calendar");
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
   const [responding, setResponding] = useState<string | null>(null);
   const [responseNotice, setResponseNotice] = useState<SaveNotice>(null);
@@ -218,7 +218,7 @@ function PartnerHome({
   sessions: OperationsPartnerSession[];
   selectedDate: string;
   onSelectDate: (date: string) => void;
-  onOpenProject: (projectId: string, tab: "calendar" | "schedule") => void;
+  onOpenProject: (projectId: string, tab: "calendar" | "schedule" | "manuals") => void;
   onOpenShifts: () => void;
 }) {
   const daySessions = sessions.filter((session) => session.sessionDate === selectedDate);
@@ -271,8 +271,8 @@ function PartnerProject({
   sessions: OperationsPartnerSession[];
   selectedDate: string;
   onSelectDate: (date: string) => void;
-  tab: "calendar" | "schedule";
-  onTabChange: (tab: "calendar" | "schedule") => void;
+  tab: "calendar" | "schedule" | "manuals";
+  onTabChange: (tab: "calendar" | "schedule" | "manuals") => void;
 }) {
   const projectSessions = sessions.filter((session) => session.projectId === projectId);
   const title = project.title;
@@ -286,6 +286,7 @@ function PartnerProject({
       <nav className="flex gap-1 rounded-xl bg-[var(--mikke-surface-soft)] p-1" aria-label={`${title}内のページ`}>
         <button type="button" onClick={() => onTabChange("calendar")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "calendar" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><CalendarDays size={14} />カレンダー</button>
         <button type="button" onClick={() => onTabChange("schedule")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "schedule" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><List size={14} />スケジュール</button>
+        <button type="button" onClick={() => onTabChange("manuals")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "manuals" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><BookOpen size={14} />マニュアル</button>
       </nav>
       {tab === "calendar" ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.8fr)]">
@@ -296,13 +297,60 @@ function PartnerProject({
             {daySessions.length ? <div className="space-y-2">{daySessions.map((session) => <PartnerScheduleRow key={session.id} session={session} />)}</div> : <MikkeEmptyState title="この日の担当はありません" />}
           </MikkeSection>
         </div>
-      ) : (
+      ) : tab === "schedule" ? (
         <MikkeSection title="スケジュール" tone="editorial">
           <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">「レッスン画面」を押すと、Zoomの横に置ける専用窓で開きます。</p>
           <div className="space-y-2">{projectSessions.map((session) => <PartnerScheduleRow key={session.id} session={session} />)}</div>
         </MikkeSection>
+      ) : (
+        <PartnerManualLibrary manuals={project.manuals} />
       )}
     </div>
+  );
+}
+
+function PartnerManualLibrary({ manuals }: { manuals: OperationsPartnerManual[] }) {
+  const [selectedManualNo, setSelectedManualNo] = useState(manuals[0]?.no ?? 1);
+  useEffect(() => {
+    if (!manuals.some((manual) => manual.no === selectedManualNo)) {
+      setSelectedManualNo(manuals[0]?.no ?? 1);
+    }
+  }, [manuals, selectedManualNo]);
+  const manual = manuals.find((item) => item.no === selectedManualNo) ?? null;
+
+  return (
+    <MikkeSection title="マニュアル" tone="editorial">
+      <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">担当予定がない日も、プロジェクトのマニュアルをいつでも確認できます。</p>
+      {manuals.length ? (
+        <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <nav className="space-y-2" aria-label="マニュアル一覧">
+            {manuals.map((item) => (
+              <button
+                key={item.no}
+                type="button"
+                onClick={() => setSelectedManualNo(item.no)}
+                className={`w-full rounded-xl border px-3 py-3 text-left text-sm font-bold ${item.no === selectedManualNo ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]" : "border-[var(--mikke-line)] bg-white"}`}
+              >
+                <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em]">No.{item.no}</span>
+                <span className="mt-1 block">{item.title}</span>
+              </button>
+            ))}
+          </nav>
+          {manual ? (
+            <article className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h3 className="text-lg font-extrabold">No.{manual.no} {manual.title}</h3>
+                {manual.materialUrl ? <a href={manual.materialUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">教材 <ExternalLink size={12} /></a> : null}
+              </div>
+              {manual.body ? <p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-7">{manual.body}</p> : <p className="mt-4 text-xs font-semibold text-[var(--mikke-muted)]">本文はまだ登録されていません。</p>}
+              <ManualList label="質問" values={manual.questions} />
+              <ManualList label="表現" values={manual.expressions} />
+              {manual.cautions ? <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold leading-5 text-amber-900">指導上の注意：{manual.cautions}</p> : null}
+            </article>
+          ) : null}
+        </div>
+      ) : <MikkeEmptyState title="マニュアルはまだ共有されていません" helper="本部のマニュアル管理で「組織共有」を有効にすると表示されます。" />}
+    </MikkeSection>
   );
 }
 
