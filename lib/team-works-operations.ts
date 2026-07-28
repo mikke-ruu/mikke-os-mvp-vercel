@@ -58,6 +58,7 @@ export type RecentOperationsComment = {
 export type OperationsDashboardData = {
   hasOperationsProjects: boolean;
   projects: OperationsProjectSummary[];
+  activePresenceEvents: OperationsCalendarEvent[];
   monthEvents: OperationsCalendarEvent[];
   monthHolidayDates: Set<string>;
   monthHolidays: OperationsHoliday[];
@@ -263,6 +264,20 @@ async function fetchSessionRows(client: SupabaseClient, projectIds: string[], fr
   }[];
 }
 
+async function fetchActivePresenceSessionRows(client: SupabaseClient, projectIds: string[]) {
+  if (projectIds.length === 0) return [];
+  const { data, error } = await client
+    .from("team_works_op_sessions")
+    .select("id,project_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,partner_presence_status")
+    .in("project_id", projectIds)
+    .in("partner_presence_status", ["standby", "in_progress"])
+    .neq("status", "cancelled")
+    .order("session_date", { ascending: true })
+    .order("start_time", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Awaited<ReturnType<typeof fetchSessionRows>>;
+}
+
 async function fetchHolidayRows(
   client: SupabaseClient,
   organizationIds: string[],
@@ -365,6 +380,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
   const empty: OperationsDashboardData = {
     hasOperationsProjects: false,
     projects: [],
+    activePresenceEvents: [],
     monthEvents: [],
     monthHolidayDates: new Set(),
     monthHolidays: [],
@@ -393,9 +409,10 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
   const attentionEndKey = formatDateKey(addDays(today, 6));
   const upcomingEndKey = formatDateKey(addDays(today, 60));
 
-  const [memberNameById, sessionRows, holidayRows, unassignedRows, upcomingRows, commentRows] = await Promise.all([
+  const [memberNameById, sessionRows, activePresenceRows, holidayRows, unassignedRows, upcomingRows, commentRows] = await Promise.all([
     fetchOrganizationMemberNames(client, organizationIds),
     fetchSessionRows(client, projectIds, gridStartKey, gridEndKey),
+    fetchActivePresenceSessionRows(client, projectIds),
     fetchHolidayRows(client, organizationIds, projectIds, gridStartKey, gridEndKey),
     fetchUnassignedUpcomingSessionRows(client, projectIds, todayKey, attentionEndKey),
     fetchSessionRows(client, projectIds, todayKey, upcomingEndKey),
@@ -403,7 +420,24 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
   ]);
 
   const sessionIds = sessionRows.map((row) => row.id);
-  const rosterCounts = await fetchRosterCounts(client, [...new Set([...sessionIds, ...unassignedRows.map((row) => row.id), ...upcomingRows.map((row) => row.id)])]);
+  const rosterCounts = await fetchRosterCounts(client, [...new Set([
+    ...sessionIds,
+    ...activePresenceRows.map((row) => row.id),
+    ...unassignedRows.map((row) => row.id),
+    ...upcomingRows.map((row) => row.id)
+  ])]);
+
+  const activePresenceEvents = activePresenceRows
+    .flatMap((row) => {
+      const event = assembleEvent(row, projectById, memberNameById, rosterCounts);
+      return event ? [event] : [];
+    })
+    .sort((a, b) => {
+      if (a.partnerPresenceStatus !== b.partnerPresenceStatus) {
+        return a.partnerPresenceStatus === "in_progress" ? -1 : 1;
+      }
+      return (a.sessionDate + a.startTime).localeCompare(b.sessionDate + b.startTime);
+    });
 
   const monthEvents = sessionRows
     .filter((row) => row.status !== "cancelled" && !isJapanDayOffKey(row.session_date))
@@ -448,6 +482,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
   return {
     hasOperationsProjects: true,
     projects,
+    activePresenceEvents,
     monthEvents,
     monthHolidayDates: new Set(holidayRows.map((holiday) => holiday.date)),
     monthHolidays: holidayRows,

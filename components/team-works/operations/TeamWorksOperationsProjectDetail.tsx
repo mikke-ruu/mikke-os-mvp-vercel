@@ -118,6 +118,11 @@ export function TeamWorksProjectDetailRoute({ projectId }: { projectId: string }
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const timerId = window.setInterval(() => void load(), 5000);
+    return () => window.clearInterval(timerId);
+  }, [load]);
+
   if (error) {
     return (
       <TeamWorksOperationsShell title="プロジェクト詳細">
@@ -256,6 +261,14 @@ function OverviewTab({
 }) {
   const nowKey = toDateKey(new Date());
   const activeSessions = data.sessions.filter((session) => session.status !== "cancelled");
+  const liveSessions = activeSessions
+    .filter((session) => session.partnerPresenceStatus === "standby" || session.partnerPresenceStatus === "in_progress")
+    .sort((a, b) => {
+      if (a.partnerPresenceStatus !== b.partnerPresenceStatus) {
+        return a.partnerPresenceStatus === "in_progress" ? -1 : 1;
+      }
+      return (a.sessionDate + a.startTime).localeCompare(b.sessionDate + b.startTime);
+    });
   const upcoming = activeSessions.filter((session) => session.sessionDate >= nowKey);
   const todaySession = upcoming.find((session) => session.sessionDate === nowKey);
   const startOfWeek = startOfMonday(new Date());
@@ -267,6 +280,36 @@ function OverviewTab({
 
   return (
     <div className="space-y-6">
+      {liveSessions.length > 0 ? (
+        <section aria-live="polite" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Clock3 size={18} className="text-emerald-700" />
+            <h2 className="text-sm font-extrabold text-emerald-950">只今のレッスン状況</h2>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {liveSessions.map((session) => (
+              <button
+                key={session.id}
+                type="button"
+                onClick={() => onSelectTab("schedule")}
+                className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-3 text-left"
+              >
+                <PartnerPresenceBadge status={session.partnerPresenceStatus} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-extrabold">
+                    {formatDate(session.sessionDate)} {session.startTime}〜{endTime(session.startTime, session.durationMin)}
+                  </span>
+                  <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">
+                    担当 {session.partnerName ?? "未定"} · 名簿{session.roster.length}名
+                  </span>
+                </span>
+                <span className="text-xs font-bold text-[var(--mikke-primary)]">確認</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <button
         type="button"
         onClick={() => onSelectTab("schedule")}
@@ -509,7 +552,25 @@ function ProjectCalendarPanel({
               } ${inMonth ? "" : "opacity-40"}`}>
                 <span className="block text-[10px] font-bold">{date.getDate()}</span>
                 <span className="mt-1 flex flex-wrap gap-1">
-                  {sessions.slice(0, 2).map((session) => <span key={session.id} className="rounded bg-[var(--mikke-primary)] px-1 py-0.5 text-[8px] font-bold text-white">{session.startTime}</span>)}
+                  {sessions.slice(0, 2).map((session) => (
+                    <span
+                      key={session.id}
+                      className={`rounded px-1 py-0.5 text-[8px] font-bold ${
+                        session.partnerPresenceStatus === "in_progress"
+                          ? "bg-emerald-600 text-white"
+                          : session.partnerPresenceStatus === "standby"
+                            ? "bg-amber-400 text-amber-950"
+                            : "bg-[var(--mikke-primary)] text-white"
+                      }`}
+                    >
+                      {session.startTime}
+                      {session.partnerPresenceStatus === "standby"
+                        ? " スタンバイ"
+                        : session.partnerPresenceStatus === "in_progress"
+                          ? " 実施中"
+                          : ""}
+                    </span>
+                  ))}
                   {sessions.length >= 3 ? <span className="rounded bg-[var(--mikke-yellow)] px-1 py-0.5 text-[8px] font-extrabold text-slate-900">全{sessions.length}件</span> : null}
                   {holiday ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
                   {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-orange-100 px-1 py-0.5 text-[8px] font-bold text-orange-800">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}

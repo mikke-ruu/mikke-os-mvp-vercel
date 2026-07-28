@@ -510,7 +510,7 @@ export async function updateOperationsPartnerSessionZoom(
 export async function updateOperationsPartnerPresence(
   client: SupabaseClient,
   sessionId: string,
-  status: "standby" | "in_progress" | "ended"
+  status: "not_started" | "standby" | "in_progress" | "ended"
 ) {
   const { error } = await client.rpc("team_works_update_partner_presence", {
     p_session_id: sessionId,

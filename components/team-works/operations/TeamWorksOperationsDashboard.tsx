@@ -54,6 +54,11 @@ export function TeamWorksOperationsDashboard() {
   }, [monthDate, load]);
 
   useEffect(() => {
+    const timerId = window.setInterval(() => void load(monthDate), 5000);
+    return () => window.clearInterval(timerId);
+  }, [load, monthDate]);
+
+  useEffect(() => {
     if (calendarAutoPositioned || !data) return;
     const todayKey = formatDateKey(new Date());
     const hasFutureEventInVisibleMonth = data.monthEvents.some((event) => event.sessionDate >= todayKey);
@@ -94,6 +99,36 @@ export function TeamWorksOperationsDashboard() {
 
   return (
     <div className="space-y-6">
+      {data.activePresenceEvents.length > 0 ? (
+        <section aria-live="polite" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Clock size={18} className="text-emerald-700" />
+            <h2 className="text-sm font-extrabold text-emerald-950">只今のレッスン状況</h2>
+            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+              {data.activePresenceEvents.length}件
+            </span>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {data.activePresenceEvents.map((event) => (
+              <Link
+                key={event.id}
+                href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
+                className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-3"
+              >
+                <PartnerPresenceLabel status={event.partnerPresenceStatus} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-extrabold">{event.projectTitle}</span>
+                  <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">
+                    {event.sessionDate} {event.startTime} · 担当 {event.partnerName ?? "未定"}
+                  </span>
+                </span>
+                <span className="text-xs font-bold text-[var(--mikke-primary)]">確認</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.7fr_1fr]">
         <TeamWorksMonthCalendar
           monthDate={monthDate}

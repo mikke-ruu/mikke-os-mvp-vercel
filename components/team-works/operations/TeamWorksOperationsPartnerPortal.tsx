@@ -424,17 +424,24 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
     return () => window.clearInterval(timerId);
   }, [timerRunning]);
 
-  async function changePresence(next: "standby" | "in_progress" | "ended") {
+  async function changePresence(next: "not_started" | "standby" | "in_progress" | "ended") {
     setPresenceBusy(true);
     setPresenceNotice(null);
     try {
       await updateOperationsPartnerPresence(supabase, session.id, next);
       setPresence(next);
       if (next === "standby") setControlsCollapsed(true);
+      if (next === "not_started") setControlsCollapsed(false);
       if (next === "ended") setTimerRunning(false);
       setPresenceNotice({
         tone: "success",
-        text: next === "standby" ? "本部へスタンバイを通知しました。" : next === "ended" ? "レッスン終了を通知しました。" : "本部へレッスン開始を通知しました。"
+        text: next === "not_started"
+          ? "スタンバイ前に戻しました。"
+          : next === "standby"
+            ? "本部へスタンバイを通知しました。"
+            : next === "ended"
+              ? "レッスン終了を通知しました。"
+              : "本部へレッスン開始を通知しました。"
       });
       await onRefresh();
       return true;
@@ -498,8 +505,18 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
               </button>
             ) : null}
             {presence === "standby" ? (
-              <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
-                <Play size={14} />レッスン開始
+              <>
+                <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  <Play size={14} />レッスン開始
+                </button>
+                <button type="button" disabled={presenceBusy} onClick={() => void changePresence("not_started")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                  <RotateCcw size={13} />スタンバイ前に戻す
+                </button>
+              </>
+            ) : null}
+            {presence === "in_progress" ? (
+              <button type="button" disabled={presenceBusy} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                <RotateCcw size={13} />スタンバイに戻す
               </button>
             ) : null}
             {session.zoomUrl ? (

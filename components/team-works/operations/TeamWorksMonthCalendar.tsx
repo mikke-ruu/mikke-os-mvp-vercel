@@ -147,10 +147,23 @@ export function TeamWorksMonthCalendar({
                 {visibleEvents.map((event) => (
                   <span
                     key={event.id}
-                    className="mt-0.5 block truncate rounded px-1 py-[1px] text-[8px] font-bold"
-                    style={{ background: event.bg, color: event.fg }}
+                    className={`mt-0.5 block truncate rounded px-1 py-[1px] text-[8px] font-bold ${
+                      event.partnerPresenceStatus === "in_progress"
+                        ? "bg-emerald-600 text-white"
+                        : event.partnerPresenceStatus === "standby"
+                          ? "bg-amber-400 text-amber-950"
+                          : ""
+                    }`}
+                    style={event.partnerPresenceStatus === "not_started" || event.partnerPresenceStatus === "ended"
+                      ? { background: event.bg, color: event.fg }
+                      : undefined}
                   >
                     {event.projectTitle} {event.startTime}
+                    {event.partnerPresenceStatus === "standby"
+                      ? " スタンバイ"
+                      : event.partnerPresenceStatus === "in_progress"
+                        ? " 実施中"
+                        : ""}
                   </span>
                 ))}
                 {overflowCount > 0 ? <span className="mt-0.5 block text-[8px] font-bold text-[var(--mikke-muted-light)]">+{overflowCount}</span> : null}
