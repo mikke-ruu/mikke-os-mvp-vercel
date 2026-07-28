@@ -133,9 +133,11 @@ export function SchoolCalendar({ state, updateState }: Props) {
                 }}
                 aria-label={`${key}${isHoliday ? "（休講）" : ""}`}
                 className={`flex min-h-[74px] cursor-pointer flex-col items-start gap-1 rounded-xl border p-1.5 text-left sm:min-h-[92px] ${
-                  isHoliday || japanDayOff.isDayOff
+                  isHoliday
                     ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]"
-                    : "border-transparent hover:bg-[var(--mikke-surface-soft)]"
+                    : japanDayOff.isDayOff
+                      ? "border-[var(--mikke-pink)] bg-[var(--mikke-pink)]"
+                      : "border-transparent hover:bg-[var(--mikke-surface-soft)]"
                 } ${inMonth ? "" : "opacity-40"}`}
               >
                 <div className="flex w-full items-center justify-between">
@@ -151,7 +153,7 @@ export function SchoolCalendar({ state, updateState }: Props) {
                       休
                     </span>
                   ) : japanDayOff.isDayOff ? (
-                    <span title={japanDayOff.label ?? undefined} className="max-w-[72%] truncate rounded-full border border-[var(--mikke-line)] bg-white px-1.5 py-0.5 text-[9px] font-bold text-[var(--mikke-muted)]">
+                    <span title={japanDayOff.label ?? undefined} className="max-w-[72%] truncate rounded-full bg-white px-1.5 py-0.5 text-[9px] font-bold text-[var(--tw-on-tint)]">
                       {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
                     </span>
                   ) : null}

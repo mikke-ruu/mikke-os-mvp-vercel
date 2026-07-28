@@ -547,7 +547,7 @@ function ProjectCalendarPanel({
                 key === selectedDate
                   ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]"
                   : japanDayOff.isDayOff
-                    ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]"
+                    ? "border-[var(--mikke-pink)] bg-[var(--mikke-pink)]"
                     : "border-[var(--mikke-line)] bg-white"
               } ${inMonth ? "" : "opacity-40"}`}>
                 <span className="block text-[10px] font-bold">{date.getDate()}</span>
@@ -573,17 +573,17 @@ function ProjectCalendarPanel({
                   ))}
                   {sessions.length >= 3 ? <span className="rounded bg-[var(--mikke-yellow)] px-1 py-0.5 text-[8px] font-extrabold text-[var(--tw-on-tint)]">全{sessions.length}件</span> : null}
                   {holiday ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
-                  {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-1 py-0.5 text-[8px] font-bold text-[var(--mikke-muted)]">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}
+                  {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold text-[var(--tw-on-tint)]">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}
                 </span>
               </button>;
             })}
           </div>
-          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-pink)]" />休講 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" />土日祝 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />パートナー稼働可能日（接続準備中）</p>
+          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm border border-[var(--mikke-pink)] bg-[var(--mikke-pink)]" />休講・土日祝 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />パートナー稼働可能日（接続準備中）</p>
         </div>
         <aside className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
           <h3 className="text-sm font-extrabold">{formatDate(selectedDate)} の予定詳細</h3>
           {selectedJapanDayOff.isDayOff ? (
-            <p className="mt-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">
+            <p className="mt-3 rounded-xl bg-[var(--mikke-pink)] px-3 py-2 text-xs font-bold text-[var(--tw-on-tint)]">
               休校日{selectedJapanDayOff.isNationalHoliday && selectedJapanDayOff.label ? `（${selectedJapanDayOff.label}）` : ""}
             </p>
           ) : null}

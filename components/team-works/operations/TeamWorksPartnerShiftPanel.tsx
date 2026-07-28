@@ -145,7 +145,7 @@ export function TeamWorksPartnerShiftPanel() {
                       selected
                         ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white"
                         : japanDayOff.isDayOff
-                          ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]"
+                          ? "border-[var(--mikke-pink)] bg-[var(--mikke-pink)] text-[var(--tw-on-tint)]"
                           : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"
                     } ${inMonth ? "" : "opacity-25"} disabled:cursor-default`}
                   >

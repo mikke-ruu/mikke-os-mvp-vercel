@@ -125,9 +125,9 @@ export function TeamWorksMonthCalendar({
                 type="button"
                 onClick={() => onSelectDay(dateKey)}
                 className={`min-h-[60px] rounded-lg border p-1 text-left ${
-                  japanDayOff.isDayOff ? "bg-[var(--mikke-surface-soft)]" : "bg-white"
+                  japanDayOff.isDayOff ? "border-[var(--mikke-pink)] bg-[var(--mikke-pink)]" : "border-[var(--mikke-line)] bg-white"
                 } ${
-                  isToday ? "border-[1.5px] border-[var(--mikke-green)]" : "border-[var(--mikke-line)]"
+                  isToday ? "border-[1.5px] border-[var(--mikke-green)]" : ""
                 }`}
               >
                 <span className={`text-[10px] font-bold ${isToday ? "text-[var(--mikke-success)]" : "text-[var(--mikke-muted)]"}`}>
@@ -135,7 +135,7 @@ export function TeamWorksMonthCalendar({
                 </span>
                 {isHoliday ? <span className="mt-0.5 block text-[8px] font-extrabold text-[var(--mikke-accent)]">休校</span> : null}
                 {!isHoliday && japanDayOff.isDayOff ? (
-                  <span title={japanDayOff.label ?? undefined} className="mt-0.5 block truncate text-[8px] font-extrabold text-[var(--mikke-muted)]">
+                  <span title={japanDayOff.label ?? undefined} className="mt-0.5 block truncate text-[8px] font-extrabold text-[var(--tw-on-tint)]">
                     {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
                   </span>
                 ) : null}
@@ -191,7 +191,7 @@ export function TeamWorksMonthCalendar({
           休校
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" />
+          <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--mikke-pink)]" />
           土日祝
         </span>
         {shiftAvailability.length > 0 ? (

@@ -120,7 +120,7 @@ export function ClientMonthCalendar({
                 key === selectedDate
                   ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]"
                   : japanDayOff.isDayOff
-                    ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]"
+                    ? "border-[var(--mikke-pink)] bg-[var(--mikke-pink)]"
                     : "border-[var(--mikke-line)] bg-white"
               } ${inMonth ? "" : "opacity-40"}`}
             >
@@ -139,7 +139,7 @@ export function ClientMonthCalendar({
                 ) : null}
                 {dayHolidays.length > 0 ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
                 {dayHolidays.length === 0 && japanDayOff.isDayOff ? (
-                  <span title={japanDayOff.label ?? undefined} className="truncate rounded border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-1 py-0.5 text-[8px] font-bold text-[var(--mikke-muted)]">
+                  <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold text-[var(--tw-on-tint)]">
                     {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
                   </span>
                 ) : null}
@@ -149,7 +149,7 @@ export function ClientMonthCalendar({
         })}
       </div>
       <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold text-[var(--mikke-muted)]">
-        <span className="h-2.5 w-2.5 rounded-[3px] border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" />
+        <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--mikke-pink)]" />
         土日祝
       </p>
     </div>
