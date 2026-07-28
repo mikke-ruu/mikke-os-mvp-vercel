@@ -57,6 +57,7 @@ export type OperationsPartnerSession = {
 export type OperationsPartnerPortalData = {
   memberName: string | null;
   projectCount: number;
+  projects: { id: string; title: string }[];
   offers: { projectId: string; projectTitle: string; organizationMemberId: string; requestedAt: string }[];
   today: OperationsPartnerSession[];
   upcoming: OperationsPartnerSession[];
@@ -168,7 +169,7 @@ export async function loadOperationsPartnerPortal(
   const members = (memberResult.data ?? []) as MemberRow[];
   const memberIds = members.map((member) => member.id);
   if (memberIds.length === 0) {
-    return { memberName: null, projectCount: 0, offers: [], today: [], upcoming: [] };
+    return { memberName: null, projectCount: 0, projects: [], offers: [], today: [], upcoming: [] };
   }
 
   const projectMemberResult = await client
@@ -185,10 +186,18 @@ export async function loadOperationsPartnerPortal(
   if (offerResult.error) throw offerResult.error;
   const offerRows = (offerResult.data ?? []) as { project_id: string; organization_member_id: string; status: string; requested_at: string }[];
   const waitingOffers = offerRows.filter((offer) => offer.status === "pending");
-  const unavailableProjectIds = new Set(offerRows.filter((offer) => offer.status !== "accepted").map((offer) => offer.project_id));
+  const offerRowsByMembership = new Map<string, typeof offerRows>();
+  for (const offer of offerRows) {
+    const key = `${offer.project_id}:${offer.organization_member_id}`;
+    offerRowsByMembership.set(key, [...(offerRowsByMembership.get(key) ?? []), offer]);
+  }
+  const acceptedProjectMembers = projectMembers.filter((membership) => {
+    const pairOffers = offerRowsByMembership.get(`${membership.project_id}:${membership.organization_member_id}`) ?? [];
+    return pairOffers.length === 0 || pairOffers.some((offer) => offer.status === "accepted");
+  });
   const projectIds = [...new Set(projectMembers.map((row) => row.project_id))];
   if (projectIds.length === 0) {
-    return { memberName: members[0]?.display_name ?? null, projectCount: 0, offers: [], today: [], upcoming: [] };
+    return { memberName: members[0]?.display_name ?? null, projectCount: 0, projects: [], offers: [], today: [], upcoming: [] };
   }
 
   const projectResult = await client
@@ -200,13 +209,17 @@ export async function loadOperationsPartnerPortal(
   if (projectResult.error) throw projectResult.error;
   const projects = (projectResult.data ?? []) as ProjectRow[];
   const projectTitleById = new Map(projects.map((project) => [project.id, project.title]));
-  const operationsProjectIds = projects.map((project) => project.id).filter((projectId) => !unavailableProjectIds.has(projectId));
+  const acceptedProjectIds = new Set(acceptedProjectMembers.map((membership) => membership.project_id));
+  const portalProjects = projects
+    .filter((project) => acceptedProjectIds.has(project.id))
+    .map((project) => ({ id: project.id, title: project.title }));
+  const operationsProjectIds = portalProjects.map((project) => project.id);
   const offers = waitingOffers.flatMap((offer) => {
     const projectTitle = projectTitleById.get(offer.project_id);
     return projectTitle ? [{ projectId: offer.project_id, projectTitle, organizationMemberId: offer.organization_member_id, requestedAt: offer.requested_at }] : [];
   });
   if (operationsProjectIds.length === 0) {
-    return { memberName: members[0]?.display_name ?? null, projectCount: 0, offers, today: [], upcoming: [] };
+    return { memberName: members[0]?.display_name ?? null, projectCount: 0, projects: [], offers, today: [], upcoming: [] };
   }
 
   const today = dateKey(new Date());
@@ -240,7 +253,9 @@ export async function loadOperationsPartnerPortal(
   if (sessions.length === 0) {
     return {
       memberName: members[0]?.display_name ?? null,
-      projectCount: operationsProjectIds.length, offers,
+      projectCount: operationsProjectIds.length,
+      projects: portalProjects,
+      offers,
       today: [],
       upcoming: []
     };
@@ -362,6 +377,7 @@ export async function loadOperationsPartnerPortal(
   return {
     memberName: members[0]?.display_name ?? null,
     projectCount: operationsProjectIds.length,
+    projects: portalProjects,
     offers,
     today: mapped.filter((session) => session.sessionDate === today),
     upcoming: mapped.filter((session) => session.sessionDate !== today)
@@ -382,6 +398,37 @@ export async function respondToOperationsPartnerOffer(
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("参加依頼を更新できませんでした。");
+
+  // Keep the directory assignment in sync with the accepted/declined offer.
+  // Portal visibility itself is based on the exact project membership +
+  // offer pair above, but this status is what headquarters sees.
+  const { data: userData } = await client.auth.getUser();
+  const normalizedEmail = userData.user?.email?.trim().toLowerCase();
+  if (!normalizedEmail) return;
+  const memberResult = await client
+    .from("team_works_organization_members")
+    .select("organization_id")
+    .eq("id", input.organizationMemberId)
+    .maybeSingle();
+  if (memberResult.error) throw memberResult.error;
+  if (!memberResult.data) return;
+  const partnerResult = await client
+    .from("team_works_partners")
+    .select("id")
+    .eq("organization_id", memberResult.data.organization_id)
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+  if (partnerResult.error) throw partnerResult.error;
+  if (!partnerResult.data) return;
+  const { error: linkError } = await client
+    .from("team_works_project_partners")
+    .update({
+      status: input.accept ? "active" : "archived",
+      updated_at: new Date().toISOString()
+    })
+    .eq("project_id", input.projectId)
+    .eq("partner_id", partnerResult.data.id);
+  if (linkError) throw linkError;
 }
 
 export async function submitOperationsPartnerReport(

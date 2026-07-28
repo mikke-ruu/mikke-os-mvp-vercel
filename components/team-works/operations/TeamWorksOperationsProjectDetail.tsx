@@ -1550,7 +1550,9 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
     setMessage("");
     try {
       const result = await addOperationsClientToProject(supabase, { projectId: data.project.id, clientId });
-      if (result.status === "invited") {
+      if (result.status === "assigned") {
+        setMessage(`${result.displayName} さんはすでにこのプロジェクトへ参加しています。重複招待は作成しませんでした。`);
+      } else if (result.status === "invited") {
         setMessage(`${result.displayName} さんをこのプロジェクトに追加しました。クライアントのポータルに「承認のお知らせ」が届き、承認すると参加が有効になります。`);
       } else {
         setMessage(`${result.email} さんはまだポータルにログインしていません。「クライアント管理」の固定URLを渡してログインしてもらうと開通し、その後この追加が有効になります。`);

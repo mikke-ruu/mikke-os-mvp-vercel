@@ -18,8 +18,10 @@ function nextMonth(): Date {
   return new Date(now.getFullYear(), now.getMonth() + 1, 1);
 }
 
-function submissionDeadline(targetMonth: Date): Date {
-  return new Date(targetMonth.getFullYear(), targetMonth.getMonth() - 1, 25, 23, 59, 59);
+function submissionDeadline(targetMonth: Date, configuredDay: number): Date {
+  const lastDayOfPreviousMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 0).getDate();
+  const day = Math.min(Math.max(1, configuredDay), lastDayOfPreviousMonth);
+  return new Date(targetMonth.getFullYear(), targetMonth.getMonth() - 1, day, 23, 59, 59);
 }
 
 function statusLabel(status: PartnerShiftSubmission["status"]): string {
@@ -32,6 +34,7 @@ export function TeamWorksPartnerShiftPanel() {
   const [desiredDays, setDesiredDays] = useState(4);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [note, setNote] = useState("");
+  const [shiftDeadlineDay, setShiftDeadlineDay] = useState(25);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -42,6 +45,7 @@ export function TeamWorksPartnerShiftPanel() {
     try {
       const result = await loadMyPartnerShift(supabase, targetMonth);
       setSubmission(result.submission);
+      setShiftDeadlineDay(result.shiftDeadlineDay);
       setDesiredDays(result.submission?.desiredDays ?? 4);
       setAvailableDates(result.submission?.availableDates ?? []);
       setNote(result.submission?.note ?? "");
@@ -55,7 +59,7 @@ export function TeamWorksPartnerShiftPanel() {
   useEffect(() => { void load(); }, [load]);
 
   const calendarDates = useMemo(() => buildCalendarGridDates(targetMonth), [targetMonth]);
-  const deadline = submissionDeadline(targetMonth);
+  const deadline = submissionDeadline(targetMonth, shiftDeadlineDay);
   const deadlinePassed = Date.now() > deadline.getTime();
   const confirmed = submission?.status === "confirmed";
 
@@ -83,7 +87,7 @@ export function TeamWorksPartnerShiftPanel() {
 
   return (
     <section className="space-y-4">
-      <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+      <div className="rounded-2xl border border-[#f9d3d2] bg-[#f9d3d2]/25 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="inline-flex items-center gap-2 text-sm font-extrabold text-[var(--mikke-primary)]">
@@ -101,7 +105,7 @@ export function TeamWorksPartnerShiftPanel() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3 sm:p-4">
+      <div className="rounded-2xl border border-[#ffd370] bg-[#ffd370]/10 p-3 sm:p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
           <button type="button" aria-label="前月" onClick={() => setTargetMonth((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))} className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)]">
             <ChevronLeft size={16} />

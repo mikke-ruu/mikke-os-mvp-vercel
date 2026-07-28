@@ -122,10 +122,7 @@ export function TeamWorksPartnerLessonWindow({ sessionId }: { sessionId: string 
 
 function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalData; onRefresh: () => Promise<void> }) {
   const sessions = useMemo(() => [...data.today, ...data.upcoming], [data.today, data.upcoming]);
-  const projects = useMemo(
-    () => [...new Map(sessions.map((session) => [session.projectId, { id: session.projectId, title: session.projectTitle }])).values()],
-    [sessions]
-  );
+  const projects = data.projects;
   const [activeView, setActiveView] = useState("home");
   const [projectTab, setProjectTab] = useState<"calendar" | "schedule">("calendar");
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
@@ -187,8 +184,9 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
           onOpenProject={(projectId, tab) => { setActiveView(projectId); setProjectTab(tab); }}
           onOpenShifts={() => setActiveView("shifts")}
         />
-      ) : sessions.length ? (
+      ) : projects.some((project) => project.id === activeView) ? (
         <PartnerProject
+          project={projects.find((project) => project.id === activeView)!}
           projectId={activeView}
           sessions={sessions}
           selectedDate={selectedDate}
@@ -243,22 +241,24 @@ function PartnerHome({
           title="希望シフトを提出"
           detail="稼働できる日を本部へ共有"
           onClick={onOpenShifts}
-          emphasized
+          tone="yellow"
         />
         <PartnerHomeAction
           icon={<CalendarDays size={18} />}
           title="次回レッスン"
           detail={nextSession ? `${nextSession.projectTitle}・${formatDate(nextSession.sessionDate)} ${nextSession.startTime}` : "予定はありません"}
           onClick={nextSession ? () => onOpenProject(nextSession.projectId, "schedule") : undefined}
+          tone="pink"
         />
-        <PartnerHomeAction icon={<UsersRound size={18} />} title="本日の担当" detail={`${data.today.length}件`} />
-        <PartnerHomeAction icon={<List size={18} />} title="30日以内" detail={`${sessions.length}件`} onClick={nextSession ? () => onOpenProject(nextSession.projectId, "schedule") : undefined} />
+        <PartnerHomeAction icon={<UsersRound size={18} />} title="本日の担当" detail={`${data.today.length}件`} tone="green" />
+        <PartnerHomeAction icon={<List size={18} />} title="30日以内" detail={`${sessions.length}件`} onClick={nextSession ? () => onOpenProject(nextSession.projectId, "schedule") : undefined} tone="orange" />
       </div>
     </div>
   );
 }
 
 function PartnerProject({
+  project,
   projectId,
   sessions,
   selectedDate,
@@ -266,6 +266,7 @@ function PartnerProject({
   tab,
   onTabChange
 }: {
+  project: OperationsPartnerPortalData["projects"][number];
   projectId: string;
   sessions: OperationsPartnerSession[];
   selectedDate: string;
@@ -274,7 +275,7 @@ function PartnerProject({
   onTabChange: (tab: "calendar" | "schedule") => void;
 }) {
   const projectSessions = sessions.filter((session) => session.projectId === projectId);
-  const title = projectSessions[0]?.projectTitle ?? "プロジェクト";
+  const title = project.title;
   const daySessions = projectSessions.filter((session) => session.sessionDate === selectedDate);
   return (
     <div className="space-y-5">
@@ -321,9 +322,15 @@ function PartnerScheduleRow({ session }: { session: OperationsPartnerSession }) 
   );
 }
 
-function PartnerHomeAction({ icon, title, detail, onClick, emphasized = false }: { icon: React.ReactNode; title: string; detail: string; onClick?: () => void; emphasized?: boolean }) {
+function PartnerHomeAction({ icon, title, detail, onClick, tone = "green" }: { icon: React.ReactNode; title: string; detail: string; onClick?: () => void; tone?: "green" | "orange" | "pink" | "yellow" }) {
+  const toneClass = {
+    green: "border-[#8bc7ad] bg-[#8bc7ad]/20",
+    orange: "border-[#f75a3b]/50 bg-[#f75a3b]/10",
+    pink: "border-[#f9d3d2] bg-[#f9d3d2]/35",
+    yellow: "border-[#ffd370] bg-[#ffd370]/25"
+  }[tone];
   const content = <><div className="flex items-center gap-2 text-[var(--mikke-primary)]">{icon}<span className="text-xs font-bold">{title}</span></div><p className="mt-3 text-sm font-extrabold">{detail}</p></>;
-  return onClick ? <button type="button" onClick={onClick} className={`rounded-2xl border p-4 text-left ${emphasized ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>{content}</button> : <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">{content}</div>;
+  return onClick ? <button type="button" onClick={onClick} className={`rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 ${toneClass}`}>{content}</button> : <div className={`rounded-2xl border p-4 ${toneClass}`}>{content}</div>;
 }
 
 function PartnerProfileDetails() {

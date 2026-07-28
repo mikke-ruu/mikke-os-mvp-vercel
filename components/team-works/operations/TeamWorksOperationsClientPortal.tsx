@@ -336,6 +336,7 @@ function ProjectCalendarTab({
   const daySessions = projectSessions.filter((session) => session.sessionDate === selectedDate && session.status !== "cancelled");
   const dayHoliday = projectHolidays.find((holiday) => holiday.date === selectedDate);
   const participants = data.participants.filter((participant) => participant.projectId === project.id);
+  const groups = data.groups.filter((group) => group.projectId === project.id);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]">
@@ -351,7 +352,7 @@ function ProjectCalendarTab({
               <div key={session.id}>
                 <SessionSummary session={session} />
                 <div className="mt-3">
-                  <RosterEditor session={session} participants={participants} mutate={mutate} />
+                  <RosterEditor session={session} participants={participants} groups={groups} mutate={mutate} />
                 </div>
               </div>
             ))}
@@ -366,13 +367,71 @@ function SessionSummary({ session }: { session: OperationsClientSession }) {
   return <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4"><p className="font-extrabold">{session.startTime}〜{endTime(session.startTime, session.durationMin)}</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">担当：{session.partnerName ?? "担当未定"}</p>{session.zoomUrl || session.zoomMeetingId ? <div className="mt-3 border-t border-[var(--mikke-line)] pt-3"><p className="text-xs font-extrabold text-[var(--mikke-primary)]">Zoom</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{session.zoomMeetingId ? `ID ${session.zoomMeetingId}` : "参加URL"}{session.zoomPasscode ? ` ／ パスコード ${session.zoomPasscode}` : ""}</p>{session.zoomUrl ? <a href={session.zoomUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white"><ExternalLink size={13} />Zoomを開く</a> : null}</div> : null}</div>;
 }
 
-function RosterEditor({ session, participants, mutate }: { session: OperationsClientSession; participants: OperationsClientPortalData["participants"]; mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice> }) {
+function RosterEditor({
+  session,
+  participants,
+  groups,
+  mutate
+}: {
+  session: OperationsClientSession;
+  participants: OperationsClientPortalData["participants"];
+  groups: OperationsClientPortalData["groups"];
+  mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice>;
+}) {
   const [selectedIds, setSelectedIds] = useState(session.roster.map((item) => item.participantId));
+  const [groupFilter, setGroupFilter] = useState("all");
   const [saveNotice, setSaveNotice] = useState<MutationNotice | null>(null);
   useEffect(() => { setSelectedIds(session.roster.map((item) => item.participantId)); }, [session.id, session.roster]);
+  useEffect(() => {
+    if (groupFilter !== "all" && !groups.some((group) => group.id === groupFilter)) setGroupFilter("all");
+  }, [groupFilter, groups]);
+  const visibleParticipants = groupFilter === "all"
+    ? participants
+    : participants.filter((participant) => participant.groupId === groupFilter);
   function toggle(id: string) { setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]); }
   function move(id: string, direction: -1 | 1) { setSelectedIds((current) => { const index = current.indexOf(id); const nextIndex = index + direction; if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current; const next = [...current]; [next[index], next[nextIndex]] = [next[nextIndex], next[index]]; return next; }); }
-  return <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4"><p className="mb-3 text-xs font-bold text-[var(--mikke-muted)]">出席順を確定</p><div className="space-y-2">{participants.map((participant) => { const index = selectedIds.indexOf(participant.id); return <div key={participant.id} className={`flex items-center gap-2 rounded-xl border p-3 ${index >= 0 ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}><input id={`participant-${session.id}-${participant.id}`} type="checkbox" checked={index >= 0} onChange={() => toggle(participant.id)} className="h-4 w-4" /><label htmlFor={`participant-${session.id}-${participant.id}`} className="min-w-0 flex-1 text-sm font-extrabold">{index >= 0 ? `${index + 1}. ` : ""}{participant.name}</label>{index >= 0 ? <div className="flex gap-1"><button type="button" onClick={() => move(participant.id, -1)} aria-label="上へ" className="rounded-lg p-1 text-[var(--mikke-primary)]"><ChevronUp size={17} /></button><button type="button" onClick={() => move(participant.id, 1)} aria-label="下へ" className="rounded-lg p-1 text-[var(--mikke-primary)]"><ChevronDown size={17} /></button></div> : null}</div>; })}{!participants.length ? <MikkeEmptyState title="名簿はまだありません" helper="名簿タブから対象者を登録してください。" /> : null}</div><div className="mt-4 flex flex-wrap items-center gap-2"><button type="button" onClick={() => void mutate(() => saveOperationsClientSessionRoster(supabase, { projectId: session.projectId, sessionId: session.id, participantIds: selectedIds }), "出席順を確定しました。本部と担当パートナーに共有されます。").then(setSaveNotice)} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">出席順を保存</button><InlineMutationNotice notice={saveNotice} /></div></div>;
+  const filterTone = (index: number, active: boolean) => {
+    const tones = [
+      active ? "border-[#f75a3b] bg-[#f75a3b] text-white" : "border-[#f75a3b]/40 bg-[#f75a3b]/10",
+      active ? "border-[#f9d3d2] bg-[#f9d3d2] text-[var(--mikke-text)]" : "border-[#f9d3d2] bg-[#f9d3d2]/25",
+      active ? "border-[#ffd370] bg-[#ffd370] text-[var(--mikke-text)]" : "border-[#ffd370] bg-[#ffd370]/20",
+      active ? "border-[#8bc7ad] bg-[#8bc7ad] text-[var(--mikke-text)]" : "border-[#8bc7ad] bg-[#8bc7ad]/20"
+    ];
+    return tones[index % tones.length];
+  };
+  return (
+    <div className="rounded-2xl border border-[#f9d3d2] bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-bold text-[var(--mikke-muted)]">出席順を確定</p>
+        <p className="rounded-full bg-[#ffd370]/25 px-2.5 py-1 text-[11px] font-bold">選択済み {selectedIds.length}名</p>
+      </div>
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="名簿をグループで絞り込み">
+        <button type="button" onClick={() => setGroupFilter("all")} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${groupFilter === "all" ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>すべて（{participants.length}）</button>
+        {groups.map((group, index) => {
+          const count = participants.filter((participant) => participant.groupId === group.id).length;
+          return <button key={group.id} type="button" onClick={() => setGroupFilter(group.id)} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${filterTone(index, groupFilter === group.id)}`}>{group.name}（{count}）</button>;
+        })}
+      </div>
+      <div className="space-y-2">
+        {visibleParticipants.map((participant) => {
+          const index = selectedIds.indexOf(participant.id);
+          return (
+            <div key={participant.id} className={`flex items-center gap-2 rounded-xl border p-3 ${index >= 0 ? "border-[#8bc7ad] bg-[#8bc7ad]/20" : "border-[var(--mikke-line)] bg-white"}`}>
+              <input id={`participant-${session.id}-${participant.id}`} type="checkbox" checked={index >= 0} onChange={() => toggle(participant.id)} className="h-4 w-4" />
+              <label htmlFor={`participant-${session.id}-${participant.id}`} className="min-w-0 flex-1 text-sm font-extrabold">{index >= 0 ? `${index + 1}. ` : ""}{participant.name}</label>
+              {index >= 0 ? <div className="flex gap-1"><button type="button" onClick={() => move(participant.id, -1)} aria-label="上へ" className="rounded-lg p-1 text-[var(--mikke-primary)]"><ChevronUp size={17} /></button><button type="button" onClick={() => move(participant.id, 1)} aria-label="下へ" className="rounded-lg p-1 text-[var(--mikke-primary)]"><ChevronDown size={17} /></button></div> : null}
+            </div>
+          );
+        })}
+        {!participants.length ? <MikkeEmptyState title="名簿はまだありません" helper="名簿タブから対象者を登録してください。" /> : null}
+        {participants.length && !visibleParticipants.length ? <MikkeEmptyState title="このグループにはまだ登録がありません" /> : null}
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={() => void mutate(() => saveOperationsClientSessionRoster(supabase, { projectId: session.projectId, sessionId: session.id, participantIds: selectedIds }), "出席順を確定しました。本部と担当パートナーに共有されます。").then(setSaveNotice)} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">出席順を保存</button>
+        <InlineMutationNotice notice={saveNotice} />
+      </div>
+    </div>
+  );
 }
 
 function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPortalData; project: OperationsClientPortalData["projects"][number]; mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice> }) {
@@ -422,20 +481,23 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
     <div className="space-y-5">
       <MikkeSection title="グループ" tone="editorial">
         <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">クライアント側でクラスや曜日などのグループを作成・変更します。</p>
-        <form onSubmit={submitGroup} className="flex flex-col gap-2 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4 sm:flex-row">
+        <form onSubmit={submitGroup} className="flex flex-col gap-2 rounded-2xl border border-[#ffd370] bg-[#ffd370]/15 p-4 sm:flex-row">
           <input value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="グループ名" required className="min-w-0 flex-1 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
           <button className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">{editingGroupId ? "名前を更新" : "グループ追加"}</button>
           {editingGroupId ? <button type="button" onClick={() => { setEditingGroupId(null); setGroupName(""); }} className="rounded-xl border border-[var(--mikke-line)] px-4 py-2.5 text-sm font-bold">取消</button> : null}
           <InlineMutationNotice notice={groupNotice} />
         </form>
         <div className="mt-3 flex flex-wrap gap-2">
-          {groups.map((group) => <button key={group.id} type="button" onClick={() => { setEditingGroupId(group.id); setGroupName(group.name); }} className="rounded-full bg-[var(--mikke-primary-soft)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)]">{group.name}・編集</button>)}
+          {groups.map((group, index) => {
+            const tones = ["bg-[#f75a3b]/12", "bg-[#f9d3d2]/45", "bg-[#ffd370]/30", "bg-[#8bc7ad]/30"];
+            return <button key={group.id} type="button" onClick={() => { setEditingGroupId(group.id); setGroupName(group.name); }} className={`rounded-full px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)] ${tones[index % tones.length]}`}>{group.name}・編集</button>;
+          })}
           {!groups.length ? <p className="text-xs font-semibold text-[var(--mikke-muted)]">グループはまだありません。</p> : null}
         </div>
       </MikkeSection>
 
       <MikkeSection title="名簿" tone="editorial">
-        <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4 sm:grid-cols-2">
+        <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-[#f9d3d2] bg-[#f9d3d2]/15 p-4 sm:grid-cols-2">
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="対象者名" required className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
           <input value={level} onChange={(event) => setLevel(event.target.value)} placeholder="補足（任意）" className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
           <select value={groupId} onChange={(event) => setGroupId(event.target.value)} className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm"><option value="">グループ未設定</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select>

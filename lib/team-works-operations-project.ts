@@ -1090,25 +1090,67 @@ export type OperationsOrganizationProfile = {
   email: string | null;
   phone: string | null;
   address: string | null;
+  shiftSubmissionDeadlineDay: number;
+  otherDeadlineDay: number | null;
+  paymentDay: number | null;
 };
 
 export async function loadOperationsOrganizationProfile(client: SupabaseClient): Promise<OperationsOrganizationProfile | null> {
   const organizationIds = await resolveStaffOrganizationIds(client);
   if (!organizationIds[0]) return null;
-  const { data, error } = await client
+  let result = await client
     .from("team_works_organizations")
-    .select("id,name,email,phone,address")
+    .select("id,name,email,phone,address,shift_submission_deadline_day,other_deadline_day,payment_day")
     .eq("id", organizationIds[0])
     .maybeSingle();
-  if (error) throw error;
-  return data as OperationsOrganizationProfile | null;
+  if (result.error && isMissingSupabaseField(result.error, ["shift_submission_deadline_day", "other_deadline_day", "payment_day"])) {
+    result = await client
+      .from("team_works_organizations")
+      .select("id,name,email,phone,address")
+      .eq("id", organizationIds[0])
+      .maybeSingle() as typeof result;
+  }
+  if (result.error) throw result.error;
+  const row = result.data as {
+    id: string;
+    name: string;
+    email: string | null;
+    phone: string | null;
+    address: string | null;
+    shift_submission_deadline_day?: number;
+    other_deadline_day?: number | null;
+    payment_day?: number | null;
+  } | null;
+  return row ? {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    address: row.address,
+    shiftSubmissionDeadlineDay: row.shift_submission_deadline_day ?? 25,
+    otherDeadlineDay: row.other_deadline_day ?? null,
+    paymentDay: row.payment_day ?? null
+  } : null;
 }
 
 export async function updateOperationsOrganizationProfile(
   client: SupabaseClient,
-  input: { id: string; name: string; email: string; phone: string; address: string }
+  input: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: string;
+    shiftSubmissionDeadlineDay: number;
+    otherDeadlineDay: number | null;
+    paymentDay: number | null;
+  }
 ) {
   if (!input.name.trim()) throw new Error("企業名を入力してください。");
+  const validDay = (value: number | null) => value === null || (Number.isInteger(value) && value >= 1 && value <= 31);
+  if (!validDay(input.shiftSubmissionDeadlineDay) || !validDay(input.otherDeadlineDay) || !validDay(input.paymentDay)) {
+    throw new Error("締め日・支払日は1〜31の日付で入力してください。");
+  }
   const { data, error } = await client
     .from("team_works_organizations")
     .update({
@@ -1116,6 +1158,9 @@ export async function updateOperationsOrganizationProfile(
       email: input.email.trim() || null,
       phone: input.phone.trim() || null,
       address: input.address.trim() || null,
+      shift_submission_deadline_day: input.shiftSubmissionDeadlineDay,
+      other_deadline_day: input.otherDeadlineDay,
+      payment_day: input.paymentDay,
       updated_at: new Date().toISOString()
     })
     .eq("id", input.id)
@@ -1132,9 +1177,27 @@ export async function createOperationsStaffInvite(
   const normalizedEmail = email.trim().toLowerCase();
   if (!normalizedEmail.includes("@")) throw new Error("有効なメールアドレスを入力してください。");
   const organizationId = await resolveFirstStaffOrganizationId(client);
+  const activeMemberResult = await client.rpc("team_works_find_active_member", {
+    target_organization_id: organizationId,
+    target_role: "manager",
+    target_email: normalizedEmail
+  });
+  if (activeMemberResult.error) throw activeMemberResult.error;
+  if ((activeMemberResult.data ?? []).length > 0) {
+    throw new Error("このメールアドレスは、すでに本部メンバーとして参加しています。");
+  }
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError) throw userError;
   if (!userData.user) throw new Error("ログインが必要です。");
+  const { error: revokeError } = await client
+    .from("team_works_member_invites")
+    .update({ status: "revoked", updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .is("project_id", null)
+    .eq("email", normalizedEmail)
+    .eq("role", "manager")
+    .eq("status", "pending");
+  if (revokeError) throw revokeError;
   const { data, error } = await client
     .from("team_works_member_invites")
     .insert({
@@ -1657,6 +1720,12 @@ export type OperationsProjectPartnerAddResult =
 
 export type OperationsProjectClientAddResult =
   | {
+      status: "assigned";
+      organizationMemberId: string;
+      displayName: string;
+      email: string;
+    }
+  | {
       // Assigned to the project but waiting for the client to approve it in
       // their portal. project_members(client) is created only on approval.
       status: "invited";
@@ -2055,14 +2124,32 @@ export async function addOperationsPartnerToProject(
         status: "active"
       });
 
-      await updateOperationsProjectPartnerOffer(client, {
-        projectId: project.id,
-        organizationMemberId: member.id,
-        status: "pending"
-      });
+      const existingOfferResult = await client
+        .from("team_works_project_partner_offers")
+        .select("status")
+        .eq("project_id", project.id)
+        .eq("organization_member_id", member.id)
+        .maybeSingle();
+      if (existingOfferResult.error) throw existingOfferResult.error;
+      const alreadyAccepted = existingOfferResult.data?.status === "accepted";
+
+      if (alreadyAccepted) {
+        const { error: activeLinkError } = await client
+          .from("team_works_project_partners")
+          .update({ status: "active", updated_at: new Date().toISOString() })
+          .eq("project_id", project.id)
+          .eq("partner_id", partner.id);
+        if (activeLinkError) throw activeLinkError;
+      } else {
+        await updateOperationsProjectPartnerOffer(client, {
+          projectId: project.id,
+          organizationMemberId: member.id,
+          status: "pending"
+        });
+      }
 
       return {
-        status: "pending_approval",
+        status: alreadyAccepted ? "assigned" : "pending_approval",
         organizationMemberId: member.id,
         displayName: partner.display_name,
         email: normalizedEmail
@@ -2195,6 +2282,16 @@ export async function addOperationsClientToProject(
         .eq("role", "client_user")
         .eq("status", "pending");
 
+      const existingMembershipResult = await client
+        .from("team_works_project_members")
+        .select("organization_member_id")
+        .eq("project_id", project.id)
+        .eq("organization_member_id", member.id)
+        .eq("project_role", "client")
+        .maybeSingle();
+      if (existingMembershipResult.error) throw existingMembershipResult.error;
+      const alreadyAssigned = Boolean(existingMembershipResult.data);
+
       // Assign as pending: the client must approve in their portal before
       // project_members(client) is created and full access is granted. The
       // approval RPC (team_works_approve_client_project) does that step.
@@ -2205,7 +2302,7 @@ export async function addOperationsClientToProject(
             project_id: project.id,
             organization_id: project.organization_id,
             client_id: directoryClient.id,
-            status: "invited",
+            status: alreadyAssigned ? "active" : "invited",
             updated_at: new Date().toISOString()
           },
           { onConflict: "project_id,client_id" }
@@ -2213,7 +2310,7 @@ export async function addOperationsClientToProject(
       if (projectClientError) throw projectClientError;
 
       return {
-        status: "invited",
+        status: alreadyAssigned ? "assigned" : "invited",
         organizationMemberId: member.id,
         displayName: directoryClient.display_name,
         email: normalizedEmail

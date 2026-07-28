@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Clipboard, LoaderCircle, Mail, UserCog, UserPlus } from "lucide-react";
+import { CheckCircle2, Clipboard, LoaderCircle, Mail, UserCog, UserPlus } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
@@ -29,7 +29,16 @@ function roleLabel(role: string) {
 function TeamWorksSettingsContent() {
   const [members, setMembers] = useState<OperationsOrganizationMemberEntry[]>([]);
   const [organization, setOrganization] = useState<OperationsOrganizationProfile | null>(null);
-  const [organizationForm, setOrganizationForm] = useState({ name: "", email: "", phone: "", address: "" });
+  const [organizationForm, setOrganizationForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    shiftSubmissionDeadlineDay: "25",
+    otherDeadlineDay: "",
+    paymentDay: ""
+  });
+  const [organizationNotice, setOrganizationNotice] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [savingOrganization, setSavingOrganization] = useState(false);
@@ -53,7 +62,10 @@ function TeamWorksSettingsContent() {
         name: organizationProfile.name,
         email: organizationProfile.email ?? "",
         phone: organizationProfile.phone ?? "",
-        address: organizationProfile.address ?? ""
+        address: organizationProfile.address ?? "",
+        shiftSubmissionDeadlineDay: String(organizationProfile.shiftSubmissionDeadlineDay),
+        otherDeadlineDay: organizationProfile.otherDeadlineDay ? String(organizationProfile.otherDeadlineDay) : "",
+        paymentDay: organizationProfile.paymentDay ? String(organizationProfile.paymentDay) : ""
       });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "組織メンバーを読み込めませんでした。");
@@ -72,9 +84,19 @@ function TeamWorksSettingsContent() {
     setSavingOrganization(true);
     setMessage("");
     setError("");
+    setOrganizationNotice("");
     try {
-      await updateOperationsOrganizationProfile(supabase, { id: organization.id, ...organizationForm });
-      setMessage("企業情報を保存しました。");
+      await updateOperationsOrganizationProfile(supabase, {
+        id: organization.id,
+        name: organizationForm.name,
+        email: organizationForm.email,
+        phone: organizationForm.phone,
+        address: organizationForm.address,
+        shiftSubmissionDeadlineDay: Number(organizationForm.shiftSubmissionDeadlineDay),
+        otherDeadlineDay: organizationForm.otherDeadlineDay ? Number(organizationForm.otherDeadlineDay) : null,
+        paymentDay: organizationForm.paymentDay ? Number(organizationForm.paymentDay) : null
+      });
+      setOrganizationNotice("企業情報と締め日を保存しました。");
       await reload();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "企業情報を保存できませんでした。");
@@ -127,7 +149,20 @@ function TeamWorksSettingsContent() {
             <TeamWorksProjectField label="代表メール"><input type="email" value={organizationForm.email} onChange={(event) => setOrganizationForm({ ...organizationForm, email: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
             <TeamWorksProjectField label="電話番号"><input value={organizationForm.phone} onChange={(event) => setOrganizationForm({ ...organizationForm, phone: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
             <TeamWorksProjectField label="住所"><input value={organizationForm.address} onChange={(event) => setOrganizationForm({ ...organizationForm, address: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
-            <div className="sm:col-span-2"><button disabled={savingOrganization || !organization} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{savingOrganization ? "保存中…" : "企業情報を保存"}</button></div>
+            <div className="sm:col-span-2 mt-2 rounded-2xl border border-[#ffd370] bg-[#ffd370]/20 p-4">
+              <p className="mb-3 text-sm font-extrabold text-[var(--mikke-primary)]">運用日の設定</p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <TeamWorksProjectField label="シフト提出締め日" required><input type="number" min={1} max={31} value={organizationForm.shiftSubmissionDeadlineDay} onChange={(event) => setOrganizationForm({ ...organizationForm, shiftSubmissionDeadlineDay: event.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
+                <TeamWorksProjectField label="その他の締め日"><input type="number" min={1} max={31} value={organizationForm.otherDeadlineDay} onChange={(event) => setOrganizationForm({ ...organizationForm, otherDeadlineDay: event.target.value })} placeholder="未設定" className={teamWorksProjectInputClass} /></TeamWorksProjectField>
+                <TeamWorksProjectField label="支払日"><input type="number" min={1} max={31} value={organizationForm.paymentDay} onChange={(event) => setOrganizationForm({ ...organizationForm, paymentDay: event.target.value })} placeholder="未設定" className={teamWorksProjectInputClass} /></TeamWorksProjectField>
+              </div>
+              <p className="mt-2 text-[11px] font-semibold text-[var(--mikke-muted)]">月末より後の日付を設定した月は、その月の最終日として案内します。</p>
+            </div>
+            <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
+              <button disabled={savingOrganization || !organization} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{savingOrganization ? "保存中…" : "企業情報を保存"}</button>
+              {organizationNotice ? <span role="status" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 size={15} />{organizationNotice}</span> : null}
+              {error ? <span role="alert" className="text-xs font-bold text-red-700">{error}</span> : null}
+            </div>
           </form>
         </MikkeSection>
 

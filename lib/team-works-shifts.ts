@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 import { resolveStaffOrganizationIds } from "@/lib/team-works-operations";
 
 export type PartnerShiftStatus = "draft" | "submitted" | "confirmed" | "returned";
@@ -83,9 +84,18 @@ export async function resolveMyPartnerShiftMembership(client: SupabaseClient): P
 export async function loadMyPartnerShift(
   client: SupabaseClient,
   targetMonth: Date
-): Promise<{ membership: PartnerShiftMembership | null; submission: PartnerShiftSubmission | null }> {
+): Promise<{ membership: PartnerShiftMembership | null; submission: PartnerShiftSubmission | null; shiftDeadlineDay: number }> {
   const membership = await resolveMyPartnerShiftMembership(client);
-  if (!membership) return { membership: null, submission: null };
+  if (!membership) return { membership: null, submission: null, shiftDeadlineDay: 25 };
+  const organizationResult = await client
+    .from("team_works_organizations")
+    .select("shift_submission_deadline_day")
+    .eq("id", membership.organizationId)
+    .maybeSingle();
+  if (organizationResult.error && !isMissingSupabaseField(organizationResult.error, ["shift_submission_deadline_day"])) {
+    throw organizationResult.error;
+  }
+  const shiftDeadlineDay = Number(organizationResult.data?.shift_submission_deadline_day ?? 25);
   const { data, error } = await client
     .from("team_works_partner_shift_submissions")
     .select("id,organization_id,partner_member_id,target_month,desired_days,available_dates,note,status,submitted_at,confirmed_at")
@@ -95,7 +105,8 @@ export async function loadMyPartnerShift(
   if (error) throw error;
   return {
     membership,
-    submission: data ? toSubmission(data as ShiftRow, membership.partnerName) : null
+    submission: data ? toSubmission(data as ShiftRow, membership.partnerName) : null,
+    shiftDeadlineDay
   };
 }
 
