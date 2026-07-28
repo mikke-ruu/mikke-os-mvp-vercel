@@ -4,6 +4,7 @@ import { CalendarCheck2, CheckCircle2, CircleAlert, LoaderCircle } from "lucide-
 import { useState } from "react";
 import { confirmStaffPartnerShift, type PartnerShiftSubmission } from "@/lib/team-works-shifts";
 import { supabase } from "@/lib/supabase/client";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 
 function formatAvailableDate(dateKey: string): string {
   const date = new Date(`${dateKey}T00:00:00`);
@@ -19,6 +20,7 @@ export function TeamWorksShiftAdminPanel({
   submissions: PartnerShiftSubmission[];
   onRefresh: () => Promise<void>;
 }) {
+  const labels = useTeamWorksLabels();
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
@@ -41,7 +43,7 @@ export function TeamWorksShiftAdminPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="inline-flex items-center gap-2 text-sm font-extrabold text-[var(--mikke-primary)]">
-            <CalendarCheck2 size={18} />パートナー希望シフト
+            <CalendarCheck2 size={18} />{labels.workers}希望シフト
           </p>
           <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">
             {targetMonth.getFullYear()}年{targetMonth.getMonth() + 1}月分・カレンダーの黄色表示と同じ提出内容です。

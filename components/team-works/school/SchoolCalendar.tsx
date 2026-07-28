@@ -13,6 +13,7 @@ import {
   type TeamWorksSession,
   type TeamWorksState
 } from "@/lib/team-works";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
 
 type Props = {
@@ -209,6 +210,7 @@ function SessionDetailPanel({
   session: TeamWorksSession;
   onClose: () => void;
 }) {
+  const labels = useTeamWorksLabels();
   const worker = state.workers.find((item) => item.id === session.workerId);
   const client = state.clients.find((item) => item.id === session.clientId);
 
@@ -232,7 +234,7 @@ function SessionDetailPanel({
           <p className="mt-1 font-bold text-[var(--mikke-primary)]">{session.durationMinutes}分</p>
         </div>
         <div className="rounded-xl bg-[var(--mikke-surface)] px-3 py-2">
-          <p className="tw-helper font-bold">担当パートナー</p>
+          <p className="tw-helper font-bold">担当{labels.workers}</p>
           <p className="mt-1 font-bold text-[var(--mikke-primary)]">{worker?.name ?? "未割当"}</p>
         </div>
         <div className="rounded-xl bg-[var(--mikke-surface)] px-3 py-2">

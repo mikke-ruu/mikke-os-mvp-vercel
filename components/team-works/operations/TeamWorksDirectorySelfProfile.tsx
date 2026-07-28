@@ -5,6 +5,7 @@ import { CheckCircle2, CircleAlert } from "lucide-react";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "@/components/team-works/projects/TeamWorksProjectsShell";
 import { supabase } from "@/lib/supabase/client";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import {
   loadMyOperationsClientProfile,
   loadMyOperationsPartnerProfile,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/team-works-operations-project";
 
 export function TeamWorksPartnerSelfProfile() {
+  const labels = useTeamWorksLabels();
   const [form, setForm] = useState({ displayName: "", email: "", phone: "", address: "", skills: "", bio: "" });
   const [available, setAvailable] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -42,17 +44,17 @@ export function TeamWorksPartnerSelfProfile() {
     try {
       await updateMyOperationsPartnerProfile(supabase, form);
       setMessageKind("success");
-      setMessage("パートナー情報を保存しました。本部の名簿にも反映されます。");
+      setMessage(`${labels.workers}情報を保存しました。本部の名簿にも反映されます。`);
     } catch (error) {
       setMessageKind("error");
-      setMessage(error instanceof Error ? error.message : "パートナー情報を保存できませんでした。");
+      setMessage(error instanceof Error ? error.message : `${labels.workers}情報を保存できませんでした。`);
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <MikkeSection title="パートナー情報" tone="editorial">
+    <MikkeSection title={`${labels.workers}情報`} tone="editorial">
       <p className="-mt-2 mb-3 text-xs leading-6 text-[var(--mikke-muted)]">本部へ共有する連絡先・スキル・自己紹介です。</p>
       <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
         <TeamWorksProjectField label="名前" required><input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
@@ -62,7 +64,7 @@ export function TeamWorksPartnerSelfProfile() {
         <TeamWorksProjectField label="スキル"><textarea rows={3} value={form.skills} onChange={(e) => setForm({ ...form, skills: e.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
         <TeamWorksProjectField label="自己紹介"><textarea rows={3} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
         <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-          <button disabled={saving || !form.displayName.trim()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{saving ? "保存中…" : "パートナー情報を保存"}</button>
+          <button disabled={saving || !form.displayName.trim()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{saving ? "保存中…" : `${labels.workers}情報を保存`}</button>
           {message ? <SaveResult kind={messageKind} message={message} /> : null}
         </div>
       </form>

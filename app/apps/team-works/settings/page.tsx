@@ -7,7 +7,9 @@ import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { TeamWorksOperationsShell } from "@/components/team-works/operations/TeamWorksOperationsShell";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "@/components/team-works/projects/TeamWorksProjectsShell";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import { supabase } from "@/lib/supabase/client";
+import type { TeamWorksLabels } from "@/lib/team-works-labels";
 import {
   archiveOperationsOrganizationMember,
   createOperationsStaffInvite,
@@ -18,15 +20,16 @@ import {
   type OperationsOrganizationMemberEntry
 } from "@/lib/team-works-operations-project";
 
-function roleLabel(role: string) {
+function roleLabel(role: string, labels: TeamWorksLabels) {
   if (role === "owner") return "オーナー";
   if (role === "manager") return "マネージャー";
   if (role === "client_user") return "クライアント";
-  if (role === "worker") return "パートナー";
+  if (role === "worker") return labels.workers;
   return role;
 }
 
 function TeamWorksSettingsContent() {
+  const labels = useTeamWorksLabels();
   const [members, setMembers] = useState<OperationsOrganizationMemberEntry[]>([]);
   const [organization, setOrganization] = useState<OperationsOrganizationProfile | null>(null);
   const [organizationForm, setOrganizationForm] = useState({
@@ -125,7 +128,7 @@ function TeamWorksSettingsContent() {
   }
 
   async function archive(member: OperationsOrganizationMemberEntry) {
-    if (!window.confirm(`${member.displayName}さん（${roleLabel(member.role)}）をアーカイブしますか？\n過去の予定・報告・支払などの記録は残ります。同じメールアドレスで新しい招待を受け直せるようになります。`)) return;
+    if (!window.confirm(`${member.displayName}さん（${roleLabel(member.role, labels)}）をアーカイブしますか？\n過去の予定・報告・支払などの記録は残ります。同じメールアドレスで新しい招待を受け直せるようになります。`)) return;
     setBusyId(member.id);
     setMessage("");
     setError("");
@@ -201,7 +204,7 @@ function TeamWorksSettingsContent() {
                         </p>
                       ) : null}
                       <span className="mt-2 inline-block rounded-full bg-[var(--mikke-primary-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--mikke-primary)]">
-                        {roleLabel(member.role)}
+                        {roleLabel(member.role, labels)}
                       </span>
                       <span className="ml-2 mt-2 inline-block rounded-full bg-[var(--mikke-green)] px-2.5 py-1 text-[10px] font-bold">アクティブ</span>
                     </div>

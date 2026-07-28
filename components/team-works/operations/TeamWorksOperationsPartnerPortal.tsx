@@ -27,6 +27,7 @@ import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { ClientMonthCalendar } from "@/components/team-works/operations/ClientMonthCalendar";
 import { useTeamWorksPortalRoles } from "@/components/team-works/useTeamWorksPortalRoles";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import { TeamWorksPartnerSelfProfile } from "@/components/team-works/operations/TeamWorksDirectorySelfProfile";
 import { TeamWorksPartnerShiftPanel } from "@/components/team-works/operations/TeamWorksPartnerShiftPanel";
 import { supabase } from "@/lib/supabase/client";
@@ -64,15 +65,16 @@ export function TeamWorksOperationsPartnerPortal() {
   }, [load]);
 
   const { hasClient } = useTeamWorksPortalRoles();
+  const labels = useTeamWorksLabels();
   const navItems: MikkeShellNavItem[] = [
-    { label: "パートナーポータル", href: "/apps/team-works/portal/worker", icon: Users },
+    { label: `${labels.workers}ポータル`, href: "/apps/team-works/portal/worker", icon: Users },
     ...(hasClient ? [{ label: "クライアントポータル", href: "/apps/team-works/portal/client", icon: FolderKanban }] : [])
   ];
 
   return (
     <MikkeAppShell
       appName="Team Works"
-      title="パートナーポータル"
+      title={`${labels.workers}ポータル`}
       subtitle="担当レッスンを、名簿とマニュアルを見ながら進行"
       currentApp={{ label: "Team", href: "/apps/team-works/portal/worker", icon: CalendarDays }}
       theme="green"
@@ -121,6 +123,7 @@ export function TeamWorksPartnerLessonWindow({ sessionId }: { sessionId: string 
 }
 
 function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalData; onRefresh: () => Promise<void> }) {
+  const labels = useTeamWorksLabels();
   const sessions = useMemo(() => [...data.today, ...data.upcoming], [data.today, data.upcoming]);
   const projects = data.projects;
   const [activeView, setActiveView] = useState("home");
@@ -153,7 +156,7 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
     <div className="space-y-6">
       <PartnerOfferCards offers={data.offers} responding={responding} notice={responseNotice} onRespond={respond} />
 
-      <nav aria-label="パートナーポータル内のページ" className="flex gap-1 overflow-x-auto border-b border-[var(--mikke-line)]">
+      <nav aria-label={`${labels.workers}ポータル内のページ`} className="flex gap-1 overflow-x-auto border-b border-[var(--mikke-line)]">
         <button
           type="button"
           onClick={() => setActiveView("home")}
@@ -382,9 +385,10 @@ function PartnerHomeAction({ icon, title, detail, onClick, tone = "green" }: { i
 }
 
 function PartnerProfileDetails() {
+  const labels = useTeamWorksLabels();
   return (
     <details className="rounded-2xl border border-[var(--mikke-line)] bg-white">
-      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-bold">パートナー情報<ChevronDown size={16} /></summary>
+      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-bold">{labels.workers}情報<ChevronDown size={16} /></summary>
       <div className="border-t border-[var(--mikke-line)] p-4"><TeamWorksPartnerSelfProfile /></div>
     </details>
   );

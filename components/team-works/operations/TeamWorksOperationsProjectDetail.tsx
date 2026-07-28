@@ -37,6 +37,8 @@ import {
 import { supabase } from "@/lib/supabase/client";
 import { supabaseErrorMessage } from "@/lib/supabase-schema-compat";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
+import type { TeamWorksLabels } from "@/lib/team-works-labels";
 import {
   addOperationsClientToProject,
   addOperationsPartnerToProject,
@@ -89,17 +91,19 @@ type ProjectTab =
   | "portal"
   | "settings";
 
-const tabs: { id: ProjectTab; label: string }[] = [
-  { id: "overview", label: "概要" },
-  { id: "schedule", label: "スケジュール" },
-  { id: "messages", label: "メッセージ" },
-  { id: "partners", label: "パートナー" },
-  { id: "roster", label: "名簿" },
-  { id: "reports", label: "報告" },
-  { id: "manuals", label: "マニュアル" },
-  { id: "portal", label: "ポータル設定" },
-  { id: "settings", label: "プロジェクト設定" }
-];
+function buildTabs(labels: TeamWorksLabels): { id: ProjectTab; label: string }[] {
+  return [
+    { id: "overview", label: "概要" },
+    { id: "schedule", label: "スケジュール" },
+    { id: "messages", label: "メッセージ" },
+    { id: "partners", label: labels.workers },
+    { id: "roster", label: "名簿" },
+    { id: "reports", label: "報告" },
+    { id: "manuals", label: "マニュアル" },
+    { id: "portal", label: "ポータル設定" },
+    { id: "settings", label: "プロジェクト設定" }
+  ];
+}
 
 export function TeamWorksProjectDetailRoute({ projectId }: { projectId: string }) {
   const [data, setData] = useState<OperationsProjectDetailData | null | undefined>(undefined);
@@ -159,6 +163,8 @@ function OperationsProjectDetail({
 }) {
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get("tab");
+  const labels = useTeamWorksLabels();
+  const tabs = buildTabs(labels);
   const [activeTab, setActiveTab] = useState<ProjectTab>(
     tabs.some((tab) => tab.id === requestedTab) ? requestedTab as ProjectTab : "overview"
   );
@@ -259,6 +265,7 @@ function OverviewTab({
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
   onSelectTab: (tab: ProjectTab) => void;
 }) {
+  const labels = useTeamWorksLabels();
   const nowKey = toDateKey(new Date());
   const activeSessions = data.sessions.filter((session) => session.status !== "cancelled");
   const liveSessions = activeSessions
@@ -327,11 +334,11 @@ function OverviewTab({
 
       <div className="grid grid-cols-3 gap-3">
         <MetricCard icon={CalendarDays} tone="blue" label="今週のコマ" value={String(weekCount)} onClick={() => onSelectTab("schedule")} />
-        <MetricCard icon={Users} tone="green" label="パートナー" value={`${data.partners.length}名`} onClick={() => onSelectTab("partners")} />
+        <MetricCard icon={Users} tone="green" label={labels.workers} value={`${data.partners.length}名`} onClick={() => onSelectTab("partners")} />
         <MetricCard icon={GraduationCap} tone="pink" label="対象者" value={`${data.participants.length}名`} onClick={() => onSelectTab("roster")} />
       </div>
       <p className="-mt-3 text-[11px] font-semibold text-[var(--mikke-muted)]">
-        パートナーはこのプロジェクトの参加人数、対象者はクライアント側の総登録者数です。
+        {labels.workers}はこのプロジェクトの参加人数、対象者はクライアント側の総登録者数です。
       </p>
 
       <OverviewListSection
@@ -399,7 +406,7 @@ function OverviewTab({
             ["overview", "概要", CalendarDays],
             ["schedule", "スケジュール", CalendarDays],
             ["messages", "メッセージ", MessageSquare],
-            ["partners", "パートナー", Clock3],
+            ["partners", labels.workers, Clock3],
             ["roster", "名簿", Users],
             ["reports", "報告", FileCheck2],
             ["manuals", "マニュアル", BookOpen],
@@ -431,6 +438,7 @@ function ProjectCalendarPanel({
   saving: boolean;
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
+  const labels = useTeamWorksLabels();
   const [monthDate, setMonthDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
   const [adding, setAdding] = useState(false);
@@ -578,7 +586,7 @@ function ProjectCalendarPanel({
               </button>;
             })}
           </div>
-          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm border border-[var(--mikke-pink)] bg-[var(--mikke-pink)]" />休講・土日祝 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />パートナー稼働可能日（接続準備中）</p>
+          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm border border-[var(--mikke-pink)] bg-[var(--mikke-pink)]" />休講・土日祝 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />{labels.workers}稼働可能日（接続準備中）</p>
         </div>
         <aside className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
           <h3 className="text-sm font-extrabold">{formatDate(selectedDate)} の予定詳細</h3>
@@ -626,6 +634,7 @@ function ProjectCalendarPanel({
 }
 
 function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }: { session: OperationsProjectDetailData["sessions"][number]; partners: OperationsProjectDetailData["partners"]; saving: boolean; mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>; dateLabel?: string }) {
+  const labels = useTeamWorksLabels();
   const [open, setOpen] = useState(false);
   const [startTime, setStartTime] = useState(session.startTime);
   const [finishTime, setFinishTime] = useState(endTime(session.startTime, session.durationMin));
@@ -677,7 +686,7 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
               <label className="text-[11px] font-bold text-[var(--mikke-muted)]">開始時間<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="開始時間" /></label>
               <label className="text-[11px] font-bold text-[var(--mikke-muted)]">終了時間<input type="time" value={finishTime} onChange={(event) => setFinishTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="終了時間" /></label>
             </div>
-            <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label="担当パートナー"><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label={`担当${labels.workers}`}><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
             <div className="flex gap-2">
               <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">予定を保存</button>
               {session.generatedFromRuleId ? (
@@ -933,6 +942,7 @@ function RosterTab({
 }
 
 function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData; onSelectTab: (tab: ProjectTab) => void }) {
+  const labels = useTeamWorksLabels();
   const [members, setMembers] = useState<OperationsProjectMember[]>([]);
   const [allProjectMembers, setAllProjectMembers] = useState<OperationsProjectMember[]>([]);
   const [pendingInvites, setPendingInvites] = useState<OperationsPendingInvite[]>([]);
@@ -964,7 +974,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
       setPartnerOffers(offers);
       setPartnerId((current) => current || partnerDirectory[0]?.id || "");
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "パートナー情報を読み込めませんでした。");
+      setError(loadError instanceof Error ? loadError.message : `${labels.workers}情報を読み込めませんでした。`);
     }
   }, [data.project.id]);
 
@@ -980,17 +990,17 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
     try {
       const result = await addOperationsPartnerToProject(supabase, { projectId: data.project.id, partnerId });
       if (result.status === "pending_approval") {
-        setMessage(`${result.displayName} さんへ参加依頼を送りました。パートナーポータルで承認されるまで Members には表示されません。`);
+        setMessage(`${result.displayName} さんへ参加依頼を送りました。${labels.workers}ポータルで承認されるまで Members には表示されません。`);
         setPendingOpen(true);
       } else if (result.status === "assigned") {
-        setMessage(`${result.displayName} さんをこのプロジェクトに追加しました。パートナーポータルには、このプロジェクトが表示されます。`);
+        setMessage(`${result.displayName} さんをこのプロジェクトに追加しました。${labels.workers}ポータルには、このプロジェクトが表示されます。`);
       } else {
-        setMessage(`${result.email} さんはまだポータルにログインしていません。「パートナー管理」の固定URLを渡してログインしてもらうと開通し、その後この追加が有効になります。`);
+        setMessage(`${result.email} さんはまだポータルにログインしていません。「${labels.workers}管理」の固定URLを渡してログインしてもらうと開通し、その後この追加が有効になります。`);
         setPendingOpen(true);
       }
       await reloadMembers();
     } catch (submitError) {
-      setMessage(submitError instanceof Error ? submitError.message : "パートナーをプロジェクトに追加できませんでした。");
+      setMessage(submitError instanceof Error ? submitError.message : `${labels.workers}をプロジェクトに追加できませんでした。`);
     } finally {
       setBusy(false);
     }
@@ -1023,7 +1033,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
       setMessage(`${member.displayName}さんのこのプロジェクト内の時給を保存しました。`);
       await reloadMembers();
     } catch (settingError) {
-      setMessage(settingError instanceof Error ? settingError.message : "パートナー設定を保存できませんでした。");
+      setMessage(settingError instanceof Error ? settingError.message : `${labels.workers}設定を保存できませんでした。`);
     } finally {
       setBusy(false);
     }
@@ -1049,7 +1059,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
       setMessage(`${member.displayName}さんをこのプロジェクトから外しました。`);
       await reloadMembers();
     } catch (removeError) {
-      setMessage(removeError instanceof Error ? removeError.message : "パートナーをプロジェクトから外せませんでした。");
+      setMessage(removeError instanceof Error ? removeError.message : `${labels.workers}をプロジェクトから外せませんでした。`);
     } finally {
       setBusy(false);
     }
@@ -1102,13 +1112,13 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
     <div className="space-y-5">
       <TabIntro
         icon={Clock3}
-        title="パートナー"
-        description="登録済みパートナーをプロジェクトに追加します。開通済みの人は招待リンクなしで参加、未開通の人だけ Pending invites に残します。"
+        title={labels.workers}
+        description={`登録済み${labels.workers}をプロジェクトに追加します。開通済みの人は招待リンクなしで参加、未開通の人だけ Pending invites に残します。`}
       />
 
       <MikkeSection title="Invite" tone="editorial">
         <form onSubmit={submitPartner} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
-          <TeamWorksProjectField label="追加するパートナー" required>
+          <TeamWorksProjectField label={`追加する${labels.workers}`} required>
             <select value={partnerId} onChange={(event) => setPartnerId(event.target.value)} className={teamWorksProjectInputClass}>
               {directory.filter((partner) => partner.status === "active").map((partner) => (
                 <option key={partner.id} value={partner.id}>
@@ -1127,7 +1137,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
         </form>
         {directory.length === 0 ? (
           <p className="mt-3 text-xs font-bold text-[var(--mikke-muted)]">
-            先に左メニューの「パートナー管理」で名簿登録してください。
+            先に左メニューの「{labels.workers}管理」で名簿登録してください。
           </p>
         ) : null}
         {message ? (
@@ -1147,7 +1157,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
           <span>
             <span className="block text-sm font-extrabold">ポータル未開通 / 参加依頼中</span>
             <span className="mt-1 block text-xs font-semibold text-[var(--mikke-muted)]">
-              {pendingInvites.length + pendingOffers.length === 0 ? "参加依頼中のパートナーはいません" : `${pendingInvites.length + pendingOffers.length}件の参加依頼があります`}
+              {pendingInvites.length + pendingOffers.length === 0 ? `参加依頼中の${labels.workers}はいません` : `${pendingInvites.length + pendingOffers.length}件の参加依頼があります`}
             </span>
           </span>
           <span className="rounded-full bg-[var(--mikke-primary-soft)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-primary)]">
@@ -1156,7 +1166,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
         </button>
         {pendingOpen ? (
           pendingInvites.length + pendingOffers.length === 0 ? (
-            <MikkeEmptyState title="参加依頼中のパートナーはいません" />
+            <MikkeEmptyState title={`参加依頼中の${labels.workers}はいません`} />
           ) : (
             <div className="grid gap-2 md:grid-cols-2">
               {pendingOffers.map((offer) => {
@@ -1164,8 +1174,8 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
                 return (
                   <div key={offer.organizationMemberId} className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--mikke-line)] bg-white px-3 py-2.5">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-bold">{member?.displayName ?? "パートナー"}</p>
-                      <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">パートナーポータルで承認待ち</p>
+                      <p className="truncate text-sm font-bold">{member?.displayName ?? labels.workers}</p>
+                      <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">{labels.workers}ポータルで承認待ち</p>
                     </div>
                     <button
                       type="button"
@@ -1182,7 +1192,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
                 <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--mikke-line)] bg-white px-3 py-2.5">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-bold">{invite.email}</p>
-                    <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">未ログイン・「パートナー管理」の固定URLでログインすると開通します</p>
+                    <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">未ログイン・「{labels.workers}管理」の固定URLでログインすると開通します</p>
                   </div>
                   <button
                     type="button"
@@ -1201,7 +1211,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
 
       <MikkeSection title="Members" tone="editorial">
         {members.length === 0 ? (
-          <MikkeEmptyState title="参加メンバーはまだいません" helper="上のフォームから登録済みパートナーを追加できます。" />
+          <MikkeEmptyState title="参加メンバーはまだいません" helper={`上のフォームから登録済み${labels.workers}を追加できます。`} />
         ) : (
           <div className="grid gap-2 md:grid-cols-2">
             {members.map((member) => (
@@ -1244,6 +1254,7 @@ function PartnerMemberCard({
   onSaveHourlyWage: (hourlyWage: number | null) => void;
   onRemove: () => void;
 }) {
+  const labels = useTeamWorksLabels();
   const [open, setOpen] = useState(false);
   const [hourlyWageValue, setHourlyWageValue] = useState(hourlyWage === null ? "" : String(hourlyWage));
 
@@ -1290,7 +1301,7 @@ function PartnerMemberCard({
           </div>
           <div>
             <p className="text-[11px] font-bold tracking-[0.22em] text-[var(--mikke-primary)]">稼働可能日1カ月分</p>
-            <p className="mt-1">未接続です。後ほどパートナー登録ページ側で整理します。</p>
+            <p className="mt-1">未接続です。後ほど{labels.workers}登録ページ側で整理します。</p>
           </div>
           <button
             type="button"
@@ -1315,6 +1326,7 @@ function ManualsTab({
   saving: boolean;
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
+  const labels = useTeamWorksLabels();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [manualNo, setManualNo] = useState(data.manuals.length ? Math.max(...data.manuals.map((manual) => manual.no)) + 1 : 1);
   const [title, setTitle] = useState("");
@@ -1388,7 +1400,7 @@ function ManualsTab({
           <TeamWorksProjectField label="タイトル" required className="mt-3">
             <input value={title} onChange={(event) => setTitle(event.target.value)} className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
-          <TeamWorksProjectField label="本文" helper="パートナーポータルのセクションタブに表示します。" className="mt-3">
+          <TeamWorksProjectField label="本文" helper={`${labels.workers}ポータルのセクションタブに表示します。`} className="mt-3">
             <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={8} className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
           <TeamWorksProjectField label="教材リンク" helper="任意。ファイル教材はprivate storage対応時に追加します。" className="mt-3">
@@ -1403,11 +1415,12 @@ function ManualsTab({
 }
 
 function ReportsTab({ data }: { data: OperationsProjectDetailData }) {
+  const labels = useTeamWorksLabels();
   return (
     <div className="space-y-5">
       <TabIntro icon={FileCheck2} title="報告" description="既存のフォーム提出を、運営型プロジェクトの報告としてまとめて表示します。" />
       {data.reports.length === 0 ? (
-        <MikkeEmptyState title="報告はまだありません" helper="R4のパートナーポータルから授業・業務報告を提出すると、ここに表示されます。" />
+        <MikkeEmptyState title="報告はまだありません" helper={`R4の${labels.workers}ポータルから授業・業務報告を提出すると、ここに表示されます。`} />
       ) : (
         <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
           {data.reports.map((report) => (
@@ -1425,10 +1438,11 @@ function ReportsTab({ data }: { data: OperationsProjectDetailData }) {
 }
 
 function PayoutsTab({ data }: { data: OperationsProjectDetailData }) {
+  const labels = useTeamWorksLabels();
   const total = data.payouts.reduce((sum, payout) => sum + payout.amount, 0);
   return (
     <div className="space-y-5">
-      <TabIntro icon={CircleDollarSign} title="報酬" description="パートナーへの報酬記録です。本部だけが全体を確認できます。" />
+      <TabIntro icon={CircleDollarSign} title="報酬" description={`${labels.workers}への報酬記録です。本部だけが全体を確認できます。`} />
       <FinanceSummary label="記録合計" amount={total} enabled={data.project.payoutsEnabled} />
       {data.payouts.length === 0 ? (
         <MikkeEmptyState title="報酬記録はまだありません" />
@@ -1824,6 +1838,7 @@ function PortalTab({
   saving: boolean;
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
+  const labels = useTeamWorksLabels();
   const [clientVisible, setClientVisible] = useState(data.project.clientVisible);
   const [payoutsEnabled, setPayoutsEnabled] = useState(data.project.payoutsEnabled);
   const [invoicesEnabled, setInvoicesEnabled] = useState(data.project.invoicesEnabled);
@@ -1851,21 +1866,21 @@ function PortalTab({
           <PortalFeatureHeading title="クライアントに表示" helper="クライアント担当者が使う画面に表示する内容" />
           <div className="mt-3 space-y-3">
             <FeatureCheck checked={clientVisible} onChange={setClientVisible} title="クライアントポータル全体" helper="自プロジェクトのスケジュール・提出物・メッセージを表示する" />
-            <FeatureCheck checked={clientPartnerContactVisible} onChange={setClientPartnerContactVisible} title="担当パートナー連絡先" helper="連絡先とメッセージに担当パートナーを表示する。オフの場合は本部窓口のみ" />
+            <FeatureCheck checked={clientPartnerContactVisible} onChange={setClientPartnerContactVisible} title={`担当${labels.workers}連絡先`} helper={`連絡先とメッセージに担当${labels.workers}を表示する。オフの場合は本部窓口のみ`} />
             <FeatureCheck checked={invoicesEnabled} onChange={setInvoicesEnabled} title="請求記録" helper="クライアントの請求先画面に必要な請求情報を表示する" />
           </div>
         </div>
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-          <PortalFeatureHeading title="パートナーに表示" helper="担当パートナーが使う画面に表示する内容" />
+          <PortalFeatureHeading title={`${labels.workers}に表示`} helper={`担当${labels.workers}が使う画面に表示する内容`} />
           <div className="mt-3 space-y-3">
-            <FeatureCheck checked={payoutsEnabled} onChange={setPayoutsEnabled} title="報酬記録" helper="対象パートナーの報酬画面に必要な報酬情報を表示する" />
-            <FeatureCheck checked title="マニュアル" helper="本部と担当パートナーだけに常時表示し、クライアントには表示しない" disabled />
+            <FeatureCheck checked={payoutsEnabled} onChange={setPayoutsEnabled} title="報酬記録" helper={`対象${labels.workers}の報酬画面に必要な報酬情報を表示する`} />
+            <FeatureCheck checked title="マニュアル" helper={`本部と担当${labels.workers}だけに常時表示し、クライアントには表示しない`} disabled />
           </div>
         </div>
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
           <PortalFeatureHeading title="共通・常時" helper="運営に必要なため両ポータルで常に使う内容" />
           <div className="mt-3">
-            <FeatureCheck checked title="名簿・進捗" helper="クライアントと担当パートナーの名簿・進捗画面に常時表示する" disabled />
+            <FeatureCheck checked title="名簿・進捗" helper={`クライアントと担当${labels.workers}の名簿・進捗画面に常時表示する`} disabled />
           </div>
         </div>
         <div className="max-w-2xl">
@@ -1885,6 +1900,7 @@ function MessagesTab({
   saving: boolean;
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
+  const labels = useTeamWorksLabels();
   const [members, setMembers] = useState<OperationsProjectMember[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -1949,21 +1965,21 @@ function MessagesTab({
 
   return (
     <div className="space-y-5">
-      <TabIntro icon={MessageSquare} title="メッセージ" description="クライアントは上部に固定し、参加パートナーは最新のやり取り順に表示します。カードを選ぶと会話を開けます。" />
+      <TabIntro icon={MessageSquare} title="メッセージ" description={`クライアントは上部に固定し、参加${labels.workers}は最新のやり取り順に表示します。カードを選ぶと会話を開けます。`} />
       {loadError ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{loadError}</p> : null}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)]">
         <aside className="space-y-4">
           <ConversationGroup title="クライアント" helper="プロジェクトの窓口" tone="client" members={activeClients} archivedMembers={archivedClients} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="アクティブなクライアントはまだいません" />
-          <ConversationGroup title="参加パートナー" helper="新着メッセージ順" tone="partner" members={activePartners} archivedMembers={archivedPartners} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="アクティブな参加パートナーはまだいません" />
+          <ConversationGroup title={`参加${labels.workers}`} helper="新着メッセージ順" tone="partner" members={activePartners} archivedMembers={archivedPartners} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty={`アクティブな参加${labels.workers}はまだいません`} />
         </aside>
         <section ref={conversationRef} className="min-h-[420px] scroll-mt-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
           {!selectedMember ? (
-            <MikkeEmptyState title="会話する相手を選択してください" helper="左の一覧からクライアントまたは参加パートナーを選びます。" />
+            <MikkeEmptyState title="会話する相手を選択してください" helper={`左の一覧からクライアントまたは参加${labels.workers}を選びます。`} />
           ) : (
             <>
               <div className="flex items-center justify-between gap-3 border-b border-[var(--mikke-line)] pb-3">
-                <div><p className="text-sm font-extrabold">{selectedMember.displayName}</p><p className="mt-0.5 text-[11px] font-semibold text-[var(--mikke-muted)]">{selectedMember.projectRole === "client" ? "クライアント" : "パートナー"}{selectedMember.email ? ` ・ ${selectedMember.email}` : ""}</p></div>
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${selectedMember.projectRole === "client" ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-green)]"}`}>{selectedMember.projectRole === "client" ? "クライアント" : "パートナー"}</span>
+                <div><p className="text-sm font-extrabold">{selectedMember.displayName}</p><p className="mt-0.5 text-[11px] font-semibold text-[var(--mikke-muted)]">{selectedMember.projectRole === "client" ? "クライアント" : labels.workers}{selectedMember.email ? ` ・ ${selectedMember.email}` : ""}</p></div>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${selectedMember.projectRole === "client" ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-green)]"}`}>{selectedMember.projectRole === "client" ? "クライアント" : labels.workers}</span>
               </div>
               <div className="max-h-[260px] space-y-3 overflow-y-auto py-4 lg:max-h-[420px]">
                 {thread.length === 0 ? <p className="py-16 text-center text-xs font-semibold text-[var(--mikke-muted)]">まだやり取りはありません。最初のメッセージを送れます。</p> : thread.map((comment) => {

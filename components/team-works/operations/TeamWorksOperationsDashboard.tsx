@@ -17,6 +17,7 @@ import { TeamWorksDayPanel } from "./TeamWorksDayPanel";
 import { TeamWorksMonthCalendar } from "./TeamWorksMonthCalendar";
 import { TeamWorksShiftAdminPanel } from "./TeamWorksShiftAdminPanel";
 import { loadStaffPartnerShifts, type PartnerShiftSubmission } from "@/lib/team-works-shifts";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 
 function startOfCurrentMonth(): Date {
   const now = new Date();
@@ -393,6 +394,7 @@ function formatShortDate(dateKey: string, todayKey: string): string {
 }
 
 function FinanceCard() {
+  const labels = useTeamWorksLabels();
   return (
     <Link href="/apps/team-works/projects" className="block rounded-2xl border border-[#ffd370] bg-white p-4 transition hover:border-[#8bc7ad]">
       <div className="mb-3 flex items-baseline justify-between">
@@ -422,7 +424,7 @@ function FinanceCard() {
         </div>
       </div>
       <p className="mt-3 text-[10.5px] leading-5 text-[var(--mikke-muted-light)]">
-        パートナー報酬・請求のレートがまだ設定されていないため集計できません。レート項目を追加すると自動で表示されます。
+        {labels.workers}報酬・請求のレートがまだ設定されていないため集計できません。レート項目を追加すると自動で表示されます。
       </p>
     </Link>
   );

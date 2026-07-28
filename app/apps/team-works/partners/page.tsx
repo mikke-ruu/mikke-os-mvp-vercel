@@ -8,6 +8,7 @@ import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { TeamWorksOperationsShell } from "@/components/team-works/operations/TeamWorksOperationsShell";
 import { TeamWorksPortalUrlCard } from "@/components/team-works/operations/TeamWorksPortalUrlCard";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "@/components/team-works/projects/TeamWorksProjectsShell";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import { supabase } from "@/lib/supabase/client";
 import {
   archiveOperationsPartner,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/team-works-operations-project";
 
 function TeamWorksPartnersContent() {
+  const labels = useTeamWorksLabels();
   const [partners, setPartners] = useState<OperationsPartnerDirectoryEntry[]>([]);
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -34,7 +36,7 @@ function TeamWorksPartnersContent() {
     try {
       setPartners(await loadOperationsPartnerDirectory(supabase));
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "パートナー名簿を読み込めませんでした。");
+      setError(loadError instanceof Error ? loadError.message : `${labels.workers}名簿を読み込めませんでした。`);
     } finally {
       setLoading(false);
     }
@@ -54,10 +56,10 @@ function TeamWorksPartnersContent() {
       setDisplayName("");
       setEmail("");
       setNote("");
-      setMessage("パートナー名簿に登録しました。各プロジェクトの「パートナー・シフト」から招待できます。");
+      setMessage(`${labels.workers}名簿に登録しました。各プロジェクトの「${labels.workers}・シフト」から招待できます。`);
       await reload();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "パートナーを登録できませんでした。");
+      setError(submitError instanceof Error ? submitError.message : `${labels.workers}を登録できませんでした。`);
     } finally {
       setBusy(false);
     }
@@ -95,16 +97,16 @@ function TeamWorksPartnersContent() {
   }
 
   return (
-    <TeamWorksOperationsShell title="パートナー管理" subtitle="組織全体のパートナー名簿">
+    <TeamWorksOperationsShell title={`${labels.workers}管理`} subtitle={`組織全体の${labels.workers}名簿`}>
       <div className="space-y-5">
         <TeamWorksPortalUrlCard
-          title="パートナー用ポータルURL"
+          title={`${labels.workers}用ポータルURL`}
           path="/apps/team-works/portal/worker"
-          description="名簿に登録したパートナーには、このURLだけを渡します。相手はここでログイン（初めての方は新規登録）すると、登録メールと一致していればポータルが開きます。プロジェクトに割り当てると、ポータル内に承認のお知らせが届きます。"
+          description={`名簿に登録した${labels.workers}には、このURLだけを渡します。相手はここでログイン（初めての方は新規登録）すると、登録メールと一致していればポータルが開きます。プロジェクトに割り当てると、ポータル内に承認のお知らせが届きます。`}
         />
         <MikkeSection title="Partner Directory" tone="editorial">
           <form onSubmit={submit} className="grid gap-3 lg:grid-cols-[1fr_1fr_1.2fr_auto] lg:items-end">
-            <TeamWorksProjectField label="パートナー名" required>
+            <TeamWorksProjectField label={`${labels.workers}名`} required>
               <input
                 value={displayName}
                 onChange={(event) => setDisplayName(event.target.value)}
@@ -146,7 +148,7 @@ function TeamWorksPartnersContent() {
           {loading ? (
             <p className="text-sm font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>
           ) : partners.length === 0 ? (
-            <MikkeEmptyState title="登録済みパートナーはまだいません" helper="先にここで名簿登録し、各プロジェクトからworker固定で招待します。" />
+            <MikkeEmptyState title={`登録済み${labels.workers}はまだいません`} helper="先にここで名簿登録し、各プロジェクトからworker固定で招待します。" />
           ) : (
             <div className="grid gap-2 md:grid-cols-2">
               {partners.map((partner) => (

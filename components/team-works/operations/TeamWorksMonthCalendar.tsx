@@ -9,6 +9,7 @@ import {
   type OperationsProjectSummary
 } from "@/lib/team-works-operations";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 
 const dowLabels = ["日", "月", "火", "水", "木", "金", "土"];
 const maxChipsPerCell = 2;
@@ -32,6 +33,7 @@ export function TeamWorksMonthCalendar({
   shiftAvailability?: { date: string; names: string[] }[];
   onSelectDay: (dateKey: string) => void;
 }) {
+  const labels = useTeamWorksLabels();
   const [view, setView] = useState<CalendarView>("month");
   const todayKey = formatDateKey(new Date());
   const gridDates = useMemo(() => buildCalendarGridDates(monthDate), [monthDate]);
@@ -174,7 +176,7 @@ export function TeamWorksMonthCalendar({
       ) : (
         <div className="rounded-lg border border-dashed border-[var(--mikke-line)] px-3 py-10 text-center text-xs text-[var(--mikke-muted-light)]">
           {view === "week"
-            ? "週表示（次のモックで設計）— 1日ごとの時間割で担当パートナーのシフト調整に使う想定"
+            ? `週表示（次のモックで設計）— 1日ごとの時間割で担当${labels.workers}のシフト調整に使う想定`
             : "日表示（次のモックで設計）— 1日の全コマをタイムライン表示"}
         </div>
       )}
@@ -197,7 +199,7 @@ export function TeamWorksMonthCalendar({
         {shiftAvailability.length > 0 ? (
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--mikke-yellow)]" />
-            パートナー希望日
+            {labels.workers}希望日
           </span>
         ) : null}
       </div>

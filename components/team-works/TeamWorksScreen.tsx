@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
+import type { TeamWorksLabels } from "@/lib/team-works-labels";
 import {
   ArrowRight,
   BookOpenCheck,
@@ -117,6 +119,7 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
     }
   }, [hydrated, textScale]);
 
+  const labels = useTeamWorksLabels();
   const helpers = useMemo(() => createHelpers(state), [state]);
   const payoutRows = useMemo(() => createPayoutRows(state), [state]);
   const unassignedCount = state.sessions.filter((session) => session.status === "unassigned").length;
@@ -131,7 +134,8 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
     payoutTotal,
     unassignedCount,
     reportWaitingCount,
-    completedCount
+    completedCount,
+    labels
   });
 
   function updateState(next: TeamWorksState) {
@@ -268,7 +272,8 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
 }
 
 function DesktopSidebar({ view, mode, setMode }: { view: TeamWorksView; mode: ViewMode; setMode: (mode: ViewMode) => void }) {
-  const navGroups = navGroupsForMode(mode);
+  const labels = useTeamWorksLabels();
+  const navGroups = navGroupsForMode(mode, labels);
 
   return (
     <aside className="tw-sidebar">
@@ -276,7 +281,7 @@ function DesktopSidebar({ view, mode, setMode }: { view: TeamWorksView; mode: Vi
         <div className="tw-sidebar-logo">TW</div>
         <div>
           <p className="tw-card-title">Team Works</p>
-          <p className="tw-helper">{modeLabel(mode)}</p>
+          <p className="tw-helper">{modeLabel(mode, labels)}</p>
         </div>
       </div>
       <div className="mt-4">
@@ -326,9 +331,10 @@ function DesktopSidebar({ view, mode, setMode }: { view: TeamWorksView; mode: Vi
 }
 
 function ModeSwitcher({ mode, setMode, compact = false }: { mode: ViewMode; setMode: (mode: ViewMode) => void; compact?: boolean }) {
+  const labels = useTeamWorksLabels();
   const modes: { value: ViewMode; label: string; helper: string }[] = [
     { value: "admin", label: "管理者", helper: "全体管理" },
-    { value: "worker", label: "パートナー", helper: "授業実施" },
+    { value: "worker", label: labels.workers, helper: "授業実施" },
     { value: "client", label: "学校", helper: "学校画面" }
   ];
 
@@ -365,6 +371,7 @@ function HomeView({
   payoutTotal: number;
   reportWaitingCount: number;
 }) {
+  const labels = useTeamWorksLabels();
   const unassignedSessions = state.sessions.filter((session) => session.status === "unassigned");
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_360px]">
@@ -384,7 +391,7 @@ function HomeView({
         <Panel title="RIN RING運用の流れ">
           <FlowStep label="学校が生徒名簿を準備" />
           <FlowStep label="管理者が授業と担当者を設定" />
-          <FlowStep label="パートナーが名簿から生徒を選ぶ" />
+          <FlowStep label={`${labels.workers}が名簿から生徒を選ぶ`} />
           <FlowStep label="カルテに沿ってテーマを表示" />
           <FlowStep label="報告で次回へ引き継ぎ" />
         </Panel>
@@ -440,6 +447,7 @@ function OperationsDashboardView({
   payoutTotal: number;
   reportWaitingCount: number;
 }) {
+  const labels = useTeamWorksLabels();
   const unassignedSessions = state.sessions.filter((session) => session.status === "unassigned");
   const pendingMessages = state.messages.slice(0, 3);
   const completedSessions = state.sessions.filter((session) => session.status === "completed");
@@ -486,7 +494,7 @@ function OperationsDashboardView({
         <Panel title="対応が必要" tone="urgent">
           <SummaryLine label="未割当授業" value={`${unassignedSessions.length}件`} tone="orange" />
           <SummaryLine label="確認待ち報告" value={`${reportWaitingCount}件`} tone="orange" />
-          <SummaryLine label="学校・パートナー連絡" value={`${pendingMessages.length}件`} tone="orange" />
+          <SummaryLine label={`学校・${labels.workers}連絡`} value={`${pendingMessages.length}件`} tone="orange" />
         </Panel>
         <Panel title="すぐ開く">
           <LinkButton href="/apps/team-works/assignments" label="未割当を処理する" />
@@ -771,6 +779,7 @@ function GroupManagerPanel({ state, updateState, clientId }: ScreenProps & { cli
 }
 
 function WorkersView({ state, updateState }: ScreenProps) {
+  const labels = useTeamWorksLabels();
   const [form, setForm] = useState({
     name: "",
     availabilityStatus: "available" as WorkerStatus,
@@ -806,9 +815,9 @@ function WorkersView({ state, updateState }: ScreenProps) {
   return (
     <TwoColumn
       main={
-        <Panel title="会話パートナー一覧">
+        <Panel title={`会話${labels.workers}一覧`}>
           <DataList
-            empty="会話パートナーがまだありません。"
+            empty={`会話${labels.workers}がまだありません。`}
             items={state.workers.map((worker) => ({
               id: worker.id,
               title: worker.name,
@@ -820,7 +829,7 @@ function WorkersView({ state, updateState }: ScreenProps) {
         </Panel>
       }
       side={
-        <Panel title="会話パートナーを追加">
+        <Panel title={`会話${labels.workers}を追加`}>
           <TextInput label="名前" value={form.name} onChange={(name) => setForm({ ...form, name })} />
           <SelectInput label="稼働ステータス" value={form.availabilityStatus} onChange={(availabilityStatus) => setForm({ ...form, availabilityStatus: availabilityStatus as WorkerStatus })} options={workerStatusOptions} />
           <div>
@@ -842,7 +851,7 @@ function WorkersView({ state, updateState }: ScreenProps) {
           </div>
           <TextInput label="時給または報酬単価" value={form.rate} onChange={(rate) => setForm({ ...form, rate })} />
           <TextArea label="メモ" value={form.memo} onChange={(memo) => setForm({ ...form, memo })} />
-          <ActionButton label="パートナーを追加" onClick={addWorker} icon="save" />
+          <ActionButton label={`${labels.workers}を追加`} onClick={addWorker} icon="save" />
         </Panel>
       }
     />
@@ -850,6 +859,7 @@ function WorkersView({ state, updateState }: ScreenProps) {
 }
 
 function SessionsView({ state, updateState, helpers }: ScreenProps & { helpers: Helpers }) {
+  const labels = useTeamWorksLabels();
   const [scheduleTab, setScheduleTab] = useState<"calendar" | "list">("calendar");
   const [form, setForm] = useState({
     clientId: state.clients[0]?.id ?? "",
@@ -910,7 +920,7 @@ function SessionsView({ state, updateState, helpers }: ScreenProps & { helpers: 
               <TextInput label="日時" value={form.startsAt} onChange={(startsAt) => setForm({ ...form, startsAt })} type="datetime-local" />
               <TextInput label="授業時間（分）" value={form.durationMinutes} onChange={(durationMinutes) => setForm({ ...form, durationMinutes })} />
               <TextInput label="Zoom URL" value={form.zoomUrl} onChange={(zoomUrl) => setForm({ ...form, zoomUrl })} />
-              <SelectInput label="担当パートナー" value={form.workerId} onChange={(workerId) => setForm({ ...form, workerId })} options={[{ value: "", label: "未割当" }, ...state.workers.map((worker) => ({ value: worker.id, label: worker.name }))]} />
+              <SelectInput label={`担当${labels.workers}`} value={form.workerId} onChange={(workerId) => setForm({ ...form, workerId })} options={[{ value: "", label: "未割当" }, ...state.workers.map((worker) => ({ value: worker.id, label: worker.name }))]} />
               <ActionButton label="授業を追加" onClick={addSession} icon="save" />
             </Panel>
           }
@@ -935,6 +945,7 @@ function SegmentButton({ active, onClick, children }: { active: boolean; onClick
 }
 
 function AssignmentsView({ state, updateState, helpers }: ScreenProps & { helpers: Helpers }) {
+  const labels = useTeamWorksLabels();
   function assignWorker(sessionId: string, workerId: string) {
     updateState({
       ...state,
@@ -968,7 +979,7 @@ function AssignmentsView({ state, updateState, helpers }: ScreenProps & { helper
               </div>
               <div className="grid gap-2">
                 <SelectInput
-                  label="担当パートナー"
+                  label={`担当${labels.workers}`}
                   value={session.workerId}
                   onChange={(workerId) => assignWorker(session.id, workerId)}
                   options={[{ value: "", label: "未割当" }, ...state.workers.map((worker) => ({ value: worker.id, label: worker.name }))]}
@@ -1343,13 +1354,14 @@ function ReportEditor({
 }
 
 function PayoutsView({ rows }: { rows: PayoutRow[] }) {
+  const labels = useTeamWorksLabels();
   return (
-    <Panel title="パートナー別集計">
+    <Panel title={`${labels.workers}別集計`}>
       <div className="grid gap-3">
         {rows.map((row) => (
           <article key={row.workerId} className="tw-card p-4">
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-              <SummaryLine label="対象パートナー" value={row.workerName} />
+              <SummaryLine label={`対象${labels.workers}`} value={row.workerName} />
               <SummaryLine label="実施回数" value={`${row.count}回`} />
               <SummaryLine label="実施時間" value={`${row.hours}時間`} />
               <SummaryLine label="報酬予定額" value={`${row.amount.toLocaleString()}円`} tone="green" />
@@ -1913,14 +1925,14 @@ function modeForView(view: TeamWorksView): ViewMode {
   return "admin";
 }
 
-function modeLabel(mode: ViewMode) {
-  if (mode === "worker") return "パートナー画面";
+function modeLabel(mode: ViewMode, labels: TeamWorksLabels) {
+  if (mode === "worker") return `${labels.workers}画面`;
   if (mode === "client") return "学校画面";
   return "管理者画面";
 }
 
-function navGroupsForMode(mode: ViewMode): { title: string; views: TeamWorksView[] }[] {
-  if (mode === "worker") return [{ title: "パートナー", views: ["workerPortal"] }];
+function navGroupsForMode(mode: ViewMode, labels: TeamWorksLabels): { title: string; views: TeamWorksView[] }[] {
+  if (mode === "worker") return [{ title: labels.workers, views: ["workerPortal"] }];
   if (mode === "client") return [{ title: "学校", views: ["clientPortal"] }];
   return [
     { title: "全体確認", views: ["home", "dashboard"] },
@@ -1944,7 +1956,8 @@ function createViewMetrics({
   payoutTotal,
   unassignedCount,
   reportWaitingCount,
-  completedCount
+  completedCount,
+  labels
 }: {
   view: TeamWorksView;
   state: TeamWorksState;
@@ -1953,6 +1966,7 @@ function createViewMetrics({
   unassignedCount: number;
   reportWaitingCount: number;
   completedCount: number;
+  labels: TeamWorksLabels;
 }): MetricProps[] {
   if (view === "workerPortal") {
     const firstWorkerId = state.workers[0]?.id ?? "";
@@ -2004,7 +2018,7 @@ function createViewMetrics({
 
   if (view === "payouts") {
     return [
-      { label: "対象パートナー", value: `${payoutRows.length}名`, tone: "navy" },
+      { label: `対象${labels.workers}`, value: `${payoutRows.length}名`, tone: "navy" },
       { label: "実施回数", value: `${payoutRows.reduce((sum, row) => sum + row.count, 0)}回`, tone: "green" },
       { label: "実施時間", value: `${payoutRows.reduce((sum, row) => sum + row.hours, 0)}時間`, tone: "green" },
       { label: "報酬予定", value: `${payoutTotal.toLocaleString()}円`, tone: "green" }

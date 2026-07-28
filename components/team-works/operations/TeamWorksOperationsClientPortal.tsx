@@ -7,6 +7,7 @@ import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { ClientMonthCalendar } from "@/components/team-works/operations/ClientMonthCalendar";
 import { TeamWorksClientProjectsShell } from "@/components/team-works/client-projects/TeamWorksClientProjectsShell";
 import { TeamWorksClientSelfProfile } from "@/components/team-works/operations/TeamWorksDirectorySelfProfile";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import { supabase } from "@/lib/supabase/client";
 import {
   approveOperationsClientProject,
@@ -417,6 +418,7 @@ function RosterEditor({
   groups: OperationsClientPortalData["groups"];
   mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice>;
 }) {
+  const labels = useTeamWorksLabels();
   const [selectedIds, setSelectedIds] = useState(session.roster.map((item) => item.participantId));
   const [groupFilter, setGroupFilter] = useState("all");
   const [saveNotice, setSaveNotice] = useState<MutationNotice | null>(null);
@@ -497,7 +499,7 @@ function RosterEditor({
         {participants.length && !visibleParticipants.length ? <MikkeEmptyState title="このグループにはまだ登録がありません" /> : null}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <button type="button" onClick={() => void mutate(() => saveOperationsClientSessionRoster(supabase, { projectId: session.projectId, sessionId: session.id, participantIds: selectedIds }), "出席順を確定しました。本部と担当パートナーに共有されます。").then(setSaveNotice)} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">出席順を保存</button>
+        <button type="button" onClick={() => void mutate(() => saveOperationsClientSessionRoster(supabase, { projectId: session.projectId, sessionId: session.id, participantIds: selectedIds }), `出席順を確定しました。本部と担当${labels.workers}に共有されます。`).then(setSaveNotice)} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">出席順を保存</button>
         <InlineMutationNotice notice={saveNotice} />
       </div>
     </div>
@@ -581,6 +583,7 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
 }
 
 function ProjectMessagesTab({ data, project, mutate }: { data: OperationsClientPortalData; project: OperationsClientPortalData["projects"][number]; mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice> }) {
+  const labels = useTeamWorksLabels();
   const contacts = data.contacts.filter((contact) => contact.projectId === project.id);
   const [contactId, setContactId] = useState(contacts[0]?.memberId ?? "");
   useEffect(() => { if (!contacts.some((contact) => contact.memberId === contactId)) setContactId(contacts[0]?.memberId ?? ""); }, [contacts, contactId]);
@@ -589,7 +592,7 @@ function ProjectMessagesTab({ data, project, mutate }: { data: OperationsClientP
   const contact = contacts.find((item) => item.memberId === contactId) ?? null;
   const messages = contact ? data.messages.filter((message) => message.projectId === project.id && (message.authorMemberId === contact.memberId || message.recipientMemberId === contact.memberId)) : [];
   async function submit(event: FormEvent) { event.preventDefault(); if (!contact) return; const result = await mutate(() => sendOperationsClientMessage(supabase, { projectId: project.id, recipientMemberId: contact.memberId, body }), "メッセージを送信しました。"); setSendNotice(result); if (result.tone === "success") setBody(""); }
-  return <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]"><MikkeSection title="連絡先" tone="editorial"><div className="space-y-2">{contacts.map((item) => <button key={item.memberId} type="button" onClick={() => setContactId(item.memberId)} className={`w-full rounded-xl border p-3 text-left ${item.memberId === contactId ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}><p className="font-extrabold">{item.name}</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{item.role === "worker" ? "担当パートナー" : "本部窓口"}</p></button>)}</div>{!contacts.length ? <MikkeEmptyState title="連絡先はまだありません" /> : null}</MikkeSection><MikkeSection title={contact ? `${contact.name}とのメッセージ` : "メッセージ"} tone="editorial">{contact ? <><div className="min-h-56 space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">{messages.map((message) => <div key={message.id} className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm font-semibold ${message.authorMemberId === project.clientMemberId ? "ml-auto bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-text)]"}`}>{message.body}</div>)}{!messages.length ? <p className="text-sm font-semibold text-[var(--mikke-muted)]">まだメッセージはありません。</p> : null}</div><form onSubmit={submit} className="mt-3 flex flex-wrap gap-2"><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={2} placeholder={`${contact.name}さんへメッセージを送る`} className="min-w-0 flex-1 resize-none rounded-xl border border-[var(--mikke-line)] px-3 py-2.5 text-sm" /><button className="rounded-xl bg-[var(--mikke-primary)] px-4 text-sm font-bold text-white">送信</button><InlineMutationNotice notice={sendNotice} /></form></> : <MikkeEmptyState title="連絡先を選択してください" />}</MikkeSection></div>;
+  return <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]"><MikkeSection title="連絡先" tone="editorial"><div className="space-y-2">{contacts.map((item) => <button key={item.memberId} type="button" onClick={() => setContactId(item.memberId)} className={`w-full rounded-xl border p-3 text-left ${item.memberId === contactId ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}><p className="font-extrabold">{item.name}</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{item.role === "worker" ? `担当${labels.workers}` : "本部窓口"}</p></button>)}</div>{!contacts.length ? <MikkeEmptyState title="連絡先はまだありません" /> : null}</MikkeSection><MikkeSection title={contact ? `${contact.name}とのメッセージ` : "メッセージ"} tone="editorial">{contact ? <><div className="min-h-56 space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">{messages.map((message) => <div key={message.id} className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm font-semibold ${message.authorMemberId === project.clientMemberId ? "ml-auto bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-text)]"}`}>{message.body}</div>)}{!messages.length ? <p className="text-sm font-semibold text-[var(--mikke-muted)]">まだメッセージはありません。</p> : null}</div><form onSubmit={submit} className="mt-3 flex flex-wrap gap-2"><textarea value={body} onChange={(event) => setBody(event.target.value)} rows={2} placeholder={`${contact.name}さんへメッセージを送る`} className="min-w-0 flex-1 resize-none rounded-xl border border-[var(--mikke-line)] px-3 py-2.5 text-sm" /><button className="rounded-xl bg-[var(--mikke-primary)] px-4 text-sm font-bold text-white">送信</button><InlineMutationNotice notice={sendNotice} /></form></> : <MikkeEmptyState title="連絡先を選択してください" />}</MikkeSection></div>;
 }
 
 function InlineMutationNotice({ notice }: { notice: MutationNotice | null }) {

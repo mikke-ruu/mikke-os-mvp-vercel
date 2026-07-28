@@ -3,6 +3,7 @@
 import { CircleUserRound, FolderKanban, Users } from "lucide-react";
 import { MikkeAppShell, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import { useTeamWorksPortalRoles } from "@/components/team-works/useTeamWorksPortalRoles";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 
 export function TeamWorksClientProjectsShell({
   title,
@@ -18,9 +19,10 @@ export function TeamWorksClientProjectsShell({
   // このシェルはクライアントポータル配下でのみ使われるため、クライアント項目は判定を待たず常に出す
   // （そうしないと役割判定が終わるまでサイドバー自体が一瞬消えてレイアウトが崩れる）。
   const { hasWorker } = useTeamWorksPortalRoles();
+  const labels = useTeamWorksLabels();
   const navItems: MikkeShellNavItem[] = [
     { label: "クライアントポータル", href: "/apps/team-works/portal/client", icon: FolderKanban },
-    ...(hasWorker ? [{ label: "パートナーポータル", href: "/apps/team-works/portal/worker", icon: Users }] : [])
+    ...(hasWorker ? [{ label: `${labels.workers}ポータル`, href: "/apps/team-works/portal/worker", icon: Users }] : [])
   ];
   return (
     <MikkeAppShell

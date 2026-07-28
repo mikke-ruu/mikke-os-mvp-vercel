@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 import { fetchOperationsProjects, resolveStaffOrganizationIds } from "@/lib/team-works-operations";
+import { GENERAL_PURPOSE_LABELS } from "@/lib/team-works-labels";
 
 export type OperationsProject = {
   id: string;
@@ -650,7 +651,10 @@ export async function createOperationsProject(
           name: organizationName,
           status: "active",
           archived_at: null,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          // このブロックは所属組織が0件の時だけ通るので実質新規作成のみ。
+          // 既存組織の更新でこの値が上書きされることはない。
+          label_settings: GENERAL_PURPOSE_LABELS
         },
         { onConflict: "owner_user_id,source_local_id" }
       )
