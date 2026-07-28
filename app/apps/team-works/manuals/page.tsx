@@ -52,7 +52,7 @@ function TeamWorksManualsContent() {
         <p className="-mt-2 mb-4 text-xs leading-6 text-[var(--mikke-muted)]">
           「プロジェクト限定」はその校だけで使用し、「組織共有」は他プロジェクトへ複製して育てるマスターです。本文編集・新規追加は各プロジェクトのマニュアルタブで行います。
         </p>
-        {error ? <p role="alert" className="mb-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{error}</p> : null}
+        {error ? <p role="alert" className="mb-3 rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
         {manuals === null ? <p className="text-sm text-[var(--mikke-muted)]">読み込み中…</p> : groups.length === 0 ? (
           <MikkeEmptyState title="マニュアルはまだありません" helper="プロジェクト詳細の「マニュアル」から追加してください。" />
         ) : (

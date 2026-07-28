@@ -301,7 +301,7 @@ export function TeamWorksProjectForm() {
       </MikkeSection>
 
       {message ? <p className="mb-3 text-sm font-bold text-[var(--mikke-danger)]">{message}</p> : null}
-      <button type="submit" disabled={saving || !name.trim()} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
+      <button type="submit" disabled={saving || !name.trim()} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
         {saving ? "作成しています…" : selectedTemplate ? "テンプレートからプロジェクトを作成" : "プロジェクトを作成"}
       </button>
     </form>

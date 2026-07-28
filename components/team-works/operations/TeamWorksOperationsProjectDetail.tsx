@@ -224,7 +224,7 @@ function OperationsProjectDetail({
         </nav>
 
         {mutationError ? (
-          <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+          <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">
             {mutationError}
           </p>
         ) : null}
@@ -281,10 +281,10 @@ function OverviewTab({
   return (
     <div className="space-y-6">
       {liveSessions.length > 0 ? (
-        <section aria-live="polite" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+        <section aria-live="polite" className="rounded-2xl border border-[var(--mikke-line)] border-l-4 border-l-[var(--tw-done)] bg-white p-4">
           <div className="mb-3 flex items-center gap-2">
-            <Clock3 size={18} className="text-emerald-700" />
-            <h2 className="text-sm font-extrabold text-emerald-950">只今のレッスン状況</h2>
+            <Clock3 size={18} className="text-[var(--tw-on-tint)]" />
+            <h2 className="text-sm font-extrabold">只今のレッスン状況</h2>
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             {liveSessions.map((session) => (
@@ -292,7 +292,7 @@ function OverviewTab({
                 key={session.id}
                 type="button"
                 onClick={() => onSelectTab("schedule")}
-                className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-3 text-left"
+                className="flex items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-3 text-left"
               >
                 <PartnerPresenceBadge status={session.partnerPresenceStatus} />
                 <span className="min-w-0 flex-1">
@@ -523,7 +523,7 @@ function ProjectCalendarPanel({
           <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">日付を押すと右側で予定詳細・登録・編集ができます。</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">月</span>
+          <span className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">月</span>
           <span className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">週</span>
           <span className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">日</span>
         </div>
@@ -547,7 +547,7 @@ function ProjectCalendarPanel({
                 key === selectedDate
                   ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]"
                   : japanDayOff.isDayOff
-                    ? "border-orange-200 bg-orange-50"
+                    ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]"
                     : "border-[var(--mikke-line)] bg-white"
               } ${inMonth ? "" : "opacity-40"}`}>
                 <span className="block text-[10px] font-bold">{date.getDate()}</span>
@@ -557,9 +557,9 @@ function ProjectCalendarPanel({
                       key={session.id}
                       className={`rounded px-1 py-0.5 text-[8px] font-bold ${
                         session.partnerPresenceStatus === "in_progress"
-                          ? "bg-emerald-600 text-white"
+                          ? "bg-[var(--tw-done)] text-[var(--tw-on-tint)]"
                           : session.partnerPresenceStatus === "standby"
-                            ? "bg-amber-400 text-amber-950"
+                            ? "bg-[var(--tw-planned)] text-[var(--tw-on-tint)]"
                             : "bg-[var(--mikke-primary)] text-white"
                       }`}
                     >
@@ -571,25 +571,25 @@ function ProjectCalendarPanel({
                           : ""}
                     </span>
                   ))}
-                  {sessions.length >= 3 ? <span className="rounded bg-[var(--mikke-yellow)] px-1 py-0.5 text-[8px] font-extrabold text-slate-900">全{sessions.length}件</span> : null}
+                  {sessions.length >= 3 ? <span className="rounded bg-[var(--mikke-yellow)] px-1 py-0.5 text-[8px] font-extrabold text-[var(--tw-on-tint)]">全{sessions.length}件</span> : null}
                   {holiday ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
-                  {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-orange-100 px-1 py-0.5 text-[8px] font-bold text-orange-800">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}
+                  {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-1 py-0.5 text-[8px] font-bold text-[var(--mikke-muted)]">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}
                 </span>
               </button>;
             })}
           </div>
-          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-pink)]" />休講 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm border border-orange-200 bg-orange-50" />土日祝 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />パートナー稼働可能日（接続準備中）</p>
+          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-pink)]" />休講 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" />土日祝 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />パートナー稼働可能日（接続準備中）</p>
         </div>
         <aside className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
           <h3 className="text-sm font-extrabold">{formatDate(selectedDate)} の予定詳細</h3>
           {selectedJapanDayOff.isDayOff ? (
-            <p className="mt-3 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-800">
+            <p className="mt-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">
               休校日{selectedJapanDayOff.isNationalHoliday && selectedJapanDayOff.label ? `（${selectedJapanDayOff.label}）` : ""}
             </p>
           ) : null}
           <div className="mt-3 space-y-2">
             {selectedSessions.map((session) => <CalendarSessionEditor key={session.id} session={session} partners={data.partners} saving={saving} mutate={mutate} />)}
-            {selectedHoliday ? <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs"><span><b>休講</b>{selectedHoliday.memo ? `　${selectedHoliday.memo}` : ""}</span><button type="button" disabled={saving} onClick={() => void mutate(() => deleteOperationsHoliday(supabase, selectedHoliday.id), "休講日を削除しました。")} className="rounded-lg border border-red-200 px-2 py-1 font-bold text-red-700">削除</button></div> : null}
+            {selectedHoliday ? <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs"><span><b>休講</b>{selectedHoliday.memo ? `　${selectedHoliday.memo}` : ""}</span><button type="button" disabled={saving} onClick={() => void mutate(() => deleteOperationsHoliday(supabase, selectedHoliday.id), "休講日を削除しました。")} className="rounded-lg border border-[var(--tw-action)] px-2 py-1 font-bold text-[var(--tw-action)]">削除</button></div> : null}
           </div>
           {!selectedJapanDayOff.isDayOff && adding ? <form onSubmit={addSession} className="mt-3 space-y-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
             <p className="text-xs font-extrabold">この日に予定を追加</p>
@@ -616,7 +616,7 @@ function ProjectCalendarPanel({
               ) : null}
             </fieldset>
             <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{data.partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
-            <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">{scheduleMode === "weekly" ? "毎週の予定を登録" : "登録"}</button>
+            <button disabled={saving} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">{scheduleMode === "weekly" ? "毎週の予定を登録" : "登録"}</button>
           </form> : !selectedJapanDayOff.isDayOff ? <button type="button" onClick={() => setAdding(true)} className="mt-3 w-full rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-bold text-[var(--mikke-primary)]">＋ 予定追加</button> : null}
           {!selectedHoliday ? <div className="mt-2 flex gap-2"><input value={holidayMemo} onChange={(event) => setHolidayMemo(event.target.value)} placeholder="休講メモ（任意）" className={teamWorksProjectInputClass} /><button type="button" disabled={saving} onClick={() => void addHoliday()} className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2 text-xs font-bold">休講</button></div> : null}
         </aside>
@@ -664,7 +664,7 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
               if (!window.confirm(`${formatDate(session.sessionDate)} ${session.startTime}の予定を削除しますか？`)) return;
               void mutate(() => cancelOperationsSession(supabase, session.id), "予定を削除しました。");
             }}
-            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700"
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--tw-action)] px-2 py-1 text-[11px] font-bold text-[var(--tw-action)]"
           >
             <Trash2 size={13} />削除
           </button>
@@ -679,7 +679,7 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
             </div>
             <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label="担当パートナー"><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
             <div className="flex gap-2">
-              <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">予定を保存</button>
+              <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">予定を保存</button>
               {session.generatedFromRuleId ? (
                 <button
                   type="button"
@@ -691,7 +691,7 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
                       "毎週設定を停止し、今後の予定をまとめて削除しました。"
                     );
                   }}
-                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"
+                  className="rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]"
                 >
                   毎週分を一括削除
                 </button>
@@ -755,7 +755,7 @@ function ScheduleTab({
                       "毎週設定を停止し、今後の予定をまとめて削除しました。"
                     );
                   }}
-                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]"
                 >
                   <Trash2 size={14} />毎週分を一括削除
                 </button>
@@ -1120,7 +1120,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
           <button
             type="submit"
             disabled={busy || !partnerId}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:opacity-50"
           >
             <Plus size={15} /> プロジェクトに追加
           </button>
@@ -1134,7 +1134,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
           <p role="status" className="mt-3 text-xs font-bold leading-5 text-[var(--mikke-muted)]">{message}</p>
         ) : null}
         {error ? (
-          <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{error}</p>
+          <p role="alert" className="mt-3 rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p>
         ) : null}
       </MikkeSection>
 
@@ -1171,7 +1171,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
                       type="button"
                       disabled={busy}
                       onClick={() => void cancelOffer(offer.organizationMemberId)}
-                      className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 disabled:opacity-50"
+                      className="shrink-0 rounded-lg border border-[var(--tw-action)] px-2 py-1 text-[11px] font-bold text-[var(--tw-action)] disabled:opacity-50"
                     >
                       キャンセル
                     </button>
@@ -1188,7 +1188,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
                     type="button"
                     disabled={busy}
                     onClick={() => void revokeInvite(invite)}
-                    className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 disabled:opacity-50"
+                    className="shrink-0 rounded-lg border border-[var(--tw-action)] px-2 py-1 text-[11px] font-bold text-[var(--tw-action)] disabled:opacity-50"
                   >
                     削除
                   </button>
@@ -1272,7 +1272,7 @@ function PartnerMemberCard({
           </div>
           <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-3">
             <label className="block text-[11px] font-bold tracking-[0.16em] text-[var(--mikke-primary)]" htmlFor={`hourly-wage-${member.organizationMemberId}`}>このプロジェクト内の時給</label>
-            <div className="mt-2 flex items-center gap-2"><input id={`hourly-wage-${member.organizationMemberId}`} type="number" min={0} value={hourlyWageValue} onChange={(event) => setHourlyWageValue(event.target.value)} placeholder="未設定" className={teamWorksProjectInputClass} /><span className="shrink-0">円 / 時間</span><button type="button" disabled={saving} onClick={() => onSaveHourlyWage(hourlyWageValue.trim() ? Number(hourlyWageValue) : null)} className="shrink-0 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">保存</button></div>
+            <div className="mt-2 flex items-center gap-2"><input id={`hourly-wage-${member.organizationMemberId}`} type="number" min={0} value={hourlyWageValue} onChange={(event) => setHourlyWageValue(event.target.value)} placeholder="未設定" className={teamWorksProjectInputClass} /><span className="shrink-0">円 / 時間</span><button type="button" disabled={saving} onClick={() => onSaveHourlyWage(hourlyWageValue.trim() ? Number(hourlyWageValue) : null)} className="shrink-0 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:opacity-50">保存</button></div>
           </div>
           <div>
             <p className="text-[11px] font-bold tracking-[0.22em] text-[var(--mikke-primary)]">担当日1カ月分</p>
@@ -1299,7 +1299,7 @@ function PartnerMemberCard({
           >
             <MessageSquare size={14} /> メッセージを見る
           </button>
-          <button type="button" disabled={saving} onClick={onRemove} className="ml-2 inline-flex rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-50">プロジェクトから外す</button>
+          <button type="button" disabled={saving} onClick={onRemove} className="ml-2 inline-flex rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)] disabled:opacity-50">プロジェクトから外す</button>
         </div>
       ) : null}
     </div>
@@ -1590,7 +1590,7 @@ function ProjectClientInfoPanel({ data }: { data: OperationsProjectDetailData })
   return (
     <MikkeSection title="クライアント情報" tone="editorial">
       <p className="-mt-2 mb-3 text-xs leading-6 text-[var(--mikke-muted)]">このプロジェクトで現在有効な担当者のみ表示します。会社名の専用項目はまだないため、登録時の「会社・補足」を表示します。</p>
-      {error ? <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
       {clients.length ? <div className="grid gap-3 sm:grid-cols-2">{clients.map((client) => {
         const directoryEntry = directory.find((entry) => entry.email.toLowerCase() === client.email?.toLowerCase());
         return <article key={client.organizationMemberId} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4"><div className="flex items-center justify-between gap-2"><p className="font-extrabold">{client.displayName}</p><span className={`rounded-full px-2 py-1 text-[10px] font-bold ${client.status === "active" ? "bg-[var(--mikke-green)]" : "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]"}`}>{client.status === "active" ? "有効" : "停止・アーカイブ"}</span></div><p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">メール：{client.email ?? "未登録"}</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">会社・補足：{directoryEntry?.note ?? "未設定"}</p></article>;
@@ -1759,7 +1759,7 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
         <button
           type="submit"
           disabled={busy || !clientId}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:opacity-50"
         >
           <Plus size={15} /> プロジェクトに追加
         </button>
@@ -1770,7 +1770,7 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
         </p>
       ) : null}
       {message ? <p role="status" className="mt-3 text-xs font-bold leading-5 text-[var(--mikke-muted)]">{message}</p> : null}
-      {error ? <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{error}</p> : null}
+      {error ? <p role="alert" className="mt-3 rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
 
       <button
         type="button"
@@ -1802,7 +1802,7 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
                   type="button"
                   disabled={busy}
                   onClick={() => void revokeInvite(invite)}
-                  className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 disabled:opacity-50"
+                  className="shrink-0 rounded-lg border border-[var(--tw-action)] px-2 py-1 text-[11px] font-bold text-[var(--tw-action)] disabled:opacity-50"
                 >
                   削除
                 </button>
@@ -1950,7 +1950,7 @@ function MessagesTab({
   return (
     <div className="space-y-5">
       <TabIntro icon={MessageSquare} title="メッセージ" description="クライアントは上部に固定し、参加パートナーは最新のやり取り順に表示します。カードを選ぶと会話を開けます。" />
-      {loadError ? <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">{loadError}</p> : null}
+      {loadError ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{loadError}</p> : null}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)]">
         <aside className="space-y-4">
           <ConversationGroup title="クライアント" helper="プロジェクトの窓口" tone="client" members={activeClients} archivedMembers={archivedClients} data={data} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="アクティブなクライアントはまだいません" />
@@ -1973,7 +1973,7 @@ function MessagesTab({
               </div>
               <form onSubmit={send} className="border-t border-[var(--mikke-line)] pt-3">
                 <label className="sr-only" htmlFor="operations-direct-message">メッセージ</label>
-                <div className="flex items-end gap-2"><textarea id="operations-direct-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`${selectedMember.displayName}さんへメッセージを送る`} rows={3} className={`${teamWorksProjectInputClass} min-h-[78px] resize-y`} /><button disabled={saving || !draft.trim()} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[var(--mikke-primary)] px-3 py-2.5 text-xs font-bold text-white disabled:opacity-50"><Send size={14} />送信</button></div>
+                <div className="flex items-end gap-2"><textarea id="operations-direct-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`${selectedMember.displayName}さんへメッセージを送る`} rows={3} className={`${teamWorksProjectInputClass} min-h-[78px] resize-y`} /><button disabled={saving || !draft.trim()} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[var(--tw-action)] px-3 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:opacity-50"><Send size={14} />送信</button></div>
               </form>
             </>
           )}
@@ -2142,7 +2142,7 @@ function SaveButton({ saving, label }: { saving: boolean; label: string }) {
     <button
       type="submit"
       disabled={saving}
-      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+      className="mt-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:opacity-50"
     >
       <CheckCircle2 size={15} /> {saving ? "保存中…" : label}
     </button>
@@ -2238,7 +2238,12 @@ function endTime(startTime: string, durationMin: number) {
 function PartnerPresenceBadge({ status }: { status: "not_started" | "standby" | "in_progress" | "ended" }) {
   if (status === "not_started") return null;
   const labels = { standby: "スタンバイ", in_progress: "実施中", ended: "終了" };
-  const tone = status === "standby" ? "bg-amber-100 text-amber-800" : status === "in_progress" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700";
+  const tone =
+    status === "standby"
+      ? "bg-[var(--tw-planned)] text-[var(--tw-on-tint)]"
+      : status === "in_progress"
+        ? "bg-[var(--tw-done)] text-[var(--tw-on-tint)]"
+        : "border border-[var(--mikke-line)] text-[var(--mikke-muted)]";
   return <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${tone}`}>{labels[status]}</span>;
 }
 

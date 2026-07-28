@@ -98,7 +98,7 @@ export function TeamWorksPartnerShiftPanel() {
             </p>
           </div>
           {submission ? (
-            <span className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${confirmed ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+            <span className={`rounded-full px-3 py-1.5 text-xs font-extrabold ${confirmed ? "bg-[var(--tw-done)] text-[var(--tw-on-tint)]" : "bg-[var(--tw-planned)] text-[var(--tw-on-tint)]"}`}>
               {statusLabel(submission.status)}
             </span>
           ) : null}
@@ -112,7 +112,7 @@ export function TeamWorksPartnerShiftPanel() {
           </button>
           <div className="text-center">
             <p className="text-base font-extrabold">{targetMonth.getFullYear()}年{targetMonth.getMonth() + 1}月</p>
-            <p className={`mt-0.5 text-[11px] font-bold ${deadlinePassed ? "text-amber-700" : "text-[var(--mikke-muted)]"}`}>
+            <p className={`mt-0.5 text-[11px] font-bold ${deadlinePassed ? "text-[var(--tw-action)]" : "text-[var(--mikke-muted)]"}`}>
               提出期限 {deadline.getMonth() + 1}/{deadline.getDate()}
               {deadlinePassed ? "（期限後も提出できます）" : ""}
             </p>
@@ -145,7 +145,7 @@ export function TeamWorksPartnerShiftPanel() {
                       selected
                         ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white"
                         : japanDayOff.isDayOff
-                          ? "border-orange-200 bg-orange-50 text-orange-800"
+                          ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]"
                           : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"
                     } ${inMonth ? "" : "opacity-25"} disabled:cursor-default`}
                   >
@@ -171,18 +171,18 @@ export function TeamWorksPartnerShiftPanel() {
           </label>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button type="button" disabled={saving || loading || confirmed || availableDates.length === 0} onClick={() => void submit()} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+          <button type="button" disabled={saving || loading || confirmed || availableDates.length === 0} onClick={() => void submit()} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[var(--tw-action)] px-4 py-2.5 text-sm font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
             {saving ? <LoaderCircle size={16} className="animate-spin" /> : <CalendarCheck2 size={16} />}
             {submission ? "希望シフトを更新" : "希望シフトを提出"}
           </button>
           <span className="text-xs font-bold text-[var(--mikke-muted)]">選択 {availableDates.length}日／希望 {desiredDays || 0}日</span>
           {notice ? (
-            <span className={`inline-flex items-center gap-1 text-xs font-bold ${notice.tone === "success" ? "text-emerald-700" : "text-red-700"}`}>
+            <span className={`inline-flex items-center gap-1 text-xs font-bold ${notice.tone === "success" ? "text-[var(--tw-on-tint)]" : "text-[var(--tw-action)]"}`}>
               {notice.tone === "success" ? <CheckCircle2 size={15} /> : <CircleAlert size={15} />}{notice.text}
             </span>
           ) : null}
         </div>
-        {confirmed ? <p className="mt-3 text-xs font-bold text-emerald-700">本部確認済みです。変更が必要な場合は本部へ連絡してください。</p> : null}
+        {confirmed ? <p className="mt-3 text-xs font-bold text-[var(--tw-on-tint)]">本部確認済みです。変更が必要な場合は本部へ連絡してください。</p> : null}
       </div>
     </section>
   );

@@ -159,9 +159,9 @@ function TeamWorksSettingsContent() {
               <p className="mt-2 text-[11px] font-semibold text-[var(--mikke-muted)]">月末より後の日付を設定した月は、その月の最終日として案内します。</p>
             </div>
             <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
-              <button disabled={savingOrganization || !organization} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{savingOrganization ? "保存中…" : "企業情報を保存"}</button>
-              {organizationNotice ? <span role="status" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 size={15} />{organizationNotice}</span> : null}
-              {error ? <span role="alert" className="text-xs font-bold text-red-700">{error}</span> : null}
+              <button disabled={savingOrganization || !organization} className="rounded-xl bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{savingOrganization ? "保存中…" : "企業情報を保存"}</button>
+              {organizationNotice ? <span role="status" className="inline-flex items-center gap-1 text-xs font-bold text-[var(--tw-on-tint)]"><CheckCircle2 size={15} />{organizationNotice}</span> : null}
+              {error ? <span role="alert" className="text-xs font-bold text-[var(--tw-action)]">{error}</span> : null}
             </div>
           </form>
         </MikkeSection>
@@ -170,7 +170,7 @@ function TeamWorksSettingsContent() {
           <p className="-mt-2 mb-3 text-xs leading-6 text-[var(--mikke-muted)]">この本部のホーム・プロジェクト・名簿を管理できるマネージャーを招待します。</p>
           <form onSubmit={createInvite} className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
             <TeamWorksProjectField label="メールアドレス" required><input type="email" value={inviteEmail} onChange={(event) => setInviteEmail(event.target.value)} className={teamWorksProjectInputClass} /></TeamWorksProjectField>
-            <button disabled={inviting || !inviteEmail.trim()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50"><UserPlus size={15} />{inviting ? "作成中…" : "招待リンクを作成"}</button>
+            <button disabled={inviting || !inviteEmail.trim()} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]"><UserPlus size={15} />{inviting ? "作成中…" : "招待リンクを作成"}</button>
           </form>
           {inviteUrl ? <div className="mt-3 flex gap-2"><input readOnly value={inviteUrl} className={teamWorksProjectInputClass} /><button type="button" onClick={() => void navigator.clipboard.writeText(inviteUrl)} className="shrink-0 rounded-xl border border-[var(--mikke-line)] px-3 text-xs font-bold"><Clipboard size={15} /></button></div> : null}
         </MikkeSection>
@@ -180,7 +180,7 @@ function TeamWorksSettingsContent() {
             ここに表示されるのは現在アクティブなメンバーです。アーカイブすると本部・各ポータルへのアクセスを止めてこの一覧から隠しますが、過去の予定・報告・支払記録は保持します。同じメールアドレスで再招待できます。オーナーはアーカイブできません。
           </p>
           {message ? <p role="status" className="mt-3 text-xs font-bold text-[var(--mikke-primary)]">{message}</p> : null}
-          {error ? <p role="alert" className="mt-3 text-xs font-bold text-red-600">{error}</p> : null}
+          {error ? <p role="alert" className="mt-3 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
           {loading ? (
             <p className="mt-4 text-sm font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>
           ) : members.length === 0 ? (
@@ -210,7 +210,7 @@ function TeamWorksSettingsContent() {
                         type="button"
                         disabled={busyId === member.id}
                         onClick={() => void archive(member)}
-                        className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700 disabled:opacity-50"
+                        className="shrink-0 rounded-lg border border-[var(--tw-action)] px-2 py-1 text-[11px] font-bold text-[var(--tw-action)] disabled:opacity-50"
                       >
                         {busyId === member.id ? <LoaderCircle size={13} className="animate-spin" /> : "アーカイブ"}
                       </button>

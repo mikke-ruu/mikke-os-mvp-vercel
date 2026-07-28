@@ -55,12 +55,12 @@ export function TeamWorksInviteAccept() {
       <div className="mx-auto max-w-xl rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-5 sm:p-7">
         {accepted ? (
           <div className="text-center">
-            <CheckCircle2 size={42} className="mx-auto text-emerald-600" />
+            <CheckCircle2 size={42} className="mx-auto text-[var(--tw-on-tint)]" />
             <h2 className="mt-4 text-lg font-bold">案件へ参加しました</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
               Team Worksのメンバー情報と案件権限が登録されました。
             </p>
-            <Link href={postAcceptHref(role)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">
+            <Link href={postAcceptHref(role)} className="mt-5 inline-flex items-center gap-2 rounded-lg bg-[var(--tw-action)] px-4 py-2.5 text-sm font-bold text-[var(--tw-on-solid)]">
               {postAcceptLabel(role)}
             </Link>
           </div>
@@ -77,9 +77,9 @@ export function TeamWorksInviteAccept() {
               <div className="flex items-center justify-between gap-4"><dt className="text-[var(--mikke-muted)]">表示名</dt><dd className="font-bold">{profile.display_name}</dd></div>
               <div className="flex items-center justify-between gap-4"><dt className="text-[var(--mikke-muted)]">役割</dt><dd className="font-bold">{role ? roleLabel(role) : "確認できません"}</dd></div>
             </dl>
-            {!validLink ? <p role="alert" className="mt-4 text-sm font-bold text-red-600">招待リンクが不完全です。招待した方にリンクの再発行を依頼してください。</p> : null}
-            {errorMessage ? <p role="alert" className="mt-4 text-sm font-bold leading-6 text-red-600">{errorMessage}</p> : null}
-            <button type="button" onClick={acceptInvite} disabled={busy || !validLink} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
+            {!validLink ? <p role="alert" className="mt-4 text-sm font-bold text-[var(--tw-action)]">招待リンクが不完全です。招待した方にリンクの再発行を依頼してください。</p> : null}
+            {errorMessage ? <p role="alert" className="mt-4 text-sm font-bold leading-6 text-[var(--tw-action)]">{errorMessage}</p> : null}
+            <button type="button" onClick={acceptInvite} disabled={busy || !validLink} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-[var(--tw-action)] px-4 py-3 text-sm font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
               {busy ? <LoaderCircle size={17} className="animate-spin" /> : <LogIn size={17} />}
               この案件に参加する
             </button>

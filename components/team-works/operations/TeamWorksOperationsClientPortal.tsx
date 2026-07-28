@@ -594,7 +594,7 @@ function ProjectMessagesTab({ data, project, mutate }: { data: OperationsClientP
 
 function InlineMutationNotice({ notice }: { notice: MutationNotice | null }) {
   if (!notice) return null;
-  return <span role={notice.tone === "error" ? "alert" : "status"} className={`inline-flex items-center gap-1 text-xs font-bold ${notice.tone === "success" ? "text-emerald-700" : "text-red-700"}`}>{notice.tone === "success" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}{notice.text}</span>;
+  return <span role={notice.tone === "error" ? "alert" : "status"} className={`inline-flex items-center gap-1 text-xs font-bold ${notice.tone === "success" ? "text-[var(--tw-on-tint)]" : "text-[var(--tw-action)]"}`}>{notice.tone === "success" ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}{notice.text}</span>;
 }
 
 function formatDate(dateKey: string): string { const date = new Date(`${dateKey}T00:00:00`); return `${date.getMonth() + 1}/${date.getDate()}（${"日月火水木金土"[date.getDay()]}）`; }

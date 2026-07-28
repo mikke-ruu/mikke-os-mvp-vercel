@@ -125,9 +125,9 @@ export function TeamWorksMonthCalendar({
                 type="button"
                 onClick={() => onSelectDay(dateKey)}
                 className={`min-h-[60px] rounded-lg border p-1 text-left ${
-                  japanDayOff.isDayOff ? "bg-orange-50" : "bg-white"
+                  japanDayOff.isDayOff ? "bg-[var(--mikke-surface-soft)]" : "bg-white"
                 } ${
-                  isToday ? "border-[1.5px] border-[var(--mikke-green)]" : japanDayOff.isDayOff ? "border-orange-200" : "border-[var(--mikke-line)]"
+                  isToday ? "border-[1.5px] border-[var(--mikke-green)]" : "border-[var(--mikke-line)]"
                 }`}
               >
                 <span className={`text-[10px] font-bold ${isToday ? "text-[var(--mikke-success)]" : "text-[var(--mikke-muted)]"}`}>
@@ -135,7 +135,7 @@ export function TeamWorksMonthCalendar({
                 </span>
                 {isHoliday ? <span className="mt-0.5 block text-[8px] font-extrabold text-[var(--mikke-accent)]">休校</span> : null}
                 {!isHoliday && japanDayOff.isDayOff ? (
-                  <span title={japanDayOff.label ?? undefined} className="mt-0.5 block truncate text-[8px] font-extrabold text-orange-700">
+                  <span title={japanDayOff.label ?? undefined} className="mt-0.5 block truncate text-[8px] font-extrabold text-[var(--mikke-muted)]">
                     {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
                   </span>
                 ) : null}
@@ -149,9 +149,9 @@ export function TeamWorksMonthCalendar({
                     key={event.id}
                     className={`mt-0.5 block truncate rounded px-1 py-[1px] text-[8px] font-bold ${
                       event.partnerPresenceStatus === "in_progress"
-                        ? "bg-emerald-600 text-white"
+                        ? "bg-[var(--tw-done)] text-[var(--tw-on-tint)]"
                         : event.partnerPresenceStatus === "standby"
-                          ? "bg-amber-400 text-amber-950"
+                          ? "bg-[var(--tw-planned)] text-[var(--tw-on-tint)]"
                           : ""
                     }`}
                     style={event.partnerPresenceStatus === "not_started" || event.partnerPresenceStatus === "ended"
@@ -191,7 +191,7 @@ export function TeamWorksMonthCalendar({
           休校
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-[3px] border border-orange-200 bg-orange-50" />
+          <span className="h-2.5 w-2.5 rounded-[3px] border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" />
           土日祝
         </span>
         {shiftAvailability.length > 0 ? (

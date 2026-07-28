@@ -154,7 +154,7 @@ export function TeamWorksClientProjectDetail({ projectId }: { projectId: string 
 
   return (
     <div className="space-y-6">
-      {databaseError ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 px-3 py-2 text-sm font-bold text-[var(--mikke-danger)]">{databaseError}</p> : null}
+      {databaseError ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] px-3 py-2 text-sm font-bold text-[var(--mikke-danger)]">{databaseError}</p> : null}
       <Link href="/apps/team-works/portal/client/projects" className="inline-flex items-center gap-2 text-xs font-bold text-[var(--mikke-primary)]"><ArrowLeft size={15} /> プロジェクト一覧</Link>
 
       <section className="border-b border-[var(--mikke-line)] pb-5">

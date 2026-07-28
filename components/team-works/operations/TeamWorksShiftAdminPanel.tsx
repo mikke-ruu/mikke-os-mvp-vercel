@@ -60,7 +60,7 @@ export function TeamWorksShiftAdminPanel({
             <article key={submission.id} className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-extrabold">{submission.partnerName}</p>
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${submission.status === "confirmed" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${submission.status === "confirmed" ? "bg-[var(--tw-done)] text-[var(--tw-on-tint)]" : "bg-[var(--tw-planned)] text-[var(--tw-on-tint)]"}`}>
                   {submission.status === "confirmed" ? "確認済み" : "提出済み"}
                 </span>
               </div>
@@ -70,7 +70,7 @@ export function TeamWorksShiftAdminPanel({
               </p>
               {submission.note ? <p className="mt-2 rounded-lg bg-white px-3 py-2 text-xs font-semibold leading-5">{submission.note}</p> : null}
               {submission.status !== "confirmed" ? (
-                <button type="button" disabled={confirmingId === submission.id} onClick={() => void confirm(submission)} className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                <button type="button" disabled={confirmingId === submission.id} onClick={() => void confirm(submission)} className="mt-3 inline-flex min-h-9 items-center gap-2 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
                   {confirmingId === submission.id ? <LoaderCircle size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
                   内容を確認済みにする
                 </button>
@@ -81,7 +81,7 @@ export function TeamWorksShiftAdminPanel({
       )}
 
       {notice ? (
-        <p className={`mt-3 inline-flex items-center gap-1 text-xs font-bold ${notice.tone === "success" ? "text-emerald-700" : "text-red-700"}`}>
+        <p className={`mt-3 inline-flex items-center gap-1 text-xs font-bold ${notice.tone === "success" ? "text-[var(--tw-on-tint)]" : "text-[var(--tw-action)]"}`}>
           {notice.tone === "success" ? <CheckCircle2 size={15} /> : <CircleAlert size={15} />}{notice.text}
         </p>
       ) : null}

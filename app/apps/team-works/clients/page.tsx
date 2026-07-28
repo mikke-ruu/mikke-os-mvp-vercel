@@ -132,14 +132,14 @@ function TeamWorksClientsContent() {
             <button
               type="submit"
               disabled={busy || !displayName.trim() || !email.trim()}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-50"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]"
             >
               {busy ? <LoaderCircle size={15} className="animate-spin" /> : <UserPlus size={15} />}
               登録
             </button>
           </form>
           {message ? <p role="status" className="mt-3 text-xs font-bold text-[var(--mikke-primary)]">{message}</p> : null}
-          {error ? <p role="alert" className="mt-3 text-xs font-bold text-red-600">{error}</p> : null}
+          {error ? <p role="alert" className="mt-3 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
         </MikkeSection>
 
         <MikkeSection title="Clients" tone="editorial">
@@ -184,7 +184,7 @@ function TeamWorksClientsContent() {
                       type="button"
                       disabled={busyClientId === client.id}
                       onClick={() => void archive(client)}
-                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2 py-1.5 text-xs font-bold text-red-700 disabled:opacity-50"
+                      className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-[var(--tw-action)] px-2 py-1.5 text-xs font-bold text-[var(--tw-action)] disabled:opacity-50"
                     >
                       <Archive size={14} /> アーカイブ
                     </button>

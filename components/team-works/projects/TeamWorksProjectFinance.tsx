@@ -206,7 +206,7 @@ export function TeamWorksProjectFinance({ project, localTasks }: { project: Proj
 
   return (
     <div className="space-y-6">
-      {errorMessage ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 px-3 py-2 text-sm font-bold text-[var(--mikke-danger)]">{errorMessage}</p> : null}
+      {errorMessage ? <p role="alert" className="rounded-lg border border-[var(--mikke-danger)] px-3 py-2 text-sm font-bold text-[var(--mikke-danger)]">{errorMessage}</p> : null}
       {activitySyncMessage ? <p className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-bg)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">{activitySyncMessage}</p> : null}
 
       <div className="grid gap-3 sm:grid-cols-2">

@@ -100,11 +100,11 @@ export function TeamWorksOperationsDashboard() {
   return (
     <div className="space-y-6">
       {data.activePresenceEvents.length > 0 ? (
-        <section aria-live="polite" className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+        <section aria-live="polite" className="rounded-2xl border border-[var(--mikke-line)] border-l-4 border-l-[var(--tw-done)] bg-white p-4">
           <div className="mb-3 flex items-center gap-2">
-            <Clock size={18} className="text-emerald-700" />
-            <h2 className="text-sm font-extrabold text-emerald-950">只今のレッスン状況</h2>
-            <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-extrabold text-emerald-800">
+            <Clock size={18} className="text-[var(--tw-on-tint)]" />
+            <h2 className="text-sm font-extrabold">只今のレッスン状況</h2>
+            <span className="rounded-full bg-[var(--tw-done)] px-2 py-0.5 text-[10px] font-extrabold text-[var(--tw-on-tint)]">
               {data.activePresenceEvents.length}件
             </span>
           </div>
@@ -113,7 +113,7 @@ export function TeamWorksOperationsDashboard() {
               <Link
                 key={event.id}
                 href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
-                className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-3"
+                className="flex items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-3"
               >
                 <PartnerPresenceLabel status={event.partnerPresenceStatus} />
                 <span className="min-w-0 flex-1">
@@ -227,9 +227,9 @@ export function TeamWorksOperationsDashboard() {
                 <Link
                   key={event.id}
                   href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
-                  className="grid gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3 transition hover:border-[#8bc7ad] sm:grid-cols-[90px_1fr_auto] sm:items-center"
+                  className="grid gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3 transition hover:border-[var(--tw-done)] sm:grid-cols-[90px_1fr_auto] sm:items-center"
                 >
-                  <span className="rounded-lg bg-[#ffd370] px-2 py-2 text-center text-xs font-extrabold text-[#1b1b1f]">
+                  <span className="rounded-lg bg-[var(--tw-planned)] px-2 py-2 text-center text-xs font-extrabold text-[var(--tw-on-tint)]">
                     {formatShortDate(event.sessionDate, todayKey)} {event.startTime}
                   </span>
                   <span className="min-w-0">
@@ -260,17 +260,26 @@ export function TeamWorksOperationsDashboard() {
   );
 }
 
+// 状態バッジ。正典の役割色をそのまま塗り、淡色の上は黒文字にする。
+// スタンバイ=これから(YELLOW)、実施中=正常稼働(GREEN)、終了=記録済みなので色を使わない。
 function PartnerPresenceLabel({ status }: { status: "not_started" | "standby" | "in_progress" | "ended" }) {
   if (status === "not_started") return null;
   const labels = { standby: "スタンバイ", in_progress: "実施中", ended: "終了" };
-  const tone = status === "standby" ? "bg-amber-100 text-amber-800" : status === "in_progress" ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700";
+  const tone =
+    status === "standby"
+      ? "bg-[var(--tw-planned)] text-[var(--tw-on-tint)]"
+      : status === "in_progress"
+        ? "bg-[var(--tw-done)] text-[var(--tw-on-tint)]"
+        : "border border-[var(--mikke-line)] text-[var(--mikke-muted)]";
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-extrabold ${tone}`}>{labels[status]}</span>;
 }
 
 function FirstOperationsProjectSetup() {
   const router = useRouter();
-  const [title, setTitle] = useState("スリランカ校");
-  const [organizationName, setOrganizationName] = useState("アリサ日本語レッスン");
+  // 初期値は空にする。以前ここに実組織名が入っていたため、新規ユーザーが
+  // そのまま送信すると他社名の組織が作られてしまっていた。
+  const [title, setTitle] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
   const [contractStartedOn, setContractStartedOn] = useState(formatDateKey(new Date()));
   const [contractEndedOn, setContractEndedOn] = useState("");
   const [saving, setSaving] = useState(false);
@@ -303,7 +312,7 @@ function FirstOperationsProjectSetup() {
     <div className="mx-auto max-w-2xl">
       <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm sm:p-6">
         <div className="flex items-start gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--mikke-green)] text-[#1b1b1f]">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[var(--tw-done)] text-[var(--tw-on-tint)]">
             <Plus size={21} />
           </span>
           <div>
@@ -320,7 +329,7 @@ function FirstOperationsProjectSetup() {
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="例：スリランカ校"
+              placeholder="例：渋谷教室、A社定期メンテナンス"
               required
               className={inputClass}
             />
@@ -330,7 +339,7 @@ function FirstOperationsProjectSetup() {
             <input
               value={organizationName}
               onChange={(event) => setOrganizationName(event.target.value)}
-              placeholder="例：アリサ日本語レッスン"
+              placeholder="例：株式会社◯◯、◯◯事務所"
               className={inputClass}
             />
             <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">
@@ -359,14 +368,15 @@ function FirstOperationsProjectSetup() {
             </label>
           </div>
           {error ? (
-            <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+            <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">
               {error}
             </p>
           ) : null}
+          {/* 主要操作はORANGE（正典9章）。無効時はopacityで薄めず、無彩色に置き換える。 */}
           <button
             type="submit"
             disabled={saving || !title.trim()}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-5 py-3 text-sm font-bold text-white disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--tw-action)] px-5 py-3 text-sm font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]"
           >
             <Plus size={16} /> {saving ? "作成中…" : "運営型プロジェクトを作成"}
           </button>

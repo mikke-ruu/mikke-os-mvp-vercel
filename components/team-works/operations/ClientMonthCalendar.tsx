@@ -18,13 +18,13 @@ type CalendarHoliday = {
 
 const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
 
+// プロジェクトの見分け用ドット。役割色ではなく識別色として5色を巡回させる。
 const projectDotColors = [
-  "bg-[var(--mikke-primary)]",
-  "bg-[var(--mikke-accent)]",
-  "bg-amber-500",
-  "bg-sky-500",
-  "bg-violet-500",
-  "bg-emerald-500"
+  "bg-[var(--mikke-blue)]",
+  "bg-[var(--mikke-orange)]",
+  "bg-[var(--mikke-green)]",
+  "bg-[var(--mikke-yellow)]",
+  "bg-[var(--mikke-pink)]"
 ];
 
 function toDateKey(date: Date): string {
@@ -120,7 +120,7 @@ export function ClientMonthCalendar({
                 key === selectedDate
                   ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]"
                   : japanDayOff.isDayOff
-                    ? "border-orange-200 bg-orange-50"
+                    ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]"
                     : "border-[var(--mikke-line)] bg-white"
               } ${inMonth ? "" : "opacity-40"}`}
             >
@@ -133,13 +133,13 @@ export function ClientMonthCalendar({
                   </span>
                 ))}
                 {daySessions.length >= 3 ? (
-                  <span className="rounded bg-[var(--mikke-yellow)] px-1 py-0.5 text-[8px] font-extrabold text-slate-900">
+                  <span className="rounded bg-[var(--mikke-yellow)] px-1 py-0.5 text-[8px] font-extrabold text-[var(--tw-on-tint)]">
                     全{daySessions.length}件
                   </span>
                 ) : null}
                 {dayHolidays.length > 0 ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
                 {dayHolidays.length === 0 && japanDayOff.isDayOff ? (
-                  <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-orange-100 px-1 py-0.5 text-[8px] font-bold text-orange-800">
+                  <span title={japanDayOff.label ?? undefined} className="truncate rounded border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-1 py-0.5 text-[8px] font-bold text-[var(--mikke-muted)]">
                     {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
                   </span>
                 ) : null}
@@ -149,7 +149,7 @@ export function ClientMonthCalendar({
         })}
       </div>
       <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold text-[var(--mikke-muted)]">
-        <span className="h-2.5 w-2.5 rounded-[3px] border border-orange-200 bg-orange-50" />
+        <span className="h-2.5 w-2.5 rounded-[3px] border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" />
         土日祝
       </p>
     </div>

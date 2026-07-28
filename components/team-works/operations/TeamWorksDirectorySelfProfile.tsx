@@ -136,7 +136,7 @@ function SaveResult({ kind, message }: { kind: "success" | "error"; message: str
       className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold ${
         kind === "success"
           ? "bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]"
-          : "bg-red-50 text-red-700"
+          : "border border-[var(--mikke-danger)] text-[var(--mikke-danger)]"
       }`}
     >
       <Icon size={15} /> {message}
