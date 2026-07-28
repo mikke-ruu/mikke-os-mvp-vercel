@@ -70,6 +70,7 @@ export type OperationsScheduleRule = {
 
 export type OperationsProjectSession = {
   id: string;
+  generatedFromRuleId: string | null;
   sessionDate: string;
   startTime: string;
   durationMin: number;
@@ -270,7 +271,7 @@ export async function loadOperationsProjectDetail(
       .order("start_time"),
     client
       .from("team_works_op_sessions")
-      .select("id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status")
+      .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status")
       .eq("project_id", projectId)
       .gte("session_date", dateKey(addDays(new Date(), -14)))
       .lte("session_date", dateKey(addDays(new Date(), 90)))
@@ -323,7 +324,7 @@ export async function loadOperationsProjectDetail(
   if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default", "partner_presence_status"])) {
     sessionResult = await client
       .from("team_works_op_sessions")
-      .select("id,session_date,start_time,duration_min,status,partner_member_id")
+      .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id")
       .eq("project_id", projectId)
       .gte("session_date", dateKey(addDays(new Date(), -14)))
       .lte("session_date", dateKey(addDays(new Date(), 90)))
@@ -373,6 +374,7 @@ export async function loadOperationsProjectDetail(
 
   const sessionRows = (sessionResult.data ?? []) as {
     id: string;
+    generated_from_rule_id: string | null;
     session_date: string;
     start_time: string;
     duration_min: number;
@@ -501,6 +503,7 @@ export async function loadOperationsProjectDetail(
     })),
     sessions: sessionRows.map((row) => ({
       id: row.id,
+      generatedFromRuleId: row.generated_from_rule_id ?? null,
       sessionDate: row.session_date,
       startTime: row.start_time.slice(0, 5),
       durationMin: row.duration_min,
@@ -1166,6 +1169,9 @@ export async function updateOperationsOrganizationProfile(
     .eq("id", input.id)
     .select("id")
     .maybeSingle();
+  if (error && isMissingSupabaseField(error, ["shift_submission_deadline_day", "other_deadline_day", "payment_day"])) {
+    throw new Error("締め日設定のデータベース更新がまだ反映されていません。20260728070657_team_works_organization_deadlines.sql を適用後に、もう一度保存してください。");
+  }
   if (error) throw error;
   if (!data) throw new Error("企業情報を保存できませんでした。オーナー権限を確認してください。");
 }
@@ -1393,6 +1399,31 @@ export async function updateOperationsScheduleRuleStatus(
     .maybeSingle();
   if (error) throw error;
   if (!data) throw new Error("週次パターンを更新できませんでした。権限と対象を確認してください。");
+}
+
+export async function archiveOperationsScheduleRuleAndCancelFutureSessions(
+  client: SupabaseClient,
+  ruleId: string,
+  fromDate: string
+): Promise<number> {
+  const sessionResult = await client
+    .from("team_works_op_sessions")
+    .update({ status: "cancelled", updated_at: new Date().toISOString() })
+    .eq("generated_from_rule_id", ruleId)
+    .gte("session_date", fromDate)
+    .eq("status", "scheduled")
+    .select("id");
+  if (sessionResult.error) throw sessionResult.error;
+
+  const { data, error } = await client
+    .from("team_works_schedule_rules")
+    .update({ status: "archived", updated_at: new Date().toISOString() })
+    .eq("id", ruleId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("毎週設定を削除できませんでした。権限と対象を確認してください。");
+  return sessionResult.data?.length ?? 0;
 }
 
 export async function createOperationsHoliday(

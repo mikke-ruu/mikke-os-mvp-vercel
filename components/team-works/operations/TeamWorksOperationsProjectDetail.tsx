@@ -18,6 +18,7 @@ import {
   Plus,
   Settings2,
   Send,
+  Trash2,
   Users,
   Video,
   WalletCards
@@ -39,10 +40,12 @@ import { getJapanDayOff } from "@/lib/japanese-calendar";
 import {
   addOperationsClientToProject,
   addOperationsPartnerToProject,
+  archiveOperationsScheduleRuleAndCancelFutureSessions,
   cancelOperationsSession,
   createOperationsHoliday,
   createOperationsManual,
   createOperationsParticipant,
+  createOperationsScheduleRule,
   createOperationsSession,
   deleteOperationsHoliday,
   loadOperationsClientDirectory,
@@ -72,6 +75,7 @@ import {
   type OperationsProjectPartnerOffer,
   type OperationsProjectMember
 } from "@/lib/team-works-operations-project";
+import { generateSessionsForProject } from "@/lib/team-works-operations";
 import { TeamWorksOperationsShell } from "./TeamWorksOperationsShell";
 
 type ProjectTab =
@@ -390,6 +394,7 @@ function ProjectCalendarPanel({
   const [startTime, setStartTime] = useState("13:00");
   const [finishTime, setFinishTime] = useState("14:00");
   const [partnerMemberId, setPartnerMemberId] = useState("");
+  const [scheduleMode, setScheduleMode] = useState<"once" | "weekly">("once");
   const [holidayMemo, setHolidayMemo] = useState("");
   const calendarDates = useMemo(() => monthCalendarDates(monthDate), [monthDate]);
   const sessionsByDate = useMemo(() => {
@@ -402,7 +407,8 @@ function ProjectCalendarPanel({
   const holidaysByDate = useMemo(() => new Map(data.holidays.map((holiday) => [holiday.holidayDate, holiday])), [data.holidays]);
   const selectedSessions = sessionsByDate.get(selectedDate) ?? [];
   const selectedHoliday = holidaysByDate.get(selectedDate);
-  const selectedJapanDayOff = getJapanDayOff(new Date(`${selectedDate}T00:00:00`));
+  const selectedDateObject = new Date(`${selectedDate}T00:00:00`);
+  const selectedJapanDayOff = getJapanDayOff(selectedDateObject);
 
   const selectDate = (date: Date) => {
     setSelectedDate(toDateKey(date));
@@ -411,14 +417,44 @@ function ProjectCalendarPanel({
 
   const addSession = async (event: FormEvent) => {
     event.preventDefault();
+    const durationMin = durationBetweenTimes(startTime, finishTime);
+    const firstDate = selectedDateObject;
+    const contractEndDate = data.project.contractEndedOn
+      ? new Date(`${data.project.contractEndedOn}T00:00:00`)
+      : null;
+    const weeksAhead = contractEndDate && contractEndDate >= firstDate
+      ? Math.max(1, Math.ceil((contractEndDate.getTime() - firstDate.getTime() + 86_400_000) / (7 * 86_400_000)))
+      : 12;
     await mutate(
-      () => createOperationsSession(supabase, data.project.id, {
-        sessionDate: selectedDate,
-        startTime,
-        durationMin: durationBetweenTimes(startTime, finishTime),
-        partnerMemberId: partnerMemberId || null
-      }),
-      "予定を登録しました。"
+      async () => {
+        if (scheduleMode === "once") {
+          await createOperationsSession(supabase, data.project.id, {
+            sessionDate: selectedDate,
+            startTime,
+            durationMin,
+            partnerMemberId: partnerMemberId || null
+          });
+          return;
+        }
+        await createOperationsScheduleRule(supabase, data.project.id, {
+          weekday: firstDate.getDay(),
+          startTime,
+          durationMin,
+          partnerMemberId: partnerMemberId || null
+        });
+        await generateSessionsForProject(
+          supabase,
+          {
+            id: data.project.id,
+            organizationId: data.project.organizationId,
+            title: data.project.title
+          },
+          { fromDate: firstDate, weeksAhead }
+        );
+      },
+      scheduleMode === "weekly"
+        ? `毎週の予定を登録しました（${data.project.contractEndedOn ? "契約終了日まで" : "12週間分"}）。`
+        : "予定を登録しました。"
     );
     setAdding(false);
   };
@@ -474,6 +510,7 @@ function ProjectCalendarPanel({
                 <span className="block text-[10px] font-bold">{date.getDate()}</span>
                 <span className="mt-1 flex flex-wrap gap-1">
                   {sessions.slice(0, 2).map((session) => <span key={session.id} className="rounded bg-[var(--mikke-primary)] px-1 py-0.5 text-[8px] font-bold text-white">{session.startTime}</span>)}
+                  {sessions.length >= 3 ? <span className="rounded bg-[var(--mikke-yellow)] px-1 py-0.5 text-[8px] font-extrabold text-slate-900">全{sessions.length}件</span> : null}
                   {holiday ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
                   {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-orange-100 px-1 py-0.5 text-[8px] font-bold text-orange-800">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}
                 </span>
@@ -499,8 +536,26 @@ function ProjectCalendarPanel({
               <label className="text-[11px] font-bold text-[var(--mikke-muted)]">開始時間<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} /></label>
               <label className="text-[11px] font-bold text-[var(--mikke-muted)]">終了時間<input type="time" value={finishTime} onChange={(event) => setFinishTime(event.target.value)} className={teamWorksProjectInputClass} /></label>
             </div>
+            <fieldset>
+              <legend className="mb-1 text-[11px] font-bold text-[var(--mikke-muted)]">繰り返し</legend>
+              <div className="grid grid-cols-2 gap-2">
+                <label className={`cursor-pointer rounded-lg border px-3 py-2 text-center text-xs font-bold ${scheduleMode === "once" ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]" : "border-[var(--mikke-line)] bg-white"}`}>
+                  <input type="radio" name="schedule-mode" value="once" checked={scheduleMode === "once"} onChange={() => setScheduleMode("once")} className="sr-only" />
+                  今回のみ
+                </label>
+                <label className={`cursor-pointer rounded-lg border px-3 py-2 text-center text-xs font-bold ${scheduleMode === "weekly" ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]" : "border-[var(--mikke-line)] bg-white"}`}>
+                  <input type="radio" name="schedule-mode" value="weekly" checked={scheduleMode === "weekly"} onChange={() => setScheduleMode("weekly")} className="sr-only" />
+                  毎週
+                </label>
+              </div>
+              {scheduleMode === "weekly" ? (
+                <p className="mt-1.5 text-[10px] font-semibold text-[var(--mikke-muted)]">
+                  毎週{weekdayLabel(selectedDateObject.getDay())}曜日として、{data.project.contractEndedOn ? `契約終了日（${formatDate(data.project.contractEndedOn)}）まで` : "12週間分"}を作成します。
+                </p>
+              ) : null}
+            </fieldset>
             <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{data.partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
-            <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">登録</button>
+            <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">{scheduleMode === "weekly" ? "毎週の予定を登録" : "登録"}</button>
           </form> : !selectedJapanDayOff.isDayOff ? <button type="button" onClick={() => setAdding(true)} className="mt-3 w-full rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-bold text-[var(--mikke-primary)]">＋ 予定追加</button> : null}
           {!selectedHoliday ? <div className="mt-2 flex gap-2"><input value={holidayMemo} onChange={(event) => setHolidayMemo(event.target.value)} placeholder="休講メモ（任意）" className={teamWorksProjectInputClass} /><button type="button" disabled={saving} onClick={() => void addHoliday()} className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2 text-xs font-bold">休講</button></div> : null}
         </aside>
@@ -540,6 +595,19 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
             Zoomを開く
           </a>
         ) : null}
+        {session.status !== "completed" ? (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => {
+              if (!window.confirm(`${formatDate(session.sessionDate)} ${session.startTime}の予定を削除しますか？`)) return;
+              void mutate(() => cancelOperationsSession(supabase, session.id), "予定を削除しました。");
+            }}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700"
+          >
+            <Trash2 size={13} />削除
+          </button>
+        ) : null}
       </div>
       {open ? (
         <div className="mt-3 space-y-4">
@@ -551,7 +619,22 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
             <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label="担当パートナー"><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
             <div className="flex gap-2">
               <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">予定を保存</button>
-              <button type="button" disabled={saving} onClick={() => void mutate(() => cancelOperationsSession(supabase, session.id), "予定を削除しました。")} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-bold text-red-700">削除</button>
+              {session.generatedFromRuleId ? (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    if (!window.confirm("この毎週設定を停止し、本日以降に生成済みの予定をまとめて削除しますか？過去の実施記録は残ります。")) return;
+                    void mutate(
+                      async () => { await archiveOperationsScheduleRuleAndCancelFutureSessions(supabase, session.generatedFromRuleId!, toDateKey(new Date())); },
+                      "毎週設定を停止し、今後の予定をまとめて削除しました。"
+                    );
+                  }}
+                  className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"
+                >
+                  毎週分を一括削除
+                </button>
+              ) : null}
             </div>
           </div>
           <div className="space-y-2 border-t border-[var(--mikke-line)] pt-3">
@@ -593,12 +676,29 @@ function ScheduleTab({
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
             {data.rules.map((rule) => (
-              <InfoCard
-                key={rule.id}
-                title={`毎週 ${weekdayLabel(rule.weekday)} ${rule.startTime}〜${endTime(rule.startTime, rule.durationMin)}`}
-                helper={`担当 ${rule.partnerName ?? "未定"} ／ ${rule.durationMin}分`}
-                badge={rule.status === "active" ? "有効" : "一時停止"}
-              />
+              <article key={rule.id} className="rounded-xl border border-[var(--mikke-line)] bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-extrabold">毎週 {weekdayLabel(rule.weekday)} {rule.startTime}〜{endTime(rule.startTime, rule.durationMin)}</p>
+                    <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">担当 {rule.partnerName ?? "未定"} ／ {rule.durationMin}分</p>
+                  </div>
+                  <span className="rounded-full bg-[var(--mikke-green)] px-2 py-1 text-[10px] font-bold">{rule.status === "active" ? "有効" : "一時停止"}</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    if (!window.confirm("この毎週設定を停止し、本日以降に生成済みの予定をまとめて削除しますか？過去の実施記録は残ります。")) return;
+                    void mutate(
+                      async () => { await archiveOperationsScheduleRuleAndCancelFutureSessions(supabase, rule.id, toDateKey(new Date())); },
+                      "毎週設定を停止し、今後の予定をまとめて削除しました。"
+                    );
+                  }}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700"
+                >
+                  <Trash2 size={14} />毎週分を一括削除
+                </button>
+              </article>
             ))}
           </div>
         )}
