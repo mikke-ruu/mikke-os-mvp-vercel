@@ -431,16 +431,33 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
       await updateOperationsPartnerPresence(supabase, session.id, next);
       setPresence(next);
       if (next === "standby") setControlsCollapsed(true);
+      if (next === "ended") setTimerRunning(false);
       setPresenceNotice({
         tone: "success",
-        text: next === "standby" ? "本部へスタンバイを通知しました。" : next === "ended" ? "レッスン終了を通知しました。" : "開始を通知しました。"
+        text: next === "standby" ? "本部へスタンバイを通知しました。" : next === "ended" ? "レッスン終了を通知しました。" : "本部へレッスン開始を通知しました。"
       });
       await onRefresh();
+      return true;
     } catch (error) {
       setPresenceNotice({ tone: "error", text: toErrorMessage(error, "状態を更新できませんでした。") });
+      return false;
     } finally {
       setPresenceBusy(false);
     }
+  }
+
+  async function toggleTimer() {
+    if (timerRunning) {
+      setTimerRunning(false);
+      return;
+    }
+
+    const isFirstParticipant = selectedStudent?.orderIndex === 1;
+    if (isFirstParticipant && presence !== "in_progress") {
+      const started = await changePresence("in_progress");
+      if (!started) return;
+    }
+    setTimerRunning(true);
   }
 
   function moveNext(currentId: string) {
@@ -486,7 +503,7 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
               </button>
             ) : null}
             {session.zoomUrl ? (
-              <a href={session.zoomUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#2d8cff] px-4 py-2 text-xs font-bold text-white">
+              <a href={session.zoomUrl} target="_blank" rel="noreferrer" onClick={() => setControlsCollapsed(true)} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#2d8cff] px-4 py-2 text-xs font-bold text-white">
                 <ExternalLink size={14} />Zoomを開く
               </a>
             ) : (
@@ -496,7 +513,11 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
               <button type="button" disabled={presenceBusy} onClick={() => void changePresence("ended")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-red-200 bg-white px-4 py-2 text-xs font-bold text-red-700 disabled:opacity-50">
                 <Square size={13} />レッスン終了
               </button>
-            ) : null}
+            ) : (
+              <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                <RotateCcw size={13} />レッスン中に戻す
+              </button>
+            )}
             <SaveFeedback notice={presenceNotice} />
             {presence !== "not_started" ? (
               <button type="button" onClick={() => setControlsCollapsed(true)} className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-xs font-bold text-[var(--mikke-primary)]">
@@ -518,7 +539,7 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
             targetMinutes={targetMinutes}
             elapsedSeconds={elapsedSeconds}
             timerRunning={timerRunning}
-            onToggleTimer={() => setTimerRunning((running) => !running)}
+            onToggleTimer={() => void toggleTimer()}
             onResetTimer={() => { setTimerRunning(false); setElapsedSeconds(0); }}
             onOpenRecord={() => setMobileRecordOpen(true)}
           />
@@ -542,7 +563,7 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
                   targetMinutes={targetMinutes}
                   elapsedSeconds={elapsedSeconds}
                   timerRunning={timerRunning}
-                  onToggleTimer={() => setTimerRunning((running) => !running)}
+                  onToggleTimer={() => void toggleTimer()}
                   onResetTimer={() => { setTimerRunning(false); setElapsedSeconds(0); }}
                 />
               ))}
@@ -575,7 +596,7 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
                   targetMinutes={targetMinutes}
                   elapsedSeconds={elapsedSeconds}
                   timerRunning={timerRunning}
-                  onToggleTimer={() => setTimerRunning((running) => !running)}
+                  onToggleTimer={() => void toggleTimer()}
                   onResetTimer={() => { setTimerRunning(false); setElapsedSeconds(0); }}
                   showTimer={false}
                 />
