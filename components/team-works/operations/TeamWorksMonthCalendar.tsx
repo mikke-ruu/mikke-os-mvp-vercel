@@ -8,6 +8,7 @@ import {
   type OperationsCalendarEvent,
   type OperationsProjectSummary
 } from "@/lib/team-works-operations";
+import { getJapanDayOff } from "@/lib/japanese-calendar";
 
 const dowLabels = ["日", "月", "火", "水", "木", "金", "土"];
 const maxChipsPerCell = 2;
@@ -20,6 +21,7 @@ export function TeamWorksMonthCalendar({
   events,
   holidayDates,
   projects,
+  shiftAvailability = [],
   onSelectDay
 }: {
   monthDate: Date;
@@ -27,6 +29,7 @@ export function TeamWorksMonthCalendar({
   events: OperationsCalendarEvent[];
   holidayDates: Set<string>;
   projects: OperationsProjectSummary[];
+  shiftAvailability?: { date: string; names: string[] }[];
   onSelectDay: (dateKey: string) => void;
 }) {
   const [view, setView] = useState<CalendarView>("month");
@@ -42,6 +45,10 @@ export function TeamWorksMonthCalendar({
     }
     return map;
   }, [events]);
+  const shiftsByDate = useMemo(
+    () => new Map(shiftAvailability.map((item) => [item.date, item.names])),
+    [shiftAvailability]
+  );
 
   const goPrevMonth = () => onMonthChange(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1));
   const goNextMonth = () => onMonthChange(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1));
@@ -98,7 +105,9 @@ export function TeamWorksMonthCalendar({
             const inMonth = date.getMonth() === monthDate.getMonth();
             const isToday = dateKey === todayKey;
             const isHoliday = holidayDates.has(dateKey);
+            const japanDayOff = getJapanDayOff(date);
             const dayEvents = eventsByDate.get(dateKey) ?? [];
+            const availablePartnerNames = shiftsByDate.get(dateKey) ?? [];
             const visibleEvents = dayEvents.slice(0, maxChipsPerCell);
             const overflowCount = dayEvents.length - visibleEvents.length;
 
@@ -115,14 +124,26 @@ export function TeamWorksMonthCalendar({
                 key={dateKey}
                 type="button"
                 onClick={() => onSelectDay(dateKey)}
-                className={`min-h-[60px] rounded-lg border bg-white p-1 text-left ${
-                  isToday ? "border-[1.5px] border-[var(--mikke-green)]" : "border-[var(--mikke-line)]"
+                className={`min-h-[60px] rounded-lg border p-1 text-left ${
+                  japanDayOff.isDayOff ? "bg-orange-50" : "bg-white"
+                } ${
+                  isToday ? "border-[1.5px] border-[var(--mikke-green)]" : japanDayOff.isDayOff ? "border-orange-200" : "border-[var(--mikke-line)]"
                 }`}
               >
                 <span className={`text-[10px] font-bold ${isToday ? "text-[var(--mikke-success)]" : "text-[var(--mikke-muted)]"}`}>
                   {date.getDate()}
                 </span>
                 {isHoliday ? <span className="mt-0.5 block text-[8px] font-extrabold text-[var(--mikke-accent)]">休校</span> : null}
+                {!isHoliday && japanDayOff.isDayOff ? (
+                  <span title={japanDayOff.label ?? undefined} className="mt-0.5 block truncate text-[8px] font-extrabold text-orange-700">
+                    {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
+                  </span>
+                ) : null}
+                {availablePartnerNames.length > 0 ? (
+                  <span title={availablePartnerNames.join("、")} className="mt-0.5 block truncate rounded bg-[var(--mikke-yellow)] px-1 py-[1px] text-[8px] font-extrabold text-[#1b1b1f]">
+                    希望 {availablePartnerNames.length}名
+                  </span>
+                ) : null}
                 {visibleEvents.map((event) => (
                   <span
                     key={event.id}
@@ -156,6 +177,16 @@ export function TeamWorksMonthCalendar({
           <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--mikke-accent)]" />
           休校
         </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-[3px] border border-orange-200 bg-orange-50" />
+          土日祝
+        </span>
+        {shiftAvailability.length > 0 ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--mikke-yellow)]" />
+            パートナー希望日
+          </span>
+        ) : null}
       </div>
     </div>
   );

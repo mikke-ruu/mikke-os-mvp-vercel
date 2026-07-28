@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StatChipTone } from "@/components/mikkeos/StatChip";
+import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 
 /**
  * Team Works R2: 運営型プロジェクトのダッシュボード/スケジュール用データアクセス＋
@@ -95,11 +96,11 @@ export type GenerateSessionsResult = {
 
 /** 5色固定パレット・淡色(green/yellow/pink)は黒文字・濃色(blue/orange)は白文字（StatChipと同じ規則）。 */
 const projectColorCycle: { tone: StatChipTone; bg: string; fg: string }[] = [
-  { tone: "blue", bg: "var(--mikke-blue)", fg: "#ffffff" },
-  { tone: "green", bg: "var(--mikke-green)", fg: "#1b1b1f" },
-  { tone: "orange", bg: "var(--mikke-orange)", fg: "#ffffff" },
-  { tone: "pink", bg: "var(--mikke-pink)", fg: "#1b1b1f" },
-  { tone: "yellow", bg: "var(--mikke-yellow)", fg: "#1b1b1f" }
+  { tone: "blue", bg: "var(--mikke-blue, #3f4eb5)", fg: "#ffffff" },
+  { tone: "green", bg: "var(--mikke-green, #8bc7ad)", fg: "#1b1b1f" },
+  { tone: "orange", bg: "var(--mikke-orange, #f75a3b)", fg: "#ffffff" },
+  { tone: "pink", bg: "var(--mikke-pink, #f9d3d2)", fg: "#1b1b1f" },
+  { tone: "yellow", bg: "var(--mikke-yellow, #ffd370)", fg: "#1b1b1f" }
 ];
 
 // ---------- date helpers ----------
@@ -405,7 +406,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
   const rosterCounts = await fetchRosterCounts(client, [...new Set([...sessionIds, ...unassignedRows.map((row) => row.id), ...upcomingRows.map((row) => row.id)])]);
 
   const monthEvents = sessionRows
-    .filter((row) => row.status !== "cancelled")
+    .filter((row) => row.status !== "cancelled" && !isJapanDayOffKey(row.session_date))
     .flatMap((row) => {
       const event = assembleEvent(row, projectById, memberNameById, rosterCounts);
       return event ? [event] : [];
@@ -416,6 +417,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   const needsAttentionUnassigned = unassignedRows
+    .filter((row) => !isJapanDayOffKey(row.session_date))
     .flatMap((row) => {
       const event = assembleEvent(row, projectById, memberNameById, rosterCounts);
       return event ? [event] : [];
@@ -423,7 +425,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
     .sort((a, b) => (a.sessionDate + a.startTime).localeCompare(b.sessionDate + b.startTime));
 
   const upcomingEvents = upcomingRows
-    .filter((row) => row.status === "scheduled")
+    .filter((row) => row.status === "scheduled" && !isJapanDayOffKey(row.session_date))
     .flatMap((row) => {
       const event = assembleEvent(row, projectById, memberNameById, rosterCounts);
       return event ? [event] : [];
@@ -514,7 +516,7 @@ export async function loadOperationsScheduleGroups(
     fetchOrganizationMemberNames(client, organizationIds),
     fetchSessionRows(client, projectIds, fromKey, toKey)
   ]);
-  const activeRows = sessionRows.filter((row) => row.status !== "cancelled");
+  const activeRows = sessionRows.filter((row) => row.status !== "cancelled" && !isJapanDayOffKey(row.session_date));
   const rosterCounts = await fetchRosterCounts(client, activeRows.map((row) => row.id));
 
   const groupsByDate = new Map<string, OperationsCalendarEvent[]>();
@@ -605,7 +607,7 @@ export async function generateSessionsForProject(
       const date = addDays(fromDate, offset);
       if (date.getDay() !== rule.weekday) continue;
       const dateKey = formatDateKey(date);
-      if (holidayDateSet.has(dateKey)) {
+      if (holidayDateSet.has(dateKey) || isJapanDayOffKey(dateKey)) {
         skippedHolidayDateCount += 1;
         continue;
       }

@@ -48,6 +48,9 @@ export function TeamWorksInviteAccept() {
       subtitle="ログイン中のアカウントで招待を受け取ります"
       currentApp={{ label: "Team", href: "/apps/team-works" }}
       footerLabel="Team Works by mikke"
+      ownedApps={[]}
+      otherApps={[]}
+      suggestedApps={[]}
     >
       <div className="mx-auto max-w-xl rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-5 sm:p-7">
         {accepted ? (

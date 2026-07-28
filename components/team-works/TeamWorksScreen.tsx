@@ -167,7 +167,7 @@ export function TeamWorksScreen({ view }: { view: TeamWorksView }) {
   );
 
   const screen = (
-    <MikkeAppShell appName="Team Works" title={config.title} subtitle={config.description} currentApp={{ label: "Team", href: "/apps/team-works" }} theme="green">
+    <MikkeAppShell appName="Team Works" title={config.title} subtitle={config.description} currentApp={{ label: "Team", href: "/apps/team-works" }} theme="green" ownedApps={[]} otherApps={[]} suggestedApps={[]}>
       <div className="tw-app min-w-0" data-text-scale={textScale}>
         <div className="tw-workspace min-w-0">
           <DesktopSidebar view={effectiveView} mode={mode} setMode={setMode} />

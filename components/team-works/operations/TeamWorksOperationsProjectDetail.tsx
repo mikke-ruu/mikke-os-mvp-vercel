@@ -35,6 +35,7 @@ import {
 } from "@/components/team-works/projects/TeamWorksProjectsShell";
 import { supabase } from "@/lib/supabase/client";
 import { supabaseErrorMessage } from "@/lib/supabase-schema-compat";
+import { getJapanDayOff } from "@/lib/japanese-calendar";
 import {
   addOperationsClientToProject,
   addOperationsPartnerToProject,
@@ -401,12 +402,7 @@ function ProjectCalendarPanel({
   const holidaysByDate = useMemo(() => new Map(data.holidays.map((holiday) => [holiday.holidayDate, holiday])), [data.holidays]);
   const selectedSessions = sessionsByDate.get(selectedDate) ?? [];
   const selectedHoliday = holidaysByDate.get(selectedDate);
-
-  useEffect(() => {
-    if (selectedDate.slice(0, 7) !== `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`) {
-      setMonthDate(new Date(`${selectedDate}T00:00:00`));
-    }
-  }, [selectedDate, monthDate]);
+  const selectedJapanDayOff = getJapanDayOff(new Date(`${selectedDate}T00:00:00`));
 
   const selectDate = (date: Date) => {
     setSelectedDate(toDateKey(date));
@@ -448,16 +444,18 @@ function ProjectCalendarPanel({
           <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">日付を押すと右側で予定詳細・登録・編集ができます。</p>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" aria-label="前の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white"><ChevronLeft size={15} /></button>
           <span className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">月</span>
           <span className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">週</span>
           <span className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">日</span>
-          <button type="button" aria-label="次の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white"><ChevronRight size={15} /></button>
         </div>
       </div>
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.8fr)]">
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
-          <p className="mb-3 text-sm font-extrabold">{monthDate.getFullYear()}年 {monthDate.getMonth() + 1}月</p>
+          <div className="mb-3 flex items-center gap-2">
+            <button type="button" aria-label="前の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"><ChevronLeft size={15} /></button>
+            <p className="text-sm font-extrabold">{monthDate.getFullYear()}年 {monthDate.getMonth() + 1}月</p>
+            <button type="button" aria-label="次の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"><ChevronRight size={15} /></button>
+          </div>
           <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[var(--mikke-muted)]">{weekdays.map((day) => <span key={day}>{day}</span>)}</div>
           <div className="mt-1 grid grid-cols-7 gap-1">
             {calendarDates.map((date) => {
@@ -465,24 +463,37 @@ function ProjectCalendarPanel({
               const inMonth = date.getMonth() === monthDate.getMonth();
               const sessions = sessionsByDate.get(key) ?? [];
               const holiday = holidaysByDate.get(key);
-              return <button key={key} type="button" onClick={() => selectDate(date)} className={`min-h-16 rounded-lg border p-1.5 text-left ${key === selectedDate ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"} ${inMonth ? "" : "opacity-40"}`}>
+              const japanDayOff = getJapanDayOff(date);
+              return <button key={key} type="button" onClick={() => selectDate(date)} className={`min-h-16 rounded-lg border p-1.5 text-left ${
+                key === selectedDate
+                  ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]"
+                  : japanDayOff.isDayOff
+                    ? "border-orange-200 bg-orange-50"
+                    : "border-[var(--mikke-line)] bg-white"
+              } ${inMonth ? "" : "opacity-40"}`}>
                 <span className="block text-[10px] font-bold">{date.getDate()}</span>
                 <span className="mt-1 flex flex-wrap gap-1">
                   {sessions.slice(0, 2).map((session) => <span key={session.id} className="rounded bg-[var(--mikke-primary)] px-1 py-0.5 text-[8px] font-bold text-white">{session.startTime}</span>)}
                   {holiday ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
+                  {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-orange-100 px-1 py-0.5 text-[8px] font-bold text-orange-800">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}
                 </span>
               </button>;
             })}
           </div>
-          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-pink)]" />休講 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />パートナー稼働可能日（接続準備中）</p>
+          <p className="mt-3 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-primary)]" />予定 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm bg-[var(--mikke-pink)]" />休講 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-sm border border-orange-200 bg-orange-50" />土日祝 <span className="ml-3 mr-1 inline-block h-2 w-2 rounded-full bg-[var(--mikke-yellow)]" />パートナー稼働可能日（接続準備中）</p>
         </div>
         <aside className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
           <h3 className="text-sm font-extrabold">{formatDate(selectedDate)} の予定詳細</h3>
+          {selectedJapanDayOff.isDayOff ? (
+            <p className="mt-3 rounded-xl border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-bold text-orange-800">
+              休校日{selectedJapanDayOff.isNationalHoliday && selectedJapanDayOff.label ? `（${selectedJapanDayOff.label}）` : ""}
+            </p>
+          ) : null}
           <div className="mt-3 space-y-2">
             {selectedSessions.map((session) => <CalendarSessionEditor key={session.id} session={session} partners={data.partners} saving={saving} mutate={mutate} />)}
             {selectedHoliday ? <div className="flex items-center justify-between gap-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs"><span><b>休講</b>{selectedHoliday.memo ? `　${selectedHoliday.memo}` : ""}</span><button type="button" disabled={saving} onClick={() => void mutate(() => deleteOperationsHoliday(supabase, selectedHoliday.id), "休講日を削除しました。")} className="rounded-lg border border-red-200 px-2 py-1 font-bold text-red-700">削除</button></div> : null}
           </div>
-          {adding ? <form onSubmit={addSession} className="mt-3 space-y-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+          {!selectedJapanDayOff.isDayOff && adding ? <form onSubmit={addSession} className="mt-3 space-y-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
             <p className="text-xs font-extrabold">この日に予定を追加</p>
             <div className="grid grid-cols-2 gap-2">
               <label className="text-[11px] font-bold text-[var(--mikke-muted)]">開始時間<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} /></label>
@@ -490,7 +501,7 @@ function ProjectCalendarPanel({
             </div>
             <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{data.partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
             <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">登録</button>
-          </form> : <button type="button" onClick={() => setAdding(true)} className="mt-3 w-full rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-bold text-[var(--mikke-primary)]">＋ 予定追加</button>}
+          </form> : !selectedJapanDayOff.isDayOff ? <button type="button" onClick={() => setAdding(true)} className="mt-3 w-full rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-bold text-[var(--mikke-primary)]">＋ 予定追加</button> : null}
           {!selectedHoliday ? <div className="mt-2 flex gap-2"><input value={holidayMemo} onChange={(event) => setHolidayMemo(event.target.value)} placeholder="休講メモ（任意）" className={teamWorksProjectInputClass} /><button type="button" disabled={saving} onClick={() => void addHoliday()} className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2 text-xs font-bold">休講</button></div> : null}
         </aside>
       </div>

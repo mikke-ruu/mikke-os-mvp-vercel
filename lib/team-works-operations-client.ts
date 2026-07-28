@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 
 export type OperationsClientParticipant = {
@@ -227,7 +228,7 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
       sessionDate: session.session_date,
       startTime: session.start_time.slice(0, 5),
       durationMin: session.duration_min,
-      status: session.status,
+      status: isJapanDayOffKey(session.session_date) ? "cancelled" : session.status,
       partnerName: session.partner_member_id ? nameByMemberId.get(session.partner_member_id) ?? "担当未定" : "担当未定",
       zoomUrl: session.zoom_url ?? null,
       zoomMeetingId: session.zoom_meeting_id ?? null,

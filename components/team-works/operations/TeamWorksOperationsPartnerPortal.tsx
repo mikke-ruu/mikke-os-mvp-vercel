@@ -3,6 +3,7 @@
 import {
   AlertCircle,
   BookOpen,
+  CalendarCheck2,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -27,6 +28,7 @@ import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { ClientMonthCalendar } from "@/components/team-works/operations/ClientMonthCalendar";
 import { useTeamWorksPortalRoles } from "@/components/team-works/useTeamWorksPortalRoles";
 import { TeamWorksPartnerSelfProfile } from "@/components/team-works/operations/TeamWorksDirectorySelfProfile";
+import { TeamWorksPartnerShiftPanel } from "@/components/team-works/operations/TeamWorksPartnerShiftPanel";
 import { supabase } from "@/lib/supabase/client";
 import {
   loadOperationsPartnerPortal,
@@ -76,6 +78,9 @@ export function TeamWorksOperationsPartnerPortal() {
       theme="green"
       footerLabel="Team Works by mikke"
       navItems={navItems}
+      ownedApps={[]}
+      otherApps={[]}
+      suggestedApps={[]}
     >
       <div className="mb-5 flex items-center justify-between border-b border-[var(--mikke-line)] pb-4">
         <p className="inline-flex items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]">
@@ -128,7 +133,7 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
   const [responseNotice, setResponseNotice] = useState<SaveNotice>(null);
 
   useEffect(() => {
-    if (activeView !== "home" && !projects.some((project) => project.id === activeView)) {
+    if (!["home", "shifts"].includes(activeView) && !projects.some((project) => project.id === activeView)) {
       setActiveView("home");
     }
   }, [activeView, projects]);
@@ -151,46 +156,46 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
     <div className="space-y-6">
       <PartnerOfferCards offers={data.offers} responding={responding} notice={responseNotice} onRespond={respond} />
 
-      {sessions.length ? (
-        <>
-          <nav aria-label="パートナーポータル内のページ" className="flex gap-1 overflow-x-auto border-b border-[var(--mikke-line)]">
-            <button
-              type="button"
-              onClick={() => setActiveView("home")}
-              className={`shrink-0 border-b-2 px-4 py-3 text-sm font-bold ${activeView === "home" ? "border-[var(--mikke-accent)] text-[var(--mikke-primary)]" : "border-transparent text-[var(--mikke-muted)]"}`}
-            >
-              総合ホーム
-            </button>
-            {projects.map((project) => (
-              <button
-                key={project.id}
-                type="button"
-                onClick={() => { setActiveView(project.id); setProjectTab("calendar"); }}
-                className={`shrink-0 border-b-2 px-4 py-3 text-sm font-bold ${activeView === project.id ? "border-[var(--mikke-accent)] text-[var(--mikke-primary)]" : "border-transparent text-[var(--mikke-muted)]"}`}
-              >
-                {project.title}
-              </button>
-            ))}
-          </nav>
-          {activeView === "home" ? (
-            <PartnerHome
-              data={data}
-              sessions={sessions}
-              selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
-              onOpenProject={(projectId, tab) => { setActiveView(projectId); setProjectTab(tab); }}
-            />
-          ) : (
-            <PartnerProject
-              projectId={activeView}
-              sessions={sessions}
-              selectedDate={selectedDate}
-              onSelectDate={setSelectedDate}
-              tab={projectTab}
-              onTabChange={setProjectTab}
-            />
-          )}
-        </>
+      <nav aria-label="パートナーポータル内のページ" className="flex gap-1 overflow-x-auto border-b border-[var(--mikke-line)]">
+        <button
+          type="button"
+          onClick={() => setActiveView("home")}
+          className={`shrink-0 border-b-2 px-4 py-3 text-sm font-bold ${activeView === "home" ? "border-[var(--mikke-accent)] text-[var(--mikke-primary)]" : "border-transparent text-[var(--mikke-muted)]"}`}
+        >
+          総合ホーム
+        </button>
+        {projects.map((project) => (
+          <button
+            key={project.id}
+            type="button"
+            onClick={() => { setActiveView(project.id); setProjectTab("calendar"); }}
+            className={`shrink-0 border-b-2 px-4 py-3 text-sm font-bold ${activeView === project.id ? "border-[var(--mikke-accent)] text-[var(--mikke-primary)]" : "border-transparent text-[var(--mikke-muted)]"}`}
+          >
+            {project.title}
+          </button>
+        ))}
+      </nav>
+
+      {activeView === "shifts" ? (
+        <TeamWorksPartnerShiftPanel />
+      ) : activeView === "home" ? (
+        <PartnerHome
+          data={data}
+          sessions={sessions}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          onOpenProject={(projectId, tab) => { setActiveView(projectId); setProjectTab(tab); }}
+          onOpenShifts={() => setActiveView("shifts")}
+        />
+      ) : sessions.length ? (
+        <PartnerProject
+          projectId={activeView}
+          sessions={sessions}
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          tab={projectTab}
+          onTabChange={setProjectTab}
+        />
       ) : (
         <MikkeEmptyState
           title="担当レッスンはありません"
@@ -198,7 +203,7 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
         />
       )}
 
-      {activeView !== "home" ? null : <PartnerProfileDetails />}
+      {activeView === "home" ? <PartnerProfileDetails /> : null}
     </div>
   );
 }
@@ -208,13 +213,15 @@ function PartnerHome({
   sessions,
   selectedDate,
   onSelectDate,
-  onOpenProject
+  onOpenProject,
+  onOpenShifts
 }: {
   data: OperationsPartnerPortalData;
   sessions: OperationsPartnerSession[];
   selectedDate: string;
   onSelectDate: (date: string) => void;
   onOpenProject: (projectId: string, tab: "calendar" | "schedule") => void;
+  onOpenShifts: () => void;
 }) {
   const daySessions = sessions.filter((session) => session.sessionDate === selectedDate);
   const nextSession = sessions[0] ?? null;
@@ -230,7 +237,14 @@ function PartnerHome({
       <MikkeSection title="本日のスケジュール" tone="editorial">
         {data.today.length ? <div className="space-y-2">{data.today.map((session) => <PartnerScheduleRow key={session.id} session={session} />)}</div> : <MikkeEmptyState title="本日の担当はありません" />}
       </MikkeSection>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <PartnerHomeAction
+          icon={<CalendarCheck2 size={18} />}
+          title="希望シフトを提出"
+          detail="稼働できる日を本部へ共有"
+          onClick={onOpenShifts}
+          emphasized
+        />
         <PartnerHomeAction
           icon={<CalendarDays size={18} />}
           title="次回レッスン"
@@ -307,9 +321,9 @@ function PartnerScheduleRow({ session }: { session: OperationsPartnerSession }) 
   );
 }
 
-function PartnerHomeAction({ icon, title, detail, onClick }: { icon: React.ReactNode; title: string; detail: string; onClick?: () => void }) {
+function PartnerHomeAction({ icon, title, detail, onClick, emphasized = false }: { icon: React.ReactNode; title: string; detail: string; onClick?: () => void; emphasized?: boolean }) {
   const content = <><div className="flex items-center gap-2 text-[var(--mikke-primary)]">{icon}<span className="text-xs font-bold">{title}</span></div><p className="mt-3 text-sm font-extrabold">{detail}</p></>;
-  return onClick ? <button type="button" onClick={onClick} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 text-left">{content}</button> : <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">{content}</div>;
+  return onClick ? <button type="button" onClick={onClick} className={`rounded-2xl border p-4 text-left ${emphasized ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>{content}</button> : <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">{content}</div>;
 }
 
 function PartnerProfileDetails() {
@@ -331,6 +345,7 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
   const [presence, setPresence] = useState(session.partnerPresenceStatus);
   const [presenceBusy, setPresenceBusy] = useState(false);
   const [presenceNotice, setPresenceNotice] = useState<SaveNotice>(null);
+  const [controlsCollapsed, setControlsCollapsed] = useState(session.partnerPresenceStatus !== "not_started");
   const firstOpen = session.roster.find((item) => !item.completedAt)?.id ?? session.roster[0]?.id ?? "";
   const [selectedRosterId, setSelectedRosterId] = useState(firstOpen);
   const [mobileRecordOpen, setMobileRecordOpen] = useState(false);
@@ -360,6 +375,7 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
     try {
       await updateOperationsPartnerPresence(supabase, session.id, next);
       setPresence(next);
+      if (next === "standby") setControlsCollapsed(true);
       setPresenceNotice({
         tone: "success",
         text: next === "standby" ? "本部へスタンバイを通知しました。" : next === "ended" ? "レッスン終了を通知しました。" : "開始を通知しました。"
@@ -382,7 +398,7 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
     <article className={`flex min-h-0 flex-col overflow-hidden border border-[var(--mikke-line)] bg-white ${standalone ? "h-dvh rounded-none" : "rounded-2xl"}`}>
       <header className="shrink-0 border-b border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 sm:p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-extrabold">{session.projectTitle}</h2>
               <PresenceBadge status={presence} />
@@ -391,10 +407,18 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
               <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{formatDate(session.sessionDate)}</span>
               <span className="inline-flex items-center gap-1"><Clock size={13} />{session.startTime}〜{endTime(session.startTime, session.durationMin)}</span>
               <span className="inline-flex items-center gap-1"><UsersRound size={13} />{session.roster.length}名</span>
-              {session.zoomMeetingId ? <span>Zoom ID {session.zoomMeetingId}</span> : null}
-              {session.zoomPasscode ? <span>パスコード {session.zoomPasscode}</span> : null}
+              {!controlsCollapsed && session.zoomMeetingId ? <span>Zoom ID {session.zoomMeetingId}</span> : null}
+              {!controlsCollapsed && session.zoomPasscode ? <span>パスコード {session.zoomPasscode}</span> : null}
             </p>
           </div>
+          {controlsCollapsed ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <SaveFeedback notice={presenceNotice} />
+              <button type="button" onClick={() => setControlsCollapsed(false)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--mikke-line)] bg-white px-3 text-[11px] font-bold text-[var(--mikke-primary)]">
+                操作を表示 <ChevronDown size={13} />
+              </button>
+            </div>
+          ) : (
           <div className="flex flex-wrap items-center gap-2">
             {presence === "not_started" ? (
               <button type="button" disabled={presenceBusy} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
@@ -419,9 +443,15 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
               </button>
             ) : null}
             <SaveFeedback notice={presenceNotice} />
+            {presence !== "not_started" ? (
+              <button type="button" onClick={() => setControlsCollapsed(true)} className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-xs font-bold text-[var(--mikke-primary)]">
+                操作を畳む <ChevronDown size={13} className="rotate-180" />
+              </button>
+            ) : null}
           </div>
+          )}
         </div>
-        <PartnerZoomSettings session={session} onUpdated={onRefresh} />
+        {!controlsCollapsed ? <PartnerZoomSettings session={session} onUpdated={onRefresh} /> : null}
       </header>
 
       {session.roster.length ? (
@@ -606,7 +636,6 @@ function StudentAccordion({
   onResetTimer: () => void;
   showTimer?: boolean;
 }) {
-  const [attendance, setAttendance] = useState(item.attendanceStatus);
   const [assessment, setAssessment] = useState<OperationsPartnerAssessment>(item.assessment);
   const [handoffNote, setHandoffNote] = useState(item.handoffNote);
   const [saving, setSaving] = useState(false);
@@ -617,7 +646,7 @@ function StudentAccordion({
     try {
       await saveOperationsPartnerStudentHandoff(supabase, {
         rosterId: item.id,
-        attendanceStatus: attendance,
+        attendanceStatus: item.attendanceStatus,
         assessment,
         handoffNote,
         complete
@@ -642,7 +671,7 @@ function StudentAccordion({
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-extrabold">{item.participantName}</span>
-          <span className="mt-0.5 block text-[11px] font-semibold text-[var(--mikke-muted)]">{attendanceLabel(attendance)}・進捗 No.{item.currentManualNo}</span>
+          <span className="mt-0.5 block text-[11px] font-semibold text-[var(--mikke-muted)]">進捗 No.{item.currentManualNo}</span>
         </span>
         <ChevronDown size={17} className={`shrink-0 text-[var(--mikke-muted)] transition ${open ? "rotate-180" : ""}`} />
       </button>
@@ -660,16 +689,6 @@ function StudentAccordion({
             </div>
           ) : null}
           {item.cautions ? <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900">注意：{item.cautions}</p> : null}
-          <label className="block text-[11px] font-bold text-[var(--mikke-muted)]">
-            出欠
-            <select value={attendance} onChange={(event) => setAttendance(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs">
-              <option value="scheduled">未確認</option>
-              <option value="present">出席</option>
-              <option value="absent">欠席</option>
-              <option value="late">遅刻</option>
-              <option value="excused">連絡あり</option>
-            </select>
-          </label>
           <div className="grid gap-2">
             <RatingRow label="受け答えのスムーズさ" value={assessment.responseSmoothness} onChange={(value) => setAssessment((current) => ({ ...current, responseSmoothness: value }))} />
             <RatingRow label="理解度" value={assessment.comprehension} onChange={(value) => setAssessment((current) => ({ ...current, comprehension: value }))} />
@@ -890,10 +909,6 @@ function PresenceBadge({ status }: { status: OperationsPartnerSession["partnerPr
 function ManualList({ label, values }: { label: string; values: string[] }) {
   if (values.length === 0) return null;
   return <div className="mt-3 text-xs leading-5"><span className="font-bold">{label}：</span><span className="font-semibold text-[var(--mikke-muted)]">{values.join("／")}</span></div>;
-}
-
-function attendanceLabel(status: string) {
-  return ({ scheduled: "未確認", present: "出席", absent: "欠席", late: "遅刻", excused: "連絡あり" } as Record<string, string>)[status] ?? status;
 }
 
 function formatDate(dateKey: string): string {

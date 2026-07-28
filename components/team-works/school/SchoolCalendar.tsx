@@ -13,6 +13,7 @@ import {
   type TeamWorksSession,
   type TeamWorksState
 } from "@/lib/team-works";
+import { getJapanDayOff } from "@/lib/japanese-calendar";
 
 type Props = {
   state: TeamWorksState;
@@ -116,6 +117,7 @@ export function SchoolCalendar({ state, updateState }: Props) {
             const isToday = key === todayKey;
             const daySessions = sessionsByDate[key] ?? [];
             const isHoliday = orgHolidayDates.has(key);
+            const japanDayOff = getJapanDayOff(date);
 
             return (
               <div
@@ -131,8 +133,8 @@ export function SchoolCalendar({ state, updateState }: Props) {
                 }}
                 aria-label={`${key}${isHoliday ? "（休講）" : ""}`}
                 className={`flex min-h-[74px] cursor-pointer flex-col items-start gap-1 rounded-xl border p-1.5 text-left sm:min-h-[92px] ${
-                  isHoliday
-                    ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]"
+                  isHoliday || japanDayOff.isDayOff
+                    ? "border-orange-200 bg-orange-50"
                     : "border-transparent hover:bg-[var(--mikke-surface-soft)]"
                 } ${inMonth ? "" : "opacity-40"}`}
               >
@@ -147,6 +149,10 @@ export function SchoolCalendar({ state, updateState }: Props) {
                   {isHoliday ? (
                     <span className="rounded-full bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[9px] font-bold text-[var(--mikke-accent)]">
                       休
+                    </span>
+                  ) : japanDayOff.isDayOff ? (
+                    <span title={japanDayOff.label ?? undefined} className="max-w-[72%] truncate rounded-full bg-orange-100 px-1.5 py-0.5 text-[9px] font-bold text-orange-800">
+                      {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
                     </span>
                   ) : null}
                 </div>

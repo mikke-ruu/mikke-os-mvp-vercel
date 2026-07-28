@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 import { fetchOperationsProjects, resolveStaffOrganizationIds } from "@/lib/team-works-operations";
 
@@ -503,7 +504,7 @@ export async function loadOperationsProjectDetail(
       sessionDate: row.session_date,
       startTime: row.start_time.slice(0, 5),
       durationMin: row.duration_min,
-      status: row.status,
+      status: isJapanDayOffKey(row.session_date) ? "cancelled" : row.status,
       partnerMemberId: row.partner_member_id,
       partnerName: row.partner_member_id ? memberNameById.get(row.partner_member_id) ?? "パートナー" : null,
       zoomUrl: row.zoom_url ?? null,
@@ -1247,6 +1248,9 @@ export async function createOperationsSession(
   projectId: string,
   input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null }
 ) {
+  if (isJapanDayOffKey(input.sessionDate)) {
+    throw new Error("土日祝は休校日のため、レッスンを登録できません。");
+  }
   const { error } = await client.from("team_works_op_sessions").insert({
     project_id: projectId,
     session_date: input.sessionDate,
@@ -1263,6 +1267,9 @@ export async function updateOperationsSession(
   sessionId: string,
   input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null }
 ) {
+  if (isJapanDayOffKey(input.sessionDate)) {
+    throw new Error("土日祝は休校日のため、レッスンを移動できません。");
+  }
   const { data, error } = await client
     .from("team_works_op_sessions")
     .update({

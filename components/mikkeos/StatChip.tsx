@@ -4,11 +4,11 @@ export type StatChipTone = "blue" | "pink" | "yellow" | "green" | "orange";
 
 /** 青チップは白アイコン、他の薄い4色チップは黒アイコン（brief 4章）。 */
 const toneStyles: Record<StatChipTone, { background: string; iconColor: string }> = {
-  blue: { background: "var(--mikke-blue)", iconColor: "#ffffff" },
-  orange: { background: "var(--mikke-orange)", iconColor: "#ffffff" },
-  pink: { background: "var(--mikke-pink)", iconColor: "#1b1b1f" },
-  yellow: { background: "var(--mikke-yellow)", iconColor: "#1b1b1f" },
-  green: { background: "var(--mikke-green)", iconColor: "#1b1b1f" }
+  blue: { background: "var(--mikke-blue, #3f4eb5)", iconColor: "#ffffff" },
+  orange: { background: "var(--mikke-orange, #f75a3b)", iconColor: "#ffffff" },
+  pink: { background: "var(--mikke-pink, #f9d3d2)", iconColor: "#1b1b1f" },
+  yellow: { background: "var(--mikke-yellow, #ffd370)", iconColor: "#1b1b1f" },
+  green: { background: "var(--mikke-green, #8bc7ad)", iconColor: "#1b1b1f" }
 };
 
 type StatChipProps = {

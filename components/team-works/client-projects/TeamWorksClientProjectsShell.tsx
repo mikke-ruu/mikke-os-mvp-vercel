@@ -31,6 +31,9 @@ export function TeamWorksClientProjectsShell({
       theme="green"
       footerLabel="Team Works by mikke"
       navItems={navItems}
+      ownedApps={[]}
+      otherApps={[]}
+      suggestedApps={[]}
     >
       <div className="mb-6 flex flex-col gap-3 border-b border-[var(--mikke-line)] pb-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="inline-flex items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]">

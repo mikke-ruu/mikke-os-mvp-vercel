@@ -15,6 +15,8 @@ import {
 } from "@/lib/team-works-operations";
 import { TeamWorksDayPanel } from "./TeamWorksDayPanel";
 import { TeamWorksMonthCalendar } from "./TeamWorksMonthCalendar";
+import { TeamWorksShiftAdminPanel } from "./TeamWorksShiftAdminPanel";
+import { loadStaffPartnerShifts, type PartnerShiftSubmission } from "@/lib/team-works-shifts";
 
 function startOfCurrentMonth(): Date {
   const now = new Date();
@@ -27,13 +29,19 @@ export function TeamWorksOperationsDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [shiftSubmissions, setShiftSubmissions] = useState<PartnerShiftSubmission[]>([]);
+  const [calendarAutoPositioned, setCalendarAutoPositioned] = useState(false);
 
   const load = useCallback(async (targetMonth: Date) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await loadOperationsDashboardData(supabase, targetMonth);
+      const [result, shifts] = await Promise.all([
+        loadOperationsDashboardData(supabase, targetMonth),
+        loadStaffPartnerShifts(supabase, targetMonth)
+      ]);
       setData(result);
+      setShiftSubmissions(shifts);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "ダッシュボードの読み込みに失敗しました。");
     } finally {
@@ -44,6 +52,23 @@ export function TeamWorksOperationsDashboard() {
   useEffect(() => {
     void load(monthDate);
   }, [monthDate, load]);
+
+  useEffect(() => {
+    if (calendarAutoPositioned || !data) return;
+    const todayKey = formatDateKey(new Date());
+    const hasFutureEventInVisibleMonth = data.monthEvents.some((event) => event.sessionDate >= todayKey);
+    const nextEvent = data.upcomingEvents[0];
+    setCalendarAutoPositioned(true);
+    if (!hasFutureEventInVisibleMonth && nextEvent) {
+      const nextEventDate = new Date(`${nextEvent.sessionDate}T00:00:00`);
+      if (
+        nextEventDate.getFullYear() !== monthDate.getFullYear()
+        || nextEventDate.getMonth() !== monthDate.getMonth()
+      ) {
+        setMonthDate(new Date(nextEventDate.getFullYear(), nextEventDate.getMonth(), 1));
+      }
+    }
+  }, [calendarAutoPositioned, data, monthDate]);
 
   if (loading && !data) {
     return <p className="text-sm text-[var(--mikke-muted)]">読み込んでいます…</p>;
@@ -60,16 +85,27 @@ export function TeamWorksOperationsDashboard() {
   const selectedDayEvents = selectedDayKey ? data.monthEvents.filter((event) => event.sessionDate === selectedDayKey) : [];
   const selectedDayHolidays = selectedDayKey ? data.monthHolidays.filter((holiday) => holiday.date === selectedDayKey) : [];
   const todayKey = formatDateKey(new Date());
+  const shiftAvailability = [...shiftSubmissions.reduce((map, submission) => {
+    for (const date of submission.availableDates) {
+      map.set(date, [...(map.get(date) ?? []), submission.partnerName]);
+    }
+    return map;
+  }, new Map<string, string[]>())].map(([date, names]) => ({ date, names }));
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.7fr_1fr]">
         <TeamWorksMonthCalendar
           monthDate={monthDate}
-          onMonthChange={setMonthDate}
+          onMonthChange={(nextMonth) => {
+            setCalendarAutoPositioned(true);
+            setSelectedDayKey(null);
+            setMonthDate(nextMonth);
+          }}
           events={data.monthEvents}
           holidayDates={data.monthHolidayDates}
           projects={data.projects}
+          shiftAvailability={shiftAvailability}
           onSelectDay={setSelectedDayKey}
         />
 
@@ -78,6 +114,12 @@ export function TeamWorksOperationsDashboard() {
           <MessagesCard comments={data.recentComments} />
         </div>
       </div>
+
+      <TeamWorksShiftAdminPanel
+        targetMonth={monthDate}
+        submissions={shiftSubmissions}
+        onRefresh={() => load(monthDate)}
+      />
 
       <MikkeSection title="Today" tone="editorial">
         <p className="mb-2 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">本日のスケジュール（本部）</p>
@@ -150,9 +192,9 @@ export function TeamWorksOperationsDashboard() {
                 <Link
                   key={event.id}
                   href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
-                  className="grid gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3 sm:grid-cols-[90px_1fr_auto] sm:items-center"
+                  className="grid gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3 transition hover:border-[#8bc7ad] sm:grid-cols-[90px_1fr_auto] sm:items-center"
                 >
-                  <span className="rounded-lg bg-[var(--mikke-surface-soft)] px-2 py-2 text-center text-xs font-extrabold">
+                  <span className="rounded-lg bg-[#ffd370] px-2 py-2 text-center text-xs font-extrabold text-[#1b1b1f]">
                     {formatShortDate(event.sessionDate, todayKey)} {event.startTime}
                   </span>
                   <span className="min-w-0">
@@ -307,7 +349,7 @@ function formatShortDate(dateKey: string, todayKey: string): string {
 
 function FinanceCard() {
   return (
-    <Link href="/apps/team-works/projects" className="block rounded-2xl border border-[var(--mikke-line)] bg-white p-4 transition hover:border-[var(--mikke-primary)]">
+    <Link href="/apps/team-works/projects" className="block rounded-2xl border border-[#ffd370] bg-white p-4 transition hover:border-[#8bc7ad]">
       <div className="mb-3 flex items-baseline justify-between">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--mikke-primary)]">
           <Wallet size={13} /> Finance
@@ -343,7 +385,7 @@ function FinanceCard() {
 
 function MessagesCard({ comments }: { comments: OperationsDashboardData["recentComments"] }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+    <div className="overflow-hidden rounded-2xl border border-[#f9d3d2] bg-white">
       <div className="flex items-baseline justify-between px-4 pt-4">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--mikke-primary)]">
           <MessageSquare size={13} /> Messages
@@ -356,7 +398,7 @@ function MessagesCard({ comments }: { comments: OperationsDashboardData["recentC
           <div className="divide-y divide-[var(--mikke-line)]">
             {comments.map((comment) => (
               <Link key={comment.id} href={`/apps/team-works/projects/${comment.projectId}?tab=messages`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--mikke-surface-soft)]">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f9d3d2] text-[#3f4eb5]">
                   <Users size={14} />
                 </span>
                 <span className="min-w-0 flex-1">

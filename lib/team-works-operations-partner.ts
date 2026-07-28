@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 
 export type OperationsPartnerManual = {
@@ -214,6 +215,7 @@ export async function loadOperationsPartnerPortal(
     .from("team_works_op_sessions")
     .select("id,project_id,session_date,start_time,duration_min,status,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,partner_standby_at,partner_ended_at")
     .in("project_id", operationsProjectIds)
+    .in("partner_member_id", memberIds)
     .gte("session_date", today)
     .lte("session_date", through)
     .neq("status", "cancelled")
@@ -224,6 +226,7 @@ export async function loadOperationsPartnerPortal(
       .from("team_works_op_sessions")
       .select("id,project_id,session_date,start_time,duration_min,status")
       .in("project_id", operationsProjectIds)
+      .in("partner_member_id", memberIds)
       .gte("session_date", today)
       .lte("session_date", through)
       .neq("status", "cancelled")
@@ -231,7 +234,9 @@ export async function loadOperationsPartnerPortal(
       .order("start_time") as typeof sessionResult;
   }
   if (sessionResult.error) throw sessionResult.error;
-  const sessions = (sessionResult.data ?? []) as SessionRow[];
+  const sessions = ((sessionResult.data ?? []) as SessionRow[]).filter(
+    (session) => !isJapanDayOffKey(session.session_date)
+  );
   if (sessions.length === 0) {
     return {
       memberName: members[0]?.display_name ?? null,

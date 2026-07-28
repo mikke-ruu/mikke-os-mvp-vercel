@@ -56,6 +56,9 @@ export function TeamWorksOperationsShell({
       footerLabel="Team Works by mikke"
       navItems={teamWorksNavItems}
       bottomNavItems={teamWorksBottomNavItems}
+      ownedApps={[]}
+      otherApps={[]}
+      suggestedApps={[]}
     >
       {children}
     </MikkeAppShell>

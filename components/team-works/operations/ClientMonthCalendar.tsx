@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
+import { getJapanDayOff } from "@/lib/japanese-calendar";
 
 type CalendarSession = {
   id: string;
@@ -53,7 +54,20 @@ export function ClientMonthCalendar({
   selectedDate: string | null;
   onSelectDate: (dateKey: string) => void;
 }) {
-  const [monthDate, setMonthDate] = useState(() => new Date());
+  const [monthDate, setMonthDate] = useState(() => {
+    const now = new Date();
+    const todayKey = toDateKey(now);
+    const currentMonthKey = todayKey.slice(0, 7);
+    const upcoming = sessions
+      .filter((session) => session.status !== "cancelled" && session.sessionDate >= todayKey)
+      .sort((a, b) => a.sessionDate.localeCompare(b.sessionDate));
+    const hasUpcomingThisMonth = upcoming.some((session) => session.sessionDate.startsWith(currentMonthKey));
+    if (!hasUpcomingThisMonth && upcoming[0]) {
+      const nextDate = new Date(`${upcoming[0].sessionDate}T00:00:00`);
+      return new Date(nextDate.getFullYear(), nextDate.getMonth(), 1);
+    }
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
   const calendarDates = useMemo(() => monthCalendarDates(monthDate), [monthDate]);
 
   const projectIds = useMemo(() => [...new Set(sessions.map((session) => session.projectId))], [sessions]);
@@ -82,12 +96,10 @@ export function ClientMonthCalendar({
 
   return (
     <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center gap-2">
+        <button type="button" aria-label="前の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"><ChevronLeft size={15} /></button>
         <p className="text-sm font-extrabold">{monthDate.getFullYear()}年 {monthDate.getMonth() + 1}月</p>
-        <div className="flex items-center gap-2">
-          <button type="button" aria-label="前の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white"><ChevronLeft size={15} /></button>
-          <button type="button" aria-label="次の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white"><ChevronRight size={15} /></button>
-        </div>
+        <button type="button" aria-label="次の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))} className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"><ChevronRight size={15} /></button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[var(--mikke-muted)]">
         {weekdays.map((day) => <span key={day}>{day}</span>)}
@@ -98,12 +110,19 @@ export function ClientMonthCalendar({
           const inMonth = date.getMonth() === monthDate.getMonth();
           const daySessions = sessionsByDate.get(key) ?? [];
           const dayHolidays = holidaysByDate.get(key) ?? [];
+          const japanDayOff = getJapanDayOff(date);
           return (
             <button
               key={key}
               type="button"
               onClick={() => onSelectDate(key)}
-              className={`min-h-16 rounded-lg border p-1.5 text-left ${key === selectedDate ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"} ${inMonth ? "" : "opacity-40"}`}
+              className={`min-h-16 rounded-lg border p-1.5 text-left ${
+                key === selectedDate
+                  ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]"
+                  : japanDayOff.isDayOff
+                    ? "border-orange-200 bg-orange-50"
+                    : "border-[var(--mikke-line)] bg-white"
+              } ${inMonth ? "" : "opacity-40"}`}
             >
               <span className="block text-[10px] font-bold">{date.getDate()}</span>
               <span className="mt-1 flex flex-wrap gap-1">
@@ -114,11 +133,20 @@ export function ClientMonthCalendar({
                   </span>
                 ))}
                 {dayHolidays.length > 0 ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
+                {dayHolidays.length === 0 && japanDayOff.isDayOff ? (
+                  <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-orange-100 px-1 py-0.5 text-[8px] font-bold text-orange-800">
+                    {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
+                  </span>
+                ) : null}
               </span>
             </button>
           );
         })}
       </div>
+      <p className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-bold text-[var(--mikke-muted)]">
+        <span className="h-2.5 w-2.5 rounded-[3px] border border-orange-200 bg-orange-50" />
+        土日祝
+      </p>
     </div>
   );
 }

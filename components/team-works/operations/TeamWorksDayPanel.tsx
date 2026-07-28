@@ -48,8 +48,13 @@ export function TeamWorksDayPanel({
         className={`absolute inset-0 bg-[var(--mikke-backdrop)] transition-opacity duration-150 ${entered ? "opacity-100" : "opacity-0"}`}
       />
       <div
-        className={`absolute inset-x-0 bottom-0 mx-auto max-w-xl rounded-t-2xl border border-b-0 border-[var(--mikke-line)] bg-white p-4 pb-6 shadow-2xl transition-transform duration-150 ease-out ${
-          entered ? "translate-y-0" : "translate-y-full"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${formatPanelTitle(dateKey)}の予定`}
+        className={`absolute inset-x-0 bottom-0 mx-auto max-h-[82dvh] max-w-xl overflow-y-auto rounded-t-2xl border border-b-0 border-[var(--mikke-line)] bg-white p-4 pb-6 shadow-2xl transition-all duration-150 ease-out sm:inset-x-[8vw] sm:bottom-auto sm:top-1/2 sm:max-h-[76vh] sm:max-w-4xl sm:rounded-2xl sm:border sm:p-6 ${
+          entered
+            ? "translate-y-0 opacity-100 sm:-translate-y-1/2 sm:scale-100"
+            : "translate-y-full opacity-0 sm:-translate-y-1/2 sm:scale-95"
         }`}
       >
         <div className="mb-3 flex items-center justify-between">
@@ -73,9 +78,9 @@ export function TeamWorksDayPanel({
         {events.length === 0 ? (
           <p className="py-6 text-center text-xs font-semibold text-[var(--mikke-muted)]">この日の予定はありません</p>
         ) : (
-          <div className="divide-y divide-[var(--mikke-line)] rounded-xl border border-[var(--mikke-line)]">
+          <div className="grid gap-3 sm:grid-cols-2">
             {events.map((event) => (
-              <div key={event.id} className="flex items-center gap-3 px-3 py-3">
+              <div key={event.id} className="flex items-center gap-3 rounded-xl border border-[var(--mikke-line)] px-3 py-3">
                 <span className="h-8 w-1 shrink-0 rounded-full" style={{ background: event.bg }} />
                 <span className="w-12 shrink-0 text-sm font-bold">{event.startTime}</span>
                 <span className="min-w-0 flex-1">

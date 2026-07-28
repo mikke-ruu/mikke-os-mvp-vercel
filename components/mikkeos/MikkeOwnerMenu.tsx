@@ -66,11 +66,11 @@ const defaultSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
  * 「5色を濃くも薄くもしない」ルールを守ったまま各所でコントラストが崩れないようにする。
  */
 export const tileToneStyles: Record<StatChipTone, { background: string; foreground: string }> = {
-  blue: { background: "var(--mikke-blue)", foreground: "#ffffff" },
-  orange: { background: "var(--mikke-orange)", foreground: "#ffffff" },
-  green: { background: "var(--mikke-green)", foreground: "#1b1b1f" },
-  yellow: { background: "var(--mikke-yellow)", foreground: "#1b1b1f" },
-  pink: { background: "var(--mikke-pink)", foreground: "#1b1b1f" }
+  blue: { background: "var(--mikke-blue, #3f4eb5)", foreground: "#ffffff" },
+  orange: { background: "var(--mikke-orange, #f75a3b)", foreground: "#ffffff" },
+  green: { background: "var(--mikke-green, #8bc7ad)", foreground: "#1b1b1f" },
+  yellow: { background: "var(--mikke-yellow, #ffd370)", foreground: "#1b1b1f" },
+  pink: { background: "var(--mikke-pink, #f9d3d2)", foreground: "#1b1b1f" }
 };
 
 export const tileToneCycle: StatChipTone[] = ["blue", "orange", "green", "yellow", "pink"];

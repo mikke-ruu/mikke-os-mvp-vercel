@@ -27,6 +27,9 @@ export function TeamWorksProjectsShell({
       currentApp={{ label: "Team", href: "/apps/team-works", icon: FolderKanban }}
       theme="green"
       footerLabel="Team Works by mikke"
+      ownedApps={[]}
+      otherApps={[]}
+      suggestedApps={[]}
     >
       <nav aria-label="Team Worksの仕事モード" className="mb-6 flex flex-wrap gap-2 border-b border-[var(--mikke-line)] pb-3">
         <Link
