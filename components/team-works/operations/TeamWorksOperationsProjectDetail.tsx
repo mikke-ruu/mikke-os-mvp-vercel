@@ -29,6 +29,8 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { TeamWorksProjectDetail } from "@/components/team-works/projects/TeamWorksProjectDetail";
+import { TeamWorksDeliveryProjectDetail } from "@/components/team-works/projects/TeamWorksDeliveryProjectDetail";
+import { isDatabaseProjectId as isDeliveryDatabaseProjectId } from "@/lib/team-works-operations-project";
 import {
   TeamWorksProjectField,
   TeamWorksProjectsShell,
@@ -105,14 +107,32 @@ function buildTabs(labels: TeamWorksLabels): { id: ProjectTab; label: string }[]
   ];
 }
 
+async function checkDeliveryProjectExists(client: typeof supabase, projectId: string): Promise<boolean> {
+  if (!isDeliveryDatabaseProjectId(projectId)) return false;
+  const { data, error } = await client.from("team_works_projects").select("id").eq("id", projectId).eq("style", "delivery").maybeSingle();
+  if (error) return false;
+  return Boolean(data);
+}
+
 export function TeamWorksProjectDetailRoute({ projectId }: { projectId: string }) {
   const [data, setData] = useState<OperationsProjectDetailData | null | undefined>(undefined);
+  const [isDeliveryProject, setIsDeliveryProject] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setData(await loadOperationsProjectDetail(supabase, projectId));
+      const operationsData = await loadOperationsProjectDetail(supabase, projectId);
+      if (operationsData) {
+        setIsDeliveryProject(false);
+        setData(operationsData);
+        return;
+      }
+      // 運営型として見つからなかった場合、Supabase上の納品型プロジェクトかどうかを確認する。
+      // 存在すれば新しいSupabase接続版の詳細画面へ、無ければ従来のlocalStorage版へ落とす。
+      const deliveryExists = await checkDeliveryProjectExists(supabase, projectId);
+      setIsDeliveryProject(deliveryExists);
+      setData(null);
     } catch (loadError) {
       setError(supabaseErrorMessage(loadError, "プロジェクト詳細の読み込みに失敗しました。"));
     }
@@ -146,7 +166,7 @@ export function TeamWorksProjectDetailRoute({ projectId }: { projectId: string }
   if (data === null) {
     return (
       <TeamWorksProjectsShell title="プロジェクト詳細" subtitle="工程・タスク・成果物・メンバーを確認する">
-        <TeamWorksProjectDetail projectId={projectId} />
+        {isDeliveryProject ? <TeamWorksDeliveryProjectDetail projectId={projectId} /> : <TeamWorksProjectDetail projectId={projectId} />}
       </TeamWorksProjectsShell>
     );
   }

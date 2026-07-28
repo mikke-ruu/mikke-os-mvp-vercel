@@ -601,19 +601,17 @@ export async function loadOperationsProjectDetail(
   };
 }
 
-export async function createOperationsProject(
+// 現在のユーザーが所属する組織を解決し、無ければ作成する。運営型・納品型どちらの
+// プロジェクト作成からも呼ばれる共通処理(元はcreateOperationsProject内に
+// あったものを切り出した)。
+export async function ensureStaffOrganizationContext(
   client: SupabaseClient,
-  input: {
-    organizationName: string;
-    title: string;
-    contractStartedOn: string;
-    contractEndedOn: string;
-  }
-): Promise<string> {
+  organizationName: string
+): Promise<{ organizationId: string; organizationMemberId: string; projectRole: "owner" | "manager" }> {
   const { data: userData, error: userError } = await client.auth.getUser();
   if (userError) throw userError;
   const user = userData.user;
-  if (!user) throw new Error("運営型プロジェクトの作成にはログインが必要です。");
+  if (!user) throw new Error("プロジェクトの作成にはログインが必要です。");
 
   const staffOrganizationIds = await resolveStaffOrganizationIds(client);
   let organizationId = staffOrganizationIds[0] ?? null;
@@ -641,14 +639,14 @@ export async function createOperationsProject(
 
   if (!organizationId || !organizationMemberId) {
     const ownerDisplayName = user.email?.split("@")[0] || "オーナー";
-    const organizationName = input.organizationName.trim() || "マイチーム Team Works";
+    const resolvedOrganizationName = organizationName.trim() || "マイチーム Team Works";
     const { data: organization, error: organizationError } = await client
       .from("team_works_organizations")
       .upsert(
         {
           owner_user_id: user.id,
           source_local_id: "mikke-team-works-primary",
-          name: organizationName,
+          name: resolvedOrganizationName,
           status: "active",
           archived_at: null,
           updated_at: new Date().toISOString(),
@@ -687,6 +685,20 @@ export async function createOperationsProject(
     organizationMemberId = ownerMember.id as string;
     projectRole = "owner";
   }
+
+  return { organizationId, organizationMemberId, projectRole };
+}
+
+export async function createOperationsProject(
+  client: SupabaseClient,
+  input: {
+    organizationName: string;
+    title: string;
+    contractStartedOn: string;
+    contractEndedOn: string;
+  }
+): Promise<string> {
+  const { organizationId, organizationMemberId, projectRole } = await ensureStaffOrganizationContext(client, input.organizationName);
 
   const { data: project, error: projectError } = await client
     .from("team_works_projects")

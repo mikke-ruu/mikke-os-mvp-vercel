@@ -7,6 +7,7 @@ import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { projectStatusLabels, useTeamWorksProjectStore } from "@/lib/team-works-projects";
 import { createTeamWorksWorkerProjectList, TEAM_WORKS_WORKER_PORTAL_DEMO_WORKER_ID } from "@/lib/team-works-worker-projects";
 import { useTeamWorksPortalActor } from "@/components/team-works/useTeamWorksPortalActor";
+import { TeamWorksDeliveryPortalProjectList } from "@/components/team-works/projects/TeamWorksDeliveryPortalProjectList";
 
 export function TeamWorksWorkerProjectList() {
   const { hydrated, projectState, saveProjectState } = useTeamWorksProjectStore();
@@ -48,6 +49,8 @@ export function TeamWorksWorkerProjectList() {
           </div>
         ) : <MikkeEmptyState title="担当プロジェクトはありません" helper="プロジェクトへ参加すると、担当の工程とタスクがここに表示されます。" />}
       </section>
+
+      <TeamWorksDeliveryPortalProjectList basePath="/apps/team-works/portal/worker/projects" />
     </div>
   );
 }
