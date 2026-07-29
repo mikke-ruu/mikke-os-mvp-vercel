@@ -431,7 +431,16 @@ async function addDirectoryMemberToDeliveryProject(
   return { organizationMemberId: activeMemberRow.member_id, displayName: directoryRow.display_name as string };
 }
 
-export type DeliveryStepTemplateStep = { title: string; defaultRole: "worker" | "client" | "manager" | null };
+export type DeliveryStepTemplateStep = {
+  title: string;
+  defaultRole: "worker" | "client" | "manager" | null;
+  // Phase 6以降の項目。旧テンプレート(この項目が無いもの)とも互換を保つため、
+  // すべて省略可能にしている。
+  submissionType?: DeliveryTaskSubmissionType;
+  needsInternalReview?: boolean;
+  needsClientReview?: boolean;
+  standardDays?: number | null;
+};
 
 export type DeliveryStepTemplate = {
   id: string;
@@ -504,7 +513,15 @@ export async function createDeliveryProjectWithSetup(
     organizationName: string;
     title: string;
     members: { directoryTable: "team_works_partners" | "team_works_clients"; directoryId: string; projectRole: "worker" | "client" }[];
-    steps: { title: string; clientVisible: boolean }[];
+    steps: {
+      title: string;
+      clientVisible: boolean;
+      ownerRole?: DeliveryTaskOwnerRole | null;
+      submissionType?: DeliveryTaskSubmissionType;
+      needsInternalReview?: boolean;
+      needsClientReview?: boolean;
+      standardDays?: number | null;
+    }[];
   }
 ): Promise<{ projectId: string; skippedMembers: string[] }> {
   const projectId = await createDeliveryProject(client, { organizationName: input.organizationName, title: input.title });
@@ -524,7 +541,12 @@ export async function createDeliveryProjectWithSetup(
         assigneeMemberId: null,
         dueOn: null,
         clientVisible: step.clientVisible,
-        position: index
+        position: index,
+        ownerRole: step.ownerRole ?? null,
+        submissionType: step.submissionType ?? "none",
+        needsInternalReview: step.needsInternalReview ?? false,
+        needsClientReview: step.needsClientReview ?? false,
+        standardDays: step.standardDays ?? null
       })
     )
   );

@@ -8,12 +8,16 @@ import { supabase } from "@/lib/supabase/client";
 import {
   archiveStepTemplate,
   createStepTemplate,
+  deliveryTaskSubmissionTypeLabels,
   fetchStepTemplates,
   updateStepTemplate,
   type DeliveryStepTemplate,
-  type DeliveryStepTemplateStep
+  type DeliveryStepTemplateStep,
+  type DeliveryTaskSubmissionType
 } from "@/lib/team-works-delivery";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
+
+const submissionTypeOptions = Object.keys(deliveryTaskSubmissionTypeLabels) as DeliveryTaskSubmissionType[];
 
 let rowKeySeed = 0;
 function newRowKey() {
@@ -28,15 +32,15 @@ const exampleTemplates: { name: string; description: string; steps: DeliveryStep
     name: "認定講座 個別構築コース",
     description: "依頼者の技術・経験を、キット・教材・動画・Academy・運営環境まで一緒に形にするコース。",
     steps: [
-      { title: "ヒアリング・講座整理", defaultRole: "manager" },
-      { title: "キット作製", defaultRole: "manager" },
-      { title: "テキスト・ディプロマ作成", defaultRole: "client" },
-      { title: "写真・動画撮影", defaultRole: "manager" },
-      { title: "画像加工・動画編集", defaultRole: "manager" },
-      { title: "Academy構築", defaultRole: "manager" },
-      { title: "Community構築(必要な場合のみ)", defaultRole: "manager" },
-      { title: "モニター受講・修正", defaultRole: "client" },
-      { title: "納品・運営開始", defaultRole: "manager" }
+      { title: "ヒアリング・講座整理", defaultRole: "manager", submissionType: "none", standardDays: 3 },
+      { title: "キット作製", defaultRole: "manager", submissionType: "none", standardDays: 5 },
+      { title: "テキスト・ディプロマ作成", defaultRole: "client", submissionType: "form", needsInternalReview: true, needsClientReview: true, standardDays: 7 },
+      { title: "写真・動画撮影", defaultRole: "manager", submissionType: "none", standardDays: 3 },
+      { title: "画像加工・動画編集", defaultRole: "manager", submissionType: "file", needsInternalReview: true, standardDays: 5 },
+      { title: "Academy構築", defaultRole: "manager", submissionType: "none", standardDays: 5 },
+      { title: "Community構築(必要な場合のみ)", defaultRole: "manager", submissionType: "none", standardDays: 2 },
+      { title: "モニター受講・修正", defaultRole: "client", submissionType: "form", needsClientReview: true, standardDays: 5 },
+      { title: "納品・運営開始", defaultRole: "manager", submissionType: "url", needsClientReview: true, standardDays: 2 }
     ]
   }
 ];
@@ -131,7 +135,7 @@ function TemplateEditor({ template, onClose, onSaved }: { template: DeliveryStep
   const [error, setError] = useState("");
 
   function addStep() {
-    setSteps((current) => [...current, { key: newRowKey(), title: "", defaultRole: null }]);
+    setSteps((current) => [...current, { key: newRowKey(), title: "", defaultRole: null, submissionType: "none", needsInternalReview: false, needsClientReview: false, standardDays: null }]);
   }
 
   function updateStep(key: string, patch: Partial<EditableStep>) {
@@ -157,7 +161,16 @@ function TemplateEditor({ template, onClose, onSaved }: { template: DeliveryStep
     if (!name.trim()) return;
     setSaving(true);
     setError("");
-    const cleanSteps = steps.filter((step) => step.title.trim().length > 0).map(({ title, defaultRole }) => ({ title: title.trim(), defaultRole }));
+    const cleanSteps = steps
+      .filter((step) => step.title.trim().length > 0)
+      .map(({ title, defaultRole, submissionType, needsInternalReview, needsClientReview, standardDays }) => ({
+        title: title.trim(),
+        defaultRole,
+        submissionType,
+        needsInternalReview,
+        needsClientReview,
+        standardDays
+      }));
     try {
       if (template) {
         await updateStepTemplate(supabase, template.id, { name: name.trim(), description, steps: cleanSteps });
@@ -208,12 +221,35 @@ function TemplateEditor({ template, onClose, onSaved }: { template: DeliveryStep
           <p className="mb-2 text-xs font-bold">工程</p>
           <div className="space-y-2">
             {steps.map((step, index) => (
-              <div key={step.key} className="flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] p-2">
-                <span className="w-6 shrink-0 text-center text-xs font-extrabold text-[var(--mikke-muted)]">{index + 1}</span>
-                <input value={step.title} onChange={(event) => updateStep(step.key, { title: event.target.value })} placeholder="例：ヒアリング・講座整理" className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] px-2.5 py-2 text-sm" />
-                <button type="button" onClick={() => moveStep(index, -1)} disabled={index === 0} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ChevronUp size={14} /></button>
-                <button type="button" onClick={() => moveStep(index, 1)} disabled={index === steps.length - 1} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ChevronDown size={14} /></button>
-                <button type="button" onClick={() => removeStep(step.key)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--tw-action)] text-[var(--tw-action)]"><Trash2 size={14} /></button>
+              <div key={step.key} className="rounded-xl border border-[var(--mikke-line)] p-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 shrink-0 text-center text-xs font-extrabold text-[var(--mikke-muted)]">{index + 1}</span>
+                  <input value={step.title} onChange={(event) => updateStep(step.key, { title: event.target.value })} placeholder="例：ヒアリング・講座整理" className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] px-2.5 py-2 text-sm" />
+                  <button type="button" onClick={() => moveStep(index, -1)} disabled={index === 0} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ChevronUp size={14} /></button>
+                  <button type="button" onClick={() => moveStep(index, 1)} disabled={index === steps.length - 1} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ChevronDown size={14} /></button>
+                  <button type="button" onClick={() => removeStep(step.key)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--tw-action)] text-[var(--tw-action)]"><Trash2 size={14} /></button>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 pl-8 text-[11px] font-bold">
+                  <select value={step.defaultRole ?? ""} onChange={(event) => updateStep(step.key, { defaultRole: (event.target.value || null) as EditableStep["defaultRole"] })} className="rounded-lg border border-[var(--mikke-line)] px-2 py-1.5">
+                    <option value="">誰がやるか:未設定</option>
+                    <option value="manager">本部</option>
+                    <option value="worker">担当メンバー</option>
+                    <option value="client">クライアント</option>
+                  </select>
+                  <select value={step.submissionType ?? "none"} onChange={(event) => updateStep(step.key, { submissionType: event.target.value as DeliveryTaskSubmissionType })} className="rounded-lg border border-[var(--mikke-line)] px-2 py-1.5">
+                    {submissionTypeOptions.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
+                  </select>
+                  <label className="flex items-center gap-1.5"><input type="checkbox" checked={step.needsInternalReview ?? false} onChange={(event) => updateStep(step.key, { needsInternalReview: event.target.checked })} />本部確認</label>
+                  <label className="flex items-center gap-1.5"><input type="checkbox" checked={step.needsClientReview ?? false} onChange={(event) => updateStep(step.key, { needsClientReview: event.target.checked })} />クライアント確認</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={step.standardDays ?? ""}
+                    onChange={(event) => updateStep(step.key, { standardDays: event.target.value ? Number(event.target.value) : null })}
+                    placeholder="標準日数"
+                    className="w-20 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5"
+                  />
+                </div>
               </div>
             ))}
           </div>

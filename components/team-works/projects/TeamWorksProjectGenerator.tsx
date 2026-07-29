@@ -11,19 +11,60 @@ import {
   type OperationsPartnerDirectoryEntry,
   type OperationsClientDirectoryEntry
 } from "@/lib/team-works-operations-project";
-import { createDeliveryProjectWithSetup, fetchStepTemplates, type DeliveryStepTemplate } from "@/lib/team-works-delivery";
+import {
+  createDeliveryProjectWithSetup,
+  deliveryTaskOwnerRoleLabels,
+  deliveryTaskSubmissionTypeLabels,
+  fetchStepTemplates,
+  type DeliveryStepTemplate,
+  type DeliveryTaskOwnerRole,
+  type DeliveryTaskSubmissionType
+} from "@/lib/team-works-delivery";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 
 type WizardStep = 1 | 2 | 3 | 4;
 
 type SelectedMember = { directoryTable: "team_works_partners" | "team_works_clients"; directoryId: string; displayName: string; projectRole: "worker" | "client" };
 
-type StepRow = { key: string; title: string; clientVisible: boolean };
+type StepRow = {
+  key: string;
+  title: string;
+  clientVisible: boolean;
+  ownerRole: DeliveryTaskOwnerRole | "";
+  submissionType: DeliveryTaskSubmissionType;
+  needsInternalReview: boolean;
+  needsClientReview: boolean;
+  standardDays: string;
+};
+
+const ownerRoleOptions = Object.keys(deliveryTaskOwnerRoleLabels) as DeliveryTaskOwnerRole[];
+const submissionTypeOptions = Object.keys(deliveryTaskSubmissionTypeLabels) as DeliveryTaskSubmissionType[];
 
 let rowKeySeed = 0;
 function newRowKey() {
   rowKeySeed += 1;
   return `row_${rowKeySeed}`;
+}
+
+function newStepRow(partial: Partial<StepRow> = {}): StepRow {
+  return {
+    key: newRowKey(),
+    title: "",
+    clientVisible: false,
+    ownerRole: "",
+    submissionType: "none",
+    needsInternalReview: false,
+    needsClientReview: false,
+    standardDays: "",
+    ...partial
+  };
+}
+
+function templateRoleToOwnerRole(role: "worker" | "client" | "manager" | null): DeliveryTaskOwnerRole | "" {
+  if (role === "manager") return "admin";
+  if (role === "worker") return "worker";
+  if (role === "client") return "client";
+  return "";
 }
 
 // 4段階の質問フロー: ①ゴール ②メンバーと役割 ③作業の順番(自由入力・並べ替え)
@@ -71,11 +112,22 @@ export function TeamWorksProjectGenerator() {
   function applyTemplate(templateId: string) {
     const template = templates.find((item) => item.id === templateId);
     if (!template) return;
-    setRows(template.steps.map((templateStep) => ({ key: newRowKey(), title: templateStep.title, clientVisible: false })));
+    setRows(
+      template.steps.map((templateStep) =>
+        newStepRow({
+          title: templateStep.title,
+          ownerRole: templateRoleToOwnerRole(templateStep.defaultRole),
+          submissionType: templateStep.submissionType ?? "none",
+          needsInternalReview: templateStep.needsInternalReview ?? false,
+          needsClientReview: templateStep.needsClientReview ?? false,
+          standardDays: templateStep.standardDays ? String(templateStep.standardDays) : ""
+        })
+      )
+    );
   }
 
   function addRow() {
-    setRows((current) => [...current, { key: newRowKey(), title: "", clientVisible: false }]);
+    setRows((current) => [...current, newStepRow()]);
   }
 
   function updateRow(key: string, patch: Partial<StepRow>) {
@@ -106,7 +158,15 @@ export function TeamWorksProjectGenerator() {
         organizationName,
         title,
         members: selectedMembers.map(({ directoryTable, directoryId, projectRole }) => ({ directoryTable, directoryId, projectRole })),
-        steps: validRows.map((row) => ({ title: row.title.trim(), clientVisible: row.clientVisible }))
+        steps: validRows.map((row) => ({
+          title: row.title.trim(),
+          clientVisible: row.clientVisible,
+          ownerRole: row.ownerRole || null,
+          submissionType: row.submissionType,
+          needsInternalReview: row.needsInternalReview,
+          needsClientReview: row.needsClientReview,
+          standardDays: row.standardDays ? Number(row.standardDays) : null
+        }))
       });
       if (result.skippedMembers.length > 0) {
         setSkippedNames(
@@ -182,7 +242,7 @@ export function TeamWorksProjectGenerator() {
 
       {step === 3 ? (
         <MikkeSection title="③ 作業の順番">
-          <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">タイトルだけを自由に入力・並べ替えします。期日や担当は後からプロジェクト詳細で設定できます。</p>
+          <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">工程ごとに、誰がやるか・何を出すか・誰が確認するか・標準日数を決めます。あとからプロジェクト詳細でも調整できます。</p>
           {templates.length > 0 ? (
             <label className="mb-4 block text-xs font-bold">
               テンプレートから読み込む(任意)
@@ -194,16 +254,27 @@ export function TeamWorksProjectGenerator() {
           ) : null}
           <div className="space-y-2">
             {rows.map((row, index) => (
-              <div key={row.key} className="flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] p-2">
-                <span className="w-6 shrink-0 text-center text-xs font-extrabold text-[var(--mikke-muted)]">{index + 1}</span>
-                <input value={row.title} onChange={(event) => updateRow(row.key, { title: event.target.value })} placeholder="例：ヒアリング・講座整理" className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] px-2.5 py-2 text-sm" />
-                <label className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold text-[var(--mikke-muted)]">
-                  <input type="checkbox" checked={row.clientVisible} onChange={(event) => updateRow(row.key, { clientVisible: event.target.checked })} />
-                  公開
-                </label>
-                <button type="button" onClick={() => moveRow(index, -1)} disabled={index === 0} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ChevronUp size={14} /></button>
-                <button type="button" onClick={() => moveRow(index, 1)} disabled={index === rows.length - 1} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ChevronDown size={14} /></button>
-                <button type="button" onClick={() => removeRow(row.key)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--tw-action)] text-[var(--tw-action)]"><Trash2 size={14} /></button>
+              <div key={row.key} className="rounded-xl border border-[var(--mikke-line)] p-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 shrink-0 text-center text-xs font-extrabold text-[var(--mikke-muted)]">{index + 1}</span>
+                  <input value={row.title} onChange={(event) => updateRow(row.key, { title: event.target.value })} placeholder="例：ヒアリング・講座整理" className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] px-2.5 py-2 text-sm" />
+                  <button type="button" onClick={() => moveRow(index, -1)} disabled={index === 0} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ChevronUp size={14} /></button>
+                  <button type="button" onClick={() => moveRow(index, 1)} disabled={index === rows.length - 1} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--mikke-line)] disabled:opacity-30"><ChevronDown size={14} /></button>
+                  <button type="button" onClick={() => removeRow(row.key)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-[var(--tw-action)] text-[var(--tw-action)]"><Trash2 size={14} /></button>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2 pl-8 text-[11px] font-bold">
+                  <select value={row.ownerRole} onChange={(event) => updateRow(row.key, { ownerRole: event.target.value as DeliveryTaskOwnerRole | "" })} className="rounded-lg border border-[var(--mikke-line)] px-2 py-1.5">
+                    <option value="">誰がやるか:未設定</option>
+                    {ownerRoleOptions.map((role) => <option key={role} value={role}>{deliveryTaskOwnerRoleLabels[role]}</option>)}
+                  </select>
+                  <select value={row.submissionType} onChange={(event) => updateRow(row.key, { submissionType: event.target.value as DeliveryTaskSubmissionType })} className="rounded-lg border border-[var(--mikke-line)] px-2 py-1.5">
+                    {submissionTypeOptions.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
+                  </select>
+                  <label className="flex items-center gap-1.5"><input type="checkbox" checked={row.needsInternalReview} onChange={(event) => updateRow(row.key, { needsInternalReview: event.target.checked })} />本部確認</label>
+                  <label className="flex items-center gap-1.5"><input type="checkbox" checked={row.needsClientReview} onChange={(event) => updateRow(row.key, { needsClientReview: event.target.checked })} />クライアント確認</label>
+                  <input type="number" min={1} value={row.standardDays} onChange={(event) => updateRow(row.key, { standardDays: event.target.value })} placeholder="標準日数" className="w-20 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5" />
+                  <label className="flex items-center gap-1.5"><input type="checkbox" checked={row.clientVisible} onChange={(event) => updateRow(row.key, { clientVisible: event.target.checked })} />クライアントに公開</label>
+                </div>
               </div>
             ))}
           </div>
@@ -239,7 +310,15 @@ export function TeamWorksProjectGenerator() {
               {validRows.length === 0 ? <p className="text-xs text-[var(--mikke-muted)]">未入力</p> : (
                 <ol className="mt-1 space-y-1">
                   {validRows.map((row, index) => (
-                    <li key={row.key} className="text-xs font-semibold">{index + 1}. {row.title}{row.clientVisible ? "・公開" : ""}</li>
+                    <li key={row.key} className="text-xs font-semibold">
+                      {index + 1}. {row.title}
+                      {row.ownerRole ? `・${deliveryTaskOwnerRoleLabels[row.ownerRole]}` : ""}
+                      {row.submissionType !== "none" ? `・${deliveryTaskSubmissionTypeLabels[row.submissionType]}` : ""}
+                      {row.needsInternalReview ? "・本部確認" : ""}
+                      {row.needsClientReview ? "・クライアント確認" : ""}
+                      {row.standardDays ? `・${row.standardDays}日` : ""}
+                      {row.clientVisible ? "・公開" : ""}
+                    </li>
                   ))}
                 </ol>
               )}

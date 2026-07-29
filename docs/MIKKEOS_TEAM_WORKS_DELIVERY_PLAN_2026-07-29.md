@@ -278,7 +278,7 @@ alter table public.team_works_project_tasks
 
 ---
 
-## Phase 6: ジェネレーターの作り直し
+## Phase 6: ジェネレーターの作り直し ✅実装完了(2026-07-29)
 
 ### 目的
 Phase 1〜5 の設定を、質問形式で一気に組めるようにする。
@@ -303,6 +303,24 @@ Phase 1〜5 の設定を、質問形式で一気に組めるようにする。
 ### テンプレート
 `team_works_project_step_templates.steps` (jsonb) に上記設定も保存し、
 次の案件でそのまま流し込めるようにする。認定講座の9工程を実例として登録済み。
+
+### 実装メモ(2026-07-29)
+- `TeamWorksProjectGenerator.tsx`(③作業の順番)・`TeamWorksStepTemplateManager.tsx`
+  (テンプレート編集)の両方に、工程ごとの「誰がやるか・何を出すか・本部確認・
+  クライアント確認・標準日数」入力を追加。`DeliveryStepTemplateStep` 型に
+  `submissionType`/`needsInternalReview`/`needsClientReview`/`standardDays` を
+  追加(すべて省略可能・旧テンプレートとの後方互換あり)。
+- テンプレート適用時は `defaultRole`(manager/worker/client)を工程の
+  `ownerRole`(admin/worker/client)に変換して引き継ぐ。
+- 「④確認」の一覧にも、誰がやるか・提出物・確認者・標準日数・公開設定を
+  まとめて表示するようにした。
+- 認定講座の実例テンプレート(9工程)は、計画書 冒頭の表に沿って
+  テキスト・ディプロマ作成のみ `submissionType: form` +
+  `needsInternalReview/needsClientReview: true` を設定済み。他の工程は
+  本部作業(submissionType: none)を基本にしている。
+- 「誰が確認するか(本部/クライアント/両方/なし)」は、本部確認・クライアント確認の
+  2つのチェックボックスの組み合わせで表現している(両方チェック=両方、
+  どちらもオフ=なし、独立した4択セレクトは作っていない)。
 
 ---
 
