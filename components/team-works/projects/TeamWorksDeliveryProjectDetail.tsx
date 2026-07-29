@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronUp, ListChecks, Plus, UsersRound } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, ListChecks, Plus, UsersRound } from "lucide-react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
@@ -19,7 +19,16 @@ import {
   type DeliveryTaskStatus,
   type DeliveryTaskSubmissionType
 } from "@/lib/team-works-delivery";
+import {
+  archiveTaskForm,
+  createTaskForm,
+  fetchTaskForms,
+  updateTaskForm,
+  type DeliveryFormInputActor,
+  type DeliveryProjectForm
+} from "@/lib/team-works-delivery-forms";
 import { TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
+import { TeamWorksProjectFormBuilder, type DeliveryFormPatch } from "./TeamWorksProjectFormBuilder";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 
 const taskStatuses = Object.keys(deliveryTaskStatusLabels) as DeliveryTaskStatus[];
@@ -334,8 +343,82 @@ function TaskRow({
             <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.needsClientReview} disabled={busy} onChange={(event) => void apply({ needsClientReview: event.target.checked })} />クライアントの確認が必要</label>
             <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.clientVisible} disabled={busy} onChange={(event) => void apply({ clientVisible: event.target.checked })} />クライアントに表示する</label>
           </div>
+          {task.submissionType === "form" ? (
+            <div className="md:col-span-2">
+              <TaskFormsPanel task={task} />
+            </div>
+          ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function TaskFormsPanel({ task }: { task: DeliveryTask }) {
+  const [forms, setForms] = useState<DeliveryProjectForm[] | undefined>(undefined);
+  const [error, setError] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const load = useCallback(async () => {
+    setError("");
+    try {
+      setForms(await fetchTaskForms(supabase, task.id));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "フォームを読み込めませんでした。");
+    }
+  }, [task.id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function addForm() {
+    setCreating(true);
+    setError("");
+    try {
+      const defaultActor: DeliveryFormInputActor = task.ownerRole === "client" ? "client" : task.ownerRole === "admin" ? "admin" : "worker";
+      await createTaskForm(supabase, { projectId: task.projectId, taskId: task.id, name: task.title, inputActor: defaultActor });
+      await load();
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "フォームを作成できませんでした。");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function applyPatch(formId: string, patch: DeliveryFormPatch) {
+    await updateTaskForm(supabase, formId, patch);
+    await load();
+  }
+
+  async function remove(formId: string) {
+    await archiveTaskForm(supabase, formId);
+    await load();
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+      <p className="flex items-center gap-2 text-xs font-extrabold">
+        <ClipboardList size={14} /> この工程のフォーム
+      </p>
+      {error ? <p role="alert" className="mt-2 rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+      {forms === undefined ? (
+        <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>
+      ) : (
+        <div className="mt-2 space-y-2">
+          {forms.map((form) => (
+            <TeamWorksProjectFormBuilder
+              key={form.id}
+              form={form}
+              onUpdate={(patch) => applyPatch(form.id, patch)}
+              onArchive={() => remove(form.id)}
+            />
+          ))}
+        </div>
+      )}
+      <button type="button" onClick={() => void addForm()} disabled={creating} className="mt-2 inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold">
+        <Plus size={14} /> フォームを追加
+      </button>
     </div>
   );
 }
