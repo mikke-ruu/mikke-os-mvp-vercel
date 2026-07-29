@@ -1,68 +1,11 @@
-"use client";
-
-import { FolderKanban } from "lucide-react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
-import { teamWorksTemplate } from "@/lib/team-works";
-
-export function TeamWorksProjectsShell({
-  title,
-  subtitle,
-  children
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  const pathname = usePathname();
-  const projectsActive = pathname.startsWith("/apps/team-works/projects");
-  const templatesActive = pathname.startsWith("/apps/team-works/project-templates");
-
-  return (
-    <MikkeAppShell
-      appName="Team Works"
-      title={title}
-      subtitle={subtitle}
-      currentApp={{ label: "Team", href: "/apps/team-works", icon: FolderKanban }}
-      theme="green"
-      footerLabel="Team Works by mikke"
-      ownedApps={[]}
-      otherApps={[]}
-      suggestedApps={[]}
-    >
-      <nav aria-label="Team Worksの仕事モード" className="mb-6 flex flex-wrap gap-2 border-b border-[var(--mikke-line)] pb-3">
-        <Link
-          href="/apps/team-works"
-          className={`rounded-lg px-3 py-2 text-xs font-bold ${
-            projectsActive || templatesActive ? "text-[var(--mikke-muted)]" : "bg-[var(--mikke-primary)] text-white"
-          }`}
-        >
-          継続業務
-        </Link>
-        <Link
-          href="/apps/team-works/projects"
-          className={`rounded-lg px-3 py-2 text-xs font-bold ${
-            projectsActive ? "bg-[var(--mikke-primary)] text-white" : "text-[var(--mikke-muted)]"
-          }`}
-        >
-          プロジェクト
-        </Link>
-        {teamWorksTemplate.featureSettings.enableProjectTemplates ? (
-          <Link
-            href="/apps/team-works/project-templates"
-            className={`rounded-lg px-3 py-2 text-xs font-bold ${
-              templatesActive ? "bg-[var(--mikke-primary)] text-white" : "text-[var(--mikke-muted)]"
-            }`}
-          >
-            テンプレート
-          </Link>
-        ) : null}
-      </nav>
-      {children}
-    </MikkeAppShell>
-  );
-}
+// このファイルはかつて納品型プロジェクト系画面専用の外枠(サイドバー無し・
+// 「継続業務/プロジェクト/テンプレート」3タブ)を提供していたが、2026-07-30の
+// 統一計画により廃止した。本部側の全画面は TeamWorksOperationsShell
+// (components/team-works/operations/TeamWorksOperationsShell.tsx)の
+// 左サイドバーに一本化している。
+//
+// teamWorksProjectInputClass / TeamWorksProjectField は納品型の各画面が
+// 広く import しているため、このファイルにそのまま残す。
 
 export const teamWorksProjectInputClass =
   "mt-1.5 w-full appearance-none rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";

@@ -33,7 +33,6 @@ import { TeamWorksDeliveryProjectDetail } from "@/components/team-works/projects
 import { isDatabaseProjectId as isDeliveryDatabaseProjectId } from "@/lib/team-works-operations-project";
 import {
   TeamWorksProjectField,
-  TeamWorksProjectsShell,
   teamWorksProjectInputClass
 } from "@/components/team-works/projects/TeamWorksProjectsShell";
 import { supabase } from "@/lib/supabase/client";
@@ -165,9 +164,9 @@ export function TeamWorksProjectDetailRoute({ projectId }: { projectId: string }
 
   if (data === null) {
     return (
-      <TeamWorksProjectsShell title="プロジェクト詳細" subtitle="工程・タスク・成果物・メンバーを確認する">
+      <TeamWorksOperationsShell title="プロジェクト詳細" subtitle="工程・タスク・成果物・メンバーを確認する">
         {isDeliveryProject ? <TeamWorksDeliveryProjectDetail projectId={projectId} /> : <TeamWorksProjectDetail projectId={projectId} />}
-      </TeamWorksProjectsShell>
+      </TeamWorksOperationsShell>
     );
   }
 

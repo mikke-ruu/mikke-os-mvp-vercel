@@ -1,10 +1,26 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, FileText, ListChecks, Plus, Save, UsersRound } from "lucide-react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import {
+  ArrowLeft,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  ClipboardList,
+  FileCheck2,
+  FileText,
+  Info,
+  ListChecks,
+  Package,
+  Plus,
+  Save,
+  Settings2,
+  UsersRound
+} from "lucide-react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
-import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { supabase } from "@/lib/supabase/client";
 import {
   autoScheduleDeliveryTasks,
@@ -16,6 +32,7 @@ import {
   loadDeliveryProjectDetail,
   resolveMyDeliveryProjectMembership,
   updateDeliveryProjectDueOn,
+  updateDeliveryProjectSettings,
   updateDeliveryTask,
   type DeliveryProjectDetail,
   type DeliveryProjectMember,
@@ -45,15 +62,34 @@ const taskStatuses = Object.keys(deliveryTaskStatusLabels) as DeliveryTaskStatus
 const ownerRoles = Object.keys(deliveryTaskOwnerRoleLabels) as DeliveryTaskOwnerRole[];
 const submissionTypes = Object.keys(deliveryTaskSubmissionTypeLabels) as DeliveryTaskSubmissionType[];
 
-// Supabase接続版の納品型プロジェクト詳細。フォーム・成果物・請求は
-// まだこちらに移行しておらず(旧localStorage版のままの機能)。
-// 工程には「誰が作業し・何を提出し・誰が確認するか」というバトンの
-// 受け渡しを持たせている(Phase 1)。
+type DeliveryProjectTab = "overview" | "tasks" | "schedule" | "deliverables" | "members" | "settings";
+
+function buildDeliveryTabs(): { id: DeliveryProjectTab; label: string }[] {
+  return [
+    { id: "overview", label: "概要" },
+    { id: "tasks", label: "工程" },
+    { id: "schedule", label: "スケジュール" },
+    { id: "deliverables", label: "成果物" },
+    { id: "members", label: "メンバー" },
+    { id: "settings", label: "プロジェクト設定" }
+  ];
+}
+
+// Supabase接続版の納品型プロジェクト詳細。外枠(戻る矢印・タイトル・種別バッジ・
+// 下線タブ)は運営型(TeamWorksOperationsProjectDetail)と同じマークアップ・
+// classNameを使い、本部側の見た目を統一している。タブの中身は納品型の仕事に
+// 必要なものだけを独自に決めており、運営型のタブ構成(名簿/報告/マニュアル等)は
+// 真似ていない(運営型はアリサ案件固有で将来仕様が変わる見込みのため)。
 export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: string }) {
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const tabs = buildDeliveryTabs();
+  const [activeTab, setActiveTab] = useState<DeliveryProjectTab>(
+    tabs.some((tab) => tab.id === requestedTab) ? (requestedTab as DeliveryProjectTab) : "overview"
+  );
   const [detail, setDetail] = useState<DeliveryProjectDetail | null | undefined>(undefined);
   const [myMembership, setMyMembership] = useState<DeliveryProjectMember | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -77,56 +113,255 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
   if (detail === undefined) return <p className="text-sm font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>;
   if (detail === null) return <MikkeEmptyState title="このプロジェクトは見つかりませんでした" />;
 
-  const { project, tasks, members } = detail;
+  const myMemberId = myMembership?.organizationMemberId ?? null;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <Link
+          href="/apps/team-works/projects"
+          aria-label="プロジェクト管理へ戻る"
+          className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"
+        >
+          <ArrowLeft size={17} />
+        </Link>
+        <h1 className="text-xl font-extrabold text-[var(--mikke-text)]">{detail.project.title}</h1>
+        <span className="rounded-full bg-[var(--mikke-yellow)] px-2.5 py-1 text-[11px] font-bold text-[var(--tw-on-tint)]">
+          納品型
+        </span>
+      </div>
+
+      <nav
+        aria-label={`${detail.project.title}のメニュー`}
+        className="-mx-4 overflow-x-auto border-b border-[var(--mikke-line)] px-4"
+      >
+        <div className="flex min-w-max gap-1">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`border-b-2 px-3 py-2.5 text-xs font-bold transition ${
+                activeTab === tab.id
+                  ? "border-[var(--mikke-accent)] text-[var(--mikke-primary)]"
+                  : "border-transparent text-[var(--mikke-muted)]"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
+      {activeTab === "overview" ? <OverviewTab detail={detail} onSelectTab={setActiveTab} /> : null}
+      {activeTab === "tasks" ? <TaskListSection detail={detail} myMemberId={myMemberId} onReload={load} /> : null}
+      {activeTab === "schedule" ? <ScheduleTab detail={detail} onReload={load} /> : null}
+      {activeTab === "deliverables" ? <DeliverablesTab detail={detail} myMemberId={myMemberId} /> : null}
+      {activeTab === "members" ? <MembersTab detail={detail} /> : null}
+      {activeTab === "settings" ? <SettingsTab detail={detail} onReload={load} /> : null}
+    </div>
+  );
+}
+
+function TabIntro({
+  icon: Icon,
+  title,
+  description
+}: {
+  icon: typeof CalendarDays;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex gap-3 rounded-2xl bg-[var(--mikke-surface-soft)] p-4">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[var(--mikke-yellow)] text-[var(--tw-on-tint)]">
+        <Icon size={19} />
+      </span>
+      <span>
+        <span className="block text-sm font-extrabold">{title}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-[var(--mikke-muted)]">{description}</span>
+      </span>
+    </div>
+  );
+}
+
+function OverviewTab({ detail, onSelectTab }: { detail: DeliveryProjectDetail; onSelectTab: (tab: DeliveryProjectTab) => void }) {
+  const { tasks, members } = detail;
+  const completedCount = tasks.filter((task) => task.status === "completed").length;
+  const upcoming = tasks
+    .flatMap((task) => {
+      const items: { taskId: string; title: string; date: string; kind: "提出期日" | "完了期日" }[] = [];
+      if (task.submitDueOn) items.push({ taskId: task.id, title: task.title, date: task.submitDueOn, kind: "提出期日" });
+      if (task.dueOn) items.push({ taskId: task.id, title: task.title, date: task.dueOn, kind: "完了期日" });
+      return items;
+    })
+    .filter((item) => item.date >= new Date().toISOString().slice(0, 10))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 5);
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={Info} title="概要" description="工程の進み具合と、対応が必要なことをまとめて確認します。" />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          <p className="text-xs font-bold text-[var(--mikke-muted)]">進捗</p>
+          <p className="mt-1 text-lg font-extrabold">{tasks.length}工程中 {completedCount}件完了</p>
+        </div>
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          <p className="text-xs font-bold text-[var(--mikke-muted)]">納期</p>
+          <p className="mt-1 text-lg font-extrabold">{detail.project.dueOn ?? "未設定"}</p>
+        </div>
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          <p className="text-xs font-bold text-[var(--mikke-muted)]">参加メンバー</p>
+          <p className="mt-1 text-lg font-extrabold">{members.length}名</p>
+        </div>
+      </div>
+
+      <TeamWorksDeliveryStaffPendingSummary detail={detail} />
+
+      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <p className="text-sm font-extrabold">次の期日</p>
+        {upcoming.length === 0 ? (
+          <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">今後の期日はまだ設定されていません。</p>
+        ) : (
+          <div className="mt-2 space-y-1.5">
+            {upcoming.map((item, index) => (
+              <button
+                key={`${item.taskId}-${item.kind}-${index}`}
+                type="button"
+                onClick={() => onSelectTab("tasks")}
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold hover:bg-[var(--mikke-surface-soft)]"
+              >
+                <CalendarDays size={13} className="shrink-0 text-[var(--mikke-muted)]" />
+                <span className="text-[var(--mikke-muted)]">{item.date}</span>
+                <span>{item.title}</span>
+                <span className="text-[var(--mikke-muted)]">・{item.kind}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ScheduleTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
+  const { project, tasks } = detail;
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const calendarItems = buildDeliveryCalendarItems(tasks);
   const selectedDayTasks = selectedDay ? tasks.filter((task) => task.dueOn === selectedDay || task.submitDueOn === selectedDay) : [];
 
   return (
-    <div className="space-y-6">
-      <section className="border-b border-[var(--mikke-line)] pb-5">
-        <h2 className="text-2xl font-bold tracking-normal">{project.title}</h2>
-        <p className="mt-1 text-xs font-bold text-[var(--mikke-muted)]">参加メンバー {members.length}名 ・ タスク {tasks.length}件</p>
-      </section>
+    <div className="space-y-5">
+      <TabIntro icon={CalendarDays} title="スケジュール" description="納期から逆算して各工程の期日を配置し、カレンダーで確認します。" />
+      <ProjectDueOnEditor projectId={project.id} dueOn={project.dueOn} tasks={tasks} onReload={onReload} />
+      <TeamWorksDeliveryCalendar items={calendarItems} onSelectDay={setSelectedDay} />
+      {selectedDay ? (
+        <div className="rounded-xl border border-[var(--mikke-line)] bg-white p-3">
+          <p className="text-xs font-extrabold">{selectedDay} のタスク</p>
+          {selectedDayTasks.length === 0 ? (
+            <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">この日のタスクはありません。</p>
+          ) : (
+            <div className="mt-2 space-y-1.5">
+              {selectedDayTasks.map((task) => (
+                <p key={task.id} className="text-xs font-semibold">
+                  {task.title}・{deliveryTaskStatusLabels[task.status]}
+                  {task.submitDueOn === selectedDay ? "・提出期日" : ""}
+                  {task.dueOn === selectedDay ? "・完了期日" : ""}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
-      <TeamWorksDeliveryStaffPendingSummary detail={detail} />
+// 工程をまたいだ提出物をここでまとめて確認できるようにする(工程を1つずつ
+// 開かなくても、確認待ちの成果物にすぐたどり着けるようにするため)。
+function DeliverablesTab({ detail, myMemberId }: { detail: DeliveryProjectDetail; myMemberId: string | null }) {
+  const deliverableTasks = detail.tasks.filter((task) => task.submissionType === "file" || task.submissionType === "url");
 
-      <MikkeSection title="Schedule" tone="editorial">
-        <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">タスクの期日を一目で確認します。日付をクリックするとその日のタスクを表示します。</p>
-        <ProjectDueOnEditor projectId={project.id} dueOn={project.dueOn} tasks={tasks} onReload={load} />
-        <TeamWorksDeliveryCalendar items={calendarItems} onSelectDay={setSelectedDay} />
-        {selectedDay ? (
-          <div className="mt-3 rounded-xl border border-[var(--mikke-line)] bg-white p-3">
-            <p className="text-xs font-extrabold">{selectedDay} のタスク</p>
-            {selectedDayTasks.length === 0 ? (
-              <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">この日のタスクはありません。</p>
-            ) : (
-              <div className="mt-2 space-y-1.5">
-                {selectedDayTasks.map((task) => (
-                  <p key={task.id} className="text-xs font-semibold">
-                    {task.title}・{deliveryTaskStatusLabels[task.status]}
-                    {task.submitDueOn === selectedDay ? "・提出期日" : ""}
-                    {task.dueOn === selectedDay ? "・完了期日" : ""}
-                  </p>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : null}
-      </MikkeSection>
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={Package} title="成果物" description="工程ごとの提出物をまとめて確認・承認・差し戻しできます。" />
+      {deliverableTasks.length === 0 ? (
+        <MikkeEmptyState title="成果物を伴う工程はまだありません" helper="「工程」タブで、提出物を「ファイル」または「URL」に設定してください。" />
+      ) : (
+        <div className="space-y-4">
+          {deliverableTasks.map((task) => (
+            <div key={task.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+              <p className="mb-2 text-sm font-extrabold">{task.title}</p>
+              <TeamWorksDeliveryDeliverableAdminPanel task={task} myMemberId={myMemberId} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      <TaskListSection detail={detail} myMemberId={myMembership?.organizationMemberId ?? null} onReload={load} />
+function MembersTab({ detail }: { detail: DeliveryProjectDetail }) {
+  const { members } = detail;
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={UsersRound} title="メンバー" description="このプロジェクトに参加しているメンバーです。" />
+      {members.length === 0 ? (
+        <MikkeEmptyState title="参加メンバーはまだいません" />
+      ) : (
+        <div className="space-y-2">
+          {members.map((member) => (
+            <MikkeListRow key={member.organizationMemberId} title={member.displayName} label={projectRoleLabel(member.projectRole)} icon={UsersRound} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      <MikkeSection title="Members" tone="editorial">
-        {members.length === 0 ? (
-          <MikkeEmptyState title="参加メンバーはまだいません" />
-        ) : (
-          <div className="space-y-2">
-            {members.map((member) => (
-              <MikkeListRow key={member.organizationMemberId} title={member.displayName} label={projectRoleLabel(member.projectRole)} icon={UsersRound} />
-            ))}
-          </div>
-        )}
-      </MikkeSection>
+function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
+  const [title, setTitle] = useState(detail.project.title);
+  const [clientVisible, setClientVisible] = useState(detail.project.clientVisible);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!title.trim()) return;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await updateDeliveryProjectSettings(supabase, detail.project.id, { title: title.trim(), clientVisible });
+      setMessage("保存しました。");
+      await onReload();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "保存できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={Settings2} title="プロジェクト設定" description="プロジェクト名や、クライアントへの公開範囲を管理します。" />
+      <form onSubmit={submit} className="max-w-2xl space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+        <TeamWorksProjectField label="プロジェクト名" required>
+          <input value={title} onChange={(event) => setTitle(event.target.value)} className={teamWorksProjectInputClass} required />
+        </TeamWorksProjectField>
+        <label className="flex items-center gap-2 text-xs font-bold">
+          <input type="checkbox" checked={clientVisible} onChange={(event) => setClientVisible(event.target.checked)} />
+          クライアントにプロジェクト全体を公開する
+        </label>
+        {error ? <p role="alert" className="rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+        {message ? <p className="text-xs font-bold text-[var(--tw-done)]">{message}</p> : null}
+        <button type="submit" disabled={saving || !title.trim()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
+          <Save size={15} /> 保存
+        </button>
+      </form>
     </div>
   );
 }
@@ -176,7 +411,7 @@ function ProjectDueOnEditor({
   }
 
   return (
-    <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+    <div className="flex flex-wrap items-end gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
       <TeamWorksProjectField label="納期" helper="逆算配置の起点になります">
         <input type="date" defaultValue={dueOn ?? ""} disabled={busy} onChange={(event) => void changeDueOn(event.target.value)} className={teamWorksProjectInputClass} />
       </TeamWorksProjectField>
@@ -275,7 +510,8 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
   }
 
   return (
-    <MikkeSection title="Tasks" tone="editorial">
+    <div className="space-y-5">
+      <TabIntro icon={ListChecks} title="工程" description="工程を追加し、担当・提出物・確認者・期日を設定します。" />
       <form onSubmit={submit} className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
         <div className="grid gap-3 md:grid-cols-2">
           <TeamWorksProjectField label="工程名" required className="md:col-span-2">
@@ -343,9 +579,9 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
         </button>
       </form>
 
-      {error ? <p role="alert" className="mt-3 rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+      {error ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
 
-      <div className="mt-4">
+      <div>
         {detail.tasks.length === 0 ? (
           <MikkeEmptyState title="タスクはまだありません" helper="上のフォームから追加してください。" />
         ) : (
@@ -364,7 +600,7 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
           </div>
         )}
       </div>
-    </MikkeSection>
+    </div>
   );
 }
 
@@ -485,8 +721,10 @@ function TaskRow({
             </div>
           ) : null}
           {task.submissionType === "file" || task.submissionType === "url" ? (
-            <div className="md:col-span-2">
-              <TeamWorksDeliveryDeliverableAdminPanel task={task} myMemberId={myMemberId} />
+            <div className="md:col-span-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3">
+              <p className="flex items-center gap-2 text-xs font-extrabold text-[var(--mikke-muted)]">
+                <FileCheck2 size={13} /> この工程の成果物は「成果物」タブでまとめて確認できます。
+              </p>
             </div>
           ) : null}
         </div>

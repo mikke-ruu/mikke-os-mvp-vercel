@@ -316,6 +316,28 @@ export async function updateDeliveryProjectDueOn(client: SupabaseClient, project
   if (error) throw error;
 }
 
+export async function updateDeliveryProjectSettings(
+  client: SupabaseClient,
+  projectId: string,
+  patch: Partial<{ title: string; clientVisible: boolean }>
+): Promise<void> {
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.title !== undefined) payload.title = patch.title;
+  if (patch.clientVisible !== undefined) payload.client_visible = patch.clientVisible;
+  const { error } = await client.from("team_works_projects").update(payload).eq("id", projectId);
+  if (error) throw error;
+}
+
+// アーカイブ(=削除)。物理削除はしない。archived_atが立つと一覧(.is("archived_at", null))から
+// 自動的に消える。RLSは既存のteam_works_projects_update(org staffのみ)のまま。
+export async function archiveDeliveryProject(client: SupabaseClient, projectId: string): Promise<void> {
+  const { error } = await client
+    .from("team_works_projects")
+    .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", projectId);
+  if (error) throw error;
+}
+
 function addDays(dateOn: string, days: number): string {
   const date = new Date(`${dateOn}T00:00:00`);
   date.setDate(date.getDate() + days);
