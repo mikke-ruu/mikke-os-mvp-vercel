@@ -44,6 +44,7 @@ export type DeliveryTask = {
   assigneeMemberId: string | null;
   clientVisible: boolean;
   dueOn: string | null;
+  position: number | null;
 };
 
 export type DeliveryProjectMember = {
@@ -66,7 +67,8 @@ function toTask(row: Record<string, unknown>): DeliveryTask {
     status: row.status as DeliveryTaskStatus,
     assigneeMemberId: (row.assignee_member_id as string) ?? null,
     clientVisible: Boolean(row.client_visible),
-    dueOn: (row.due_on as string) ?? null
+    dueOn: (row.due_on as string) ?? null,
+    position: (row.position as number) ?? null
   };
 }
 
@@ -158,9 +160,10 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
   const [taskResult, memberResult] = await Promise.all([
     client
       .from("team_works_project_tasks")
-      .select("id,project_id,title,status,assignee_member_id,client_visible,due_on")
+      .select("id,project_id,title,status,assignee_member_id,client_visible,due_on,position")
       .eq("project_id", projectId)
       .is("archived_at", null)
+      .order("position", { ascending: true, nullsFirst: false })
       .order("due_on", { ascending: true, nullsFirst: false }),
     client
       .from("team_works_project_members")
@@ -190,16 +193,25 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
 
 export async function createDeliveryTask(
   client: SupabaseClient,
-  input: { projectId: string; title: string; assigneeMemberId: string | null; dueOn: string | null; clientVisible: boolean }
+  input: { projectId: string; title: string; assigneeMemberId: string | null; dueOn: string | null; clientVisible: boolean; position?: number | null }
 ): Promise<void> {
   const { error } = await client.from("team_works_project_tasks").insert({
     project_id: input.projectId,
     title: input.title,
     assignee_member_id: input.assigneeMemberId,
     due_on: input.dueOn,
-    client_visible: input.clientVisible
+    client_visible: input.clientVisible,
+    position: input.position ?? null
   });
   if (error) throw error;
+}
+
+export async function reorderDeliveryTasks(client: SupabaseClient, taskIdsInOrder: string[]): Promise<void> {
+  await Promise.all(
+    taskIdsInOrder.map((taskId, index) =>
+      client.from("team_works_project_tasks").update({ position: index, updated_at: new Date().toISOString() }).eq("id", taskId)
+    )
+  );
 }
 
 export async function updateDeliveryTask(
@@ -216,6 +228,150 @@ export async function updateDeliveryTask(
   payload.updated_at = new Date().toISOString();
   const { error } = await client.from("team_works_project_tasks").update(payload).eq("id", taskId);
   if (error) throw error;
+}
+
+// 運営型の同等機能(addOperationsPartnerToProject)は、シフト承認前提の
+// オファー/招待の仕組み(パートナーがポータルで承諾するまで保留)に深く
+// 依存しているため納品型には転用しない。納品型はシフト調整という概念が
+// 無いので、既にポータンにログイン済みの名簿の相手を直接メンバーに
+// 追加するだけのシンプルな形にする。
+async function addDirectoryMemberToDeliveryProject(
+  client: SupabaseClient,
+  input: { projectId: string; organizationId: string; directoryTable: "team_works_partners" | "team_works_clients"; directoryId: string; projectRole: "worker" | "client" }
+): Promise<{ organizationMemberId: string; displayName: string } | null> {
+  const { data: directoryRow, error: directoryError } = await client
+    .from(input.directoryTable)
+    .select("id,display_name,email,status")
+    .eq("id", input.directoryId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle();
+  if (directoryError) throw directoryError;
+  if (!directoryRow || directoryRow.status === "archived") return null;
+
+  const normalizedEmail = (directoryRow.email as string).trim().toLowerCase();
+  const targetRole = input.projectRole === "worker" ? "worker" : "client_user";
+  const activeMemberResult = await client.rpc("team_works_find_active_member", {
+    target_organization_id: input.organizationId,
+    target_role: targetRole,
+    target_email: normalizedEmail
+  });
+  if (activeMemberResult.error) throw activeMemberResult.error;
+  const activeMemberRow = ((activeMemberResult.data ?? []) as { member_id: string }[])[0];
+  if (!activeMemberRow) return null;
+
+  const { error: memberError } = await client.from("team_works_project_members").upsert(
+    {
+      project_id: input.projectId,
+      organization_id: input.organizationId,
+      organization_member_id: activeMemberRow.member_id,
+      project_role: input.projectRole
+    },
+    { onConflict: "project_id,organization_member_id" }
+  );
+  if (memberError) throw memberError;
+
+  return { organizationMemberId: activeMemberRow.member_id, displayName: directoryRow.display_name as string };
+}
+
+export type DeliveryStepTemplateStep = { title: string; defaultRole: "worker" | "client" | "manager" | null };
+
+export type DeliveryStepTemplate = {
+  id: string;
+  organizationId: string;
+  name: string;
+  description: string | null;
+  steps: DeliveryStepTemplateStep[];
+};
+
+export async function fetchStepTemplates(client: SupabaseClient): Promise<DeliveryStepTemplate[]> {
+  const organizationIds = await resolveStaffOrganizationIds(client);
+  if (organizationIds.length === 0) return [];
+  const { data, error } = await client
+    .from("team_works_project_step_templates")
+    .select("id,organization_id,name,description,steps")
+    .in("organization_id", organizationIds)
+    .is("archived_at", null)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    organizationId: row.organization_id as string,
+    name: row.name as string,
+    description: (row.description as string) ?? null,
+    steps: (row.steps as DeliveryStepTemplateStep[]) ?? []
+  }));
+}
+
+export async function createStepTemplate(
+  client: SupabaseClient,
+  input: { organizationName: string; name: string; description: string; steps: DeliveryStepTemplateStep[] }
+): Promise<string> {
+  const { organizationId } = await ensureStaffOrganizationContext(client, input.organizationName);
+  const { data, error } = await client
+    .from("team_works_project_step_templates")
+    .insert({ organization_id: organizationId, name: input.name.trim(), description: input.description.trim() || null, steps: input.steps })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function updateStepTemplate(
+  client: SupabaseClient,
+  templateId: string,
+  patch: Partial<{ name: string; description: string; steps: DeliveryStepTemplateStep[] }>
+): Promise<void> {
+  const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (patch.name !== undefined) payload.name = patch.name;
+  if (patch.description !== undefined) payload.description = patch.description || null;
+  if (patch.steps !== undefined) payload.steps = patch.steps;
+  const { error } = await client.from("team_works_project_step_templates").update(payload).eq("id", templateId);
+  if (error) throw error;
+}
+
+export async function archiveStepTemplate(client: SupabaseClient, templateId: string): Promise<void> {
+  const { error } = await client
+    .from("team_works_project_step_templates")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", templateId);
+  if (error) throw error;
+}
+
+// ジェネレーターの確定ボタンから呼ぶ一括作成。プロジェクト→メンバー→
+// 並び順つきタスクの順で作る。メンバー追加に失敗しても(ポータン未ログイン等)
+// プロジェクト自体は作成済みのまま返す。呼び出し側でエラーを個別表示する。
+export async function createDeliveryProjectWithSetup(
+  client: SupabaseClient,
+  input: {
+    organizationName: string;
+    title: string;
+    members: { directoryTable: "team_works_partners" | "team_works_clients"; directoryId: string; projectRole: "worker" | "client" }[];
+    steps: { title: string; clientVisible: boolean }[];
+  }
+): Promise<{ projectId: string; skippedMembers: string[] }> {
+  const projectId = await createDeliveryProject(client, { organizationName: input.organizationName, title: input.title });
+  const { organizationId } = await ensureStaffOrganizationContext(client, input.organizationName);
+
+  const skippedMembers: string[] = [];
+  for (const member of input.members) {
+    const result = await addDirectoryMemberToDeliveryProject(client, { projectId, organizationId, ...member });
+    if (!result) skippedMembers.push(member.directoryId);
+  }
+
+  await Promise.all(
+    input.steps.map((step, index) =>
+      createDeliveryTask(client, {
+        projectId,
+        title: step.title,
+        assigneeMemberId: null,
+        dueOn: null,
+        clientVisible: step.clientVisible,
+        position: index
+      })
+    )
+  );
+
+  return { projectId, skippedMembers };
 }
 
 export type DeliveryCalendarTask = DeliveryTask & { projectTitle: string };

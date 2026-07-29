@@ -1,13 +1,13 @@
 "use client";
 
 import { AuthGate } from "@/components/AuthGate";
-import { TeamWorksProjectForm } from "@/components/team-works/projects/TeamWorksProjectForm";
+import { TeamWorksProjectGenerator } from "@/components/team-works/projects/TeamWorksProjectGenerator";
 import { TeamWorksProjectsShell } from "@/components/team-works/projects/TeamWorksProjectsShell";
 
 function TeamWorksProjectNewContent() {
   return (
-    <TeamWorksProjectsShell title="新しいプロジェクト" subtitle="空の状態から案件の基本情報とメンバーを登録する">
-      <TeamWorksProjectForm />
+    <TeamWorksProjectsShell title="新しいプロジェクト" subtitle="ゴール・メンバー・作業の順番を決めて全体を設計する">
+      <TeamWorksProjectGenerator />
     </TeamWorksProjectsShell>
   );
 }
