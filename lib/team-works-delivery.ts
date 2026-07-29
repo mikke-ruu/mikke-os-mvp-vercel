@@ -72,6 +72,32 @@ export type DeliveryTask = {
   sourceLocalId: string | null;
   // 納期からの逆算配置に使う、この工程に要する標準日数。
   standardDays: number | null;
+  // 作業指示。工程名だけでは担当者が何をどう作るか分からないため持たせる。
+  description: string | null;
+  purpose: string | null;
+  method: string | null;
+  deliverableNote: string | null;
+  checklist: string[];
+  outputs: string[];
+};
+
+// 工程の作業指示だけをまとめた型。編集UIとテンプレートで共有する。
+export type DeliveryTaskInstruction = {
+  description: string | null;
+  purpose: string | null;
+  method: string | null;
+  deliverableNote: string | null;
+  checklist: string[];
+  outputs: string[];
+};
+
+export const emptyDeliveryTaskInstruction: DeliveryTaskInstruction = {
+  description: null,
+  purpose: null,
+  method: null,
+  deliverableNote: null,
+  checklist: [],
+  outputs: []
 };
 
 export type DeliveryProjectMember = {
@@ -103,12 +129,18 @@ function toTask(row: Record<string, unknown>): DeliveryTask {
     needsInternalReview: Boolean(row.needs_internal_review),
     needsClientReview: Boolean(row.needs_client_review),
     sourceLocalId: (row.source_local_id as string) ?? null,
-    standardDays: (row.standard_days as number) ?? null
+    standardDays: (row.standard_days as number) ?? null,
+    description: (row.description as string) ?? null,
+    purpose: (row.purpose as string) ?? null,
+    method: (row.method as string) ?? null,
+    deliverableNote: (row.deliverable_note as string) ?? null,
+    checklist: (row.checklist as string[]) ?? [],
+    outputs: (row.outputs as string[]) ?? []
   };
 }
 
 const taskColumns =
-  "id,project_id,title,status,assignee_member_id,assignee_label,client_visible,due_on,submit_due_on,position,owner_role,submission_type,needs_internal_review,needs_client_review,source_local_id,standard_days";
+  "id,project_id,title,status,assignee_member_id,assignee_label,client_visible,due_on,submit_due_on,position,owner_role,submission_type,needs_internal_review,needs_client_review,source_local_id,standard_days,description,purpose,method,deliverable_note,checklist,outputs";
 
 export async function createDeliveryProject(
   client: SupabaseClient,
@@ -248,6 +280,7 @@ export async function createDeliveryTask(
     needsInternalReview?: boolean;
     needsClientReview?: boolean;
     standardDays?: number | null;
+    instruction?: Partial<DeliveryTaskInstruction>;
   }
 ): Promise<void> {
   const { error } = await client.from("team_works_project_tasks").insert({
@@ -264,7 +297,13 @@ export async function createDeliveryTask(
     submission_type: input.submissionType ?? "none",
     needs_internal_review: input.needsInternalReview ?? false,
     needs_client_review: input.needsClientReview ?? false,
-    standard_days: input.standardDays ?? null
+    standard_days: input.standardDays ?? null,
+    description: input.instruction?.description ?? null,
+    purpose: input.instruction?.purpose ?? null,
+    method: input.instruction?.method ?? null,
+    deliverable_note: input.instruction?.deliverableNote ?? null,
+    checklist: input.instruction?.checklist ?? [],
+    outputs: input.instruction?.outputs ?? []
   });
   if (error) throw error;
 }
@@ -368,6 +407,12 @@ export async function updateDeliveryTask(
     needsInternalReview: boolean;
     needsClientReview: boolean;
     standardDays: number | null;
+    description: string | null;
+    purpose: string | null;
+    method: string | null;
+    deliverableNote: string | null;
+    checklist: string[];
+    outputs: string[];
   }>
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
@@ -383,6 +428,12 @@ export async function updateDeliveryTask(
   if (patch.needsInternalReview !== undefined) payload.needs_internal_review = patch.needsInternalReview;
   if (patch.needsClientReview !== undefined) payload.needs_client_review = patch.needsClientReview;
   if (patch.standardDays !== undefined) payload.standard_days = patch.standardDays;
+  if (patch.description !== undefined) payload.description = patch.description;
+  if (patch.purpose !== undefined) payload.purpose = patch.purpose;
+  if (patch.method !== undefined) payload.method = patch.method;
+  if (patch.deliverableNote !== undefined) payload.deliverable_note = patch.deliverableNote;
+  if (patch.checklist !== undefined) payload.checklist = patch.checklist;
+  if (patch.outputs !== undefined) payload.outputs = patch.outputs;
   payload.updated_at = new Date().toISOString();
   const { error } = await client.from("team_works_project_tasks").update(payload).eq("id", taskId);
   if (error) throw error;
@@ -440,6 +491,10 @@ export type DeliveryStepTemplateStep = {
   needsInternalReview?: boolean;
   needsClientReview?: boolean;
   standardDays?: number | null;
+  // 名簿未登録の担当者名(例:「教材制作担当」「カメラマン(未定)」)。
+  assigneeLabel?: string | null;
+  // 作業指示。テンプレートに書いておくと案件作成時にそのまま入る。
+  instruction?: Partial<DeliveryTaskInstruction>;
 };
 
 export type DeliveryStepTemplate = {
@@ -507,6 +562,10 @@ export async function archiveStepTemplate(client: SupabaseClient, templateId: st
 // ジェネレーターの確定ボタンから呼ぶ一括作成。プロジェクト→メンバー→
 // 並び順つきタスクの順で作る。メンバー追加に失敗しても(ポータン未ログイン等)
 // プロジェクト自体は作成済みのまま返す。呼び出し側でエラーを個別表示する。
+//
+// 工程の担当は2通り: 名簿の相手を指定する(assigneeDirectoryId)か、
+// 名簿にまだいない相手を名前だけで置く(assigneeLabel)。前者は
+// メンバー追加の結果として得られるorganization_member_idへ解決する。
 export async function createDeliveryProjectWithSetup(
   client: SupabaseClient,
   input: {
@@ -521,6 +580,9 @@ export async function createDeliveryProjectWithSetup(
       needsInternalReview?: boolean;
       needsClientReview?: boolean;
       standardDays?: number | null;
+      assigneeDirectoryId?: string | null;
+      assigneeLabel?: string | null;
+      instruction?: Partial<DeliveryTaskInstruction>;
     }[];
   }
 ): Promise<{ projectId: string; skippedMembers: string[] }> {
@@ -528,17 +590,23 @@ export async function createDeliveryProjectWithSetup(
   const { organizationId } = await ensureStaffOrganizationContext(client, input.organizationName);
 
   const skippedMembers: string[] = [];
+  const memberIdByDirectoryId = new Map<string, string>();
   for (const member of input.members) {
     const result = await addDirectoryMemberToDeliveryProject(client, { projectId, organizationId, ...member });
-    if (!result) skippedMembers.push(member.directoryId);
+    if (result) memberIdByDirectoryId.set(member.directoryId, result.organizationMemberId);
+    else skippedMembers.push(member.directoryId);
   }
 
   await Promise.all(
-    input.steps.map((step, index) =>
-      createDeliveryTask(client, {
+    input.steps.map((step, index) => {
+      const assigneeMemberId = step.assigneeDirectoryId ? memberIdByDirectoryId.get(step.assigneeDirectoryId) ?? null : null;
+      return createDeliveryTask(client, {
         projectId,
         title: step.title,
-        assigneeMemberId: null,
+        // 名簿の相手を解決できた場合のみ実メンバーに割り当て、それ以外は
+        // 名前だけの仮担当として残す(後からプロジェクト詳細で差し替え可)。
+        assigneeMemberId,
+        assigneeLabel: assigneeMemberId ? null : step.assigneeLabel ?? null,
         dueOn: null,
         clientVisible: step.clientVisible,
         position: index,
@@ -546,9 +614,10 @@ export async function createDeliveryProjectWithSetup(
         submissionType: step.submissionType ?? "none",
         needsInternalReview: step.needsInternalReview ?? false,
         needsClientReview: step.needsClientReview ?? false,
-        standardDays: step.standardDays ?? null
-      })
-    )
+        standardDays: step.standardDays ?? null,
+        instruction: step.instruction
+      });
+    })
   );
 
   return { projectId, skippedMembers };

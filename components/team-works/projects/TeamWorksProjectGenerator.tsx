@@ -15,16 +15,23 @@ import {
   createDeliveryProjectWithSetup,
   deliveryTaskOwnerRoleLabels,
   deliveryTaskSubmissionTypeLabels,
+  emptyDeliveryTaskInstruction,
   fetchStepTemplates,
   type DeliveryStepTemplate,
+  type DeliveryTaskInstruction,
   type DeliveryTaskOwnerRole,
   type DeliveryTaskSubmissionType
 } from "@/lib/team-works-delivery";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
+import { TeamWorksTaskInstructionEditor } from "./TeamWorksTaskInstructionEditor";
 
 type WizardStep = 1 | 2 | 3 | 4;
 
 type SelectedMember = { directoryTable: "team_works_partners" | "team_works_clients"; directoryId: string; displayName: string; projectRole: "worker" | "client" };
+
+// 名簿にまだいない相手。名前だけ置いておき、工程の担当に指定できる。
+// 実メンバーが決まったらプロジェクト詳細で差し替える。
+type PlaceholderMember = { key: string; name: string; projectRole: "worker" | "client" };
 
 type StepRow = {
   key: string;
@@ -35,6 +42,10 @@ type StepRow = {
   needsInternalReview: boolean;
   needsClientReview: boolean;
   standardDays: string;
+  // 担当。名簿の相手なら directoryId、名前だけの仮担当なら label に入る。
+  assigneeDirectoryId: string;
+  assigneeLabel: string;
+  instruction: DeliveryTaskInstruction;
 };
 
 const ownerRoleOptions = Object.keys(deliveryTaskOwnerRoleLabels) as DeliveryTaskOwnerRole[];
@@ -56,8 +67,45 @@ function newStepRow(partial: Partial<StepRow> = {}): StepRow {
     needsInternalReview: false,
     needsClientReview: false,
     standardDays: "",
+    assigneeDirectoryId: "",
+    assigneeLabel: "",
+    instruction: emptyDeliveryTaskInstruction,
     ...partial
   };
+}
+
+// 担当セレクトの値。名簿の相手は "dir:<id>"、仮担当は "label:<名前>"。
+function assigneeSelectValue(row: StepRow) {
+  if (row.assigneeDirectoryId) return `dir:${row.assigneeDirectoryId}`;
+  if (row.assigneeLabel) return `label:${row.assigneeLabel}`;
+  return "";
+}
+
+function parseAssigneeSelectValue(value: string): Pick<StepRow, "assigneeDirectoryId" | "assigneeLabel"> {
+  if (value.startsWith("dir:")) return { assigneeDirectoryId: value.slice(4), assigneeLabel: "" };
+  if (value.startsWith("label:")) return { assigneeDirectoryId: "", assigneeLabel: value.slice(6) };
+  return { assigneeDirectoryId: "", assigneeLabel: "" };
+}
+
+function assigneeSummaryLabel(row: StepRow, selectedMembers: SelectedMember[]) {
+  if (row.assigneeDirectoryId) {
+    const member = selectedMembers.find((item) => item.directoryId === row.assigneeDirectoryId);
+    return member ? `・${member.displayName}` : "";
+  }
+  return row.assigneeLabel ? `・${row.assigneeLabel}(仮)` : "";
+}
+
+// 折りたたんだ状態でも中身が入っているか分かるようにする短い要約。
+function instructionSummary(instruction: DeliveryTaskInstruction) {
+  const filled = [
+    instruction.description,
+    instruction.purpose,
+    instruction.method,
+    instruction.deliverableNote,
+    instruction.checklist.some((item) => item.trim()) ? "checklist" : null,
+    instruction.outputs.some((item) => item.trim()) ? "outputs" : null
+  ].filter(Boolean).length;
+  return filled > 0 ? `${filled}項目` : "";
 }
 
 function templateRoleToOwnerRole(role: "worker" | "client" | "manager" | null): DeliveryTaskOwnerRole | "" {
@@ -81,10 +129,14 @@ export function TeamWorksProjectGenerator() {
   const [partners, setPartners] = useState<OperationsPartnerDirectoryEntry[]>([]);
   const [clients, setClients] = useState<OperationsClientDirectoryEntry[]>([]);
   const [selectedMembers, setSelectedMembers] = useState<SelectedMember[]>([]);
+  const [placeholderMembers, setPlaceholderMembers] = useState<PlaceholderMember[]>([]);
+  const [placeholderDraft, setPlaceholderDraft] = useState("");
+  const [placeholderRole, setPlaceholderRole] = useState<"worker" | "client">("worker");
   const [directoryError, setDirectoryError] = useState("");
 
   const [templates, setTemplates] = useState<DeliveryStepTemplate[]>([]);
   const [rows, setRows] = useState<StepRow[]>([]);
+  const [expandedRowKey, setExpandedRowKey] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -109,6 +161,24 @@ export function TeamWorksProjectGenerator() {
     });
   }
 
+  function addPlaceholderMember() {
+    const name = placeholderDraft.trim();
+    if (!name) return;
+    setPlaceholderMembers((current) =>
+      current.some((member) => member.name === name) ? current : [...current, { key: newRowKey(), name, projectRole: placeholderRole }]
+    );
+    setPlaceholderDraft("");
+  }
+
+  function removePlaceholderMember(key: string) {
+    const removed = placeholderMembers.find((member) => member.key === key);
+    setPlaceholderMembers((current) => current.filter((member) => member.key !== key));
+    // その仮担当を指していた工程は未割当に戻す。
+    if (removed) {
+      setRows((current) => current.map((row) => (row.assigneeLabel === removed.name ? { ...row, assigneeLabel: "" } : row)));
+    }
+  }
+
   function applyTemplate(templateId: string) {
     const template = templates.find((item) => item.id === templateId);
     if (!template) return;
@@ -120,7 +190,9 @@ export function TeamWorksProjectGenerator() {
           submissionType: templateStep.submissionType ?? "none",
           needsInternalReview: templateStep.needsInternalReview ?? false,
           needsClientReview: templateStep.needsClientReview ?? false,
-          standardDays: templateStep.standardDays ? String(templateStep.standardDays) : ""
+          standardDays: templateStep.standardDays ? String(templateStep.standardDays) : "",
+          assigneeLabel: templateStep.assigneeLabel ?? "",
+          instruction: { ...emptyDeliveryTaskInstruction, ...templateStep.instruction }
         })
       )
     );
@@ -165,7 +237,15 @@ export function TeamWorksProjectGenerator() {
           submissionType: row.submissionType,
           needsInternalReview: row.needsInternalReview,
           needsClientReview: row.needsClientReview,
-          standardDays: row.standardDays ? Number(row.standardDays) : null
+          standardDays: row.standardDays ? Number(row.standardDays) : null,
+          assigneeDirectoryId: row.assigneeDirectoryId || null,
+          assigneeLabel: row.assigneeLabel || null,
+          instruction: {
+            ...row.instruction,
+            // 追加ボタンで作った未入力の行は保存前に落とす。
+            checklist: row.instruction.checklist.map((item) => item.trim()).filter(Boolean),
+            outputs: row.instruction.outputs.map((item) => item.trim()).filter(Boolean)
+          }
         }))
       });
       if (result.skippedMembers.length > 0) {
@@ -209,7 +289,7 @@ export function TeamWorksProjectGenerator() {
 
       {step === 2 ? (
         <MikkeSection title="② メンバーは誰がいるか、それぞれの役割">
-          <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">名簿に登録済みで、ポータルにログイン済みの相手だけ追加できます。未登録の場合は先に「パートナー管理」「クライアント管理」で名簿登録してください。</p>
+          <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">名簿に登録済みで、ポータルにログイン済みの相手はチェックで追加できます。まだ決まっていない・登録していない相手は、下の「仮の担当名」に自由に書いて先に進めます。</p>
           {directoryError ? <p role="alert" className="mb-3 rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{directoryError}</p> : null}
           <div className="grid gap-5 sm:grid-cols-2">
             <div>
@@ -236,6 +316,47 @@ export function TeamWorksProjectGenerator() {
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+            <p className="text-xs font-extrabold">仮の担当名(名簿になくてもOK)</p>
+            <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">
+              例：教材制作担当、カメラマン(未定)、ネオン。次の「作業の順番」で各工程の担当として選べます。
+              実際の人が決まったら、プロジェクト詳細で本人に差し替えてください。
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <input
+                value={placeholderDraft}
+                onChange={(event) => setPlaceholderDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addPlaceholderMember();
+                  }
+                }}
+                placeholder="例：教材制作担当"
+                className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] bg-white px-2.5 py-2 text-sm"
+              />
+              <select value={placeholderRole} onChange={(event) => setPlaceholderRole(event.target.value as "worker" | "client")} className="rounded-lg border border-[var(--mikke-line)] bg-white px-2 py-2 text-xs font-bold">
+                <option value="worker">担当メンバー</option>
+                <option value="client">クライアント</option>
+              </select>
+              <button type="button" onClick={addPlaceholderMember} disabled={!placeholderDraft.trim()} className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold disabled:opacity-40">
+                <Plus size={14} /> 追加
+              </button>
+            </div>
+            {placeholderMembers.length > 0 ? (
+              <ul className="mt-2 flex flex-wrap gap-1.5">
+                {placeholderMembers.map((member) => (
+                  <li key={member.key} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--mikke-line)] bg-white px-2.5 py-1 text-xs font-bold">
+                    {member.name}・{member.projectRole === "worker" ? "担当" : "クライアント"}
+                    <button type="button" onClick={() => removePlaceholderMember(member.key)} className="text-[var(--tw-action)]" aria-label={`${member.name}を削除`}>
+                      <Trash2 size={12} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
           </div>
         </MikkeSection>
       ) : null}
@@ -267,6 +388,19 @@ export function TeamWorksProjectGenerator() {
                     <option value="">誰がやるか:未設定</option>
                     {ownerRoleOptions.map((role) => <option key={role} value={role}>{deliveryTaskOwnerRoleLabels[role]}</option>)}
                   </select>
+                  <select
+                    value={assigneeSelectValue(row)}
+                    onChange={(event) => updateRow(row.key, parseAssigneeSelectValue(event.target.value))}
+                    className="rounded-lg border border-[var(--mikke-line)] px-2 py-1.5"
+                  >
+                    <option value="">担当:未割当</option>
+                    {selectedMembers.map((member) => (
+                      <option key={member.directoryId} value={`dir:${member.directoryId}`}>{member.displayName}</option>
+                    ))}
+                    {placeholderMembers.map((member) => (
+                      <option key={member.key} value={`label:${member.name}`}>{member.name}(仮)</option>
+                    ))}
+                  </select>
                   <select value={row.submissionType} onChange={(event) => updateRow(row.key, { submissionType: event.target.value as DeliveryTaskSubmissionType })} className="rounded-lg border border-[var(--mikke-line)] px-2 py-1.5">
                     {submissionTypeOptions.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
                   </select>
@@ -274,7 +408,23 @@ export function TeamWorksProjectGenerator() {
                   <label className="flex items-center gap-1.5"><input type="checkbox" checked={row.needsClientReview} onChange={(event) => updateRow(row.key, { needsClientReview: event.target.checked })} />クライアント確認</label>
                   <input type="number" min={1} value={row.standardDays} onChange={(event) => updateRow(row.key, { standardDays: event.target.value })} placeholder="標準日数" className="w-20 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5" />
                   <label className="flex items-center gap-1.5"><input type="checkbox" checked={row.clientVisible} onChange={(event) => updateRow(row.key, { clientVisible: event.target.checked })} />クライアントに公開</label>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedRowKey((current) => (current === row.key ? null : row.key))}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5"
+                  >
+                    作業指示{instructionSummary(row.instruction) ? `(${instructionSummary(row.instruction)})` : ""}
+                    {expandedRowKey === row.key ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
                 </div>
+                {expandedRowKey === row.key ? (
+                  <div className="mt-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+                    <TeamWorksTaskInstructionEditor
+                      value={row.instruction}
+                      onChange={(instruction) => updateRow(row.key, { instruction })}
+                    />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
@@ -313,11 +463,13 @@ export function TeamWorksProjectGenerator() {
                     <li key={row.key} className="text-xs font-semibold">
                       {index + 1}. {row.title}
                       {row.ownerRole ? `・${deliveryTaskOwnerRoleLabels[row.ownerRole]}` : ""}
+                      {assigneeSummaryLabel(row, selectedMembers)}
                       {row.submissionType !== "none" ? `・${deliveryTaskSubmissionTypeLabels[row.submissionType]}` : ""}
                       {row.needsInternalReview ? "・本部確認" : ""}
                       {row.needsClientReview ? "・クライアント確認" : ""}
                       {row.standardDays ? `・${row.standardDays}日` : ""}
                       {row.clientVisible ? "・公開" : ""}
+                      {instructionSummary(row.instruction) ? `・作業指示${instructionSummary(row.instruction)}` : ""}
                     </li>
                   ))}
                 </ol>

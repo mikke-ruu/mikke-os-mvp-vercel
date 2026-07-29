@@ -324,6 +324,53 @@ Phase 1〜5 の設定を、質問形式で一気に組めるようにする。
 
 ---
 
+## Phase 7: 工程の作業指示と仮メンバー（2026-07-30 追加・実装完了）
+
+### きっかけ
+あゆみからのフィードバック:
+- 「メンバーが決まっていない場合は自由記述だったはず」
+- 「工程の内容をもっと詳細に設定できるようにしてほしい」（作業指示レベルの中身）
+
+工程名と担当ロールだけでは、担当者が**何をどう作ればよいか**が分からなかった。
+
+### migration
+`supabase/migrations/20260730090000_team_works_delivery_task_detail.sql`
+**要SQL Editorでの実行**。`team_works_project_tasks` に追加（追加のみ・既存行はそのまま）:
+
+| 列 | 内容 |
+|---|---|
+| `description` | 何を作るか（成果物の概要） |
+| `purpose` | 目的（なぜやるか） |
+| `method` | どれで（使うツール・方法） |
+| `deliverable_note` | 提出物の具体的な形。`submission_type`が種別、こちらが中身の説明 |
+| `checklist` (jsonb) | 作業順。文字列の配列 |
+| `outputs` (jsonb) | 完成物に含まれるもの。文字列の配列 |
+
+tasksのINSERT/UPDATEは本部staffのみ（P8-a）なのでRLSポリシーの変更は不要。
+SELECTは既存のまま（client_visible または自分が担当）なので、作業指示の可視範囲は
+工程の可視範囲にそのまま従う。
+
+### 実装メモ
+- 編集UIと表示UIは `components/team-works/projects/TeamWorksTaskInstructionEditor.tsx`
+  に共通化し、①工程の新規追加フォーム ②工程の編集（展開時）③ジェネレーターの
+  ③作業の順番 ④テンプレート編集 の4か所から使う。表示専用の
+  `TeamWorksTaskInstructionView` はポータル側で使う。
+- 作業指示は入力量が多いため、他の設定（即保存）と違い**まとめて保存**方式。
+- **仮メンバー**: ジェネレーター②で名簿になくても名前を自由入力でき、
+  ③で各工程の担当として選べる。名簿の相手を選んだ場合は
+  `assignee_member_id`（実メンバー）、仮メンバーは `assignee_label`（名前だけ）に入る。
+  `createDeliveryProjectWithSetup` がメンバー追加結果から
+  directoryId → organization_member_id を解決して割り当てる。
+- `DeliveryStepTemplateStep` に `assigneeLabel` / `instruction` を追加（省略可能・
+  旧テンプレートとの後方互換あり）。テンプレートに作業指示を書いておけば
+  案件作成時にそのまま入る。
+
+### 注意（このセッションで踏んだもの）
+複数セッションで同じ作業ディレクトリのdevサーバーを動かすと `.next` が壊れ、
+**全ルートが404を返す**状態になる。`rm -rf .next` して再起動すれば直る。
+
+---
+
 ## 完了の定義（受け入れテスト）
 
 **認定講座 個別構築コースの9工程が実際に回ること。** 具体的には:

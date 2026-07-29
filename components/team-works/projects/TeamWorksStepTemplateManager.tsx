@@ -9,13 +9,16 @@ import {
   archiveStepTemplate,
   createStepTemplate,
   deliveryTaskSubmissionTypeLabels,
+  emptyDeliveryTaskInstruction,
   fetchStepTemplates,
   updateStepTemplate,
   type DeliveryStepTemplate,
   type DeliveryStepTemplateStep,
+  type DeliveryTaskInstruction,
   type DeliveryTaskSubmissionType
 } from "@/lib/team-works-delivery";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
+import { TeamWorksTaskInstructionEditor } from "./TeamWorksTaskInstructionEditor";
 
 const submissionTypeOptions = Object.keys(deliveryTaskSubmissionTypeLabels) as DeliveryTaskSubmissionType[];
 
@@ -34,7 +37,30 @@ const exampleTemplates: { name: string; description: string; steps: DeliveryStep
     steps: [
       { title: "ヒアリング・講座整理", defaultRole: "manager", submissionType: "none", standardDays: 3 },
       { title: "キット作製", defaultRole: "manager", submissionType: "none", standardDays: 5 },
-      { title: "テキスト・ディプロマ作成", defaultRole: "client", submissionType: "form", needsInternalReview: true, needsClientReview: true, standardDays: 7 },
+      {
+        title: "テキスト・ディプロマ作成",
+        defaultRole: "client",
+        submissionType: "form",
+        needsInternalReview: true,
+        needsClientReview: true,
+        standardDays: 7,
+        instruction: {
+          description: "受講生が使う講座テキストとディプロマの原稿",
+          purpose: "講師が変わっても同じ内容・同じ品質で講座を届けられるようにするため。",
+          method: "本部が用意する記入フォーム",
+          checklist: [
+            "講座の説明を書く",
+            "使う材料を書き出す",
+            "作り方の工程を順番に書く",
+            "注意点を書く",
+            "よくある失敗を書く",
+            "本部が確認して整文・写真配置",
+            "クライアントが最終確認"
+          ],
+          outputs: ["講座説明", "材料リスト", "工程", "注意点", "よくある失敗"],
+          deliverableNote: "記入フォームの回答(写真がある場合は画像も添付)"
+        }
+      },
       { title: "写真・動画撮影", defaultRole: "manager", submissionType: "none", standardDays: 3 },
       { title: "画像加工・動画編集", defaultRole: "manager", submissionType: "file", needsInternalReview: true, standardDays: 5 },
       { title: "Academy構築", defaultRole: "manager", submissionType: "none", standardDays: 5 },
@@ -133,9 +159,13 @@ function TemplateEditor({ template, onClose, onSaved }: { template: DeliveryStep
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [expandedStepKey, setExpandedStepKey] = useState<string | null>(null);
 
   function addStep() {
-    setSteps((current) => [...current, { key: newRowKey(), title: "", defaultRole: null, submissionType: "none", needsInternalReview: false, needsClientReview: false, standardDays: null }]);
+    setSteps((current) => [
+      ...current,
+      { key: newRowKey(), title: "", defaultRole: null, submissionType: "none", needsInternalReview: false, needsClientReview: false, standardDays: null, assigneeLabel: "", instruction: emptyDeliveryTaskInstruction }
+    ]);
   }
 
   function updateStep(key: string, patch: Partial<EditableStep>) {
@@ -163,13 +193,22 @@ function TemplateEditor({ template, onClose, onSaved }: { template: DeliveryStep
     setError("");
     const cleanSteps = steps
       .filter((step) => step.title.trim().length > 0)
-      .map(({ title, defaultRole, submissionType, needsInternalReview, needsClientReview, standardDays }) => ({
+      .map(({ title, defaultRole, submissionType, needsInternalReview, needsClientReview, standardDays, assigneeLabel, instruction }) => ({
         title: title.trim(),
         defaultRole,
         submissionType,
         needsInternalReview,
         needsClientReview,
-        standardDays
+        standardDays,
+        assigneeLabel: assigneeLabel?.trim() || null,
+        instruction: instruction
+          ? {
+              ...instruction,
+              // 追加ボタンで作った未入力の行は保存前に落とす。
+              checklist: (instruction.checklist ?? []).map((item) => item.trim()).filter(Boolean),
+              outputs: (instruction.outputs ?? []).map((item) => item.trim()).filter(Boolean)
+            }
+          : undefined
       }));
     try {
       if (template) {
@@ -249,7 +288,29 @@ function TemplateEditor({ template, onClose, onSaved }: { template: DeliveryStep
                     placeholder="標準日数"
                     className="w-20 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5"
                   />
+                  <input
+                    value={step.assigneeLabel ?? ""}
+                    onChange={(event) => updateStep(step.key, { assigneeLabel: event.target.value })}
+                    placeholder="仮の担当名"
+                    className="w-32 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setExpandedStepKey((current) => (current === step.key ? null : step.key))}
+                    className="inline-flex items-center gap-1 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5"
+                  >
+                    作業指示
+                    {expandedStepKey === step.key ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
                 </div>
+                {expandedStepKey === step.key ? (
+                  <div className="mt-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+                    <TeamWorksTaskInstructionEditor
+                      value={{ ...emptyDeliveryTaskInstruction, ...step.instruction }}
+                      onChange={(instruction: DeliveryTaskInstruction) => updateStep(step.key, { instruction })}
+                    />
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

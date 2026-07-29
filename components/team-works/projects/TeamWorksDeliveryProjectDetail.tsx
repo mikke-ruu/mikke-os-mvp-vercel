@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, ListChecks, Plus, UsersRound } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronUp, ClipboardList, FileText, ListChecks, Plus, Save, UsersRound } from "lucide-react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
@@ -10,6 +10,7 @@ import {
   autoScheduleDeliveryTasks,
   createDeliveryTask,
   deliveryTaskOwnerRoleLabels,
+  emptyDeliveryTaskInstruction,
   deliveryTaskStatusLabels,
   deliveryTaskSubmissionTypeLabels,
   loadDeliveryProjectDetail,
@@ -19,6 +20,7 @@ import {
   type DeliveryProjectDetail,
   type DeliveryProjectMember,
   type DeliveryTask,
+  type DeliveryTaskInstruction,
   type DeliveryTaskOwnerRole,
   type DeliveryTaskStatus,
   type DeliveryTaskSubmissionType
@@ -37,6 +39,7 @@ import { TeamWorksDeliveryStaffPendingSummary } from "./TeamWorksDeliveryStaffPe
 import { TeamWorksProjectFormBuilder, type DeliveryFormPatch } from "./TeamWorksProjectFormBuilder";
 import { TeamWorksProjectFormSubmissionsReview } from "./TeamWorksProjectFormSubmissionsReview";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
+import { TeamWorksTaskInstructionEditor, toTaskInstruction } from "./TeamWorksTaskInstructionEditor";
 
 const taskStatuses = Object.keys(deliveryTaskStatusLabels) as DeliveryTaskStatus[];
 const ownerRoles = Object.keys(deliveryTaskOwnerRoleLabels) as DeliveryTaskOwnerRole[];
@@ -210,6 +213,7 @@ type NewTaskForm = {
   submissionType: DeliveryTaskSubmissionType;
   needsInternalReview: boolean;
   needsClientReview: boolean;
+  instruction: DeliveryTaskInstruction;
 };
 
 const emptyNewTaskForm: NewTaskForm = {
@@ -223,7 +227,8 @@ const emptyNewTaskForm: NewTaskForm = {
   ownerRole: "",
   submissionType: "none",
   needsInternalReview: false,
-  needsClientReview: false
+  needsClientReview: false,
+  instruction: emptyDeliveryTaskInstruction
 };
 
 function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryProjectDetail; myMemberId: string | null; onReload: () => Promise<void> }) {
@@ -231,6 +236,7 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+  const [instructionOpen, setInstructionOpen] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -250,9 +256,16 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
         ownerRole: form.ownerRole || null,
         submissionType: form.submissionType,
         needsInternalReview: form.needsInternalReview,
-        needsClientReview: form.needsClientReview
+        needsClientReview: form.needsClientReview,
+        instruction: {
+          ...form.instruction,
+          // 追加ボタンで作った未入力の行は保存前に落とす。
+          checklist: form.instruction.checklist.map((item) => item.trim()).filter(Boolean),
+          outputs: form.instruction.outputs.map((item) => item.trim()).filter(Boolean)
+        }
       });
       setForm(emptyNewTaskForm);
+      setInstructionOpen(false);
       await onReload();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "タスクを追加できませんでした。");
@@ -305,6 +318,26 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
           <label className="flex items-center gap-2"><input type="checkbox" checked={form.needsClientReview} onChange={(event) => setForm({ ...form, needsClientReview: event.target.checked })} />クライアントの確認が必要</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={form.clientVisible} onChange={(event) => setForm({ ...form, clientVisible: event.target.checked })} />クライアントに表示する</label>
         </div>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setInstructionOpen((current) => !current)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold"
+          >
+            <FileText size={14} /> 作業指示を書く(任意)
+            {instructionOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+          {instructionOpen ? (
+            <div className="mt-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3">
+              <TeamWorksTaskInstructionEditor
+                value={form.instruction}
+                onChange={(instruction) => setForm({ ...form, instruction })}
+              />
+            </div>
+          ) : null}
+        </div>
+
         <button type="submit" disabled={saving || !form.title.trim()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
           <Plus size={15} /> 工程を追加
         </button>
@@ -443,6 +476,9 @@ function TaskRow({
             <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.needsClientReview} disabled={busy} onChange={(event) => void apply({ needsClientReview: event.target.checked })} />クライアントの確認が必要</label>
             <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.clientVisible} disabled={busy} onChange={(event) => void apply({ clientVisible: event.target.checked })} />クライアントに表示する</label>
           </div>
+          <div className="md:col-span-2">
+            <TaskInstructionSection task={task} onReload={onReload} />
+          </div>
           {task.submissionType === "form" ? (
             <div className="md:col-span-2">
               <TaskFormsPanel task={task} members={members} myMemberId={myMemberId} />
@@ -455,6 +491,67 @@ function TaskRow({
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+// 作業指示は入力量が多いので、他の設定(即保存)と違って
+// ローカルで編集してから「作業指示を保存」でまとめて送る。
+function TaskInstructionSection({ task, onReload }: { task: DeliveryTask; onReload: () => Promise<void> }) {
+  const [instruction, setInstruction] = useState<DeliveryTaskInstruction>(() => toTaskInstruction(task));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const dirty = JSON.stringify(instruction) !== JSON.stringify(toTaskInstruction(task));
+
+  useEffect(() => {
+    setInstruction(toTaskInstruction(task));
+  }, [task]);
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      // 空行は保存前に落とす(追加ボタンで作った未入力の行が残らないように)。
+      await updateDeliveryTask(supabase, task.id, {
+        description: instruction.description,
+        purpose: instruction.purpose,
+        method: instruction.method,
+        deliverableNote: instruction.deliverableNote,
+        checklist: instruction.checklist.map((item) => item.trim()).filter(Boolean),
+        outputs: instruction.outputs.map((item) => item.trim()).filter(Boolean)
+      });
+      setMessage("作業指示を保存しました。");
+      await onReload();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "保存できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--mikke-line)] bg-white p-3">
+      <p className="flex items-center gap-2 text-xs font-extrabold">
+        <FileText size={14} /> 作業指示
+      </p>
+      <p className="mt-1 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">
+        担当メンバーとクライアントのポータルにそのまま表示されます。
+      </p>
+      <TeamWorksTaskInstructionEditor value={instruction} onChange={setInstruction} />
+      {error ? <p role="alert" className="mt-2 rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={saving || !dirty}
+          className="inline-flex items-center gap-1 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]"
+        >
+          <Save size={14} /> 作業指示を保存
+        </button>
+        {message && !dirty ? <span className="text-xs font-bold text-[var(--tw-done)]">{message}</span> : null}
+      </div>
     </div>
   );
 }

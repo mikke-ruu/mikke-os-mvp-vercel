@@ -19,6 +19,7 @@ import { TeamWorksDeliveryClientDeliverablePanel } from "./TeamWorksDeliveryClie
 import { TeamWorksDeliveryFormSubmissionPanel } from "./TeamWorksDeliveryFormSubmissionPanel";
 import { TeamWorksDeliveryMyActionsPanel } from "./TeamWorksDeliveryMyActionsPanel";
 import { TeamWorksDeliveryWorkerDeliverablePanel } from "./TeamWorksDeliveryWorkerDeliverablePanel";
+import { TeamWorksTaskInstructionView, toTaskInstruction } from "./TeamWorksTaskInstructionEditor";
 
 // ワーカー・クライアント共通の閲覧用ビュー。タスクの作成・状態変更は本部のみの
 // 権限(RLS)のため、ここでは期日・状態の確認と、自分が対応すべき提出物
@@ -116,6 +117,11 @@ function PortalTaskCard({ projectId, task, myMembership }: { projectId: string; 
 
   const isAssignedWorker = myMembership?.projectRole === "worker" && task.assigneeMemberId === myMembership.organizationMemberId;
   const isClient = myMembership?.projectRole === "client";
+  const instruction = toTaskInstruction(task);
+  const hasInstruction =
+    Boolean(instruction.description || instruction.purpose || instruction.method || instruction.deliverableNote) ||
+    instruction.checklist.length > 0 ||
+    instruction.outputs.length > 0;
 
   return (
     <div id={`task-${task.id}`} className="scroll-mt-24 overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
@@ -131,6 +137,12 @@ function PortalTaskCard({ projectId, task, myMembership }: { projectId: string; 
           {deliveryTaskStatusLabels[task.status]}
         </span>
       </div>
+
+      {hasInstruction ? (
+        <div className="border-t border-[var(--mikke-line)] px-4 py-3">
+          <TeamWorksTaskInstructionView instruction={instruction} />
+        </div>
+      ) : null}
 
       {task.submissionType === "form" && myMembership && forms && forms.length > 0 ? (
         <div className="space-y-3 border-t border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
