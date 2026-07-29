@@ -488,9 +488,9 @@ export function TeamWorksProjectGenerator() {
             type="button"
             onClick={() => void submit()}
             disabled={saving || !title.trim()}
-            className="mt-5 w-full rounded-lg bg-[var(--tw-action)] px-4 py-3 text-sm font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]"
+            className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--tw-action)] px-4 py-2.5 text-sm font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]"
           >
-            {saving ? "作成しています…" : "プロジェクトを作成"}
+            <Plus size={16} /> {saving ? "作成しています…" : "プロジェクトを作成"}
           </button>
         </MikkeSection>
       ) : null}
