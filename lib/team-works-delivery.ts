@@ -36,15 +36,36 @@ export type DeliveryProjectSummary = {
   clientVisible: boolean;
 };
 
+export type DeliveryTaskOwnerRole = "admin" | "worker" | "client";
+export const deliveryTaskOwnerRoleLabels: Record<DeliveryTaskOwnerRole, string> = {
+  admin: "本部",
+  worker: "担当メンバー",
+  client: "クライアント"
+};
+
+export type DeliveryTaskSubmissionType = "none" | "form" | "file" | "url";
+export const deliveryTaskSubmissionTypeLabels: Record<DeliveryTaskSubmissionType, string> = {
+  none: "提出物なし",
+  form: "フォーム",
+  file: "ファイル",
+  url: "URL"
+};
+
 export type DeliveryTask = {
   id: string;
   projectId: string;
   title: string;
   status: DeliveryTaskStatus;
   assigneeMemberId: string | null;
+  assigneeLabel: string | null;
   clientVisible: boolean;
   dueOn: string | null;
+  submitDueOn: string | null;
   position: number | null;
+  ownerRole: DeliveryTaskOwnerRole | null;
+  submissionType: DeliveryTaskSubmissionType;
+  needsInternalReview: boolean;
+  needsClientReview: boolean;
 };
 
 export type DeliveryProjectMember = {
@@ -66,11 +87,20 @@ function toTask(row: Record<string, unknown>): DeliveryTask {
     title: row.title as string,
     status: row.status as DeliveryTaskStatus,
     assigneeMemberId: (row.assignee_member_id as string) ?? null,
+    assigneeLabel: (row.assignee_label as string) ?? null,
     clientVisible: Boolean(row.client_visible),
     dueOn: (row.due_on as string) ?? null,
-    position: (row.position as number) ?? null
+    submitDueOn: (row.submit_due_on as string) ?? null,
+    position: (row.position as number) ?? null,
+    ownerRole: (row.owner_role as DeliveryTaskOwnerRole) ?? null,
+    submissionType: (row.submission_type as DeliveryTaskSubmissionType) ?? "none",
+    needsInternalReview: Boolean(row.needs_internal_review),
+    needsClientReview: Boolean(row.needs_client_review)
   };
 }
+
+const taskColumns =
+  "id,project_id,title,status,assignee_member_id,assignee_label,client_visible,due_on,submit_due_on,position,owner_role,submission_type,needs_internal_review,needs_client_review";
 
 export async function createDeliveryProject(
   client: SupabaseClient,
@@ -160,7 +190,7 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
   const [taskResult, memberResult] = await Promise.all([
     client
       .from("team_works_project_tasks")
-      .select("id,project_id,title,status,assignee_member_id,client_visible,due_on,position")
+      .select(taskColumns)
       .eq("project_id", projectId)
       .is("archived_at", null)
       .order("position", { ascending: true, nullsFirst: false })
@@ -193,15 +223,34 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
 
 export async function createDeliveryTask(
   client: SupabaseClient,
-  input: { projectId: string; title: string; assigneeMemberId: string | null; dueOn: string | null; clientVisible: boolean; position?: number | null }
+  input: {
+    projectId: string;
+    title: string;
+    assigneeMemberId: string | null;
+    assigneeLabel?: string | null;
+    dueOn: string | null;
+    submitDueOn?: string | null;
+    clientVisible: boolean;
+    position?: number | null;
+    ownerRole?: DeliveryTaskOwnerRole | null;
+    submissionType?: DeliveryTaskSubmissionType;
+    needsInternalReview?: boolean;
+    needsClientReview?: boolean;
+  }
 ): Promise<void> {
   const { error } = await client.from("team_works_project_tasks").insert({
     project_id: input.projectId,
     title: input.title,
     assignee_member_id: input.assigneeMemberId,
+    assignee_label: input.assigneeLabel ?? null,
     due_on: input.dueOn,
+    submit_due_on: input.submitDueOn ?? null,
     client_visible: input.clientVisible,
-    position: input.position ?? null
+    position: input.position ?? null,
+    owner_role: input.ownerRole ?? null,
+    submission_type: input.submissionType ?? "none",
+    needs_internal_review: input.needsInternalReview ?? false,
+    needs_client_review: input.needsClientReview ?? false
   });
   if (error) throw error;
 }
@@ -217,14 +266,32 @@ export async function reorderDeliveryTasks(client: SupabaseClient, taskIdsInOrde
 export async function updateDeliveryTask(
   client: SupabaseClient,
   taskId: string,
-  patch: Partial<{ title: string; status: DeliveryTaskStatus; assigneeMemberId: string | null; dueOn: string | null; clientVisible: boolean }>
+  patch: Partial<{
+    title: string;
+    status: DeliveryTaskStatus;
+    assigneeMemberId: string | null;
+    assigneeLabel: string | null;
+    dueOn: string | null;
+    submitDueOn: string | null;
+    clientVisible: boolean;
+    ownerRole: DeliveryTaskOwnerRole | null;
+    submissionType: DeliveryTaskSubmissionType;
+    needsInternalReview: boolean;
+    needsClientReview: boolean;
+  }>
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
   if (patch.title !== undefined) payload.title = patch.title;
   if (patch.status !== undefined) payload.status = patch.status;
   if (patch.assigneeMemberId !== undefined) payload.assignee_member_id = patch.assigneeMemberId;
+  if (patch.assigneeLabel !== undefined) payload.assignee_label = patch.assigneeLabel;
   if (patch.dueOn !== undefined) payload.due_on = patch.dueOn;
+  if (patch.submitDueOn !== undefined) payload.submit_due_on = patch.submitDueOn;
   if (patch.clientVisible !== undefined) payload.client_visible = patch.clientVisible;
+  if (patch.ownerRole !== undefined) payload.owner_role = patch.ownerRole;
+  if (patch.submissionType !== undefined) payload.submission_type = patch.submissionType;
+  if (patch.needsInternalReview !== undefined) payload.needs_internal_review = patch.needsInternalReview;
+  if (patch.needsClientReview !== undefined) payload.needs_client_review = patch.needsClientReview;
   payload.updated_at = new Date().toISOString();
   const { error } = await client.from("team_works_project_tasks").update(payload).eq("id", taskId);
   if (error) throw error;
@@ -382,7 +449,7 @@ export type DeliveryCalendarTask = DeliveryTask & { projectTitle: string };
 export async function loadDeliveryCalendarTasks(client: SupabaseClient): Promise<DeliveryCalendarTask[]> {
   const { data, error } = await client
     .from("team_works_project_tasks")
-    .select("id,project_id,title,status,assignee_member_id,client_visible,due_on,team_works_projects(title)")
+    .select(`${taskColumns},team_works_projects(title)`)
     .not("due_on", "is", null)
     .is("archived_at", null)
     .order("due_on", { ascending: true });
