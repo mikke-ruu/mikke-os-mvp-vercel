@@ -55,6 +55,19 @@ export async function fetchTaskForms(client: SupabaseClient, taskId: string): Pr
   return (data ?? []).map(toDeliveryForm);
 }
 
+// プロジェクト内の全工程のフォームをまとめて取る(「今あなたの番」サマリー用)。
+// RLSは工程ごとのfetchTaskFormsと同じ条件で自動的に絞られる。
+export async function fetchProjectForms(client: SupabaseClient, projectId: string): Promise<DeliveryProjectForm[]> {
+  const { data, error } = await client
+    .from("team_works_project_forms")
+    .select(formColumns)
+    .eq("project_id", projectId)
+    .is("archived_at", null)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(toDeliveryForm);
+}
+
 export async function createTaskForm(
   client: SupabaseClient,
   input: { projectId: string; taskId: string; name: string; inputActor: DeliveryFormInputActor }
@@ -158,6 +171,20 @@ export async function fetchFormSubmissions(client: SupabaseClient, form: Deliver
     .order("updated_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((row) => toSubmission(row, form.inputActor === "client" ? "client" : "worker"));
+}
+
+// 複数フォームぶんの提出をまとめて取る(「今あなたの番」サマリー用)。
+// RLSはfetchFormSubmissionsと同じ条件で自動的に絞られる
+// (staffは全件、worker/clientは自分の提出だけが返る)。
+export async function fetchSubmissionsByFormIds(client: SupabaseClient, forms: DeliveryProjectForm[]): Promise<ProjectFormSubmission[]> {
+  if (forms.length === 0) return [];
+  const actorByFormId = new Map(forms.map((form) => [form.id, form.inputActor === "client" ? ("client" as const) : ("worker" as const)]));
+  const { data, error } = await client
+    .from("team_works_form_submissions")
+    .select(submissionColumns)
+    .in("form_id", forms.map((form) => form.id));
+  if (error) throw error;
+  return (data ?? []).map((row) => toSubmission(row, actorByFormId.get(row.form_id as string) ?? "worker"));
 }
 
 // 記入者(worker/client)本人からのみ呼ぶ。差し戻し後の再提出も含め、

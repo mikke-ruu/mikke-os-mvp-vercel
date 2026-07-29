@@ -14,9 +14,10 @@ import {
   type DeliveryTask
 } from "@/lib/team-works-delivery";
 import { fetchTaskForms, type DeliveryProjectForm } from "@/lib/team-works-delivery-forms";
-import { TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
+import { buildDeliveryCalendarItems, TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
 import { TeamWorksDeliveryClientDeliverablePanel } from "./TeamWorksDeliveryClientDeliverablePanel";
 import { TeamWorksDeliveryFormSubmissionPanel } from "./TeamWorksDeliveryFormSubmissionPanel";
+import { TeamWorksDeliveryMyActionsPanel } from "./TeamWorksDeliveryMyActionsPanel";
 import { TeamWorksDeliveryWorkerDeliverablePanel } from "./TeamWorksDeliveryWorkerDeliverablePanel";
 
 // ワーカー・クライアント共通の閲覧用ビュー。タスクの作成・状態変更は本部のみの
@@ -51,10 +52,8 @@ export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId:
   if (detail === null) return <MikkeEmptyState title="このプロジェクトは表示できません" helper="担当から外れたか、閲覧できるプロジェクトではありません。" />;
 
   const { project, tasks } = detail;
-  const calendarItems = tasks
-    .filter((task) => task.dueOn)
-    .map((task) => ({ id: task.id, title: task.title, status: task.status, dueOn: task.dueOn as string }));
-  const selectedDayTasks = selectedDay ? tasks.filter((task) => task.dueOn === selectedDay) : [];
+  const calendarItems = buildDeliveryCalendarItems(tasks);
+  const selectedDayTasks = selectedDay ? tasks.filter((task) => task.dueOn === selectedDay || task.submitDueOn === selectedDay) : [];
 
   return (
     <div className="space-y-6">
@@ -62,6 +61,8 @@ export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId:
         <h2 className="text-2xl font-bold tracking-normal">{project.title}</h2>
         <p className="mt-1 text-xs font-bold text-[var(--mikke-muted)]">タスク {tasks.length}件</p>
       </section>
+
+      {myMembership ? <TeamWorksDeliveryMyActionsPanel detail={detail} myMembership={myMembership} /> : null}
 
       <MikkeSection title="Schedule" tone="editorial">
         <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">期日を一目で確認できます。日付をクリックするとその日のタスクを表示します。</p>
@@ -74,7 +75,11 @@ export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId:
             ) : (
               <div className="mt-2 space-y-1.5">
                 {selectedDayTasks.map((task) => (
-                  <p key={task.id} className="text-xs font-semibold">{task.title}・{deliveryTaskStatusLabels[task.status]}</p>
+                  <p key={task.id} className="text-xs font-semibold">
+                    {task.title}・{deliveryTaskStatusLabels[task.status]}
+                    {task.submitDueOn === selectedDay ? "・提出期日" : ""}
+                    {task.dueOn === selectedDay ? "・完了期日" : ""}
+                  </p>
                 ))}
               </div>
             )}
@@ -113,7 +118,7 @@ function PortalTaskCard({ projectId, task, myMembership }: { projectId: string; 
   const isClient = myMembership?.projectRole === "client";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+    <div id={`task-${task.id}`} className="scroll-mt-24 overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
       <div className="flex flex-wrap items-center gap-3 px-4 py-3">
         <ListChecks size={16} className="shrink-0 text-[var(--mikke-muted)]" />
         <div className="min-w-0 flex-1">

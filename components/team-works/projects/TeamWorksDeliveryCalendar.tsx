@@ -3,25 +3,45 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
-import { deliveryTaskStatusLabels, type DeliveryTaskStatus } from "@/lib/team-works-delivery";
+import { deliveryTaskStatusLabels, type DeliveryTask, type DeliveryTaskStatus } from "@/lib/team-works-delivery";
 
 const dowLabels = ["日", "月", "火", "水", "木", "金", "土"];
+
+export type DeliveryCalendarItemKind = "submit" | "due";
 
 export type DeliveryCalendarItem = {
   id: string;
   title: string;
   status: DeliveryTaskStatus;
-  dueOn: string;
+  date: string;
+  kind: DeliveryCalendarItemKind;
   projectTitle?: string;
 };
 
-function statusTone(status: DeliveryTaskStatus): { bg: string; text: string } {
-  if (status === "completed") return { bg: "var(--tw-done)", text: "var(--tw-on-tint)" };
-  if (status === "review_pending" || status === "revising") return { bg: "var(--tw-action)", text: "var(--tw-on-solid)" };
-  if (status === "on_hold" || status === "cancelled" || status === "archived") {
-    return { bg: "var(--mikke-surface-soft)", text: "var(--mikke-muted)" };
+// 提出期日(submit_due_on)と完了期日(due_on)の両方をカレンダー項目に展開する。
+export function buildDeliveryCalendarItems(tasks: DeliveryTask[]): DeliveryCalendarItem[] {
+  const items: DeliveryCalendarItem[] = [];
+  for (const task of tasks) {
+    if (task.submitDueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.submitDueOn, kind: "submit" });
+    if (task.dueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "due" });
   }
-  return { bg: "var(--tw-planned)", text: "var(--tw-on-tint)" };
+  return items;
+}
+
+const doneLikeStatuses: DeliveryTaskStatus[] = ["completed", "cancelled", "archived"];
+
+function isOverdue(dateOn: string, status: DeliveryTaskStatus): boolean {
+  if (doneLikeStatuses.includes(status)) return false;
+  return dateOn < toDateKey(new Date());
+}
+
+// 色は役割トークン固定: 完了=GREEN、期限超過=ORANGE(要対応)、
+// 提出期日=PINK(締切)、完了期日=BLUE(基準日)。
+function itemTone(item: DeliveryCalendarItem): { bg: string; text: string } {
+  if (item.status === "completed") return { bg: "var(--tw-done)", text: "var(--tw-on-tint)" };
+  if (isOverdue(item.date, item.status)) return { bg: "var(--tw-action)", text: "var(--tw-on-solid)" };
+  if (item.kind === "submit") return { bg: "var(--tw-deadline)", text: "var(--tw-on-tint)" };
+  return { bg: "var(--tw-title)", text: "var(--tw-on-solid)" };
 }
 
 function buildMonthDates(monthDate: Date): Date[] {
@@ -47,9 +67,9 @@ export function TeamWorksDeliveryCalendar({ items, onSelectDay }: { items: Deliv
   const itemsByDate = useMemo(() => {
     const map = new Map<string, DeliveryCalendarItem[]>();
     for (const item of items) {
-      const list = map.get(item.dueOn) ?? [];
+      const list = map.get(item.date) ?? [];
       list.push(item);
-      map.set(item.dueOn, list);
+      map.set(item.date, list);
     }
     return map;
   }, [items]);
@@ -86,10 +106,10 @@ export function TeamWorksDeliveryCalendar({ items, onSelectDay }: { items: Deliv
               <span className="block text-[10px] font-bold">{date.getDate()}</span>
               <span className="mt-1 flex flex-col gap-0.5">
                 {dayItems.slice(0, 2).map((item) => {
-                  const tone = statusTone(item.status);
+                  const tone = itemTone(item);
                   return (
-                    <span key={item.id} className="truncate rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: tone.bg, color: tone.text }}>
-                      {item.title}
+                    <span key={`${item.id}-${item.kind}`} className="truncate rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: tone.bg, color: tone.text }}>
+                      {item.kind === "submit" ? "提出 " : ""}{item.title}
                     </span>
                   );
                 })}
@@ -100,9 +120,10 @@ export function TeamWorksDeliveryCalendar({ items, onSelectDay }: { items: Deliv
         })}
       </div>
       <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-semibold text-[var(--mikke-muted)]">
-        <Legend color="var(--tw-planned)" label="未着手・進行中" />
-        <Legend color="var(--tw-action)" label="確認待ち・修正中" />
+        <Legend color="var(--tw-title)" label="完了期日" />
+        <Legend color="var(--tw-deadline)" label="提出期日" />
         <Legend color="var(--tw-done)" label="完了" />
+        <Legend color="var(--tw-action)" label="期限超過" />
         <Legend color="var(--mikke-pink)" label="土日祝" />
       </div>
     </div>

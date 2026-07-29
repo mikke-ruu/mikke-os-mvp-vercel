@@ -7,12 +7,14 @@ import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { supabase } from "@/lib/supabase/client";
 import {
+  autoScheduleDeliveryTasks,
   createDeliveryTask,
   deliveryTaskOwnerRoleLabels,
   deliveryTaskStatusLabels,
   deliveryTaskSubmissionTypeLabels,
   loadDeliveryProjectDetail,
   resolveMyDeliveryProjectMembership,
+  updateDeliveryProjectDueOn,
   updateDeliveryTask,
   type DeliveryProjectDetail,
   type DeliveryProjectMember,
@@ -29,8 +31,9 @@ import {
   type DeliveryFormInputActor,
   type DeliveryProjectForm
 } from "@/lib/team-works-delivery-forms";
-import { TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
+import { buildDeliveryCalendarItems, TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
 import { TeamWorksDeliveryDeliverableAdminPanel } from "./TeamWorksDeliveryDeliverableAdminPanel";
+import { TeamWorksDeliveryStaffPendingSummary } from "./TeamWorksDeliveryStaffPendingSummary";
 import { TeamWorksProjectFormBuilder, type DeliveryFormPatch } from "./TeamWorksProjectFormBuilder";
 import { TeamWorksProjectFormSubmissionsReview } from "./TeamWorksProjectFormSubmissionsReview";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
@@ -72,10 +75,8 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
   if (detail === null) return <MikkeEmptyState title="このプロジェクトは見つかりませんでした" />;
 
   const { project, tasks, members } = detail;
-  const calendarItems = tasks
-    .filter((task) => task.dueOn)
-    .map((task) => ({ id: task.id, title: task.title, status: task.status, dueOn: task.dueOn as string }));
-  const selectedDayTasks = selectedDay ? tasks.filter((task) => task.dueOn === selectedDay) : [];
+  const calendarItems = buildDeliveryCalendarItems(tasks);
+  const selectedDayTasks = selectedDay ? tasks.filter((task) => task.dueOn === selectedDay || task.submitDueOn === selectedDay) : [];
 
   return (
     <div className="space-y-6">
@@ -84,8 +85,11 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
         <p className="mt-1 text-xs font-bold text-[var(--mikke-muted)]">参加メンバー {members.length}名 ・ タスク {tasks.length}件</p>
       </section>
 
+      <TeamWorksDeliveryStaffPendingSummary detail={detail} />
+
       <MikkeSection title="Schedule" tone="editorial">
         <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">タスクの期日を一目で確認します。日付をクリックするとその日のタスクを表示します。</p>
+        <ProjectDueOnEditor projectId={project.id} dueOn={project.dueOn} tasks={tasks} onReload={load} />
         <TeamWorksDeliveryCalendar items={calendarItems} onSelectDay={setSelectedDay} />
         {selectedDay ? (
           <div className="mt-3 rounded-xl border border-[var(--mikke-line)] bg-white p-3">
@@ -95,7 +99,11 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
             ) : (
               <div className="mt-2 space-y-1.5">
                 {selectedDayTasks.map((task) => (
-                  <p key={task.id} className="text-xs font-semibold">{task.title}・{deliveryTaskStatusLabels[task.status]}</p>
+                  <p key={task.id} className="text-xs font-semibold">
+                    {task.title}・{deliveryTaskStatusLabels[task.status]}
+                    {task.submitDueOn === selectedDay ? "・提出期日" : ""}
+                    {task.dueOn === selectedDay ? "・完了期日" : ""}
+                  </p>
                 ))}
               </div>
             )}
@@ -120,6 +128,69 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
   );
 }
 
+function ProjectDueOnEditor({
+  projectId,
+  dueOn,
+  tasks,
+  onReload
+}: {
+  projectId: string;
+  dueOn: string | null;
+  tasks: DeliveryTask[];
+  onReload: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  async function changeDueOn(nextDueOn: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await updateDeliveryProjectDueOn(supabase, projectId, nextDueOn || null);
+      await onReload();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "更新できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function autoSchedule() {
+    if (!dueOn || tasks.length === 0) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await autoScheduleDeliveryTasks(supabase, { tasks, dueOn });
+      setMessage("納期から逆算して各工程の期日を配置しました。");
+      await onReload();
+    } catch (scheduleError) {
+      setError(scheduleError instanceof Error ? scheduleError.message : "配置できませんでした。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mb-3 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+      <TeamWorksProjectField label="納期" helper="逆算配置の起点になります">
+        <input type="date" defaultValue={dueOn ?? ""} disabled={busy} onChange={(event) => void changeDueOn(event.target.value)} className={teamWorksProjectInputClass} />
+      </TeamWorksProjectField>
+      <button
+        type="button"
+        onClick={() => void autoSchedule()}
+        disabled={busy || !dueOn || tasks.length === 0}
+        className="rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-xs font-bold disabled:opacity-40"
+      >
+        納期から逆算して配置
+      </button>
+      {error ? <p role="alert" className="text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+      {message ? <p className="text-xs font-bold text-[var(--tw-done)]">{message}</p> : null}
+    </div>
+  );
+}
+
 function projectRoleLabel(role: "owner" | "manager" | "client" | "worker"): string {
   if (role === "owner") return "オーナー";
   if (role === "manager") return "マネージャー";
@@ -131,6 +202,7 @@ type NewTaskForm = {
   title: string;
   dueOn: string;
   submitDueOn: string;
+  standardDays: string;
   assigneeMemberId: string;
   assigneeLabel: string;
   clientVisible: boolean;
@@ -144,6 +216,7 @@ const emptyNewTaskForm: NewTaskForm = {
   title: "",
   dueOn: "",
   submitDueOn: "",
+  standardDays: "",
   assigneeMemberId: "",
   assigneeLabel: "",
   clientVisible: false,
@@ -172,6 +245,7 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
         assigneeLabel: form.assigneeMemberId ? null : form.assigneeLabel.trim() || null,
         dueOn: form.dueOn || null,
         submitDueOn: form.submitDueOn || null,
+        standardDays: form.standardDays ? Number(form.standardDays) : null,
         clientVisible: form.clientVisible,
         ownerRole: form.ownerRole || null,
         submissionType: form.submissionType,
@@ -221,6 +295,9 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
             <select value={form.submissionType} onChange={(event) => setForm({ ...form, submissionType: event.target.value as DeliveryTaskSubmissionType })} className={teamWorksProjectInputClass}>
               {submissionTypes.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
             </select>
+          </TeamWorksProjectField>
+          <TeamWorksProjectField label="標準日数" helper="納期からの逆算配置に使う所要日数(未設定なら3日)">
+            <input type="number" min={1} value={form.standardDays} onChange={(event) => setForm({ ...form, standardDays: event.target.value })} className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
         </div>
         <div className="flex flex-wrap gap-4 text-xs font-bold">
@@ -291,7 +368,7 @@ function TaskRow({
   }
 
   return (
-    <div className="px-4 py-3">
+    <div id={`task-${task.id}`} className="scroll-mt-24 px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
         <ListChecks size={16} className="shrink-0 text-[var(--mikke-muted)]" />
         <div className="min-w-0 flex-1">
@@ -350,6 +427,16 @@ function TaskRow({
             <select defaultValue={task.submissionType} disabled={busy} onChange={(event) => void apply({ submissionType: event.target.value as DeliveryTaskSubmissionType })} className={teamWorksProjectInputClass}>
               {submissionTypes.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
             </select>
+          </TeamWorksProjectField>
+          <TeamWorksProjectField label="標準日数" helper="納期からの逆算配置に使う所要日数(未設定なら3日)">
+            <input
+              type="number"
+              min={1}
+              defaultValue={task.standardDays ?? ""}
+              disabled={busy}
+              onBlur={(event) => void apply({ standardDays: event.target.value ? Number(event.target.value) : null })}
+              className={teamWorksProjectInputClass}
+            />
           </TeamWorksProjectField>
           <div className="flex flex-wrap items-center gap-4 text-xs font-bold md:col-span-2">
             <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.needsInternalReview} disabled={busy} onChange={(event) => void apply({ needsInternalReview: event.target.checked })} />本部の確認が必要</label>

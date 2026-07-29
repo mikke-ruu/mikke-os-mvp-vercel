@@ -200,7 +200,7 @@ alter table public.team_works_project_tasks
 
 ---
 
-## Phase 4: 期日とカレンダー
+## Phase 4: 期日とカレンダー ✅実装完了(2026-07-29・要マイグレーション実行)
 
 ### 目的
 カレンダーが最初から埋まっている状態にする。今は期日未設定なので空。
@@ -219,9 +219,19 @@ alter table public.team_works_project_tasks
 - 納期を入れると全工程に期日が入り、カレンダーに反映される
 - `npm run lint` 通過
 
+### 実装メモ(2026-07-29)
+- migration `supabase/migrations/20260729160000_team_works_delivery_schedule.sql`
+  **要SQL Editorでの実行**。`team_works_projects.delivery_due_on` と
+  `team_works_project_tasks.standard_days` を追加(既存列はそのまま・追加のみ)。
+- 逆算アルゴリズム: 並び順(position)の最後の工程がproject.dueOnに完了し、
+  そこから標準日数ぶん遡って前工程の期日を決める。確認(本部/クライアント)が
+  必要な工程は、提出期日を完了期日の1日前に置く(確認の余裕)。後から個別調整可。
+- カレンダーの色は役割トークン固定: 完了=GREEN、期限超過=ORANGE、
+  提出期日=PINK(締切)、完了期日=BLUE(基準日)。
+
 ---
 
-## Phase 5: ポータルを「今あなたの番」画面にする
+## Phase 5: ポータルを「今あなたの番」画面にする ✅実装完了(2026-07-29)
 
 ### 目的
 ポータルを開いた瞬間に何をすればいいか分かる状態にする。**これがポータルの存在理由。**
@@ -254,6 +264,17 @@ alter table public.team_works_project_tasks
 ### 完了条件
 - 各ポータルの最上部に「自分が対応すべきこと」が出る
 - 本部で「誰待ちか」が一覧できる
+
+### 実装メモ(2026-07-29)
+- `lib/team-works-delivery-summary.ts` に純粋関数として実装(`buildMyDeliveryActionItems` /
+  `buildStaffPendingSummary`)。DB書き込みは一切なく、既存のforms/submissions/deliverablesを
+  読んで導出するだけ。
+- ポータル最上部の項目、本部ダッシュボードの一覧項目はどちらも該当工程への
+  ページ内アンカーリンク(`#task-{id}`)になっている。クリックするとその工程まで
+  スクロールする(自動展開はしていない。手動でクリックして開く)。
+- **スコープはプロジェクト単位。** 「本部ダッシュボード」は現状1プロジェクトの詳細画面の
+  最上部に出しており、複数プロジェクトを横断した一覧ではない(将来、全案件横断の
+  ダッシュボードページを作る場合はこのsummary関数をそのまま使い回せる)。
 
 ---
 

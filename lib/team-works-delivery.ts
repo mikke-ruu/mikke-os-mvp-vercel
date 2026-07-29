@@ -34,6 +34,7 @@ export type DeliveryProjectSummary = {
   title: string;
   status: string;
   clientVisible: boolean;
+  dueOn: string | null;
 };
 
 export type DeliveryTaskOwnerRole = "admin" | "worker" | "client";
@@ -69,6 +70,8 @@ export type DeliveryTask = {
   // 成果物ストレージのパス(P8-g/P8-h)がsource_local_idをキーにしているため、
   // 作成時に発行して持たせておく。表示上の意味は持たない内部識別子。
   sourceLocalId: string | null;
+  // 納期からの逆算配置に使う、この工程に要する標準日数。
+  standardDays: number | null;
 };
 
 export type DeliveryProjectMember = {
@@ -99,12 +102,13 @@ function toTask(row: Record<string, unknown>): DeliveryTask {
     submissionType: (row.submission_type as DeliveryTaskSubmissionType) ?? "none",
     needsInternalReview: Boolean(row.needs_internal_review),
     needsClientReview: Boolean(row.needs_client_review),
-    sourceLocalId: (row.source_local_id as string) ?? null
+    sourceLocalId: (row.source_local_id as string) ?? null,
+    standardDays: (row.standard_days as number) ?? null
   };
 }
 
 const taskColumns =
-  "id,project_id,title,status,assignee_member_id,assignee_label,client_visible,due_on,submit_due_on,position,owner_role,submission_type,needs_internal_review,needs_client_review,source_local_id";
+  "id,project_id,title,status,assignee_member_id,assignee_label,client_visible,due_on,submit_due_on,position,owner_role,submission_type,needs_internal_review,needs_client_review,source_local_id,standard_days";
 
 export async function createDeliveryProject(
   client: SupabaseClient,
@@ -147,7 +151,7 @@ export async function fetchDeliveryProjects(client: SupabaseClient): Promise<Del
   if (organizationIds.length === 0) return [];
   const { data, error } = await client
     .from("team_works_projects")
-    .select("id,organization_id,title,status,client_visible")
+    .select("id,organization_id,title,status,client_visible,delivery_due_on")
     .in("organization_id", organizationIds)
     .eq("style", "delivery")
     .is("archived_at", null)
@@ -158,7 +162,8 @@ export async function fetchDeliveryProjects(client: SupabaseClient): Promise<Del
     organizationId: row.organization_id as string,
     title: row.title as string,
     status: row.status as string,
-    clientVisible: Boolean(row.client_visible)
+    clientVisible: Boolean(row.client_visible),
+    dueOn: (row.delivery_due_on as string) ?? null
   }));
 }
 
@@ -167,7 +172,7 @@ export async function fetchDeliveryProjects(client: SupabaseClient): Promise<Del
 export async function fetchMyDeliveryProjects(client: SupabaseClient): Promise<DeliveryProjectSummary[]> {
   const { data, error } = await client
     .from("team_works_projects")
-    .select("id,organization_id,title,status,client_visible")
+    .select("id,organization_id,title,status,client_visible,delivery_due_on")
     .eq("style", "delivery")
     .is("archived_at", null)
     .order("created_at", { ascending: false });
@@ -177,7 +182,8 @@ export async function fetchMyDeliveryProjects(client: SupabaseClient): Promise<D
     organizationId: row.organization_id as string,
     title: row.title as string,
     status: row.status as string,
-    clientVisible: Boolean(row.client_visible)
+    clientVisible: Boolean(row.client_visible),
+    dueOn: (row.delivery_due_on as string) ?? null
   }));
 }
 
@@ -185,7 +191,7 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
   if (!isDatabaseProjectId(projectId)) return null;
   const { data: projectRow, error: projectError } = await client
     .from("team_works_projects")
-    .select("id,organization_id,title,status,client_visible,style")
+    .select("id,organization_id,title,status,client_visible,style,delivery_due_on")
     .eq("id", projectId)
     .maybeSingle();
   if (projectError) throw projectError;
@@ -213,7 +219,8 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
       organizationId: projectRow.organization_id as string,
       title: projectRow.title as string,
       status: projectRow.status as string,
-      clientVisible: Boolean(projectRow.client_visible)
+      clientVisible: Boolean(projectRow.client_visible),
+      dueOn: (projectRow.delivery_due_on as string) ?? null
     },
     tasks: (taskResult.data ?? []).map(toTask),
     members: (memberResult.data ?? []).map((row) => ({
@@ -240,6 +247,7 @@ export async function createDeliveryTask(
     submissionType?: DeliveryTaskSubmissionType;
     needsInternalReview?: boolean;
     needsClientReview?: boolean;
+    standardDays?: number | null;
   }
 ): Promise<void> {
   const { error } = await client.from("team_works_project_tasks").insert({
@@ -255,9 +263,49 @@ export async function createDeliveryTask(
     owner_role: input.ownerRole ?? null,
     submission_type: input.submissionType ?? "none",
     needs_internal_review: input.needsInternalReview ?? false,
-    needs_client_review: input.needsClientReview ?? false
+    needs_client_review: input.needsClientReview ?? false,
+    standard_days: input.standardDays ?? null
   });
   if (error) throw error;
+}
+
+export async function updateDeliveryProjectDueOn(client: SupabaseClient, projectId: string, dueOn: string | null): Promise<void> {
+  const { error } = await client
+    .from("team_works_projects")
+    .update({ delivery_due_on: dueOn, updated_at: new Date().toISOString() })
+    .eq("id", projectId);
+  if (error) throw error;
+}
+
+function addDays(dateOn: string, days: number): string {
+  const date = new Date(`${dateOn}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+// 納期(project.dueOn)から逆算して、並び順(position)の最後の工程がその日に
+// 完了するように各工程のdue_on/submit_due_onを埋める。標準日数が未設定の工程は
+// 3日として扱う。確認が必要な工程は、確認の余裕として提出期日を完了期日の
+// 1日前に置く(確認不要なら提出=完了と同日)。後から個別に調整できる。
+export async function autoScheduleDeliveryTasks(client: SupabaseClient, input: { tasks: DeliveryTask[]; dueOn: string }): Promise<void> {
+  const ordered = [...input.tasks].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
+  const dueOnByTaskId = new Map<string, string>();
+  let cursor = input.dueOn;
+  for (let index = ordered.length - 1; index >= 0; index -= 1) {
+    const task = ordered[index];
+    dueOnByTaskId.set(task.id, cursor);
+    cursor = addDays(cursor, -(task.standardDays ?? 3));
+  }
+  await Promise.all(
+    ordered.map((task) => {
+      const dueOn = dueOnByTaskId.get(task.id) as string;
+      const submitDueOn = task.needsInternalReview || task.needsClientReview ? addDays(dueOn, -1) : dueOn;
+      return client
+        .from("team_works_project_tasks")
+        .update({ due_on: dueOn, submit_due_on: submitDueOn, updated_at: new Date().toISOString() })
+        .eq("id", task.id);
+    })
+  );
 }
 
 // 本部/worker/clientいずれでも使う共通ヘルパー。「今ログインしている人は
@@ -319,6 +367,7 @@ export async function updateDeliveryTask(
     submissionType: DeliveryTaskSubmissionType;
     needsInternalReview: boolean;
     needsClientReview: boolean;
+    standardDays: number | null;
   }>
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
@@ -333,6 +382,7 @@ export async function updateDeliveryTask(
   if (patch.submissionType !== undefined) payload.submission_type = patch.submissionType;
   if (patch.needsInternalReview !== undefined) payload.needs_internal_review = patch.needsInternalReview;
   if (patch.needsClientReview !== undefined) payload.needs_client_review = patch.needsClientReview;
+  if (patch.standardDays !== undefined) payload.standard_days = patch.standardDays;
   payload.updated_at = new Date().toISOString();
   const { error } = await client.from("team_works_project_tasks").update(payload).eq("id", taskId);
   if (error) throw error;

@@ -64,6 +64,18 @@ export async function fetchTaskDeliverables(client: SupabaseClient, taskId: stri
   return (data ?? []).map(toDeliverable);
 }
 
+// プロジェクト内の全成果物をまとめて取る(「今あなたの番」サマリー用)。
+// RLSはfetchTaskDeliverablesと同じ条件で自動的に絞られる。
+export async function fetchProjectDeliverables(client: SupabaseClient, projectId: string): Promise<DeliveryDeliverable[]> {
+  const { data, error } = await client
+    .from("team_works_project_deliverables")
+    .select(deliverableColumns)
+    .eq("project_id", projectId)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(toDeliverable);
+}
+
 // workerの自分の提出。1タスクに複数版があり得るため直近1件を返す。
 export async function fetchMyDeliverable(client: SupabaseClient, taskId: string, memberId: string): Promise<DeliveryDeliverable | null> {
   const { data, error } = await client
