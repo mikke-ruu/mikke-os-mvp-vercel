@@ -143,7 +143,7 @@ alter table public.team_works_project_tasks
 
 ---
 
-## Phase 3: 提出 → 確認 → 承認フロー ★最優先
+## Phase 3: 提出 → 確認 → 承認フロー ★最優先 ✅実装完了(2026-07-29・要実機確認)
 
 ### 目的
 **ここまでで実際に案件が回る。** クライアントが提出し、本部が承認できる。
@@ -174,6 +174,29 @@ alter table public.team_works_project_tasks
 - クライアントがフォームを提出 → 本部が差し戻し → クライアントが直して再提出 → 本部が承認、が通しで動く
 - 本部が成果物をクライアント確認へ回し、クライアントが承認できる
 - `npm run lint` 通過
+
+### 実装メモ(2026-07-29)
+- `lib/team-works-delivery-forms.ts` に提出まわり(`fetchMyFormSubmission` / `saveMyFormSubmission` /
+  `uploadMyFormAttachment` / `fetchFormSubmissions` / `reviewFormSubmission`)を追加。
+  記入UIは既存の `TeamWorksProjectFormResponse.tsx`(localStorage版)をそのまま再利用。
+- `lib/team-works-delivery-deliverables.ts` を新規作成(成果物のCRUD)。差し戻し理由は
+  `team_works_project_deliverables` に列が無いため `team_works_project_comments`
+  (`deliverable_id` 付き)に記録している。
+- **P8-h(フォーム添付)/P8-g(成果物ファイル)のstorage RLSは、対象行の`source_local_id`が
+  オブジェクトパスと一致することを前提にしている。** 納品型はSupabase直書きで
+  localStorage版のsource_local_id同期を経由しないため、`team_works_project_tasks` /
+  `team_works_project_forms` の作成時に`source_local_id`を発行するよう変更した
+  (`createDeliveryTask` / `createTaskForm`)。**Phase 1/2で作成済みの既存タスク・
+  フォームには`source_local_id`が入っていないため、ファイル/画像添付を使うタスクは
+  作り直すか、`source_local_id`を後追いでUPDATEする必要がある。**
+- 本部staffは成果物テーブルへのINSERT/UPDATEはRLSを全てバイパスできるが、
+  `team-works-deliverables`バケットへの書き込みは**割り当てられたworkerしか
+  できない**(RLSがworker以外を想定していない)。そのため本部の直接登録は
+  URL/メモ形式のみに限定した。ownerRole=本部でsubmissionType=ファイルの工程では
+  ファイル提出ができないため、運用上はURL提出にするか担当をworkerに設定すること。
+- ブラウザでの実機確認は未実施(ログインが必要でパスワード代行はできないため)。
+  `npm run lint`(tsc --noEmit)は通過。次回セッションで実際にログインしての
+  通し確認(提出→差し戻し→再提出→承認、成果物のclient_review→承認)を推奨。
 
 ---
 

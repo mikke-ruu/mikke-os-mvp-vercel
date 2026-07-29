@@ -66,6 +66,9 @@ export type DeliveryTask = {
   submissionType: DeliveryTaskSubmissionType;
   needsInternalReview: boolean;
   needsClientReview: boolean;
+  // 成果物ストレージのパス(P8-g/P8-h)がsource_local_idをキーにしているため、
+  // 作成時に発行して持たせておく。表示上の意味は持たない内部識別子。
+  sourceLocalId: string | null;
 };
 
 export type DeliveryProjectMember = {
@@ -95,12 +98,13 @@ function toTask(row: Record<string, unknown>): DeliveryTask {
     ownerRole: (row.owner_role as DeliveryTaskOwnerRole) ?? null,
     submissionType: (row.submission_type as DeliveryTaskSubmissionType) ?? "none",
     needsInternalReview: Boolean(row.needs_internal_review),
-    needsClientReview: Boolean(row.needs_client_review)
+    needsClientReview: Boolean(row.needs_client_review),
+    sourceLocalId: (row.source_local_id as string) ?? null
   };
 }
 
 const taskColumns =
-  "id,project_id,title,status,assignee_member_id,assignee_label,client_visible,due_on,submit_due_on,position,owner_role,submission_type,needs_internal_review,needs_client_review";
+  "id,project_id,title,status,assignee_member_id,assignee_label,client_visible,due_on,submit_due_on,position,owner_role,submission_type,needs_internal_review,needs_client_review,source_local_id";
 
 export async function createDeliveryProject(
   client: SupabaseClient,
@@ -240,6 +244,7 @@ export async function createDeliveryTask(
 ): Promise<void> {
   const { error } = await client.from("team_works_project_tasks").insert({
     project_id: input.projectId,
+    source_local_id: crypto.randomUUID(),
     title: input.title,
     assignee_member_id: input.assigneeMemberId,
     assignee_label: input.assigneeLabel ?? null,
@@ -253,6 +258,42 @@ export async function createDeliveryTask(
     needs_client_review: input.needsClientReview ?? false
   });
   if (error) throw error;
+}
+
+// 本部/worker/clientいずれでも使う共通ヘルパー。「今ログインしている人は
+// このプロジェクトで誰か(organization_member_id・project_role)」を返す。
+// team_works_project_membersのRLSはプロジェクトメンバー全員に全行を見せる
+// (自分の行だけに絞られていない)ため、自分のorganization_members.idの
+// 集合と突き合わせて自分の行を特定する。
+export async function resolveMyDeliveryProjectMembership(
+  client: SupabaseClient,
+  projectId: string
+): Promise<DeliveryProjectMember | null> {
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError) throw userError;
+  if (!userData.user) return null;
+
+  const { data: myMembers, error: memberError } = await client
+    .from("team_works_organization_members")
+    .select("id")
+    .eq("user_id", userData.user.id)
+    .eq("status", "active");
+  if (memberError) throw memberError;
+  const myMemberIds = new Set((myMembers ?? []).map((row) => row.id as string));
+  if (myMemberIds.size === 0) return null;
+
+  const { data: projectMembers, error: projectMemberError } = await client
+    .from("team_works_project_members")
+    .select("organization_member_id,project_role,team_works_organization_members(display_name)")
+    .eq("project_id", projectId);
+  if (projectMemberError) throw projectMemberError;
+  const mine = (projectMembers ?? []).find((row) => myMemberIds.has(row.organization_member_id as string));
+  if (!mine) return null;
+  return {
+    organizationMemberId: mine.organization_member_id as string,
+    projectRole: mine.project_role as DeliveryProjectMember["projectRole"],
+    displayName: (mine.team_works_organization_members as { display_name?: string } | null)?.display_name ?? "メンバー"
+  };
 }
 
 export async function reorderDeliveryTasks(client: SupabaseClient, taskIdsInOrder: string[]): Promise<void> {

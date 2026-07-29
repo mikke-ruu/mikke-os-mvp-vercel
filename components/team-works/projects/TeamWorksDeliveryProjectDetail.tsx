@@ -12,8 +12,10 @@ import {
   deliveryTaskStatusLabels,
   deliveryTaskSubmissionTypeLabels,
   loadDeliveryProjectDetail,
+  resolveMyDeliveryProjectMembership,
   updateDeliveryTask,
   type DeliveryProjectDetail,
+  type DeliveryProjectMember,
   type DeliveryTask,
   type DeliveryTaskOwnerRole,
   type DeliveryTaskStatus,
@@ -28,7 +30,9 @@ import {
   type DeliveryProjectForm
 } from "@/lib/team-works-delivery-forms";
 import { TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
+import { TeamWorksDeliveryDeliverableAdminPanel } from "./TeamWorksDeliveryDeliverableAdminPanel";
 import { TeamWorksProjectFormBuilder, type DeliveryFormPatch } from "./TeamWorksProjectFormBuilder";
+import { TeamWorksProjectFormSubmissionsReview } from "./TeamWorksProjectFormSubmissionsReview";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
 
 const taskStatuses = Object.keys(deliveryTaskStatusLabels) as DeliveryTaskStatus[];
@@ -41,13 +45,19 @@ const submissionTypes = Object.keys(deliveryTaskSubmissionTypeLabels) as Deliver
 // 受け渡しを持たせている(Phase 1)。
 export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: string }) {
   const [detail, setDetail] = useState<DeliveryProjectDetail | null | undefined>(undefined);
+  const [myMembership, setMyMembership] = useState<DeliveryProjectMember | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setDetail(await loadDeliveryProjectDetail(supabase, projectId));
+      const [nextDetail, nextMembership] = await Promise.all([
+        loadDeliveryProjectDetail(supabase, projectId),
+        resolveMyDeliveryProjectMembership(supabase, projectId)
+      ]);
+      setDetail(nextDetail);
+      setMyMembership(nextMembership);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "プロジェクトを読み込めませんでした。");
     }
@@ -93,7 +103,7 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
         ) : null}
       </MikkeSection>
 
-      <TaskListSection detail={detail} onReload={load} />
+      <TaskListSection detail={detail} myMemberId={myMembership?.organizationMemberId ?? null} onReload={load} />
 
       <MikkeSection title="Members" tone="editorial">
         {members.length === 0 ? (
@@ -143,7 +153,7 @@ const emptyNewTaskForm: NewTaskForm = {
   needsClientReview: false
 };
 
-function TaskListSection({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
+function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryProjectDetail; myMemberId: string | null; onReload: () => Promise<void> }) {
   const [form, setForm] = useState<NewTaskForm>(emptyNewTaskForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -235,6 +245,7 @@ function TaskListSection({ detail, onReload }: { detail: DeliveryProjectDetail; 
                 key={task.id}
                 task={task}
                 members={detail.members}
+                myMemberId={myMemberId}
                 expanded={expandedTaskId === task.id}
                 onToggle={() => setExpandedTaskId((current) => (current === task.id ? null : task.id))}
                 onReload={onReload}
@@ -250,12 +261,14 @@ function TaskListSection({ detail, onReload }: { detail: DeliveryProjectDetail; 
 function TaskRow({
   task,
   members,
+  myMemberId,
   expanded,
   onToggle,
   onReload
 }: {
   task: DeliveryTask;
   members: DeliveryProjectDetail["members"];
+  myMemberId: string | null;
   expanded: boolean;
   onToggle: () => void;
   onReload: () => Promise<void>;
@@ -345,7 +358,12 @@ function TaskRow({
           </div>
           {task.submissionType === "form" ? (
             <div className="md:col-span-2">
-              <TaskFormsPanel task={task} />
+              <TaskFormsPanel task={task} members={members} myMemberId={myMemberId} />
+            </div>
+          ) : null}
+          {task.submissionType === "file" || task.submissionType === "url" ? (
+            <div className="md:col-span-2">
+              <TeamWorksDeliveryDeliverableAdminPanel task={task} myMemberId={myMemberId} />
             </div>
           ) : null}
         </div>
@@ -354,7 +372,7 @@ function TaskRow({
   );
 }
 
-function TaskFormsPanel({ task }: { task: DeliveryTask }) {
+function TaskFormsPanel({ task, members, myMemberId }: { task: DeliveryTask; members: DeliveryProjectDetail["members"]; myMemberId: string | null }) {
   const [forms, setForms] = useState<DeliveryProjectForm[] | undefined>(undefined);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -407,12 +425,14 @@ function TaskFormsPanel({ task }: { task: DeliveryTask }) {
       ) : (
         <div className="mt-2 space-y-2">
           {forms.map((form) => (
-            <TeamWorksProjectFormBuilder
-              key={form.id}
-              form={form}
-              onUpdate={(patch) => applyPatch(form.id, patch)}
-              onArchive={() => remove(form.id)}
-            />
+            <div key={form.id}>
+              <TeamWorksProjectFormBuilder
+                form={form}
+                onUpdate={(patch) => applyPatch(form.id, patch)}
+                onArchive={() => remove(form.id)}
+              />
+              <TeamWorksProjectFormSubmissionsReview form={form} members={members} myMemberId={myMemberId} />
+            </div>
           ))}
         </div>
       )}

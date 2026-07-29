@@ -5,20 +5,38 @@ import { CalendarDays, ListChecks } from "lucide-react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { supabase } from "@/lib/supabase/client";
-import { deliveryTaskStatusLabels, loadDeliveryProjectDetail, type DeliveryProjectDetail } from "@/lib/team-works-delivery";
+import {
+  deliveryTaskStatusLabels,
+  loadDeliveryProjectDetail,
+  resolveMyDeliveryProjectMembership,
+  type DeliveryProjectDetail,
+  type DeliveryProjectMember,
+  type DeliveryTask
+} from "@/lib/team-works-delivery";
+import { fetchTaskForms, type DeliveryProjectForm } from "@/lib/team-works-delivery-forms";
 import { TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
+import { TeamWorksDeliveryClientDeliverablePanel } from "./TeamWorksDeliveryClientDeliverablePanel";
+import { TeamWorksDeliveryFormSubmissionPanel } from "./TeamWorksDeliveryFormSubmissionPanel";
+import { TeamWorksDeliveryWorkerDeliverablePanel } from "./TeamWorksDeliveryWorkerDeliverablePanel";
 
 // ワーカー・クライアント共通の閲覧用ビュー。タスクの作成・状態変更は本部のみの
-// 権限(RLS)のため、ここでは期日・状態の確認に絞っている。
+// 権限(RLS)のため、ここでは期日・状態の確認と、自分が対応すべき提出物
+// (フォーム記入・成果物提出・成果物承認)に絞っている。
 export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId: string }) {
   const [detail, setDetail] = useState<DeliveryProjectDetail | null | undefined>(undefined);
+  const [myMembership, setMyMembership] = useState<DeliveryProjectMember | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setDetail(await loadDeliveryProjectDetail(supabase, projectId));
+      const [nextDetail, nextMembership] = await Promise.all([
+        loadDeliveryProjectDetail(supabase, projectId),
+        resolveMyDeliveryProjectMembership(supabase, projectId)
+      ]);
+      setDetail(nextDetail);
+      setMyMembership(nextMembership);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "プロジェクトを読み込めませんでした。");
     }
@@ -68,24 +86,66 @@ export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId:
         {tasks.length === 0 ? (
           <MikkeEmptyState title="タスクはまだありません" />
         ) : (
-          <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+          <div className="space-y-3">
             {tasks.map((task) => (
-              <div key={task.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <ListChecks size={16} className="shrink-0 text-[var(--mikke-muted)]" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold">{task.title}</p>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--mikke-muted)]">
-                    {task.dueOn ? <span className="inline-flex items-center gap-1"><CalendarDays size={12} />{task.dueOn}</span> : "期日未設定"}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full border border-[var(--mikke-line)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-muted)]">
-                  {deliveryTaskStatusLabels[task.status]}
-                </span>
-              </div>
+              <PortalTaskCard key={task.id} projectId={project.id} task={task} myMembership={myMembership} />
             ))}
           </div>
         )}
       </MikkeSection>
+    </div>
+  );
+}
+
+function PortalTaskCard({ projectId, task, myMembership }: { projectId: string; task: DeliveryTask; myMembership: DeliveryProjectMember | null }) {
+  const [forms, setForms] = useState<DeliveryProjectForm[] | undefined>(undefined);
+
+  useEffect(() => {
+    if (task.submissionType !== "form") return;
+    let cancelled = false;
+    fetchTaskForms(supabase, task.id)
+      .then((rows) => { if (!cancelled) setForms(rows); })
+      .catch(() => { if (!cancelled) setForms([]); });
+    return () => { cancelled = true; };
+  }, [task.id, task.submissionType]);
+
+  const isAssignedWorker = myMembership?.projectRole === "worker" && task.assigneeMemberId === myMembership.organizationMemberId;
+  const isClient = myMembership?.projectRole === "client";
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+      <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+        <ListChecks size={16} className="shrink-0 text-[var(--mikke-muted)]" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-bold">{task.title}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--mikke-muted)]">
+            {task.dueOn ? <span className="inline-flex items-center gap-1"><CalendarDays size={12} />{task.dueOn}</span> : "期日未設定"}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-[var(--mikke-line)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-muted)]">
+          {deliveryTaskStatusLabels[task.status]}
+        </span>
+      </div>
+
+      {task.submissionType === "form" && myMembership && forms && forms.length > 0 ? (
+        <div className="space-y-3 border-t border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+          {forms.map((form) => (
+            <TeamWorksDeliveryFormSubmissionPanel key={form.id} projectId={projectId} form={form} memberId={myMembership.organizationMemberId} />
+          ))}
+        </div>
+      ) : null}
+
+      {(task.submissionType === "file" || task.submissionType === "url") && isAssignedWorker && myMembership ? (
+        <div className="border-t border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+          <TeamWorksDeliveryWorkerDeliverablePanel projectId={projectId} task={task} memberId={myMembership.organizationMemberId} />
+        </div>
+      ) : null}
+
+      {(task.submissionType === "file" || task.submissionType === "url") && isClient && myMembership ? (
+        <div className="border-t border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+          <TeamWorksDeliveryClientDeliverablePanel projectId={projectId} task={task} memberId={myMembership.organizationMemberId} />
+        </div>
+      ) : null}
     </div>
   );
 }
