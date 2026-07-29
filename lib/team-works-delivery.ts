@@ -328,16 +328,6 @@ export async function updateDeliveryProjectSettings(
   if (error) throw error;
 }
 
-// アーカイブ(=削除)。物理削除はしない。archived_atが立つと一覧(.is("archived_at", null))から
-// 自動的に消える。RLSは既存のteam_works_projects_update(org staffのみ)のまま。
-export async function archiveDeliveryProject(client: SupabaseClient, projectId: string): Promise<void> {
-  const { error } = await client
-    .from("team_works_projects")
-    .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq("id", projectId);
-  if (error) throw error;
-}
-
 function addDays(dateOn: string, days: number): string {
   const date = new Date(`${dateOn}T00:00:00`);
   date.setDate(date.getDate() + days);

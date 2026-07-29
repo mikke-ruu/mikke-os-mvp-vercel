@@ -35,6 +35,7 @@ import {
   TeamWorksProjectField,
   teamWorksProjectInputClass
 } from "@/components/team-works/projects/TeamWorksProjectsShell";
+import { TeamWorksProjectArchivePanel } from "@/components/team-works/projects/TeamWorksProjectArchivePanel";
 import { supabase } from "@/lib/supabase/client";
 import { supabaseErrorMessage } from "@/lib/supabase-schema-compat";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
@@ -1541,9 +1542,6 @@ function ContractTab({
             <input type="date" value={endedOn} min={startedOn || undefined} onChange={(event) => setEndedOn(event.target.value)} className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
         </div>
-        <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-3 text-xs leading-5 text-[var(--mikke-muted)]">
-          終了後はプロジェクト単位でアーカイブします。誤操作防止のため、アーカイブ実行ボタンは本番の確認フローと合わせて追加します。
-        </p>
         <SaveButton saving={saving} label="契約期間を保存" />
       </form>
     </div>
@@ -1568,6 +1566,7 @@ function ProjectSettingsTab({
       <ContractTab data={data} saving={saving} mutate={mutate} />
       <ProjectClientInfoPanel data={data} />
       <ClientInvitePanel data={data} />
+      <TeamWorksProjectArchivePanel projectId={data.project.id} projectTitle={data.project.title} />
     </div>
   );
 }

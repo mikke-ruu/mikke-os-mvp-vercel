@@ -1,13 +1,20 @@
 "use client";
 
-import { ArrowRight, FileCheck2, FolderKanban, Plus, Users } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, FileCheck2, FolderKanban, Plus, RotateCcw, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { supabase } from "@/lib/supabase/client";
 import { createOperationsProject } from "@/lib/team-works-operations-project";
-import { fetchOperationsProjects, formatDateKey, type OperationsProjectSummary } from "@/lib/team-works-operations";
+import {
+  fetchArchivedTeamWorksProjects,
+  fetchOperationsProjects,
+  formatDateKey,
+  restoreTeamWorksProject,
+  type ArchivedTeamWorksProjectSummary,
+  type OperationsProjectSummary
+} from "@/lib/team-works-operations";
 import { fetchDeliveryProjects, fetchStepTemplates, type DeliveryProjectSummary, type DeliveryStepTemplate } from "@/lib/team-works-delivery";
 
 export function TeamWorksOperationsProjectList() {
@@ -15,6 +22,7 @@ export function TeamWorksOperationsProjectList() {
   const [projects, setProjects] = useState<OperationsProjectSummary[] | null>(null);
   const [deliveryProjects, setDeliveryProjects] = useState<DeliveryProjectSummary[] | null>(null);
   const [templates, setTemplates] = useState<DeliveryStepTemplate[] | null>(null);
+  const [archivedProjects, setArchivedProjects] = useState<ArchivedTeamWorksProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [organizationName, setOrganizationName] = useState("");
@@ -25,14 +33,16 @@ export function TeamWorksOperationsProjectList() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [result, deliveryResult, templateResult] = await Promise.all([
+      const [result, deliveryResult, templateResult, archivedResult] = await Promise.all([
         fetchOperationsProjects(supabase),
         fetchDeliveryProjects(supabase),
-        fetchStepTemplates(supabase)
+        fetchStepTemplates(supabase),
+        fetchArchivedTeamWorksProjects(supabase)
       ]);
       setProjects(result.projects);
       setDeliveryProjects(deliveryResult);
       setTemplates(templateResult);
+      setArchivedProjects(archivedResult);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "運営型プロジェクトの読み込みに失敗しました。");
     }
@@ -238,6 +248,71 @@ export function TeamWorksOperationsProjectList() {
         </div>
       )}
     </section>
+
+    <ArchivedProjectsSection archivedProjects={archivedProjects} onReload={load} />
     </div>
+  );
+}
+
+function ArchivedProjectsSection({
+  archivedProjects,
+  onReload
+}: {
+  archivedProjects: ArchivedTeamWorksProjectSummary[] | null;
+  onReload: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  async function restore(projectId: string) {
+    setRestoringId(projectId);
+    setError("");
+    try {
+      await restoreTeamWorksProject(supabase, projectId);
+      await onReload();
+    } catch (restoreError) {
+      setError(restoreError instanceof Error ? restoreError.message : "元に戻せませんでした。");
+    } finally {
+      setRestoringId(null);
+    }
+  }
+
+  const count = archivedProjects?.length ?? 0;
+
+  return (
+    <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 sm:p-5">
+      <button type="button" onClick={() => setOpen((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
+        <span className="text-sm font-extrabold text-[var(--mikke-muted)]">アーカイブ済み（{count}件）</span>
+        {open ? <ChevronUp size={16} className="text-[var(--mikke-muted)]" /> : <ChevronDown size={16} className="text-[var(--mikke-muted)]" />}
+      </button>
+      {open ? (
+        <div className="mt-3">
+          {error ? <p role="alert" className="mb-3 rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+          {count === 0 ? (
+            <p className="text-xs font-semibold text-[var(--mikke-muted)]">アーカイブ済みのプロジェクトはありません。</p>
+          ) : (
+            <div className="space-y-2">
+              {archivedProjects?.map((project) => (
+                <div key={project.id} className="flex items-center gap-3 rounded-xl border border-[var(--mikke-line)] p-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold">{project.title}</span>
+                    <span className="text-xs font-semibold text-[var(--mikke-muted)]">{project.style === "operations" ? "運営型" : "納品型"}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void restore(project.id)}
+                    disabled={restoringId === project.id}
+                    className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-muted)] disabled:opacity-40"
+                  >
+                    <RotateCcw size={13} /> 元に戻す
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </section>
   );
 }

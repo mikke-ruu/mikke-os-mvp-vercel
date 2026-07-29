@@ -173,6 +173,53 @@ export async function resolveStaffOrganizationIds(client: SupabaseClient): Promi
   return [...ids];
 }
 
+// プロジェクトのアーカイブ(=削除)。style(operations/delivery)を問わず
+// team_works_projects.archived_atを立てるだけの共通処理。物理削除はしない。
+// 一覧取得は.is("archived_at", null)で絞っているため、アーカイブすると
+// 自動的に一覧から消える。RLSはteam_works_projects_update(org staffのみ)のまま
+// で変更していない。
+
+export type ArchivedTeamWorksProjectSummary = {
+  id: string;
+  organizationId: string;
+  title: string;
+  style: "operations" | "delivery";
+};
+
+export async function archiveTeamWorksProject(client: SupabaseClient, projectId: string): Promise<void> {
+  const { error } = await client
+    .from("team_works_projects")
+    .update({ archived_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", projectId);
+  if (error) throw error;
+}
+
+export async function restoreTeamWorksProject(client: SupabaseClient, projectId: string): Promise<void> {
+  const { error } = await client
+    .from("team_works_projects")
+    .update({ archived_at: null, updated_at: new Date().toISOString() })
+    .eq("id", projectId);
+  if (error) throw error;
+}
+
+export async function fetchArchivedTeamWorksProjects(client: SupabaseClient): Promise<ArchivedTeamWorksProjectSummary[]> {
+  const organizationIds = await resolveStaffOrganizationIds(client);
+  if (organizationIds.length === 0) return [];
+  const { data, error } = await client
+    .from("team_works_projects")
+    .select("id,organization_id,title,style")
+    .in("organization_id", organizationIds)
+    .not("archived_at", "is", null)
+    .order("title", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    organizationId: row.organization_id as string,
+    title: row.title as string,
+    style: row.style as "operations" | "delivery"
+  }));
+}
+
 async function fetchOperationsProjectRows(client: SupabaseClient, organizationIds: string[]) {
   if (organizationIds.length === 0) return [];
   const { data, error } = await client

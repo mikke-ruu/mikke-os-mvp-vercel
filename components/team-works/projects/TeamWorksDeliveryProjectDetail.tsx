@@ -53,6 +53,7 @@ import {
 import { buildDeliveryCalendarItems, TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
 import { TeamWorksDeliveryDeliverableAdminPanel } from "./TeamWorksDeliveryDeliverableAdminPanel";
 import { TeamWorksDeliveryStaffPendingSummary } from "./TeamWorksDeliveryStaffPendingSummary";
+import { TeamWorksProjectArchivePanel } from "./TeamWorksProjectArchivePanel";
 import { TeamWorksProjectFormBuilder, type DeliveryFormPatch } from "./TeamWorksProjectFormBuilder";
 import { TeamWorksProjectFormSubmissionsReview } from "./TeamWorksProjectFormSubmissionsReview";
 import { TeamWorksProjectField, teamWorksProjectInputClass } from "./TeamWorksProjectsShell";
@@ -362,6 +363,8 @@ function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onRe
           <Save size={15} /> 保存
         </button>
       </form>
+
+      <TeamWorksProjectArchivePanel projectId={detail.project.id} projectTitle={detail.project.title} />
     </div>
   );
 }
