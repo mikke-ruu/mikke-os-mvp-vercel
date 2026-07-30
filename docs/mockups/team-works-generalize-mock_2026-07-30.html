@@ -1,0 +1,1503 @@
+<title>Team Works 統合ビュー＋汎用化 モックアップ（Phase J/K/L）</title>
+<style>
+  /* 既存Team Works本番画面(ライトテーマ固定)の再現なので、意図的に単一テーマ。
+     色は正典 docs/MIKKEOS_EDITORIAL_UI_DESIGN_RULES.md の固定5色＋役割トークンのみ。 */
+  :root {
+    color-scheme: light;
+
+    --mikke-bg: #f5f6fa;
+    --mikke-surface: #ffffff;
+    --mikke-surface-soft: #f7f8fc;
+    --mikke-line: #e6e8f0;
+    --mikke-line-soft: #eef0f6;
+    --mikke-ink: #2a2f45;
+    --mikke-muted: #7b8196;
+    --mikke-muted-light: #a7adc0;
+    --mikke-primary: #3f4eb5;
+
+    --tw-title: #3f4eb5;
+    --tw-action: #e8663f;
+    --tw-done: #8bc7ad;
+    --tw-planned: #ffd370;
+    --tw-deadline: #f4a0a0;
+    --tw-on-tint: #2a2f45;
+    --tw-on-solid: #ffffff;
+
+    --mikke-green: #6cba97;
+    --mikke-blue: #4a63c8;
+    --mikke-orange: #e8663f;
+    --mikke-pink-soft: #f9d3d2;
+    --mikke-holiday: #fbdde4;
+    --mikke-holiday-ink: #d1567b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--mikke-bg);
+    color: var(--mikke-ink);
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ---------- mockup-only control bar ---------- */
+  .mockbar {
+    position: sticky; top: 0; z-index: 20;
+    background: #2a2f45; color: #fff;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    font-size: 12px;
+  }
+  .mockbar .tag {
+    background: var(--tw-planned); color: var(--tw-on-tint);
+    font-weight: 800; border-radius: 999px; padding: 3px 10px;
+    font-size: 10.5px; letter-spacing: .04em;
+  }
+  .mockbar .switch { display: inline-flex; gap: 4px; background: rgba(255,255,255,.12); border-radius: 999px; padding: 3px; }
+  .mockbar .switch button {
+    appearance: none; border: 0; background: transparent; color: rgba(255,255,255,.72);
+    font: inherit; font-weight: 700; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  }
+  .mockbar .switch button[aria-pressed="true"] { background: #fff; color: #2a2f45; }
+  .mockbar .hint { color: rgba(255,255,255,.62); }
+  .mockbar .grp { display: inline-flex; align-items: center; gap: 8px; }
+  .mockbar .grp.is-hidden { display: none; }
+
+  /* ---------- app frame ---------- */
+  .app { display: grid; grid-template-columns: 216px 1fr; min-height: calc(100vh - 44px); }
+
+  .sidebar {
+    background: var(--mikke-surface); border-right: 1px solid var(--mikke-line);
+    padding: 22px 14px; display: flex; flex-direction: column; gap: 3px;
+  }
+  .brand { font-size: 11.5px; font-weight: 800; letter-spacing: .14em; padding: 2px 10px 18px; }
+  .navlabel { font-size: 10px; font-weight: 700; color: var(--mikke-muted-light); letter-spacing: .06em; padding: 14px 10px 4px; }
+  .navitem {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 11px; border-radius: 10px;
+    color: var(--mikke-muted); font-size: 13px; font-weight: 700; text-decoration: none;
+    border: 0; background: transparent; cursor: pointer; width: 100%; text-align: left; font-family: inherit;
+  }
+  .navitem .ic { width: 15px; text-align: center; font-size: 12px; opacity: .8; }
+  .navitem.active { background: #a8d8bd; color: #2a5c45; }
+
+  .main { padding: 26px 30px 60px; display: flex; flex-direction: column; max-width: 1240px; }
+
+  .pagetitle {
+    text-align: center; font-size: 16.5px; font-weight: 700;
+    color: var(--tw-title); letter-spacing: .22em; margin: 2px 0 18px;
+  }
+
+  .screen { display: none; flex-direction: column; gap: 22px; }
+  .screen.is-active { display: flex; }
+
+  /* ---------- page-level tabs / detail tabs（実装と同じ下線タブ） ---------- */
+  .pagetabs { display: flex; gap: 4px; border-bottom: 1px solid var(--mikke-line); }
+  .pagetabs.is-hidden { display: none; }
+  .pagetab {
+    appearance: none; border: 0; background: transparent;
+    font: inherit; font-weight: 800; font-size: 13.5px; color: var(--mikke-muted);
+    padding: 10px 18px 12px; border-bottom: 2.5px solid transparent; margin-bottom: -1px;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+  }
+  .pagetab:focus-visible { outline: 2px solid var(--tw-title); outline-offset: -3px; border-radius: 6px 6px 0 0; }
+  .pagetab .count {
+    font-size: 10px; font-weight: 800;
+    background: var(--mikke-surface-soft); color: var(--mikke-muted);
+    border-radius: 999px; padding: 1px 7px;
+  }
+  .pagetab[aria-selected="true"] { color: var(--tw-title); border-bottom-color: var(--tw-action); }
+  .pagetab[aria-selected="true"] .count { background: var(--tw-title); color: #fff; }
+
+  /* 詳細画面の細いタブ（実装の border-b-2 px-3 py-2.5 text-xs 相当） */
+  .dtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--mikke-line); overflow-x: auto; }
+  .dtab {
+    appearance: none; border: 0; background: transparent; white-space: nowrap;
+    font: inherit; font-weight: 700; font-size: 12px; color: var(--mikke-muted);
+    padding: 10px 12px; border-bottom: 2px solid transparent; margin-bottom: -1px; cursor: pointer;
+  }
+  .dtab[aria-selected="true"] { color: var(--tw-title); border-bottom-color: var(--tw-action); }
+  .dtab.is-hidden { display: none; }
+
+  .pane { display: none; flex-direction: column; gap: 18px; }
+  .pane.is-active { display: flex; }
+
+  /* ---------- 注釈（モック確認用・実装では出さない） ---------- */
+  .stateline {
+    display: flex; align-items: flex-start; gap: 8px;
+    background: #fff8e6; border: 1px dashed #e5c477; border-radius: 10px;
+    padding: 9px 12px; font-size: 11.5px; font-weight: 700; line-height: 1.7; color: #7a5a15;
+  }
+  .stateline b { font-weight: 800; }
+  .why {
+    display: flex; gap: 9px; align-items: flex-start;
+    background: #eef1fb; border-radius: 12px; padding: 10px 13px;
+    font-size: 11.5px; font-weight: 700; color: #2f3b8c; line-height: 1.7;
+  }
+  .why b { font-weight: 800; }
+
+  /* ---------- generic ---------- */
+  .card { background: var(--mikke-surface); border: 1px solid var(--mikke-line); border-radius: 16px; padding: 16px; }
+  .sectitle { font-size: 12.5px; font-weight: 800; letter-spacing: .13em; color: var(--tw-title); text-transform: uppercase; margin: 0; }
+  .secsub { font-size: 11.5px; font-weight: 600; color: var(--mikke-muted); margin: 3px 0 12px; }
+  .sechead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .seclink { font-size: 11.5px; font-weight: 700; color: var(--tw-title); text-decoration: none; }
+  .empty {
+    background: var(--mikke-surface-soft); border-radius: 12px; padding: 15px;
+    text-align: center; font-size: 12.5px; font-weight: 700; color: var(--mikke-muted);
+  }
+  .empty .sub { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; color: var(--mikke-muted-light); }
+  .row2 { display: grid; grid-template-columns: 1.7fr 1fr; gap: 16px; align-items: start; }
+  .row2 > * { min-width: 0; }
+  .siderail { display: flex; flex-direction: column; gap: 16px; }
+  .divider { border-top: 1px solid var(--mikke-line); margin-top: 16px; padding-top: 16px; }
+  footer { text-align: center; font-size: 11px; font-weight: 700; color: var(--mikke-muted-light); padding-top: 26px; }
+
+  /* TabIntro（実装の見出しカード） */
+  .tabintro { display: flex; gap: 11px; align-items: flex-start; background: var(--mikke-surface-soft); border-radius: 14px; padding: 13px 15px; }
+  .tabintro .ic { width: 30px; height: 30px; border-radius: 9px; background: var(--tw-planned); color: var(--tw-on-tint); display: grid; place-items: center; flex: none; font-size: 14px; }
+  .tabintro h2 { margin: 0; font-size: 13px; font-weight: 800; }
+  .tabintro p { margin: 2px 0 0; font-size: 11px; font-weight: 600; color: var(--mikke-muted); }
+
+  /* 詳細ヘッダ（戻る＋タイトル＋種別バッジ） */
+  .dhead { display: flex; flex-wrap: wrap; align-items: center; gap: 11px; }
+  .dback { width: 34px; height: 34px; border-radius: 11px; border: 1px solid var(--mikke-line); background: #fff; color: var(--mikke-ink); display: grid; place-items: center; cursor: pointer; font-size: 14px; }
+  .dhead h1 { margin: 0; font-size: 19px; font-weight: 800; }
+  .kindbadge { border-radius: 999px; padding: 3px 10px; font-size: 10.5px; font-weight: 800; }
+  .kindbadge.delivery { background: var(--tw-planned); color: var(--tw-on-tint); }
+  .kindbadge.ops { background: var(--mikke-surface-soft); color: var(--tw-title); }
+
+  /* ---------- calendar ---------- */
+  .calhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; flex-wrap: wrap; }
+  .calnav { display: flex; align-items: center; gap: 10px; }
+  .calnav button { width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--mikke-line); background: #fff; color: var(--mikke-muted); cursor: pointer; font-size: 13px; line-height: 1; }
+  .calnav .month { font-size: 14.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .calview { display: inline-flex; border: 1px solid var(--mikke-line); border-radius: 9px; overflow: hidden; }
+  .calview button {
+    appearance: none; border: 0; background: #fff; color: var(--mikke-muted);
+    font: inherit; font-weight: 700; font-size: 12px; padding: 5px 14px; cursor: pointer;
+    border-left: 1px solid var(--mikke-line);
+  }
+  .calview button:first-child { border-left: 0; }
+  .calview button[aria-pressed="true"] { background: var(--tw-title); color: #fff; }
+
+  .calgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--mikke-muted-light); padding-bottom: 5px; }
+  .cell {
+    border: 1px solid var(--mikke-line); border-radius: 10px;
+    min-height: 66px; padding: 5px 6px; background: #fff;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .cell.out { background: var(--mikke-surface-soft); border-color: var(--mikke-line-soft); }
+  .cell.out .dnum { color: var(--mikke-muted-light); }
+  .cell.holiday { background: var(--mikke-holiday); border-color: #f6c8d5; }
+  .cell.holiday .dnum, .cell.holiday .hlabel { color: var(--mikke-holiday-ink); }
+  .cell.today { border: 1.5px solid var(--tw-done); }
+  .dnum { font-size: 11.5px; font-weight: 800; color: var(--mikke-muted); font-variant-numeric: tabular-nums; }
+  .hlabel { font-size: 10px; font-weight: 700; }
+  .chip {
+    font-size: 9.5px; font-weight: 800; border-radius: 5px; padding: 2px 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.45;
+    display: flex; align-items: center; gap: 4px;
+  }
+  /* マスは約96pxしかないので、チップにプロジェクト名を前置すると全部潰れる。
+     プロジェクトの区別は左の丸(凡例と同じ色)で示し、文字は「提出/完了＋工程名」だけにする。 */
+  .chip .pdot { width: 5px; height: 5px; border-radius: 50%; flex: none; background: currentColor; opacity: .85; }
+  .chip .tx { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip.more { font-size: 9.5px; font-weight: 800; color: var(--mikke-muted-light); padding: 0 2px; display: block; }
+
+  .callegend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 11px; font-weight: 700; color: var(--mikke-muted); }
+  .callegend .it { display: inline-flex; align-items: center; gap: 5px; }
+  .callegend .sw { width: 9px; height: 9px; border-radius: 3px; }
+  .legend-delivery.is-hidden { display: none; }
+
+  /* カレンダー下のプロジェクトリンク（Phase Gで実装済み） */
+  .projlinks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--mikke-line-soft); }
+  .projlinks .pl-label { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; color: var(--mikke-muted-light); }
+  .pl-pill { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--mikke-line); border-radius: 999px; background: #fff; padding: 6px 13px; font-size: 11.5px; font-weight: 700; color: var(--mikke-ink); text-decoration: none; cursor: pointer; }
+  .pl-pill .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .pl-manage { margin-left: auto; font-size: 11.5px; font-weight: 800; color: var(--tw-title); text-decoration: none; }
+
+  /* ---------- finance / messages rail ---------- */
+  .finance { border-color: var(--tw-planned); }
+  .railhead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .railtitle { font-size: 10.5px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; color: var(--tw-title); display: inline-flex; align-items: center; gap: 6px; }
+  .railnote { font-size: 10.5px; font-weight: 700; color: var(--mikke-muted-light); }
+  .finbody { display: flex; align-items: center; gap: 15px; }
+  .findial { width: 62px; height: 62px; border-radius: 50%; border: 6px solid var(--mikke-line-soft); display: grid; place-items: center; flex: none; font-size: 11px; font-weight: 700; color: var(--mikke-muted-light); }
+  .finrows { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .finrow { display: flex; align-items: center; justify-content: space-between; background: var(--mikke-surface-soft); border-radius: 9px; padding: 6px 10px; font-size: 11.5px; }
+  .finrow .lb { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--mikke-muted); }
+  .finrow .sw { width: 7px; height: 7px; border-radius: 2px; }
+  .finrow .vl { font-weight: 800; color: var(--mikke-muted-light); }
+  .finfoot { margin: 12px 0 0; font-size: 10px; line-height: 1.7; color: var(--mikke-muted-light); }
+  .messages { border-color: var(--mikke-pink-soft); padding: 16px 0 0; overflow: hidden; }
+  .messages .railhead { padding: 0 16px; }
+  .msgempty { padding: 0 16px 16px; margin: 0; font-size: 11.5px; font-weight: 700; color: var(--mikke-muted); }
+  .msgrow { display: flex; align-items: center; gap: 11px; padding: 11px 16px; border-top: 1px solid var(--mikke-line); }
+  .msgav { width: 32px; height: 32px; border-radius: 50%; background: var(--mikke-pink-soft); color: var(--tw-title); display: grid; place-items: center; flex: none; font-size: 13px; }
+  .msgrow .bd { min-width: 0; flex: 1; }
+  .msgrow .nm { display: block; font-size: 11.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msgrow .tx { display: block; font-size: 11px; font-weight: 600; color: var(--mikke-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msgrow .tm { font-size: 10px; font-weight: 600; color: var(--mikke-muted-light); flex: none; }
+
+  /* ---------- shift ---------- */
+  .shifthead { display: flex; align-items: center; justify-content: space-between; }
+  .shifthead h2 { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 800; color: var(--tw-title); margin: 0; }
+  .shifthead .cnt { font-size: 11.5px; font-weight: 700; color: var(--mikke-muted-light); }
+
+  /* ---------- delivery blocks ---------- */
+  .statrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+  .statbox { border: 1px solid var(--mikke-line); border-radius: 12px; padding: 11px 13px; background: #fff; }
+  .statbox .lb { font-size: 10.5px; font-weight: 700; color: var(--mikke-muted); }
+  .statbox .vl { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 1px; }
+  .statbox.a .vl { color: var(--tw-deadline); }
+  .statbox.b .vl { color: var(--tw-title); }
+  .statbox.c .vl { color: var(--tw-action); }
+
+  .duelist { display: flex; flex-direction: column; gap: 8px; }
+  .duerow {
+    display: grid; grid-template-columns: 104px 1fr auto; gap: 12px; align-items: center;
+    border: 1px solid var(--mikke-line); border-radius: 12px; background: #fff; padding: 9px 12px;
+    text-decoration: none; color: inherit;
+  }
+  .duepill {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    background: var(--tw-planned); color: var(--tw-on-tint);
+    border-radius: 9px; padding: 7px 8px; font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+  .duerow .bd { min-width: 0; }
+  .duerow .t { display: block; font-size: 13px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .duerow .s { display: block; font-size: 10.5px; font-weight: 700; color: var(--mikke-muted); margin-top: 1px; }
+  .duerow .go { font-size: 11.5px; font-weight: 800; color: var(--tw-title); }
+
+  .actrow { display: flex; align-items: center; gap: 9px; border: 1px solid var(--mikke-line); border-radius: 10px; background: #fff; padding: 8px 12px; font-size: 11.5px; font-weight: 700; }
+  .actrow .who { margin-left: auto; color: var(--mikke-muted); font-weight: 700; }
+
+  /* ---------- needs attention (ops) ---------- */
+  .attngrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .attncard { border: 1px solid var(--mikke-line); border-left: 4px solid var(--mikke-orange); border-radius: 12px; padding: 11px 13px; background: #fff; }
+  .attncard .hd { display: flex; align-items: baseline; justify-content: space-between; }
+  .attncard .ti { font-size: 12.5px; font-weight: 800; color: var(--mikke-orange); }
+  .attncard .bang { font-size: 16px; font-weight: 800; color: var(--mikke-orange); }
+  .attncard .bd { font-size: 11px; font-weight: 600; color: var(--mikke-muted); margin-top: 2px; }
+
+  .todaylist { border: 1px solid var(--mikke-line); border-radius: 12px; background: #fff; overflow: hidden; }
+  .todayrow { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-top: 1px solid var(--mikke-line); font-size: 12.5px; }
+  .todayrow:first-child { border-top: 0; }
+  .todayrow .bar { width: 4px; height: 30px; border-radius: 999px; flex: none; }
+  .todayrow .tm { font-size: 12.5px; font-weight: 800; width: 44px; flex: none; }
+  .todayrow .bd { flex: 1; min-width: 0; }
+  .todayrow .bd .t { display: block; font-weight: 800; }
+  .todayrow .bd .s { display: block; font-size: 11px; font-weight: 600; color: var(--mikke-muted); }
+  .todayrow .go { font-size: 11px; font-weight: 700; color: var(--tw-title); border: 1px solid var(--mikke-line); border-radius: 999px; padding: 4px 11px; }
+
+  /* ---------- 折りたたみ（工程追加 / 運営型作成フォーム / アーカイブ） ---------- */
+  .collapse { border: 1px solid var(--mikke-line); border-radius: 14px; background: #fff; overflow: hidden; }
+  .collapse > .head {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    border: 0; background: transparent; cursor: pointer; font: inherit;
+    padding: 13px 15px; text-align: left;
+  }
+  .collapse > .head .plus { width: 26px; height: 26px; border-radius: 8px; background: var(--tw-action); color: #fff; display: grid; place-items: center; font-size: 15px; font-weight: 800; flex: none; }
+  .collapse > .head .t { font-size: 13px; font-weight: 800; }
+  .collapse > .head .s { font-size: 11px; font-weight: 600; color: var(--mikke-muted); }
+  .collapse > .head .caret { margin-left: auto; color: var(--mikke-muted); font-size: 12px; }
+  .collapse > .body { display: none; padding: 0 15px 15px; border-top: 1px solid var(--mikke-line-soft); padding-top: 14px; }
+  .collapse.is-open > .body { display: block; }
+  .collapse.is-open > .head .caret { transform: rotate(180deg); }
+
+  .fieldgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+  .field .lb { display: block; font-size: 11.5px; font-weight: 800; margin-bottom: 5px; }
+  .field .lb .req { color: var(--tw-action); }
+  .field input, .field select, .field textarea {
+    width: 100%; border: 1px solid var(--mikke-line); border-radius: 10px;
+    padding: 9px 12px; font: inherit; font-size: 13px; background: #fff; color: var(--mikke-ink);
+  }
+  .field .eg { display: block; margin-top: 4px; font-size: 10.5px; font-weight: 600; color: var(--mikke-muted-light); }
+  .savebtn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--tw-action); color: #fff; border: 0; border-radius: 11px;
+    padding: 10px 18px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;
+  }
+  .ghostbtn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #fff; color: var(--tw-title); border: 1px solid var(--mikke-line); border-radius: 11px;
+    padding: 9px 15px; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer;
+  }
+
+  /* ---------- プロジェクト一覧カード ---------- */
+  .projgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .projcard { display: flex; align-items: center; gap: 11px; border: 1px solid var(--mikke-line); border-radius: 13px; background: #fff; padding: 12px 14px; cursor: pointer; text-align: left; font: inherit; width: 100%; }
+  .projcard .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex: none; font-size: 15px; }
+  .projcard .ic.ops { background: var(--mikke-blue); color: #fff; }
+  .projcard .ic.del { background: var(--tw-planned); color: var(--tw-on-tint); }
+  .projcard .t { display: block; font-size: 13px; font-weight: 800; }
+  .projcard .s { display: block; font-size: 11px; font-weight: 600; color: var(--mikke-muted); margin-top: 1px; }
+  .listwrap { background: var(--mikke-surface-soft); border-radius: 16px; padding: 15px; }
+
+  /* ---------- 工程一覧 ---------- */
+  .taskrow { display: flex; align-items: center; gap: 11px; border: 1px solid var(--mikke-line); border-radius: 12px; background: #fff; padding: 11px 13px; }
+  .taskrow .no { width: 22px; height: 22px; border-radius: 7px; background: var(--mikke-surface-soft); color: var(--mikke-muted); display: grid; place-items: center; font-size: 10.5px; font-weight: 800; flex: none; }
+  .taskrow .bd { flex: 1; min-width: 0; }
+  .taskrow .bd .t { display: block; font-size: 13px; font-weight: 800; }
+  .taskrow .bd .s { display: block; font-size: 10.5px; font-weight: 600; color: var(--mikke-muted); margin-top: 1px; }
+  .stbadge { border-radius: 999px; padding: 3px 9px; font-size: 10px; font-weight: 800; flex: none; }
+  .stbadge.done { background: var(--tw-done); color: var(--tw-on-tint); }
+  .stbadge.doing { background: var(--tw-planned); color: var(--tw-on-tint); }
+  .stbadge.wait { background: var(--mikke-surface-soft); color: var(--mikke-muted); }
+  .stbadge.over { background: var(--tw-action); color: #fff; }
+
+  /* ---------- メッセージ ---------- */
+  .msggrid { display: grid; grid-template-columns: minmax(240px, .72fr) minmax(0, 1.28fr); gap: 16px; align-items: start; }
+  .convgrouptitle { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .convgrouptitle h3 { margin: 0; font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--tw-title); }
+  .convgrouptitle span { font-size: 10px; font-weight: 600; color: var(--mikke-muted); }
+  .convbtn { display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid var(--mikke-line); border-radius: 12px; background: #fff; padding: 10px 12px; cursor: pointer; font: inherit; text-align: left; margin-bottom: 8px; }
+  .convbtn[aria-pressed="true"] { border-color: var(--tw-title); background: #f4f6fd; }
+  .convbtn .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; font-size: 12px; }
+  .convbtn .av.client { background: var(--mikke-pink-soft); color: var(--tw-title); }
+  .convbtn .av.worker { background: var(--tw-done); color: var(--tw-on-tint); }
+  .convbtn .bd { min-width: 0; flex: 1; }
+  .convbtn .nm { display: block; font-size: 12.5px; font-weight: 800; }
+  .convbtn .lastmsg { display: block; font-size: 10.5px; font-weight: 600; color: var(--mikke-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thread { min-height: 380px; border: 1px solid var(--mikke-line); border-radius: 16px; background: #fff; padding: 15px; display: flex; flex-direction: column; }
+  .threadhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--mikke-line); padding-bottom: 12px; }
+  .threadhead .nm { font-size: 13px; font-weight: 800; }
+  .threadhead .sub { font-size: 10.5px; font-weight: 600; color: var(--mikke-muted); margin-top: 1px; }
+  .bubbles { flex: 1; display: flex; flex-direction: column; gap: 11px; padding: 15px 0; }
+  .bub { max-width: 86%; border-radius: 15px; padding: 9px 12px; font-size: 12.5px; line-height: 1.7; }
+  .bub .meta { display: block; font-size: 10px; font-weight: 800; color: var(--mikke-muted); margin-bottom: 3px; }
+  .bub.in { margin-right: auto; background: var(--mikke-surface-soft); }
+  .bub.out { margin-left: auto; background: #f4f6fd; }
+  .bub.sys { margin-right: auto; background: #fff6f2; border: 1px dashed #f0b7a0; }
+  .composer { display: flex; align-items: flex-end; gap: 9px; border-top: 1px solid var(--mikke-line); padding-top: 12px; }
+  .composer textarea { flex: 1; min-height: 66px; resize: vertical; }
+
+  /* ---------- 機能設定 ---------- */
+  .featlist { display: flex; flex-direction: column; gap: 10px; }
+  .featrow { display: flex; align-items: flex-start; gap: 11px; border: 1px solid var(--mikke-line); border-radius: 12px; background: #fff; padding: 11px 13px; cursor: pointer; }
+  .featrow input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--mikke-primary); flex: none; }
+  .featrow .t { display: block; font-size: 13px; font-weight: 800; }
+  .featrow .s { display: block; font-size: 11px; font-weight: 600; color: var(--mikke-muted); line-height: 1.6; margin-top: 2px; }
+  .featrow.is-forced { background: var(--mikke-surface-soft); }
+  .featrow.is-forced .t { color: var(--mikke-muted); }
+  /* 「誰の画面に出るか」を文字で明示する。プレビューを触らなくても分かるように。 */
+  .whorow { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+  .whotag {
+    display: inline-flex; align-items: center; gap: 4px;
+    border-radius: 999px; padding: 2px 9px;
+    font-size: 10px; font-weight: 800; letter-spacing: .02em;
+  }
+  .whotag.hq { background: var(--mikke-surface-soft); color: var(--mikke-muted); border: 1px solid var(--mikke-line); }
+  .whotag.client { background: var(--mikke-pink-soft); color: #8a3a55; }
+  .whotag.worker { background: #d9efe4; color: #2a5c45; }
+  .featrow .whorow .lead { font-size: 10px; font-weight: 700; color: var(--mikke-muted-light); margin-right: 2px; }
+  .wholegend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; font-weight: 700; color: var(--mikke-muted); margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--mikke-line-soft); }
+  .grouphead { border-bottom: 1px solid var(--mikke-line); padding-bottom: 11px; margin-bottom: 13px; }
+  .grouphead h2 { margin: 0; font-size: 13px; font-weight: 800; color: var(--tw-title); }
+  .grouphead p { margin: 3px 0 0; font-size: 11px; font-weight: 600; color: var(--mikke-muted); }
+
+  /* ---------- ポータルプレビュー ---------- */
+  .previewwrap { border: 1px solid var(--mikke-line); border-radius: 16px; background: var(--mikke-surface-soft); padding: 14px; }
+  .previewbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .segmented { display: inline-flex; border: 1px solid var(--mikke-line); border-radius: 10px; overflow: hidden; background: #fff; }
+  .segmented button { appearance: none; border: 0; background: #fff; color: var(--mikke-muted); font: inherit; font-weight: 700; font-size: 12px; padding: 6px 15px; cursor: pointer; border-left: 1px solid var(--mikke-line); }
+  .segmented button:first-child { border-left: 0; }
+  .segmented button[aria-pressed="true"] { background: var(--tw-title); color: #fff; }
+  .previewnote { font-size: 10.5px; font-weight: 700; color: var(--mikke-muted); }
+  .device {
+    border: 1px solid var(--mikke-line); border-radius: 14px; background: #fff; overflow: hidden;
+  }
+  .devicebar { display: flex; align-items: center; gap: 8px; background: var(--mikke-ink); color: #fff; padding: 8px 13px; font-size: 11px; font-weight: 700; }
+  .devicebar .dots { display: inline-flex; gap: 4px; }
+  .devicebar .dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.3); }
+  .devicebody { padding: 15px; display: flex; flex-direction: column; gap: 13px; }
+  .ptabs { display: flex; gap: 4px; border-bottom: 1px solid var(--mikke-line); }
+  .ptab { font-size: 11.5px; font-weight: 800; color: var(--mikke-muted); padding: 7px 12px; border-bottom: 2px solid transparent; }
+  .ptab.on { color: var(--tw-title); border-bottom-color: var(--tw-action); }
+  .pblock { border: 1px solid var(--mikke-line); border-radius: 12px; padding: 12px 13px; }
+  .pblock .ph { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--tw-title); }
+  .pblock .pb { font-size: 11.5px; font-weight: 600; color: var(--mikke-muted); margin-top: 4px; line-height: 1.7; }
+  .pblock .fake { display: flex; gap: 5px; margin-top: 9px; flex-wrap: wrap; }
+  .pblock .fake i { height: 9px; border-radius: 3px; background: var(--mikke-line-soft); display: block; }
+  .disabledbtn { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; border: 1px dashed var(--mikke-line); border-radius: 9px; background: var(--mikke-surface-soft); color: var(--mikke-muted-light); padding: 6px 12px; font-size: 11px; font-weight: 800; }
+  .is-off { display: none; }
+  .offnote { font-size: 11px; font-weight: 700; color: var(--mikke-muted-light); text-align: center; padding: 10px; border: 1px dashed var(--mikke-line); border-radius: 10px; }
+</style>
+
+<div class="mockbar">
+  <span class="tag">MOCKUP</span>
+  <span class="grp">
+    <span>画面</span>
+    <span class="switch" role="group" aria-label="画面切替">
+      <button type="button" data-screen="home" aria-pressed="true">ホーム</button>
+      <button type="button" data-screen="delivery" aria-pressed="false">納品型 詳細</button>
+      <button type="button" data-screen="projects" aria-pressed="false">プロジェクト管理</button>
+      <button type="button" data-screen="features" aria-pressed="false">機能とポータルの設定</button>
+    </span>
+  </span>
+  <span class="grp" id="acctGrp">
+    <span>組織</span>
+    <span class="switch" role="group" aria-label="組織切替">
+      <button type="button" data-acct="mixed" aria-pressed="true">運営型＋納品型</button>
+      <button type="button" data-acct="arisa" aria-pressed="false">運営型のみ（アリサ）</button>
+    </span>
+  </span>
+  <span class="hint">切替はモック確認用。実装ではプロジェクトの有無で自動判定します。</span>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">TEAM WORKS</div>
+    <button type="button" class="navitem active" data-nav="home"><span class="ic">⌂</span>ホーム</button>
+    <div class="navlabel">運営</div>
+    <button type="button" class="navitem" data-nav="none"><span class="ic">▤</span>スケジュール管理</button>
+    <button type="button" class="navitem" data-nav="none"><span class="ic">◇</span>メッセージ管理</button>
+    <button type="button" class="navitem" data-nav="projects"><span class="ic">▢</span>プロジェクト管理</button>
+    <button type="button" class="navitem" data-nav="none"><span class="ic">◎</span><span id="navWorkers">スタッフ管理</span></button>
+    <button type="button" class="navitem" data-nav="none"><span class="ic">▣</span>クライアント管理</button>
+    <button type="button" class="navitem" data-nav="none"><span class="ic">▥</span>マニュアル管理</button>
+    <div class="navlabel">設定</div>
+    <button type="button" class="navitem" data-nav="none"><span class="ic">⚙</span>企業設定</button>
+  </aside>
+
+  <main class="main">
+    <h1 class="pagetitle" id="pageTitle">本部ダッシュボード</h1>
+
+    <!-- ==================== 画面1: ホーム ==================== -->
+    <div class="screen is-active" id="screenHome">
+      <nav class="pagetabs" id="homeTabs" role="tablist" aria-label="ホームの表示切替">
+        <button class="pagetab" role="tab" data-home="all" aria-selected="true">すべて</button>
+        <button class="pagetab" role="tab" data-home="ops" aria-selected="false">運営<span class="count">1</span></button>
+        <button class="pagetab" role="tab" data-home="delivery" aria-selected="false">納品<span class="count">3</span></button>
+      </nav>
+
+      <p class="stateline" id="homeState"></p>
+
+      <div class="row2">
+        <section class="card">
+          <div class="calhead">
+            <div class="calnav">
+              <button type="button" aria-label="前の月">‹</button>
+              <span class="month" id="calMonth">2026年 8月</span>
+              <button type="button" aria-label="次の月">›</button>
+            </div>
+            <div class="calview" role="group" aria-label="表示単位">
+              <button type="button" aria-pressed="true">月</button>
+              <button type="button" aria-pressed="false">週</button>
+              <button type="button" aria-pressed="false">日</button>
+            </div>
+          </div>
+          <div class="calgrid" id="homeCal"></div>
+          <div class="callegend" id="homeLegend"></div>
+          <div class="projlinks" id="homeProjLinks"></div>
+        </section>
+
+        <div class="siderail">
+          <section class="card finance">
+            <div class="railhead"><span class="railtitle">▤ Finance</span><span class="railnote">今月・本部のみ</span></div>
+            <div class="finbody">
+              <div class="findial">未設定</div>
+              <div class="finrows">
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-blue)"></span>売上想定</span><span class="vl">—</span></div>
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-orange)"></span>経費想定</span><span class="vl">—</span></div>
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-green)"></span>利益見込み</span><span class="vl">—</span></div>
+              </div>
+            </div>
+            <p class="finfoot"><span id="finWorkers">スタッフ</span>報酬・請求のレートがまだ設定されていないため集計できません。</p>
+          </section>
+          <section class="card messages">
+            <div class="railhead"><span class="railtitle">◇ Messages</span></div>
+            <div id="homeMsgs"></div>
+          </section>
+        </div>
+      </div>
+
+      <section class="card" id="homeShift">
+        <div class="shifthead">
+          <h2>▤ <span id="shiftTitle">スタッフ希望シフト</span></h2>
+          <span class="cnt">0件</span>
+        </div>
+        <p class="secsub">2026年8月分・カレンダーの黄色表示と同じ提出内容です。</p>
+        <div class="empty">この月の希望シフトはまだ提出されていません。</div>
+      </section>
+
+      <section>
+        <h2 class="sectitle">Today</h2>
+        <p class="secsub">本日のスケジュール（本部）</p>
+        <div class="todaylist">
+          <div class="todayrow">
+            <span class="bar" style="background:var(--mikke-blue)"></span>
+            <span class="tm">13:00</span>
+            <span class="bd"><span class="t">テスト事業</span><span class="s">担当 あゆみスタッフ ・ 60分</span></span>
+            <span class="go">スケジュール</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- NEEDS ATTENTION は1つにまとめ、運営ぶん・納品ぶんを中で並べる -->
+      <section>
+        <h2 class="sectitle">Needs attention</h2>
+        <p class="secsub" id="attnSub">緊急・期日が近い・大事なこと</p>
+
+        <div id="attnOpsWrap">
+          <div class="attngrid">
+            <div class="attncard">
+              <div class="hd"><span class="ti">シフト未決定</span><span class="bang">!</span></div>
+              <div class="bd">8/7 13:00 テスト事業、担当未定。</div>
+            </div>
+            <div class="attncard">
+              <div class="hd"><span class="ti">シフト未決定</span><span class="bang">!</span></div>
+              <div class="bd">8/12 13:00 テスト事業、担当未定。</div>
+            </div>
+          </div>
+        </div>
+
+        <div id="attnDelWrap" style="margin-top:12px">
+          <div class="statrow">
+            <div class="statbox a"><div class="lb">クライアント待ち</div><div class="vl">1件</div></div>
+            <div class="statbox b"><div class="lb">本部確認待ち</div><div class="vl">2件</div></div>
+            <div class="statbox c"><div class="lb">期限超過</div><div class="vl">1件</div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px;margin-top:11px">
+            <div class="actrow"><span>▣</span><span>「Official Program全体仕様を確定する」の提出期日を過ぎています</span><span class="who">mikkeOS Official Academy 初期構築</span></div>
+            <div class="actrow"><span>▣</span><span>「キット作製」の提出物が本部確認待ちです</span><span class="who">ハンドメイド講座</span></div>
+            <div class="actrow"><span>▣</span><span>「ヒアリングシート」をクライアントが記入中です</span><span class="who">MUSUBI 認定講座構築</span></div>
+          </div>
+        </div>
+
+        <div class="divider">
+          <div class="sechead" style="margin-bottom:10px">
+            <span style="font-size:11.5px;font-weight:800;color:var(--tw-title)" id="upcomingTitle">今後の予定</span>
+            <a class="seclink" href="#">すべて見る</a>
+          </div>
+          <div class="duelist" id="homeUpcoming"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== 画面2: 納品型プロジェクト詳細 ==================== -->
+    <div class="screen" id="screenDelivery">
+      <div class="dhead">
+        <button type="button" class="dback" aria-label="プロジェクト管理へ戻る" data-nav="projects">←</button>
+        <h1>mikkeOS Official Academy 初期構築</h1>
+        <span class="kindbadge delivery">納品型</span>
+      </div>
+
+      <div class="why">
+        <span>◉</span>
+        <span><b>変更点。</b>「スケジュール」タブを廃止し、カレンダーは<b>概要</b>へ、納期設定と逆算配置は<b>工程</b>へ移しました。工程の新規追加フォームは畳んであります。<b>メッセージ</b>タブを新設（Phase K）。</span>
+      </div>
+
+      <nav class="dtabs" role="tablist" aria-label="プロジェクトのメニュー">
+        <button class="dtab" role="tab" data-dtab="overview" aria-selected="true">概要</button>
+        <button class="dtab" role="tab" data-dtab="tasks" aria-selected="false">工程</button>
+        <button class="dtab" role="tab" data-dtab="materials" aria-selected="false">資料</button>
+        <button class="dtab" role="tab" data-dtab="deliverables" aria-selected="false">成果物</button>
+        <button class="dtab" role="tab" data-dtab="members" aria-selected="false">メンバー</button>
+        <button class="dtab" role="tab" data-dtab="messages" aria-selected="false">メッセージ</button>
+        <button class="dtab" role="tab" data-dtab="dfeatures" aria-selected="false">機能とポータルの設定</button>
+        <button class="dtab" role="tab" data-dtab="settings" aria-selected="false">プロジェクト設定</button>
+      </nav>
+
+      <!-- 概要 -->
+      <div class="pane is-active" data-dpane="overview">
+        <div class="tabintro"><span class="ic">◉</span><div><h2>概要</h2><p>期日をカレンダーで確認し、対応が必要なことをまとめて見ます。</p></div></div>
+
+        <section class="card">
+          <div class="calhead">
+            <div class="calnav">
+              <button type="button" aria-label="前の月">‹</button>
+              <span class="month">2026年 8月</span>
+              <button type="button" aria-label="次の月">›</button>
+            </div>
+            <div class="calview" role="group" aria-label="表示切替">
+              <button type="button" aria-pressed="true">両方</button>
+              <button type="button" aria-pressed="false">提出期日</button>
+              <button type="button" aria-pressed="false">完了期日</button>
+            </div>
+          </div>
+          <div class="calgrid" id="delCal"></div>
+          <div class="callegend">
+            <span class="it"><span class="sw" style="background:var(--tw-title)"></span>完了期日</span>
+            <span class="it"><span class="sw" style="background:var(--tw-deadline)"></span>提出期日</span>
+            <span class="it"><span class="sw" style="background:var(--tw-done)"></span>完了</span>
+            <span class="it"><span class="sw" style="background:var(--tw-action)"></span>期限超過</span>
+            <span class="it"><span class="sw" style="background:var(--mikke-holiday)"></span>土日祝</span>
+          </div>
+        </section>
+
+        <div class="statrow">
+          <div class="statbox a"><div class="lb">クライアント待ち</div><div class="vl">0件</div></div>
+          <div class="statbox b"><div class="lb">本部確認待ち</div><div class="vl">1件</div></div>
+          <div class="statbox c"><div class="lb">期限超過</div><div class="vl">1件</div></div>
+        </div>
+
+        <section class="card">
+          <div class="sechead" style="margin-bottom:10px">
+            <span style="font-size:12.5px;font-weight:800">今後の期日</span>
+            <span style="font-size:11px;font-weight:700;color:var(--mikke-muted-light)">近い順に5件</span>
+          </div>
+          <div class="duelist" id="delDueList"></div>
+        </section>
+
+        <section class="card">
+          <div class="sechead" style="margin-bottom:10px"><span style="font-size:12.5px;font-weight:800">対応が必要なこと</span></div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div class="actrow"><span>▣</span><span>「Official Program全体仕様を確定する」の提出期日を過ぎています</span><span class="who">期限超過</span></div>
+            <div class="actrow"><span>▣</span><span>「ヒアリング・講座整理」の提出物が本部確認待ちです</span><span class="who">本部確認待ち</span></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 工程 -->
+      <div class="pane" data-dpane="tasks">
+        <div class="tabintro"><span class="ic">▤</span><div><h2>工程</h2><p>納期から逆算して期日を配置し、担当・提出物・確認者を設定します。</p></div></div>
+
+        <section class="card">
+          <div class="sechead" style="margin-bottom:11px">
+            <span style="font-size:12.5px;font-weight:800">納期と逆算配置</span>
+            <span style="font-size:11px;font-weight:700;color:var(--mikke-muted-light)">旧「スケジュール」タブから移動</span>
+          </div>
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+            <label class="field" style="flex:1;min-width:200px"><span class="lb">プロジェクトの納期</span><input type="date" value="2026-09-15"></label>
+            <button type="button" class="ghostbtn">▤ 納期から逆算して配置</button>
+          </div>
+          <p class="secsub" style="margin:9px 0 0">標準日数をもとに、各工程の提出期日・完了期日を自動で置きます。手で直した期日は上書きされます。</p>
+        </section>
+
+        <div class="collapse" id="taskAddCollapse">
+          <button type="button" class="head" data-collapse="taskAddCollapse">
+            <span class="plus">＋</span>
+            <span><span class="t">工程を追加</span><span class="s">工程名・担当・提出物・確認者・期日を設定します。テンプレートからの読み込みもここから。</span></span>
+            <span class="caret">▾</span>
+          </button>
+          <div class="body">
+            <div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px">
+              <button type="button" class="ghostbtn">▥ テンプレートから読み込む</button>
+            </div>
+            <div class="fieldgrid">
+              <label class="field" style="grid-column:1/-1"><span class="lb">工程名 <span class="req">*</span></span><input type="text" placeholder="例：テキスト・ディプロマ作成"></label>
+              <label class="field"><span class="lb">誰が作業するか</span><select><option>未設定</option><option>本部</option><option>担当メンバー</option><option>クライアント</option></select></label>
+              <label class="field"><span class="lb">担当メンバー</span><select><option>未割当</option></select><span class="eg">参加中のメンバーだけが並びます。招待中の相手は「仮の担当名」を使ってください。</span></label>
+              <label class="field"><span class="lb">仮の担当名（任意）</span><input type="text" placeholder="例：ネオン、カメラマン（未定）"></label>
+              <label class="field"><span class="lb">提出期日</span><input type="date"><span class="eg">担当者がこの日までに提出する</span></label>
+              <label class="field"><span class="lb">完了期日</span><input type="date"><span class="eg">この工程自体が完了する日</span></label>
+              <label class="field"><span class="lb">何を提出するか</span><select><option>提出物なし</option><option>フォーム</option><option>ファイル</option><option>URL</option></select></label>
+            </div>
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:13px;font-size:12px;font-weight:700">
+              <label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox">本部の確認が必要</label>
+              <label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox">クライアントの確認が必要</label>
+              <label style="display:inline-flex;gap:7px;align-items:center"><input type="checkbox">クライアントに表示する</label>
+            </div>
+            <div style="margin-top:14px"><button type="button" class="savebtn">＋ 工程を追加</button></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px" id="taskList"></div>
+      </div>
+
+      <!-- 資料（新設・要望） -->
+      <div class="pane" data-dpane="materials">
+        <div class="tabintro"><span class="ic">▥</span><div><h2>資料</h2><p>作業に必要な参考ファイル・URLを置いて共有します。成果物として提出する前の素材や見本もここへ。</p></div></div>
+        <div class="why">
+          <span>◉</span>
+          <span><b>新設（あゆみ要望）。</b>「成果物になる前のファイル・URLを、スタッフも見られるところに置きたい」に対応。運営型の<b>マニュアル</b>にあたるものを、納品型では<b>資料</b>という名前で持ちます。1件ごとに<b>誰に見せるか</b>を選べます。</span>
+        </div>
+
+        <div class="collapse" id="matAddCollapse">
+          <button type="button" class="head" data-collapse="matAddCollapse">
+            <span class="plus">＋</span>
+            <span><span class="t">資料を追加</span><span class="s">ファイルをアップロード、またはURLを登録します。</span></span>
+            <span class="caret">▾</span>
+          </button>
+          <div class="body">
+            <div class="fieldgrid">
+              <label class="field" style="grid-column:1/-1"><span class="lb">タイトル <span class="req">*</span></span><input type="text" placeholder="例：講座テキストの見本（第2版）"></label>
+              <label class="field"><span class="lb">種類</span><select><option>ファイル</option><option>URL</option></select></label>
+              <label class="field"><span class="lb">関連づける工程（任意）</span><select><option>指定なし</option><option>1. Official Program全体仕様を確定する</option><option>3. テキスト・ディプロマ作成</option></select></label>
+              <label class="field" style="grid-column:1/-1"><span class="lb">誰に見せるか</span><select><option>本部とスタッフ（クライアントには出さない）</option><option>本部・スタッフ・クライアント全員</option><option>本部だけ</option></select><span class="eg">クライアントに出す資料と、内輪の作業用資料を分けられます。</span></label>
+            </div>
+            <div style="margin-top:14px"><button type="button" class="savebtn">＋ 資料を追加</button></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="taskrow">
+            <span class="no">▥</span>
+            <span class="bd"><span class="t">講座テキストの見本（第2版）.pdf</span><span class="s">ファイル ・ 2.4MB ・ 工程3「テキスト・ディプロマ作成」</span></span>
+            <span class="whotag hq">本部</span><span class="whotag worker">スタッフ</span>
+          </div>
+          <div class="taskrow">
+            <span class="no">▤</span>
+            <span class="bd"><span class="t">ブランドガイドライン（Notion）</span><span class="s">URL ・ 指定なし</span></span>
+            <span class="whotag hq">本部</span><span class="whotag worker">スタッフ</span><span class="whotag client">クライアント</span>
+          </div>
+          <div class="taskrow">
+            <span class="no">▥</span>
+            <span class="bd"><span class="t">受講料の内訳メモ.xlsx</span><span class="s">ファイル ・ 18KB ・ 工程2「受講料・月額費用…」</span></span>
+            <span class="whotag hq">本部</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 成果物 -->
+      <div class="pane" data-dpane="deliverables">
+        <div class="tabintro"><span class="ic">▢</span><div><h2>成果物</h2><p>工程をまたいだ提出物をここでまとめて確認・承認します。</p></div></div>
+        <div class="empty">今回の変更対象外。現在の実装のままです。</div>
+      </div>
+
+      <!-- メンバー -->
+      <div class="pane" data-dpane="members">
+        <div class="tabintro"><span class="ic">◎</span><div><h2>メンバー</h2><p>参加中・招待中・仮の担当名を管理します。</p></div></div>
+        <div class="empty">今回の変更対象外。現在の実装のままです。</div>
+      </div>
+
+      <!-- メッセージ（新設） -->
+      <div class="pane" data-dpane="messages">
+        <div class="tabintro"><span class="ic">◇</span><div><h2>メッセージ</h2><p>クライアントは上部に固定し、参加メンバーは最新のやり取り順に表示します。カードを選ぶと会話を開けます。</p></div></div>
+        <div class="why">
+          <span>◉</span>
+          <span><b>Phase K で新設。</b>運営型のメッセージタブと同じ見た目・同じテーブルを使います。差し戻しの理由も同じ画面に時系列で並びます（新しいテーブルは作りません）。</span>
+        </div>
+        <div class="msggrid">
+          <aside>
+            <div class="convgrouptitle"><h3>クライアント</h3><span>プロジェクトの窓口</span></div>
+            <button type="button" class="convbtn" aria-pressed="true">
+              <span class="av client">◍</span>
+              <span class="bd"><span class="nm">MUSUBI 講座担当</span><span class="lastmsg">ヒアリングシート、記入しました</span></span>
+            </button>
+            <div class="convgrouptitle" style="margin-top:16px"><h3>参加メンバー</h3><span>新着メッセージ順</span></div>
+            <button type="button" class="convbtn">
+              <span class="av worker">◍</span>
+              <span class="bd"><span class="nm">あゆみスタッフ</span><span class="lastmsg">総合Page、明日までに出します</span></span>
+            </button>
+            <button type="button" class="convbtn">
+              <span class="av worker">◍</span>
+              <span class="bd"><span class="nm">ネオン（デザイン）</span><span class="lastmsg">まだやり取りはありません</span></span>
+            </button>
+          </aside>
+          <section class="thread">
+            <div class="threadhead">
+              <div><div class="nm">MUSUBI 講座担当</div><div class="sub">クライアント ・ musubi@example.com</div></div>
+              <span class="kindbadge" style="background:var(--mikke-pink-soft);color:var(--tw-on-tint)">クライアント</span>
+            </div>
+            <div class="bubbles">
+              <article class="bub in"><span class="meta">MUSUBI 講座担当 ・ 8/3 10:12</span>ヒアリングシート、記入しました。ご確認おねがいします。</article>
+              <article class="bub sys"><span class="meta">差し戻し（自動記録） ・ 8/3 14:40</span>「ヒアリング・講座整理」を差し戻しました。理由：受講料の欄が未記入です。</article>
+              <article class="bub out"><span class="meta">こちら ・ 8/3 14:41</span>ありがとうございます。受講料の欄だけ追記をお願いできますか。</article>
+              <article class="bub in"><span class="meta">MUSUBI 講座担当 ・ 8/4 09:05</span>追記しました！</article>
+            </div>
+            <div class="composer">
+              <textarea class="field" placeholder="MUSUBI 講座担当さんへメッセージを送る"></textarea>
+              <button type="button" class="savebtn">送信</button>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- 機能とポータルの設定（納品型・新設） -->
+      <div class="pane" data-dpane="dfeatures">
+        <div class="tabintro"><span class="ic">⚙</span><div><h2>機能とポータルの設定</h2><p>この案件で使う機能と、クライアント・スタッフに出す内容を決めます。</p></div></div>
+        <div class="why">
+          <span>◉</span>
+          <span><b>納品型にも新設（あゆみ要望）。</b>運営型と同じ考え方で、案件ごとに使う機能を選べます。納品型は「名簿」「シフト」が無い代わりに、<b>資料・フォーム・クライアント確認</b>が対象になります。</span>
+        </div>
+        <section class="card">
+          <div class="grouphead">
+            <h2>この案件で使う機能</h2>
+            <p>使わない機能はOFFにできます。OFFにするとタブとポータルの該当画面が消えます（データは消えません）。</p>
+          </div>
+          <div class="featlist">
+            <label class="featrow">
+              <input type="checkbox" checked>
+              <span><span class="t">資料</span><span class="s">参考ファイル・URLの共有。1件ごとに見せる相手を選べます。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag hq">本部：資料タブ</span><span class="whotag worker">スタッフ：資料の閲覧</span><span class="whotag client">クライアント：公開した資料のみ</span></span></span>
+            </label>
+            <label class="featrow">
+              <input type="checkbox" checked>
+              <span><span class="t">提出フォーム</span><span class="s">工程ごとに入力フォームを作って回収します。ヒアリングや仕様確認に。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag hq">本部：フォーム作成・確認</span><span class="whotag client">クライアント：記入・提出</span></span></span>
+            </label>
+            <label class="featrow">
+              <input type="checkbox" checked>
+              <span><span class="t">クライアント確認</span><span class="s">提出物をクライアントが承認・差し戻しできます。社内だけで完結する案件はOFF。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag client">クライアント：承認／差し戻し</span></span></span>
+            </label>
+            <label class="featrow">
+              <input type="checkbox" checked>
+              <span><span class="t">メッセージ</span><span class="s">クライアント・スタッフとのやり取り。差し戻し理由もここに残ります。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag hq">本部：メッセージタブ</span><span class="whotag worker">スタッフ</span><span class="whotag client">クライアント</span></span></span>
+            </label>
+            <label class="featrow">
+              <input type="checkbox" checked>
+              <span><span class="t">クライアントポータル全体</span><span class="s">OFFにすると、この案件はクライアントから完全に見えなくなります（社内案件向け）。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag client">クライアント：この案件全体</span></span></span>
+            </label>
+          </div>
+          <div class="wholegend">
+            <span class="it"><span class="whotag hq">本部</span>あなた（管理する人）の画面</span>
+            <span class="it"><span class="whotag client">クライアント</span>依頼元の画面</span>
+            <span class="it"><span class="whotag worker">スタッフ</span>実際に作業する人の画面</span>
+          </div>
+          <div style="margin-top:15px"><button type="button" class="savebtn">設定を保存</button></div>
+        </section>
+        <div class="empty">プレビュー（クライアントにはこう見えます）は、運営型と同じものがこの下に入ります。<span class="sub">「機能とポータルの設定」画面で実際の動きを確認できます。</span></div>
+      </div>
+
+      <!-- プロジェクト設定 -->
+      <div class="pane" data-dpane="settings">
+        <div class="tabintro"><span class="ic">⚙</span><div><h2>プロジェクト設定</h2><p>プロジェクト名・納期・クライアント公開・アーカイブ。</p></div></div>
+        <div class="empty">今回の変更対象外。現在の実装のままです。<span class="sub">Phase K で、クライアント公開トグルの下に「クライアントにはこう見えます」プレビューが付きます。</span></div>
+      </div>
+    </div>
+
+    <!-- ==================== 画面3: プロジェクト管理 ==================== -->
+    <div class="screen" id="screenProjects">
+      <div class="why">
+        <span>◉</span>
+        <span><b>並び替え。</b>毎日見る一覧を上に、たまにしか使わない新規作成を下にしました。作成カードは<b>2枚ともボタン式に統一</b>（運営型は押すと今のフォームがその場で開きます。フォームの中身・処理は変えていません）。</span>
+      </div>
+
+      <section class="listwrap">
+        <h2 class="sectitle">Operations</h2>
+        <p class="secsub" style="margin-bottom:11px">運営型プロジェクト ・ 契約期間中、予定・名簿・シフト・報告を繰り返し運営するプロジェクトです。</p>
+        <div class="projgrid">
+          <button type="button" class="projcard" data-nav="features">
+            <span class="ic ops">▣</span>
+            <span><span class="t">テスト事業</span><span class="s">運営型・詳細を開く</span></span>
+          </button>
+        </div>
+      </section>
+
+      <section class="listwrap">
+        <h2 class="sectitle">Delivery</h2>
+        <p class="secsub" style="margin-bottom:11px">納品型プロジェクト ・ 期日までに成果物を仕上げる、期間限定の制作案件です。</p>
+        <div class="projgrid">
+          <button type="button" class="projcard" data-nav="delivery">
+            <span class="ic del">▤</span>
+            <span><span class="t">mikkeOS Official Academy 初期構築</span><span class="s">納品型・詳細を開く</span></span>
+          </button>
+          <button type="button" class="projcard" data-nav="delivery">
+            <span class="ic del">▤</span>
+            <span><span class="t">ハンドメイド講座</span><span class="s">納品型・詳細を開く</span></span>
+          </button>
+          <button type="button" class="projcard" data-nav="delivery">
+            <span class="ic del">▤</span>
+            <span><span class="t">MUSUBI 認定講座構築</span><span class="s">納品型・詳細を開く</span></span>
+          </button>
+        </div>
+      </section>
+
+      <div class="collapse" id="opsCreate">
+        <button type="button" class="head" data-collapse="opsCreate">
+          <span class="plus">＋</span>
+          <span><span class="t">運営型プロジェクトを立ち上げる</span><span class="s">契約期間中ずっと運営する仕事。例）教室、店舗、定期メンテナンス契約</span></span>
+          <span class="caret">▾</span>
+        </button>
+        <div class="body">
+          <div class="fieldgrid">
+            <label class="field"><span class="lb">プロジェクト名 <span class="req">*</span></span><input type="text" placeholder="例：渋谷教室、A社定期メンテナンス"></label>
+            <label class="field"><span class="lb">組織名</span><input type="text" placeholder="例：株式会社◯◯、◯◯事務所"></label>
+            <label class="field"><span class="lb">契約開始日</span><input type="date" value="2026-07-30"></label>
+            <label class="field"><span class="lb">契約終了日</span><input type="date"></label>
+          </div>
+          <div style="margin-top:14px"><button type="button" class="savebtn">＋ 作成</button></div>
+        </div>
+      </div>
+
+      <div class="collapse">
+        <button type="button" class="head">
+          <span class="plus">＋</span>
+          <span><span class="t">納品型プロジェクトを立ち上げる</span><span class="s">期日までに成果物を仕上げる案件。例）認定講座構築、サイト制作、教材制作 ／ 押すと4ステップのウィザードへ（現状のまま）</span></span>
+          <span class="caret" style="transform:rotate(-90deg)">▾</span>
+        </button>
+      </div>
+
+      <section class="listwrap">
+        <div class="sechead">
+          <div>
+            <h2 class="sectitle">Templates</h2>
+            <p class="secsub" style="margin-bottom:0">工程テンプレート ・ 保存しておくと、次の案件で読み込んでそのまま使えます。</p>
+          </div>
+          <button type="button" class="savebtn">＋ テンプレートを作る</button>
+        </div>
+        <div class="projgrid" style="margin-top:12px">
+          <div class="card" style="border-radius:13px">
+            <div class="sechead"><span style="font-size:12.5px;font-weight:800">認定講座 個別構築コース</span><a class="seclink" href="#">編集 →</a></div>
+            <p class="secsub" style="margin:6px 0 0">9工程<br>1. ヒアリング・講座整理<br>2. キット作製<br>3. テキスト・ディプロマ作成<br>…他6件</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="collapse">
+        <button type="button" class="head" data-collapse="archiveCollapse">
+          <span class="t" style="font-weight:800">アーカイブ済み（0件）</span>
+          <span class="caret">▾</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ==================== 画面4: 機能とポータルの設定 ==================== -->
+    <div class="screen" id="screenFeatures">
+      <div class="dhead">
+        <button type="button" class="dback" aria-label="プロジェクト管理へ戻る" data-nav="projects">←</button>
+        <h1>テスト事業</h1>
+        <span class="kindbadge ops">運営型</span>
+      </div>
+
+      <div class="why">
+        <span>◉</span>
+        <span><b>Phase L の本命。</b>「この事業で使う機能」を切り替えると、<b>上のタブ</b>と<b>下のプレビュー</b>が同時に変わります。未設定のプロジェクト（アリサの全案件）は全部ONのままなので、何も変わりません。</span>
+      </div>
+
+      <nav class="dtabs" role="tablist" aria-label="プロジェクトのメニュー">
+        <button class="dtab" role="tab" aria-selected="false">概要</button>
+        <button class="dtab" role="tab" aria-selected="false">スケジュール</button>
+        <button class="dtab" role="tab" aria-selected="false">メッセージ</button>
+        <button class="dtab" role="tab" aria-selected="false">パートナー</button>
+        <button class="dtab" role="tab" aria-selected="false" data-feattab="roster">名簿</button>
+        <button class="dtab" role="tab" aria-selected="false" data-feattab="reports">報告</button>
+        <button class="dtab" role="tab" aria-selected="false" data-feattab="manuals">マニュアル</button>
+        <button class="dtab" role="tab" aria-selected="true">機能とポータルの設定</button>
+        <button class="dtab" role="tab" aria-selected="false">プロジェクト設定</button>
+      </nav>
+
+      <div class="tabintro"><span class="ic">⚙</span><div><h2>機能とポータルの設定</h2><p>このプロジェクトで使う機能をチェックリスト式で設定します。RLSによる認可はこの設定とは独立して常に適用されます。</p></div></div>
+
+      <section class="card">
+        <div class="grouphead">
+          <h2>この事業で使う機能</h2>
+          <p>使わない機能はOFFにできます。OFFにすると本部のタブとポータルの該当画面が消えます（データは消えません）。</p>
+        </div>
+        <div class="featlist">
+          <label class="featrow">
+            <input type="checkbox" data-feat="roster" checked>
+            <span>
+              <span class="t">名簿</span>
+              <span class="s">生徒・参加者の一覧とグループ分け。対象者を管理しない業種はOFF。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag hq">本部：名簿タブ</span><span class="whotag client">クライアント：名簿タブ</span></span>
+            </span>
+          </label>
+          <label class="featrow" id="rowAttendance">
+            <input type="checkbox" data-feat="attendance" checked>
+            <span>
+              <span class="t">出席</span>
+              <span class="s">コマごとに誰が参加したかを記録します。名簿をOFFにすると出席も自動でOFFになります。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag hq">本部：コマの出席欄</span><span class="whotag client">クライアント：出席順の確定</span><span class="whotag worker">スタッフ：レッスン中の名簿</span></span>
+            </span>
+          </label>
+          <label class="featrow">
+            <input type="checkbox" data-feat="shifts" checked>
+            <span>
+              <span class="t">希望シフト</span>
+              <span class="s">働く人が希望日を提出し、本部が確認します。固定担当だけの事業はOFF。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag hq">本部：ホームの希望シフト</span><span class="whotag worker">スタッフ：希望シフト提出</span></span>
+            </span>
+          </label>
+          <label class="featrow">
+            <input type="checkbox" data-feat="reports" checked>
+            <span>
+              <span class="t">報告</span>
+              <span class="s">実施後の報告を提出・確認します。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag hq">本部：報告タブ</span><span class="whotag worker">スタッフ：報告の提出</span></span>
+            </span>
+          </label>
+          <label class="featrow">
+            <input type="checkbox" data-feat="manuals" checked>
+            <span>
+              <span class="t">マニュアル</span>
+              <span class="s">本部と働く人が見る手順書・教材。クライアントには出ません。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag hq">本部：マニュアルタブ</span><span class="whotag worker">スタッフ：マニュアル閲覧</span></span>
+            </span>
+          </label>
+          <label class="featrow">
+            <input type="checkbox" data-feat="lessons" checked>
+            <span>
+              <span class="t">レッスン画面（ポータル）</span>
+              <span class="s">ポータルにコマのカレンダーとZoom導線を出します。訪問・納品だけの事業はOFF。本部のスケジュールは常に残ります。</span>
+              <span class="whorow"><span class="lead">出る画面</span><span class="whotag client">クライアント：カレンダー</span><span class="whotag worker">スタッフ：レッスン画面・Zoom</span></span>
+            </span>
+          </label>
+        </div>
+        <div class="wholegend">
+          <span class="it"><span class="whotag hq">本部</span>あなた（管理する人）の画面</span>
+          <span class="it"><span class="whotag client">クライアント</span>依頼元・受入先の画面</span>
+          <span class="it"><span class="whotag worker">スタッフ</span>実際に働く人の画面</span>
+        </div>
+        <p class="stateline" style="margin-top:13px">
+          <span>◉</span>
+          <span id="featState"></span>
+        </p>
+      </section>
+
+      <section class="card">
+        <div class="grouphead">
+          <h2>ポータルに表示する内容</h2>
+          <p>クライアント／働く人が使う画面に出す内容（既存の設定。今回は変更しません）</p>
+        </div>
+        <div class="featlist">
+          <label class="featrow"><input type="checkbox" checked><span><span class="t">クライアントポータル全体</span><span class="s">自プロジェクトのスケジュール・提出物・メッセージを表示する</span></span></label>
+          <label class="featrow"><input type="checkbox" checked><span><span class="t">担当スタッフ連絡先</span><span class="s">連絡先とメッセージに担当スタッフを表示する。オフの場合は本部窓口のみ</span></span></label>
+          <label class="featrow"><input type="checkbox" checked><span><span class="t">請求記録</span><span class="s">クライアントの請求先画面に必要な請求情報を表示する</span></span></label>
+          <label class="featrow"><input type="checkbox" checked><span><span class="t">報酬記録</span><span class="s">対象スタッフの報酬画面に必要な報酬情報を表示する</span></span></label>
+        </div>
+        <div style="margin-top:15px"><button type="button" class="savebtn">設定を保存</button></div>
+      </section>
+
+      <section>
+        <h2 class="sectitle">Preview</h2>
+        <p class="secsub">この設定だと、相手にはこう見えます</p>
+        <div class="previewwrap">
+          <div class="previewbar">
+            <div class="segmented" role="group" aria-label="プレビュー対象">
+              <button type="button" data-prev="client" aria-pressed="true">クライアント</button>
+              <button type="button" data-prev="worker" aria-pressed="false">スタッフ</button>
+            </div>
+            <span class="previewnote">実データを読み取り専用で表示します。ここからは操作できません。</span>
+          </div>
+
+          <!-- クライアントポータル -->
+          <div class="device" id="prevClient">
+            <div class="devicebar"><span class="dots"><i></i><i></i><i></i></span><span>クライアントポータル ・ MUSUBI 講座担当 さんの画面</span></div>
+            <div class="devicebody">
+              <div class="ptabs">
+                <span class="ptab on" data-pf="lessons">カレンダー</span>
+                <span class="ptab" data-pf="roster">名簿</span>
+                <span class="ptab">メッセージ</span>
+              </div>
+              <div class="pblock" data-pf="lessons">
+                <div class="ph">総合カレンダー</div>
+                <div class="pb">日付を選ぶと、下にその日の全校の予定を表示します。</div>
+                <div class="fake"><i style="width:60px"></i><i style="width:38px"></i><i style="width:52px"></i><i style="width:44px"></i></div>
+              </div>
+              <div class="pblock" data-pf="lessons">
+                <div class="ph">本日のスケジュール</div>
+                <div class="pb">13:00〜14:00 テスト事業 ・ 担当 あゆみスタッフ</div>
+                <div class="pb" data-pf="attendance">出席者 7名</div>
+              </div>
+              <div class="pblock" data-pf="attendance">
+                <div class="ph">未確定の出席</div>
+                <div class="pb">2件 ・ クラス名簿から出席した人を順番に選びます。</div>
+                <span class="disabledbtn">出席順を保存（プレビューでは操作できません）</span>
+              </div>
+              <div class="pblock" data-pf="roster">
+                <div class="ph">名簿</div>
+                <div class="pb">対象者の一覧とグループ分け。ここから対象者を登録できます。</div>
+                <div class="fake"><i style="width:76px"></i><i style="width:56px"></i><i style="width:64px"></i></div>
+              </div>
+              <div class="pblock">
+                <div class="ph">メッセージ</div>
+                <div class="pb">本部・担当スタッフとのやり取り。（常に表示）</div>
+              </div>
+              <p class="offnote is-off" id="clientAllOff">この設定では、クライアントポータルにはメッセージだけが表示されます。</p>
+            </div>
+          </div>
+
+          <!-- スタッフポータル -->
+          <div class="device is-off" id="prevWorker">
+            <div class="devicebar"><span class="dots"><i></i><i></i><i></i></span><span>スタッフポータル ・ あゆみスタッフ さんの画面</span></div>
+            <div class="devicebody">
+              <div class="pblock" data-pf="lessons">
+                <div class="ph">総合カレンダー</div>
+                <div class="pb">担当中の全プロジェクトをまとめて表示します。予定からレッスン専用画面を開けます。</div>
+                <div class="fake"><i style="width:60px"></i><i style="width:38px"></i><i style="width:52px"></i></div>
+              </div>
+              <div class="pblock" data-pf="shifts">
+                <div class="ph">希望シフトを提出</div>
+                <div class="pb">来月の希望日を選んで提出します。締め日は毎月25日。</div>
+                <span class="disabledbtn">希望シフトを提出（プレビューでは操作できません）</span>
+              </div>
+              <div class="pblock" data-pf="lessons">
+                <div class="ph">次回レッスン</div>
+                <div class="pb">8/6（木）13:00〜14:00 テスト事業 ・ Zoom ID 872 8413 0349</div>
+                <span class="disabledbtn" data-pf="attendance">レッスン開始（プレビューでは操作できません）</span>
+              </div>
+              <div class="pblock" data-pf="manuals">
+                <div class="ph">マニュアル</div>
+                <div class="pb">担当予定がない日も、プロジェクトのマニュアルをいつでも確認できます。</div>
+              </div>
+              <div class="pblock" data-pf="reports">
+                <div class="ph">報告</div>
+                <div class="pb">実施後の報告を提出します。</div>
+              </div>
+              <p class="offnote is-off" id="workerAllOff">この設定では、スタッフポータルにはスケジュールの確認だけが残ります。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer>Team Works by mikke</footer>
+  </main>
+</div>
+
+<script>
+  // ============ カレンダー生成 ============
+  // 2026-08-01 は土曜、2026-07-01 は水曜。
+  const MONTHS = {
+    "2026-07": { firstDow: 3, days: 31, prevDays: 30, label: "2026年 7月" },
+    "2026-08": { firstDow: 6, days: 31, prevDays: 31, label: "2026年 8月" }
+  };
+
+  function buildCalendar(target, monthKey, annotate) {
+    const meta = MONTHS[monthKey];
+    const dow = ["日", "月", "火", "水", "木", "金", "土"];
+    let html = dow.map((d) => `<div class="dow">${d}</div>`).join("");
+
+    for (let i = 0; i < meta.firstDow; i++) {
+      html += `<div class="cell out"><span class="dnum">${meta.prevDays - meta.firstDow + 1 + i}</span></div>`;
+    }
+    for (let d = 1; d <= meta.days; d++) {
+      const a = annotate(d, (meta.firstDow + d - 1) % 7) || {};
+      const cls = ["cell"];
+      if (a.holiday) cls.push("holiday");
+      if (a.today) cls.push("today");
+      let inner = `<span class="dnum">${d}</span>`;
+      if (a.holidayLabel) inner += `<span class="hlabel">${a.holidayLabel}</span>`;
+      const chips = a.chips || [];
+      for (const c of chips.slice(0, 2)) {
+        const dot = c.dot ? `<span class="pdot" style="background:${c.dot}"></span>` : "";
+        inner += `<span class="chip" style="background:${c.bg};color:${c.fg}">${dot}<span class="tx">${c.text}</span></span>`;
+      }
+      if (chips.length > 2) inner += `<span class="chip more">+${chips.length - 2}</span>`;
+      html += `<div class="${cls.join(" ")}">${inner}</div>`;
+    }
+    const filled = meta.firstDow + meta.days;
+    const trail = (7 - (filled % 7)) % 7;
+    for (let d = 1; d <= trail; d++) {
+      html += `<div class="cell out"><span class="dnum">${d}</span></div>`;
+    }
+    target.innerHTML = html;
+  }
+
+  // ============ データ ============
+  // モック上の「今日」。8/4の提出期日を期限超過(ORANGE)として見せるため8/5にしている。
+  const MOCK_TODAY = 5;
+
+  // 納品期日。kind: submit=提出のみ / due=完了のみ / both=同日にまとまったもの
+  // 納品型プロジェクトの識別色。カレンダーのチップの丸と凡例・プロジェクトリンクで共通。
+  const DELIVERY_PROJECTS = [
+    { name: "mikkeOS Official Academy 初期構築", color: "#3f4eb5" },
+    { name: "ハンドメイド講座", color: "#6cba97" },
+    { name: "MUSUBI 認定講座構築", color: "#e8663f" }
+  ];
+  const projectColor = (name) => (DELIVERY_PROJECTS.find((p) => p.name === name) || {}).color || "#3f4eb5";
+
+  const DELIVERY = [
+    { day: 2,  title: "ヒアリング・講座整理", kind: "both", project: "MUSUBI 認定講座構築", done: true },
+    { day: 4,  title: "Official Program全体仕様を確定する", kind: "submit", project: "mikkeOS Official Academy 初期構築" },
+    { day: 6,  title: "Official Program全体仕様を確定する", kind: "due", project: "mikkeOS Official Academy 初期構築" },
+    { day: 10, title: "受講料・月額費用・登録料・本部発注費を確定する", kind: "both", project: "mikkeOS Official Academy 初期構築" },
+    { day: 14, title: "Official Academy本部とTrainerの役割分担を確定する", kind: "both", project: "mikkeOS Official Academy 初期構築" },
+    { day: 17, title: "テキスト・ディプロマ作成", kind: "submit", project: "ハンドメイド講座" },
+    { day: 18, title: "Official Program総合Pageを完成する", kind: "both", project: "mikkeOS Official Academy 初期構築" },
+    { day: 22, title: "講座申込・相談・問い合わせ導線を設定する", kind: "both", project: "mikkeOS Official Academy 初期構築" },
+    { day: 26, title: "mikkeOS Member 1日ワークショップを設計する", kind: "both", project: "mikkeOS Official Academy 初期構築" },
+    { day: 30, title: "Memberワークショップ用スライド・ワーク資料を制作する", kind: "both", project: "mikkeOS Official Academy 初期構築" }
+  ];
+
+  // 実装の itemTone と同じ規則: 完了=GREEN / 期限超過=ORANGE / 提出=PINK / それ以外=BLUE
+  function deliveryTone(item) {
+    if (item.done) return { bg: "var(--tw-done)", fg: "var(--tw-on-tint)" };
+    if (item.day < MOCK_TODAY) return { bg: "var(--tw-action)", fg: "#fff" };
+    if (item.kind === "submit") return { bg: "var(--tw-deadline)", fg: "var(--tw-on-tint)" };
+    return { bg: "var(--tw-title)", fg: "#fff" };
+  }
+  function kindLabel(kind) {
+    return kind === "submit" ? "提出期日" : kind === "due" ? "完了期日" : "提出・完了期日";
+  }
+  // 意味のある語(提出/完了)を先頭に置く。マスが狭くて末尾が切れても種別だけは必ず読める。
+  function chipText(item) {
+    const prefix = item.kind === "submit" ? "提出" : item.kind === "both" ? "提出・完了" : "完了";
+    return `${prefix} ${item.title}`;
+  }
+
+  const ACCOUNTS = {
+    mixed: {
+      hasDelivery: true,
+      monthKey: "2026-08",
+      workers: "スタッフ",
+      // 運営コマ。納品期日と同じマスに乗る日をわざと含めている(4/6/17)。
+      sessions: { 4: "テスト事業 13:00", 6: "テスト事業 13:00", 7: "テスト事業 13:00", 12: "テスト事業 13:00", 17: "テスト事業 13:00", 20: "テスト事業 13:00" },
+      sessionBg: "var(--mikke-blue)",
+      holidayName: { 11: "山の日" },
+      projects: [{ name: "テスト事業", color: "var(--mikke-blue)" }],
+      messages: []
+    },
+    arisa: {
+      hasDelivery: false,
+      monthKey: "2026-07",
+      workers: "パートナー",
+      sessions: { 31: "スリランカ校 12:30" },
+      sessionBg: "var(--mikke-green)",
+      holidayName: { 20: "海の日" },
+      projects: [{ name: "インドネシア校", color: "var(--mikke-blue)" }, { name: "スリランカ校", color: "var(--mikke-green)" }],
+      messages: [{ name: "joes.style.a（スリランカ校）", body: "tesuto", time: "4日前" }]
+    }
+  };
+
+  let currentAcct = "mixed";
+  let currentHomeTab = "all";
+
+  function renderHome() {
+    const acct = ACCOUNTS[currentAcct];
+    const showDelivery = acct.hasDelivery && (currentHomeTab === "all" || currentHomeTab === "delivery");
+    const showOps = !acct.hasDelivery || currentHomeTab === "all" || currentHomeTab === "ops";
+
+    document.getElementById("homeTabs").classList.toggle("is-hidden", !acct.hasDelivery);
+    document.getElementById("calMonth").textContent = MONTHS[acct.monthKey].label;
+    document.getElementById("navWorkers").textContent = `${acct.workers}管理`;
+    document.getElementById("finWorkers").textContent = acct.workers;
+    document.getElementById("shiftTitle").textContent = `${acct.workers}希望シフト`;
+
+    // カレンダー本体
+    const byDay = new Map();
+    if (showDelivery) {
+      for (const item of DELIVERY) {
+        const list = byDay.get(item.day) || [];
+        list.push(item);
+        byDay.set(item.day, list);
+      }
+    }
+    buildCalendar(document.getElementById("homeCal"), acct.monthKey, (d, dow) => {
+      const out = { chips: [] };
+      if (acct.holidayName[d]) { out.holiday = true; out.holidayLabel = acct.holidayName[d]; }
+      else if (dow === 0 || dow === 6) { out.holiday = true; out.holidayLabel = "休校"; }
+      if (acct.monthKey === "2026-08" && d === MOCK_TODAY) out.today = true;
+      // 運営のコマを先に、納品の期日を後ろに(実装の extraItems と同じ順)
+      if (showOps && acct.sessions[d]) out.chips.push({ text: acct.sessions[d], bg: acct.sessionBg, fg: "#fff" });
+      for (const item of byDay.get(d) || []) {
+        const tone = deliveryTone(item);
+        out.chips.push({ text: chipText(item), bg: tone.bg, fg: tone.fg, dot: projectColor(item.project) });
+      }
+      return out;
+    });
+
+    // 凡例。納品を出さないときは納品ぶんの凡例も出さない(=アリサでは現状どおり)。
+    let legend = "";
+    if (showOps) {
+      legend += acct.projects.map((p) => `<span class="it"><span class="sw" style="background:${p.color}"></span>${p.name}</span>`).join("");
+      legend += `<span class="it"><span class="sw" style="background:var(--mikke-orange)"></span>休校</span>`;
+    }
+    legend += `<span class="it"><span class="sw" style="background:var(--mikke-holiday)"></span>土日祝</span>`;
+    if (showDelivery) {
+      if (showOps) legend += `<span class="it" style="width:100%;height:1px"></span>`;
+      legend += `<span class="it"><span class="sw" style="background:var(--tw-deadline)"></span>提出期日</span>`;
+      legend += `<span class="it"><span class="sw" style="background:var(--tw-title)"></span>完了期日</span>`;
+      legend += `<span class="it"><span class="sw" style="background:var(--tw-action)"></span>期限超過</span>`;
+      legend += `<span class="it"><span class="sw" style="background:var(--tw-done)"></span>完了</span>`;
+      legend += DELIVERY_PROJECTS.map((p) => `<span class="it"><span class="sw" style="background:${p.color};border-radius:50%"></span>${p.name}</span>`).join("");
+    }
+    document.getElementById("homeLegend").innerHTML = legend;
+
+    // カレンダー下のプロジェクトリンク(Phase Gで実装済み)
+    const links = acct.projects.slice();
+    if (showDelivery) for (const p of DELIVERY_PROJECTS) links.push({ name: p.name, color: p.color });
+    document.getElementById("homeProjLinks").innerHTML =
+      `<span class="pl-label">プロジェクト（${links.length}件）</span>`
+      + links.map((p) => `<span class="pl-pill"><span class="dot" style="background:${p.color}"></span>${p.name}</span>`).join("")
+      + `<span class="pl-manage" data-nav="projects" style="cursor:pointer">プロジェクト管理へ ›</span>`;
+
+    // メッセージ
+    document.getElementById("homeMsgs").innerHTML = acct.messages.length === 0
+      ? `<p class="msgempty">新着メッセージはありません。</p>`
+      : acct.messages.map((m) => `<div class="msgrow"><span class="msgav">◎</span><span class="bd"><span class="nm">${m.name}</span><span class="tx">${m.body}</span></span><span class="tm">${m.time}</span></div>`).join("");
+
+    // 今後の予定。運営のコマと納品の期日を1本の時系列にまとめる
+    // (「混合のスケジュールを一目で見たい」というのがこのタブの目的)。
+    const merged = [];
+    if (showOps) {
+      for (const [day, label] of Object.entries(acct.sessions)) {
+        if (Number(day) < MOCK_TODAY && acct.monthKey === "2026-08") continue;
+        merged.push({ day: Number(day), sort: Number(day) * 10, pill: "13:00", pillBg: "var(--tw-planned)", pillFg: "var(--tw-on-tint)", title: label.replace(" 13:00", ""), sub: "運営型・コマ ／ 担当 あゆみスタッフ" });
+      }
+    }
+    if (showDelivery) {
+      for (const x of DELIVERY.filter((d) => d.day >= MOCK_TODAY)) {
+        const tone = deliveryTone(x);
+        merged.push({ day: x.day, sort: x.day * 10 + 1, pill: kindLabel(x.kind).replace("期日", ""), pillBg: tone.bg, pillFg: tone.fg, title: x.title, sub: `納品型・${x.project}` });
+      }
+    }
+    merged.sort((a, b) => a.sort - b.sort);
+    const monthNo = acct.monthKey === "2026-08" ? 8 : 7;
+    document.getElementById("homeUpcoming").innerHTML = merged.slice(0, 8).map((x) => `
+      <a class="duerow" href="#">
+        <span class="duepill" style="background:${x.pillBg};color:${x.pillFg}">${monthNo}/${x.day} ${x.pill}</span>
+        <span class="bd"><span class="t">${x.title}</span><span class="s">${x.sub}</span></span>
+        <span class="go">開く ›</span>
+      </a>`).join("") || `<p class="secsub" style="margin:0">今後の予定はありません。</p>`;
+    document.getElementById("upcomingTitle").textContent = `今後の予定（${Math.min(merged.length, 8)}件）`;
+
+    // セクションの出し分け。「すべて」は軽く保ちたいので希望シフトは運営タブだけに置く。
+    document.getElementById("homeShift").style.display = (acct.hasDelivery ? currentHomeTab === "ops" : true) ? "" : "none";
+    document.getElementById("attnOpsWrap").style.display = showOps ? "" : "none";
+    document.getElementById("attnDelWrap").style.display = showDelivery ? "" : "none";
+    document.getElementById("attnSub").textContent = showOps && showDelivery
+      ? "緊急・期日が近い・大事なこと（運営・納品の両方）"
+      : "緊急・期日が近い・大事なこと";
+
+    // 状態表示(モック確認用)
+    const state = document.getElementById("homeState");
+    if (!acct.hasDelivery) {
+      state.innerHTML = `<span>◉</span><span><b>運営型しか使っていない組織＝アリサさんの画面。</b>タブは出ず、カレンダーにも納品のチップ・凡例が出ません。今と同じです。</span>`;
+    } else if (currentHomeTab === "all") {
+      state.innerHTML = `<span>◉</span><span><b>「すべて」タブ（初期表示）＝混合スケジュールを一目で見るための軽い画面。</b>カレンダー＋FINANCE／MESSAGES＋TODAY＋NEEDS ATTENTIONだけに絞りました（希望シフトは運営タブへ）。<b>8/4・8/6・8/17</b>のマスで運営のコマと納品の期日が同居します。空いている日がひと目で分かり、カレンダー下のリンクからそのプロジェクトへ入って予定を組めます。</span>`;
+    } else if (currentHomeTab === "ops") {
+      state.innerHTML = `<span>◉</span><span><b>「運営」タブ。</b>運営のコマだけ。Phase Gで実装済みの画面そのままです。</span>`;
+    } else {
+      state.innerHTML = `<span>◉</span><span><b>「納品」タブ。</b>納品の期日だけ。Phase Gで実装済みの画面そのままです。</span>`;
+    }
+  }
+
+  // ============ 納品型詳細 ============
+  function renderDeliveryDetail() {
+    buildCalendar(document.getElementById("delCal"), "2026-08", (d, dow) => {
+      const out = { chips: [] };
+      if (d === 11) { out.holiday = true; out.holidayLabel = "山の日"; }
+      else if (dow === 0 || dow === 6) { out.holiday = true; out.holidayLabel = "休校"; }
+      if (d === MOCK_TODAY) out.today = true;
+      // 1プロジェクトの詳細画面なので、識別用の丸は出さない(色は期日の種別だけを表す)
+      for (const item of DELIVERY.filter((x) => x.day === d && x.project === "mikkeOS Official Academy 初期構築")) {
+        const tone = deliveryTone(item);
+        out.chips.push({ text: chipText(item), bg: tone.bg, fg: tone.fg });
+      }
+      return out;
+    });
+
+    const mine = DELIVERY.filter((x) => x.project === "mikkeOS Official Academy 初期構築" && x.day >= MOCK_TODAY).slice(0, 5);
+    document.getElementById("delDueList").innerHTML = mine.map((x) => `
+      <a class="duerow" href="#">
+        <span class="duepill">▤ 08-${String(x.day).padStart(2, "0")}</span>
+        <span class="bd"><span class="t">${x.title}</span><span class="s">${kindLabel(x.kind)}</span></span>
+        <span class="go">開く ›</span>
+      </a>`).join("");
+
+    const TASKS = [
+      { no: 1, t: "Official Program全体仕様を確定する", s: "本部 ・ 提出 08-04 / 完了 08-06", st: "over", stl: "期限超過" },
+      { no: 2, t: "受講料・月額費用・登録料・本部発注費を確定する", s: "本部 ・ 提出・完了 08-10", st: "doing", stl: "進行中" },
+      { no: 3, t: "Official Academy本部とTrainerの役割分担を確定する", s: "本部 ・ 提出・完了 08-14", st: "wait", stl: "未着手" },
+      { no: 4, t: "Official Program総合Pageを完成する", s: "あゆみスタッフ ・ 提出・完了 08-18", st: "wait", stl: "未着手" },
+      { no: 5, t: "講座申込・相談・問い合わせ導線を設定する", s: "仮の担当名：ネオン ・ 提出・完了 08-22", st: "wait", stl: "未着手" }
+    ];
+    document.getElementById("taskList").innerHTML = TASKS.map((x) => `
+      <div class="taskrow">
+        <span class="no">${x.no}</span>
+        <span class="bd"><span class="t">${x.t}</span><span class="s">${x.s}</span></span>
+        <span class="stbadge ${x.st}">${x.stl}</span>
+      </div>`).join("");
+  }
+
+  // ============ 機能ON/OFF＋プレビュー ============
+  function applyFeatures() {
+    const get = (name) => document.querySelector(`[data-feat="${name}"]`);
+    const roster = get("roster").checked;
+    const attendanceBox = get("attendance");
+    // 名簿OFFなら出席は強制OFF(実装の resolve 関数と同じ依存関係)
+    if (!roster) { attendanceBox.checked = false; attendanceBox.disabled = true; }
+    else { attendanceBox.disabled = false; }
+    document.getElementById("rowAttendance").classList.toggle("is-forced", !roster);
+
+    const on = {
+      roster,
+      attendance: roster && attendanceBox.checked,
+      shifts: get("shifts").checked,
+      reports: get("reports").checked,
+      manuals: get("manuals").checked,
+      lessons: get("lessons").checked
+    };
+
+    // 本部のタブ
+    for (const tab of document.querySelectorAll("[data-feattab]")) {
+      tab.classList.toggle("is-hidden", !on[tab.dataset.feattab]);
+    }
+    // ポータルのブロック
+    for (const el of document.querySelectorAll("#prevClient [data-pf], #prevWorker [data-pf]")) {
+      el.classList.toggle("is-off", !on[el.dataset.pf]);
+    }
+    document.getElementById("clientAllOff").classList.toggle("is-off", on.lessons || on.roster || on.attendance);
+    document.getElementById("workerAllOff").classList.toggle("is-off", on.lessons || on.shifts || on.reports || on.manuals);
+
+    const offList = Object.entries({ roster: "名簿", attendance: "出席", shifts: "希望シフト", reports: "報告", manuals: "マニュアル", lessons: "レッスン画面" })
+      .filter(([k]) => !on[k]).map(([, v]) => v);
+    document.getElementById("featState").innerHTML = offList.length === 0
+      ? `<b>全部ON＝未設定と同じ状態。</b>アリサさんの全プロジェクトがこれです。保存しない限りこの状態のままで、今と何も変わりません。`
+      : `<b>OFFにした機能: ${offList.join("・")}</b>。上のタブと下のプレビューから該当箇所が消えました。データは消えていないので、ONに戻せば元通りです。`;
+  }
+
+  // ============ 画面切替 ============
+  const TITLES = { home: "本部ダッシュボード", delivery: "プロジェクト詳細", projects: "プロジェクト管理", features: "プロジェクト詳細" };
+  const NAVFOR = { home: "home", projects: "projects", delivery: "projects", features: "projects" };
+
+  function selectScreen(screen) {
+    for (const el of document.querySelectorAll(".screen")) {
+      el.classList.toggle("is-active", el.id === "screen" + screen.charAt(0).toUpperCase() + screen.slice(1));
+    }
+    for (const b of document.querySelectorAll(".mockbar [data-screen]")) {
+      b.setAttribute("aria-pressed", String(b.dataset.screen === screen));
+    }
+    for (const n of document.querySelectorAll(".navitem")) {
+      n.classList.toggle("active", n.dataset.nav === NAVFOR[screen]);
+    }
+    document.getElementById("pageTitle").textContent = TITLES[screen];
+    document.getElementById("acctGrp").classList.toggle("is-hidden", screen !== "home");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  // ============ イベント ============
+  for (const b of document.querySelectorAll(".mockbar [data-screen]")) {
+    b.addEventListener("click", () => selectScreen(b.dataset.screen));
+  }
+  for (const b of document.querySelectorAll(".mockbar [data-acct]")) {
+    b.addEventListener("click", () => {
+      currentAcct = b.dataset.acct;
+      currentHomeTab = "all";
+      for (const o of document.querySelectorAll(".mockbar [data-acct]")) o.setAttribute("aria-pressed", String(o === b));
+      for (const t of document.querySelectorAll("[data-home]")) t.setAttribute("aria-selected", String(t.dataset.home === "all"));
+      renderHome();
+    });
+  }
+  for (const t of document.querySelectorAll("[data-home]")) {
+    t.addEventListener("click", () => {
+      currentHomeTab = t.dataset.home;
+      for (const o of document.querySelectorAll("[data-home]")) o.setAttribute("aria-selected", String(o === t));
+      renderHome();
+    });
+  }
+  for (const t of document.querySelectorAll("[data-dtab]")) {
+    t.addEventListener("click", () => {
+      for (const o of document.querySelectorAll("[data-dtab]")) o.setAttribute("aria-selected", String(o === t));
+      for (const p of document.querySelectorAll("[data-dpane]")) p.classList.toggle("is-active", p.dataset.dpane === t.dataset.dtab);
+      window.scrollTo({ top: 0, behavior: "instant" });
+    });
+  }
+  for (const b of document.querySelectorAll("[data-collapse]")) {
+    b.addEventListener("click", () => {
+      const box = b.closest(".collapse");
+      if (box) box.classList.toggle("is-open");
+    });
+  }
+  for (const b of document.querySelectorAll("[data-prev]")) {
+    b.addEventListener("click", () => {
+      for (const o of document.querySelectorAll("[data-prev]")) o.setAttribute("aria-pressed", String(o === b));
+      document.getElementById("prevClient").classList.toggle("is-off", b.dataset.prev !== "client");
+      document.getElementById("prevWorker").classList.toggle("is-off", b.dataset.prev !== "worker");
+    });
+  }
+  for (const c of document.querySelectorAll("[data-feat]")) {
+    c.addEventListener("change", applyFeatures);
+  }
+  // サイドバー・カード・戻るボタンからの画面遷移
+  document.addEventListener("click", (event) => {
+    const target = event.target.closest("[data-nav]");
+    if (!target || target.dataset.nav === "none") return;
+    selectScreen(target.dataset.nav);
+  });
+
+  renderHome();
+  renderDeliveryDetail();
+  applyFeatures();
+</script>

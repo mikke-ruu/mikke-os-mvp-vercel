@@ -6,7 +6,7 @@ export type CalendarProjectLink = { id: string; title: string; bg?: string };
 
 // カレンダーの凡例の色と揃わない呼び出し元(納品ダッシュボードなど、プロジェクトに
 // 固有の色を持たない)向けの識別用フォールバック。役割トークンではなく識別色として使う。
-const fallbackDotColors = [
+export const fallbackDotColors = [
   "var(--mikke-blue)",
   "var(--mikke-orange)",
   "var(--mikke-green)",

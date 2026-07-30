@@ -16,6 +16,7 @@ import {
 import { fetchDeliveryProjects } from "@/lib/team-works-delivery";
 import { TeamWorksDayPanel } from "./TeamWorksDayPanel";
 import { TeamWorksDeliveryDashboard } from "./TeamWorksDeliveryDashboard";
+import { TeamWorksHomeAllView } from "./TeamWorksHomeAllView";
 import { TeamWorksMonthCalendar } from "./TeamWorksMonthCalendar";
 import { TeamWorksShiftAdminPanel } from "./TeamWorksShiftAdminPanel";
 import { FinanceCard, MessagesCard } from "./TeamWorksHomeCards";
@@ -27,7 +28,7 @@ function startOfCurrentMonth(): Date {
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
-type HomeTab = "ops" | "delivery";
+type HomeTab = "all" | "ops" | "delivery";
 
 export function TeamWorksOperationsDashboard() {
   const router = useRouter();
@@ -44,9 +45,10 @@ export function TeamWorksOperationsDashboard() {
   // 納品型が1件でもあるかどうかだけの軽い判定。重いloadDeliveryHomeSummary
   // (プロジェクト数×4-5クエリ)はTeamWorksDeliveryDashboard側が自分で読む。
   const [hasDeliveryProjects, setHasDeliveryProjects] = useState(false);
-  const [activeHomeTab, setActiveHomeTab] = useState<HomeTab>(
-    searchParams.get("home") === "delivery" ? "delivery" : "ops"
-  );
+  const [activeHomeTab, setActiveHomeTab] = useState<HomeTab>(() => {
+    const requested = searchParams.get("home");
+    return requested === "delivery" || requested === "ops" ? requested : "all";
+  });
 
   const load = useCallback(async (targetMonth: Date) => {
     setLoading(true);
@@ -101,8 +103,8 @@ export function TeamWorksOperationsDashboard() {
   const selectHomeTab = useCallback((tab: HomeTab) => {
     setActiveHomeTab(tab);
     const params = new URLSearchParams(searchParams.toString());
-    if (tab === "delivery") params.set("home", "delivery");
-    else params.delete("home");
+    if (tab === "all") params.delete("home");
+    else params.set("home", tab);
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname);
   }, [pathname, router, searchParams]);
@@ -148,6 +150,7 @@ export function TeamWorksOperationsDashboard() {
         <nav aria-label="ホームの表示切替" className="-mx-4 overflow-x-auto border-b border-[var(--mikke-line)] px-4">
           <div className="flex min-w-max gap-1">
             {([
+              { id: "all", label: "すべて" },
               { id: "ops", label: "運営" },
               { id: "delivery", label: "納品" }
             ] as { id: HomeTab; label: string }[]).map((tab) => (
@@ -170,6 +173,17 @@ export function TeamWorksOperationsDashboard() {
 
       {bothTypes && activeHomeTab === "delivery" ? (
         <TeamWorksDeliveryDashboard />
+      ) : bothTypes && activeHomeTab === "all" ? (
+        <TeamWorksHomeAllView
+          opsData={data}
+          monthDate={monthDate}
+          onMonthChange={(nextMonth) => {
+            setCalendarAutoPositioned(true);
+            setSelectedDayKey(null);
+            setMonthDate(nextMonth);
+          }}
+          onSelectDay={setSelectedDayKey}
+        />
       ) : (
         <>
           {data.activePresenceEvents.length > 0 ? (
@@ -321,17 +335,17 @@ export function TeamWorksOperationsDashboard() {
               )}
             </div>
           </MikkeSection>
-
-          {selectedDayKey ? (
-            <TeamWorksDayPanel
-              dateKey={selectedDayKey}
-              events={selectedDayEvents}
-              holidays={selectedDayHolidays}
-              onClose={() => setSelectedDayKey(null)}
-            />
-          ) : null}
         </>
       )}
+
+      {activeHomeTab !== "delivery" && selectedDayKey ? (
+        <TeamWorksDayPanel
+          dateKey={selectedDayKey}
+          events={selectedDayEvents}
+          holidays={selectedDayHolidays}
+          onClose={() => setSelectedDayKey(null)}
+        />
+      ) : null}
     </div>
   );
 }

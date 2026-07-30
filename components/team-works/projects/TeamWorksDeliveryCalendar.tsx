@@ -12,6 +12,7 @@ export type DeliveryCalendarItemKind = "submit" | "due" | "both";
 
 export type DeliveryCalendarItem = {
   id: string;
+  projectId: string;
   title: string;
   status: DeliveryTaskStatus;
   date: string;
@@ -30,11 +31,11 @@ export function buildDeliveryCalendarItems(tasks: (DeliveryTask & { projectTitle
   const items: DeliveryCalendarItem[] = [];
   for (const task of tasks) {
     if (task.submitDueOn && task.dueOn && task.submitDueOn === task.dueOn) {
-      items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "both", projectTitle: task.projectTitle });
+      items.push({ id: task.id, projectId: task.projectId, title: task.title, status: task.status, date: task.dueOn, kind: "both", projectTitle: task.projectTitle });
       continue;
     }
-    if (task.submitDueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.submitDueOn, kind: "submit", projectTitle: task.projectTitle });
-    if (task.dueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "due", projectTitle: task.projectTitle });
+    if (task.submitDueOn) items.push({ id: task.id, projectId: task.projectId, title: task.title, status: task.status, date: task.submitDueOn, kind: "submit", projectTitle: task.projectTitle });
+    if (task.dueOn) items.push({ id: task.id, projectId: task.projectId, title: task.title, status: task.status, date: task.dueOn, kind: "due", projectTitle: task.projectTitle });
   }
   return items;
 }
@@ -48,7 +49,7 @@ function isOverdue(dateOn: string, status: DeliveryTaskStatus): boolean {
 
 // 色は役割トークン固定: 完了=GREEN、期限超過=ORANGE(要対応)、
 // 提出期日=PINK(締切)、完了期日・提出完了同日=BLUE(基準日)。
-function itemTone(item: DeliveryCalendarItem): { bg: string; text: string } {
+export function itemTone(item: DeliveryCalendarItem): { bg: string; text: string } {
   if (item.status === "completed") return { bg: "var(--tw-done)", text: "var(--tw-on-tint)" };
   if (isOverdue(item.date, item.status)) return { bg: "var(--tw-action)", text: "var(--tw-on-solid)" };
   if (item.kind === "submit") return { bg: "var(--tw-deadline)", text: "var(--tw-on-tint)" };

@@ -18,6 +18,21 @@ const maxChipsPerCell = 2;
 
 type CalendarView = "month" | "week" | "day";
 
+// ホーム「すべて」タブ用の汎用スロット(統一計画Phase Fの実装メモで予告済みの方式)。
+// 運営コマとは意味が違う項目(納品期日など)を、コマの後ろに追加でチップ表示するためのもの。
+// マスの実効幅は約82pxしかなく、プロジェクト名をtextに前置すると必ず潰れることが
+// モック検証(2026-07-30)で分かっているため、textには種別を先頭にした短い文言だけを渡し、
+// プロジェクトの区別はdotColorの小さな丸で行う(既存ClientMonthCalendarと同じ作法)。
+export type CalendarExtraItem = {
+  dateKey: string;
+  text: string;
+  bg: string;
+  fg: string;
+  dotColor?: string;
+  projectId?: string;
+  projectTitle?: string;
+};
+
 export function TeamWorksMonthCalendar({
   monthDate,
   onMonthChange,
@@ -26,7 +41,9 @@ export function TeamWorksMonthCalendar({
   projects,
   shiftAvailability = [],
   onSelectDay,
-  operationSettings = DEFAULT_OPERATION_SETTINGS
+  operationSettings = DEFAULT_OPERATION_SETTINGS,
+  extraItems = [],
+  extraLegend
 }: {
   monthDate: Date;
   onMonthChange: (nextMonth: Date) => void;
@@ -36,6 +53,8 @@ export function TeamWorksMonthCalendar({
   shiftAvailability?: { date: string; names: string[] }[];
   onSelectDay: (dateKey: string) => void;
   operationSettings?: TeamWorksOperationSettings;
+  extraItems?: CalendarExtraItem[];
+  extraLegend?: { label: string; color: string; dot?: boolean }[];
 }) {
   const labels = useTeamWorksLabels();
   const [view, setView] = useState<CalendarView>("month");
@@ -51,10 +70,30 @@ export function TeamWorksMonthCalendar({
     }
     return map;
   }, [events]);
+  const extraItemsByDate = useMemo(() => {
+    const map = new Map<string, CalendarExtraItem[]>();
+    for (const item of extraItems) {
+      const list = map.get(item.dateKey) ?? [];
+      list.push(item);
+      map.set(item.dateKey, list);
+    }
+    return map;
+  }, [extraItems]);
   const shiftsByDate = useMemo(
     () => new Map(shiftAvailability.map((item) => [item.date, item.names])),
     [shiftAvailability]
   );
+
+  // カレンダー下のプロジェクトリンクに、extraItemsが指すプロジェクトも足す
+  // (運営型の一覧だけでは「すべて」タブで納品型プロジェクトへ飛べないため)。
+  const extraProjectLinks = useMemo(() => {
+    const seen = new Map<string, { id: string; title: string; bg?: string }>();
+    for (const item of extraItems) {
+      if (!item.projectId || !item.projectTitle || seen.has(item.projectId)) continue;
+      seen.set(item.projectId, { id: item.projectId, title: item.projectTitle, bg: item.dotColor });
+    }
+    return [...seen.values()];
+  }, [extraItems]);
 
   const goPrevMonth = () => onMonthChange(new Date(monthDate.getFullYear(), monthDate.getMonth() - 1, 1));
   const goNextMonth = () => onMonthChange(new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1));
@@ -116,9 +155,12 @@ export function TeamWorksMonthCalendar({
             // ラベル表示は従来通りgetJapanDayOff基準のまま(表示の意味は変えない)。
             const isClosed = isClosedDayKey(operationSettings, dateKey);
             const dayEvents = eventsByDate.get(dateKey) ?? [];
+            const dayExtraItems = extraItemsByDate.get(dateKey) ?? [];
             const availablePartnerNames = shiftsByDate.get(dateKey) ?? [];
             const visibleEvents = dayEvents.slice(0, maxChipsPerCell);
-            const overflowCount = dayEvents.length - visibleEvents.length;
+            const remainingSlots = Math.max(0, maxChipsPerCell - visibleEvents.length);
+            const visibleExtraItems = dayExtraItems.slice(0, remainingSlots);
+            const overflowCount = dayEvents.length - visibleEvents.length + (dayExtraItems.length - visibleExtraItems.length);
 
             if (!inMonth) {
               return (
@@ -175,6 +217,16 @@ export function TeamWorksMonthCalendar({
                         : ""}
                   </span>
                 ))}
+                {visibleExtraItems.map((item, index) => (
+                  <span
+                    key={`extra-${item.projectId ?? "x"}-${index}`}
+                    className="mt-0.5 flex items-center gap-1 truncate rounded px-1 py-[1px] text-[8px] font-bold"
+                    style={{ background: item.bg, color: item.fg }}
+                  >
+                    {item.dotColor ? <span className="h-1 w-1 shrink-0 rounded-full" style={{ background: item.dotColor }} /> : null}
+                    <span className="truncate">{item.text}</span>
+                  </span>
+                ))}
                 {overflowCount > 0 ? <span className="mt-0.5 block text-[8px] font-bold text-[var(--mikke-muted-light)]">+{overflowCount}</span> : null}
               </button>
             );
@@ -209,10 +261,24 @@ export function TeamWorksMonthCalendar({
             {labels.workers}希望日
           </span>
         ) : null}
+        {extraLegend && extraLegend.length > 0 ? (
+          <>
+            <span className="w-full basis-full" aria-hidden="true" />
+            {extraLegend.map((entry) => (
+              <span key={entry.label} className="inline-flex items-center gap-1.5">
+                <span className={entry.dot ? "h-2.5 w-2.5 rounded-full" : "h-2.5 w-2.5 rounded-[3px]"} style={{ background: entry.color }} />
+                {entry.label}
+              </span>
+            ))}
+          </>
+        ) : null}
       </div>
 
       <TeamWorksCalendarProjectLinks
-        projects={projects.map((project) => ({ id: project.id, title: project.title, bg: project.bg }))}
+        projects={[
+          ...projects.map((project) => ({ id: project.id, title: project.title, bg: project.bg })),
+          ...extraProjectLinks
+        ]}
       />
     </div>
   );

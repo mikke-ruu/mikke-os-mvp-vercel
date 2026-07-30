@@ -128,7 +128,7 @@ export function TeamWorksDeliveryDashboard() {
               {summary.upcoming.map((item, index) => (
                 <Link
                   key={`${item.taskId}-${item.kind}-${index}`}
-                  href={`/apps/team-works/projects/${item.projectId}?tab=schedule`}
+                  href={`/apps/team-works/projects/${item.projectId}?tab=tasks`}
                   className="grid gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3 transition hover:border-[var(--tw-done)] sm:grid-cols-[100px_1fr_auto] sm:items-center"
                 >
                   <span className="inline-flex items-center gap-1 rounded-lg bg-[var(--tw-planned)] px-2 py-2 text-center text-xs font-extrabold text-[var(--tw-on-tint)]">

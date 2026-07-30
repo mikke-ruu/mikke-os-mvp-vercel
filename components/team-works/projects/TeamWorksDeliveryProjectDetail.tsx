@@ -9,14 +9,17 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  ExternalLink,
   FileCheck2,
   FileText,
+  FolderOpen,
   Info,
   ListChecks,
   Package,
   Plus,
   Save,
   Settings2,
+  Trash2,
   UsersRound
 } from "lucide-react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
@@ -30,12 +33,15 @@ import {
 } from "@/lib/team-works-operations-project";
 import {
   addDeliveryProjectMember,
+  archiveDeliveryMaterial,
   autoScheduleDeliveryTasks,
+  createDeliveryMaterial,
   createDeliveryTask,
   deliveryTaskOwnerRoleLabels,
   emptyDeliveryTaskInstruction,
   deliveryTaskStatusLabels,
   deliveryTaskSubmissionTypeLabels,
+  fetchDeliveryMaterials,
   fetchDeliveryProjectPendingInvites,
   loadDeliveryProjectDetail,
   resolveMyDeliveryProjectMembership,
@@ -43,6 +49,7 @@ import {
   updateDeliveryProjectDueOn,
   updateDeliveryProjectSettings,
   updateDeliveryTask,
+  type DeliveryMaterial,
   type DeliveryPendingInvite,
   type DeliveryProjectDetail,
   type DeliveryProjectMember,
@@ -60,6 +67,7 @@ import {
   type DeliveryFormInputActor,
   type DeliveryProjectForm
 } from "@/lib/team-works-delivery-forms";
+import { formatDateKey } from "@/lib/team-works-operations";
 import { buildDeliveryCalendarItems, TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
 import { TeamWorksDeliveryDeliverableAdminPanel } from "./TeamWorksDeliveryDeliverableAdminPanel";
 import { TeamWorksDeliveryStaffPendingSummary } from "./TeamWorksDeliveryStaffPendingSummary";
@@ -73,13 +81,17 @@ const taskStatuses = Object.keys(deliveryTaskStatusLabels) as DeliveryTaskStatus
 const ownerRoles = Object.keys(deliveryTaskOwnerRoleLabels) as DeliveryTaskOwnerRole[];
 const submissionTypes = Object.keys(deliveryTaskSubmissionTypeLabels) as DeliveryTaskSubmissionType[];
 
-type DeliveryProjectTab = "overview" | "tasks" | "schedule" | "deliverables" | "members" | "settings";
+type DeliveryProjectTab = "overview" | "tasks" | "materials" | "deliverables" | "members" | "settings";
 
+// 2026-07-30再編(J-4): 「スケジュール」タブを廃止し、カレンダーは概要へ、
+// 納期設定・逆算配置は工程タブへ移した。旧 ?tab=schedule リンクはどのタブにも
+// 一致しないため自動的に概要へフォールバックする(下のuseStateの初期値判定)。
+// 「資料」タブを新設(J-5)。
 function buildDeliveryTabs(): { id: DeliveryProjectTab; label: string }[] {
   return [
     { id: "overview", label: "概要" },
     { id: "tasks", label: "工程" },
-    { id: "schedule", label: "スケジュール" },
+    { id: "materials", label: "資料" },
     { id: "deliverables", label: "成果物" },
     { id: "members", label: "メンバー" },
     { id: "settings", label: "プロジェクト設定" }
@@ -174,7 +186,7 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
 
       {activeTab === "overview" ? <OverviewTab detail={detail} onJumpToTask={jumpToTask} /> : null}
       {activeTab === "tasks" ? <TaskListSection detail={detail} myMemberId={myMemberId} onReload={load} /> : null}
-      {activeTab === "schedule" ? <ScheduleTab detail={detail} onReload={load} onJumpToTask={jumpToTask} /> : null}
+      {activeTab === "materials" ? <MaterialsTab projectId={detail.project.id} /> : null}
       {activeTab === "deliverables" ? <DeliverablesTab detail={detail} myMemberId={myMemberId} /> : null}
       {activeTab === "members" ? <MembersTab detail={detail} onReload={load} /> : null}
       {activeTab === "settings" ? <SettingsTab detail={detail} onReload={load} /> : null}
@@ -204,9 +216,15 @@ function TabIntro({
   );
 }
 
+// 2026-07-30再編(J-4): 運営型の概要と同じ骨格(カレンダー→件数カード→今後の期日→
+// 対応が必要なこと)にする。カレンダーは旧スケジュールタブから移動した。
 function OverviewTab({ detail, onJumpToTask }: { detail: DeliveryProjectDetail; onJumpToTask: (taskId: string) => void }) {
   const { tasks, members } = detail;
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const calendarItems = buildDeliveryCalendarItems(tasks);
+  const selectedDayTasks = selectedDay ? tasks.filter((task) => task.dueOn === selectedDay || task.submitDueOn === selectedDay) : [];
   const completedCount = tasks.filter((task) => task.status === "completed").length;
+  const todayKey = formatDateKey(new Date());
   const upcoming = tasks
     .flatMap((task) => {
       const items: { taskId: string; title: string; date: string; kind: "提出期日" | "完了期日" }[] = [];
@@ -214,13 +232,41 @@ function OverviewTab({ detail, onJumpToTask }: { detail: DeliveryProjectDetail; 
       if (task.dueOn) items.push({ taskId: task.id, title: task.title, date: task.dueOn, kind: "完了期日" });
       return items;
     })
-    .filter((item) => item.date >= new Date().toISOString().slice(0, 10))
+    .filter((item) => item.date >= todayKey)
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 5);
 
   return (
     <div className="space-y-5">
       <TabIntro icon={Info} title="概要" description="工程の進み具合と、対応が必要なことをまとめて確認します。" />
+
+      <TeamWorksDeliveryCalendar items={calendarItems} onSelectDay={setSelectedDay} />
+      {selectedDay ? (
+        <div className="rounded-xl border border-[var(--mikke-line)] bg-white p-3">
+          <p className="text-xs font-extrabold">{selectedDay} の工程</p>
+          {selectedDayTasks.length === 0 ? (
+            <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">この日の工程はありません。</p>
+          ) : (
+            <div className="mt-2 space-y-1.5">
+              {selectedDayTasks.map((task) => (
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => onJumpToTask(task.id)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold hover:bg-[var(--mikke-surface-soft)]"
+                >
+                  <span>
+                    {task.title}・{deliveryTaskStatusLabels[task.status]}
+                    {task.submitDueOn === selectedDay ? "・提出期日" : ""}
+                    {task.dueOn === selectedDay ? "・完了期日" : ""}
+                  </span>
+                  <span className="shrink-0 text-[var(--tw-title)]">工程を開く</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
@@ -265,51 +311,121 @@ function OverviewTab({ detail, onJumpToTask }: { detail: DeliveryProjectDetail; 
   );
 }
 
-function ScheduleTab({
-  detail,
-  onReload,
-  onJumpToTask
-}: {
-  detail: DeliveryProjectDetail;
-  onReload: () => Promise<void>;
-  onJumpToTask: (taskId: string) => void;
-}) {
-  const { project, tasks } = detail;
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const calendarItems = buildDeliveryCalendarItems(tasks);
-  const selectedDayTasks = selectedDay ? tasks.filter((task) => task.dueOn === selectedDay || task.submitDueOn === selectedDay) : [];
+// 資料(J-5): 成果物になる前の参考ファイル・URLを、本部と参加メンバーで共有する。
+// team_works_manualsテーブルを流用(運営型のマニュアルと同じ器・別の使い方)。
+// RLS上クライアントには出せないため、公開範囲の選択肢は設けていない。
+function MaterialsTab({ projectId }: { projectId: string }) {
+  const [materials, setMaterials] = useState<DeliveryMaterial[] | undefined>(undefined);
+  const [addOpen, setAddOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [materialUrl, setMaterialUrl] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setMaterials(await fetchDeliveryMaterials(supabase, projectId));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "資料を読み込めませんでした。");
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!title.trim()) return;
+    setSaving(true);
+    setError("");
+    try {
+      await createDeliveryMaterial(supabase, projectId, { title, materialUrl });
+      setTitle("");
+      setMaterialUrl("");
+      setAddOpen(false);
+      await load();
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "資料を追加できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(materialId: string) {
+    setBusyId(materialId);
+    setError("");
+    try {
+      await archiveDeliveryMaterial(supabase, materialId);
+      await load();
+    } catch (removeError) {
+      setError(removeError instanceof Error ? removeError.message : "削除できませんでした。");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <div className="space-y-5">
-      <TabIntro icon={CalendarDays} title="スケジュール" description="納期から逆算して各工程の期日を配置し、カレンダーで確認します。" />
-      <ProjectDueOnEditor projectId={project.id} dueOn={project.dueOn} tasks={tasks} onReload={onReload} />
-      <TeamWorksDeliveryCalendar items={calendarItems} onSelectDay={setSelectedDay} />
-      {selectedDay ? (
-        <div className="rounded-xl border border-[var(--mikke-line)] bg-white p-3">
-          <p className="text-xs font-extrabold">{selectedDay} のタスク</p>
-          {selectedDayTasks.length === 0 ? (
-            <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">この日のタスクはありません。</p>
-          ) : (
-            <div className="mt-2 space-y-1.5">
-              {selectedDayTasks.map((task) => (
-                <button
-                  key={task.id}
-                  type="button"
-                  onClick={() => onJumpToTask(task.id)}
-                  className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold hover:bg-[var(--mikke-surface-soft)]"
-                >
-                  <span>
-                    {task.title}・{deliveryTaskStatusLabels[task.status]}
-                    {task.submitDueOn === selectedDay ? "・提出期日" : ""}
-                    {task.dueOn === selectedDay ? "・完了期日" : ""}
-                  </span>
-                  <span className="shrink-0 text-[var(--tw-title)]">工程を開く</span>
-                </button>
-              ))}
+      <TabIntro icon={FolderOpen} title="資料" description="作業に必要な参考ファイル・URLを共有します。成果物として提出する前の素材や見本もここへ。本部と参加メンバーが見られます(クライアントには表示されません)。" />
+
+      <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+        <button
+          type="button"
+          onClick={() => setAddOpen((current) => !current)}
+          className="flex w-full items-center gap-3 p-4 text-left"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--tw-action)] text-[var(--tw-on-solid)]"><Plus size={17} /></span>
+          <span className="min-w-0 flex-1 text-sm font-extrabold">資料を追加</span>
+          {addOpen ? <ChevronUp size={16} className="shrink-0 text-[var(--mikke-muted)]" /> : <ChevronDown size={16} className="shrink-0 text-[var(--mikke-muted)]" />}
+        </button>
+        {addOpen ? (
+          <form onSubmit={submit} className="space-y-3 border-t border-[var(--mikke-line-soft)] p-4">
+            <TeamWorksProjectField label="タイトル" required>
+              <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例：講座テキストの見本（第2版）" className={teamWorksProjectInputClass} required />
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="URL" helper="Drive・Notion・Dropboxなどの共有リンクを想定しています">
+              <input value={materialUrl} onChange={(event) => setMaterialUrl(event.target.value)} placeholder="https://…" className={teamWorksProjectInputClass} />
+            </TeamWorksProjectField>
+            <button type="submit" disabled={saving || !title.trim()} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
+              <Plus size={15} /> {saving ? "追加中…" : "資料を追加"}
+            </button>
+          </form>
+        ) : null}
+      </div>
+
+      {error ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+
+      {materials === undefined ? (
+        <p className="text-xs font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>
+      ) : materials.length === 0 ? (
+        <MikkeEmptyState title="資料はまだありません" helper="上の「資料を追加」から参考ファイル・URLを登録してください。" />
+      ) : (
+        <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+          {materials.map((material) => (
+            <div key={material.id} className="flex items-center gap-3 px-4 py-3">
+              <FolderOpen size={16} className="shrink-0 text-[var(--mikke-muted)]" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-bold">{material.title}</span>
+                {material.materialUrl ? (
+                  <a href={material.materialUrl} target="_blank" rel="noreferrer" className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-[var(--tw-title)]">
+                    <ExternalLink size={11} className="shrink-0" /> {material.materialUrl}
+                  </a>
+                ) : null}
+              </span>
+              <button
+                type="button"
+                onClick={() => void remove(material.id)}
+                disabled={busyId === material.id}
+                className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2.5 py-1.5 text-xs font-bold text-[var(--mikke-muted)] disabled:opacity-40"
+              >
+                <Trash2 size={13} />
+              </button>
             </div>
-          )}
+          ))}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -660,6 +776,9 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
   const [error, setError] = useState("");
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [instructionOpen, setInstructionOpen] = useState(false);
+  // 工程の新規追加フォームは既定で畳んでおく(あゆみ指摘 2026-07-30
+  // 「新規追加を畳んで。下まで見に行くの大変」)。
+  const [addOpen, setAddOpen] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -689,6 +808,7 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
       });
       setForm(emptyNewTaskForm);
       setInstructionOpen(false);
+      setAddOpen(false);
       await onReload();
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "タスクを追加できませんでした。");
@@ -700,7 +820,21 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
   return (
     <div className="space-y-5">
       <TabIntro icon={ListChecks} title="工程" description="工程を追加し、担当・提出物・確認者・期日を設定します。" />
-      <form onSubmit={submit} className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+
+      <ProjectDueOnEditor projectId={detail.project.id} dueOn={detail.project.dueOn} tasks={detail.tasks} onReload={onReload} />
+
+      <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+        <button
+          type="button"
+          onClick={() => setAddOpen((current) => !current)}
+          className="flex w-full items-center gap-3 p-4 text-left"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[var(--tw-action)] text-[var(--tw-on-solid)]"><Plus size={17} /></span>
+          <span className="min-w-0 flex-1 text-sm font-extrabold">工程を追加</span>
+          {addOpen ? <ChevronUp size={16} className="shrink-0 text-[var(--mikke-muted)]" /> : <ChevronDown size={16} className="shrink-0 text-[var(--mikke-muted)]" />}
+        </button>
+        {addOpen ? (
+      <form onSubmit={submit} className="space-y-3 border-t border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-4">
         <div className="grid gap-3 md:grid-cols-2">
           <TeamWorksProjectField label="工程名" required className="md:col-span-2">
             <input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} placeholder="例：テキスト・ディプロマ作成" className={teamWorksProjectInputClass} required />
@@ -766,6 +900,8 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
           <Plus size={15} /> 工程を追加
         </button>
       </form>
+        ) : null}
+      </div>
 
       {error ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
 

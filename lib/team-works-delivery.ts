@@ -742,6 +742,78 @@ export async function createDeliveryProjectWithSetup(
   return { projectId, skippedMembers, invitedMembers };
 }
 
+// 「資料」タブ(J-5・あゆみ要望 2026-07-30「成果物前のファイル・URLをスタッフも
+// 閲覧できるようにしたい」)。運営型の team_works_manuals テーブルをそのまま流用する。
+// project_idは運営型に限定されておらず(team_works_projects全体を指すFK)、
+// SELECT方針も「本部staff or このプロジェクトのworker」で、style列を見ていない
+// ため、納品型プロジェクトでも新規テーブル・migrationなしでそのまま使える
+// (調査結果。詳細はdocs/MIKKEOS_TEAM_WORKS_GENERALIZE_PLAN_2026-07-30.md §J-5)。
+//
+// 制限: 既存RLSにクライアント向けSELECTポリシーが無いため、クライアントには
+// 出せない(本部・参加メンバーのみ)。ファイルアップロードは今回はURL入力のみ
+// (Drive/Notion等の共有リンクを想定)。両方とも将来ちゃんと対応するなら
+// Phase Lのmigrationにあわせて列・ポリシーを足すこと。
+export type DeliveryMaterial = {
+  id: string;
+  no: number;
+  title: string;
+  materialUrl: string | null;
+};
+
+export async function fetchDeliveryMaterials(client: SupabaseClient, projectId: string): Promise<DeliveryMaterial[]> {
+  const { data, error } = await client
+    .from("team_works_manuals")
+    .select("id,no,title,material_url")
+    .eq("project_id", projectId)
+    .eq("status", "active")
+    .order("no");
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    no: row.no as number,
+    title: row.title as string,
+    materialUrl: (row.material_url as string) ?? null
+  }));
+}
+
+export async function createDeliveryMaterial(
+  client: SupabaseClient,
+  projectId: string,
+  input: { title: string; materialUrl: string }
+): Promise<void> {
+  const title = input.title.trim();
+  const materialUrl = input.materialUrl.trim();
+  if (!title) throw new Error("資料のタイトルを入力してください。");
+  const { data: lastRow, error: lastError } = await client
+    .from("team_works_manuals")
+    .select("no")
+    .eq("project_id", projectId)
+    .order("no", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (lastError) throw lastError;
+  const nextNo = ((lastRow?.no as number | undefined) ?? 0) + 1;
+  const { error } = await client.from("team_works_manuals").insert({
+    project_id: projectId,
+    no: nextNo,
+    title,
+    material_type: materialUrl ? "link" : "none",
+    material_url: materialUrl || null
+  });
+  if (error) throw error;
+}
+
+export async function archiveDeliveryMaterial(client: SupabaseClient, materialId: string): Promise<void> {
+  const { data, error } = await client
+    .from("team_works_manuals")
+    .update({ status: "archived", archived_at: new Date().toISOString() })
+    .eq("id", materialId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("資料を削除できませんでした。権限と対象を確認してください。");
+}
+
 export type DeliveryCalendarTask = DeliveryTask & { projectTitle: string };
 
 // 期日が設定されている自分の可視範囲のタスクを横断取得する。
