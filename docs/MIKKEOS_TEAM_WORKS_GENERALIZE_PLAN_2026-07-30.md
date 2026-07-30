@@ -206,11 +206,54 @@ extraItems?: { dateKey: string; label: string; bg: string; fg: string; dotColor?
 - 完全再現が重い画面は「主要ブロックのみ＋実ポータルURLを開くリンク」まで簡略化してよい。
   **やってはいけないのは「実物と違う独自の想像図」を出すこと。**
 
+### K-2 実装状況（2026-07-31・Sonnet）
+
+**納品型: 実装完了。** `TeamWorksDeliveryPortalProjectDetail`に
+`previewMembership?: DeliveryProjectMember` / `readOnly?: boolean` を追加しただけ
+（デフォルトは今まで通り`resolveMyDeliveryProjectMembership`で自分を解決）。
+理由: `loadDeliveryProjectDetail`はプロジェクトIDだけを見るクエリで、
+運営型のような「今ログインしている本人」に依存する処理が無く、staffのRLSは
+worker/clientの可視範囲を包含する。**props注入だけで安全に実現できた**
+(想定どおりの軽いケース)。`readOnly`は`pointer-events-none`で操作を封じるだけの
+シンプルな実装。プロジェクト設定タブの下部、アーカイブパネルの上に設置。
+
+**運営型: 未実装。次のセッションへの申し送り。** 納品型より1段複雑なので
+今回は見送った。理由と設計案を残す:
+
+- `loadOperationsClientPortal(client)` / パートナー版は内部で
+  `client.auth.getUser()` → その人の`organization_member_id`を解決 →
+  RPC `team_works_activate_portal_membership`を叩く、という**「今ログインして
+  いる本人」に強く依存した作り**。納品型と違い、projectIdだけ渡しても
+  差し替えが効かない。
+- ただし**RLSはstaffに対してすでに広い読み取りを許可している**ため、
+  「対象のorganization_member_idを直接引数に取り、auth.getUser()による
+  自己解決とactivate RPCの呼び出しをスキップする」プレビュー専用のロード関数を
+  新規に書けば実現できる(RLSは変更不要、新しい権限も作らない)。
+  例:
+  ```ts
+  // lib/team-works-operations-client.ts に追加するイメージ
+  export async function loadOperationsClientPortalPreview(
+    client: SupabaseClient,
+    targetOrganizationMemberId: string
+  ): Promise<OperationsClientPortalData> {
+    // client.auth.getUser() と team_works_activate_portal_membership RPC を
+    // 呼ばずに、loadOperationsClientPortal内部の「member 解決後」のロジックを
+    // targetOrganizationMemberId から直接始める(既存クエリ群はそのまま再利用)。
+  }
+  ```
+  パートナー側(`team-works-operations-partner.ts`、未調査)も同じ形になる見込み。
+- `TeamWorksOperationsClientPortal` / パートナー版コンポーート自体にも
+  `previewData?: OperationsClientPortalData` のようなpropsを足し、
+  渡されていれば自前loadをスキップする改修が要る(納品型のprops注入より
+  一段大掛かり)。
+- 置き場所は当初案どおり「ポータル設定」タブ下部でよい。
+
 ### 完了条件（Phase K）
-- 納品型でクライアント/メンバーとメッセージの送受信ができ、差し戻し履歴も同じ画面に見える
-- 運営型ポータル設定でチェックを切り替え→プレビューで見え方の変化が確認できる
-- プレビュー内から誤って書き込みできない
-- `npm run lint` 通過
+- 納品型でクライアント/メンバーとメッセージの送受信ができ、差し戻し履歴も同じ画面に見える ✅
+- 納品型プロジェクト設定でクライアント/参加メンバー視点のプレビューが見られる ✅
+- 運営型ポータル設定でチェックを切り替え→プレビューで見え方の変化が確認できる → **未実装(上記参照)**
+- プレビュー内から誤って書き込みできない ✅(納品型はpointer-events-noneで確認済み)
+- `npm run lint` 通過 ✅
 
 ---
 
@@ -424,13 +467,29 @@ DOM実測で検証した挙動:
 ```
 Fable: この計画書 ✅
   ↓
-Opus: §6のモック ✅（§6.5に結果と計画修正）→ あゆみ確認・承認 ← ★今ここ
+Opus: §6のモック ✅（§6.5に結果と計画修正）→ あゆみ確認・承認 ✅ 2026-07-31
   ↓
-Sonnet: Phase J → コミット → Phase K → コミット → Phase L → コミット
+Sonnet: Phase J ✅実装完了・コミット済み(6f6b718, 未push) → Phase K → コミット → Phase L → コミット ← ★今ここ
   （各Phaseで npm run lint。§5のアリサ安全チェックはPhase LのあとにP通しで）
   ↓
 あゆみ: migration 1本（L-1）をSQL Editorで実行 → 実機確認
 ```
+
+### Phase J 実装メモ(2026-07-31・Sonnet)
+
+- J-5「資料」タブは`team_works_manuals`をそのまま流用(migration不要)。RLSに
+  クライアント向けSELECTポリシーが無いため、当初案にあった「見せる相手」選択
+  (本部だけ/本部+スタッフ/全員)は実装せず、**本部+参加メンバー固定**にした
+  (既存RLSの実態と一致させた。クライアント公開が要るなら別途migration+RLS追加)。
+  「関連づける工程」もテーブルに列が無いため見送り。ファイル添付はURL入力のみ
+  (Drive/Notion等の共有リンク想定)。
+- `?tab=schedule`への旧リンクは全箇所調査済み。運営型プロジェクト宛ては
+  `schedule`タブが残っているため無変更、納品型プロジェクト宛て(ホーム「すべて」
+  タブの合成タイムライン・TeamWorksDeliveryDashboardの今後の期日)は`tab=tasks`
+  に張り替え済み。
+- アリサ(運営型のみ)の安全確認: ホーム分岐ロジック上`bothTypes=false`のときは
+  常に既存ops分岐を通ることをコードレベルで再確認。プロジェクト管理・
+  スケジュール管理の並び替え/バッジ表示は全組織共通の意図的変更(あゆみ承認済み)。
 
 ## 8. 触ってはいけないもの・約束事（継承）
 

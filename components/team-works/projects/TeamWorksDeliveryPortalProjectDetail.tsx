@@ -24,7 +24,25 @@ import { TeamWorksTaskInstructionView, toTaskInstruction } from "./TeamWorksTask
 // ワーカー・クライアント共通の閲覧用ビュー。タスクの作成・状態変更は本部のみの
 // 権限(RLS)のため、ここでは期日・状態の確認と、自分が対応すべき提出物
 // (フォーム記入・成果物提出・成果物承認)に絞っている。
-export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId: string }) {
+//
+// previewMembership/readOnly(K-2・2026-07-31追加): 本部staffがプロジェクト設定
+// タブから「クライアントにはこう見える」を確認するためのプレビュー用props。
+// myMembershipは本来resolveMyDeliveryProjectMembershipで「今ログインしている
+// 本人」を解決するが、staffはそのプロジェクトのworker/clientではないことが
+// 多く、素のままだとPortalTaskCardの各パネル(フォーム記入・成果物提出等)が
+// 一切出ない「空っぽの見た目」になってしまう。previewMembershipを渡すと、
+// その役割の相手に実際に見えるパネル構成を実データのまま再現できる。
+// readOnlyは操作不可のオーバーレイを重ね、プレビュー中の誤操作を防ぐ
+// (見た目の再現であって、代理操作をさせるものではないため)。
+export function TeamWorksDeliveryPortalProjectDetail({
+  projectId,
+  previewMembership,
+  readOnly = false
+}: {
+  projectId: string;
+  previewMembership?: DeliveryProjectMember;
+  readOnly?: boolean;
+}) {
   const [detail, setDetail] = useState<DeliveryProjectDetail | null | undefined>(undefined);
   const [myMembership, setMyMembership] = useState<DeliveryProjectMember | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +51,12 @@ export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId:
   const load = useCallback(async () => {
     setError(null);
     try {
+      if (previewMembership) {
+        const nextDetail = await loadDeliveryProjectDetail(supabase, projectId);
+        setDetail(nextDetail);
+        setMyMembership(previewMembership);
+        return;
+      }
       const [nextDetail, nextMembership] = await Promise.all([
         loadDeliveryProjectDetail(supabase, projectId),
         resolveMyDeliveryProjectMembership(supabase, projectId)
@@ -42,7 +66,7 @@ export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId:
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "プロジェクトを読み込めませんでした。");
     }
-  }, [projectId]);
+  }, [projectId, previewMembership]);
 
   useEffect(() => {
     void load();
@@ -57,7 +81,7 @@ export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId:
   const selectedDayTasks = selectedDay ? tasks.filter((task) => task.dueOn === selectedDay || task.submitDueOn === selectedDay) : [];
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${readOnly ? "pointer-events-none select-none" : ""}`}>
       <section className="border-b border-[var(--mikke-line)] pb-5">
         <h2 className="text-2xl font-bold tracking-normal">{project.title}</h2>
         <p className="mt-1 text-xs font-bold text-[var(--mikke-muted)]">タスク {tasks.length}件</p>

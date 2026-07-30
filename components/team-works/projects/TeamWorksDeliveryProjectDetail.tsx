@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  Eye,
   ExternalLink,
   FileCheck2,
   FileText,
@@ -73,6 +74,7 @@ import {
 } from "@/lib/team-works-delivery-forms";
 import { formatDateKey } from "@/lib/team-works-operations";
 import { buildDeliveryCalendarItems, TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
+import { TeamWorksDeliveryPortalProjectDetail } from "./TeamWorksDeliveryPortalProjectDetail";
 import { TeamWorksDeliveryDeliverableAdminPanel } from "./TeamWorksDeliveryDeliverableAdminPanel";
 import { TeamWorksDeliveryStaffPendingSummary } from "./TeamWorksDeliveryStaffPendingSummary";
 import { TeamWorksProjectArchivePanel } from "./TeamWorksProjectArchivePanel";
@@ -851,7 +853,62 @@ function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onRe
         </button>
       </form>
 
+      <DeliveryPortalPreview projectId={detail.project.id} members={detail.members} />
+
       <TeamWorksProjectArchivePanel projectId={detail.project.id} projectTitle={detail.project.title} />
+    </div>
+  );
+}
+
+// ポータルプレビュー(K-2): 「クライアントにはこう見えます」を、想像図ではなく
+// 実データ・実部品(TeamWorksDeliveryPortalProjectDetail)で確認できるようにする。
+// previewMembershipで役割を差し替え、readOnlyで操作を封じる。
+function DeliveryPortalPreview({ projectId, members }: { projectId: string; members: DeliveryProjectMember[] }) {
+  const [previewRole, setPreviewRole] = useState<"client" | "worker">("client");
+  const client = members.find((member) => member.projectRole === "client");
+  const worker = members.find((member) => member.projectRole === "worker");
+  const previewMembership = previewRole === "client" ? client : worker;
+
+  return (
+    <div className="max-w-2xl space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="flex items-center gap-1.5 text-sm font-extrabold"><Eye size={15} /> ポータルプレビュー</p>
+        <div className="inline-flex overflow-hidden rounded-lg border border-[var(--mikke-line)]">
+          <button
+            type="button"
+            onClick={() => setPreviewRole("client")}
+            className={`px-3 py-1.5 text-xs font-bold ${previewRole === "client" ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"}`}
+          >
+            クライアント視点
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewRole("worker")}
+            className={`border-l border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold ${previewRole === "worker" ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"}`}
+          >
+            参加メンバー視点
+          </button>
+        </div>
+      </div>
+      <p className="text-xs font-semibold text-[var(--mikke-muted)]">
+        実際のデータをそのまま読み取り専用で表示します。ここから操作はできません。
+      </p>
+      {!previewMembership ? (
+        <MikkeEmptyState
+          title={previewRole === "client" ? "クライアントがまだいません" : "参加メンバーがまだいません"}
+          helper="「メンバー」タブから追加すると、ここでプレビューできます。"
+        />
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
+          <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">
+            <span className="h-2 w-2 rounded-full bg-[var(--tw-done)]" />
+            {previewMembership.displayName} さんの画面
+          </div>
+          <div className="max-h-[520px] overflow-y-auto bg-[var(--mikke-surface-soft)] p-4">
+            <TeamWorksDeliveryPortalProjectDetail projectId={projectId} previewMembership={previewMembership} readOnly />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
