@@ -106,10 +106,23 @@ export type DeliveryProjectMember = {
   displayName: string;
 };
 
+// team_works_project_commentsは運営型・納品型で共用のテーブル(RLSコメントに
+// 「shared by delivery + operations projects」と明記されている)。差し戻し理由の
+// 記録にも既に使っているので、メッセージタブ(K-1)でも新テーブルなしでそのまま使う。
+export type DeliveryProjectComment = {
+  id: string;
+  authorMemberId: string;
+  recipientMemberId: string | null;
+  audience: string;
+  body: string;
+  createdAt: string;
+};
+
 export type DeliveryProjectDetail = {
   project: DeliveryProjectSummary;
   tasks: DeliveryTask[];
   members: DeliveryProjectMember[];
+  comments: DeliveryProjectComment[];
 };
 
 function toTask(row: Record<string, unknown>): DeliveryTask {
@@ -229,7 +242,7 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
   if (projectError) throw projectError;
   if (!projectRow || projectRow.style !== "delivery") return null;
 
-  const [taskResult, memberResult] = await Promise.all([
+  const [taskResult, memberResult, commentResult] = await Promise.all([
     client
       .from("team_works_project_tasks")
       .select(taskColumns)
@@ -240,10 +253,17 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
     client
       .from("team_works_project_members")
       .select("organization_member_id,project_role,team_works_organization_members(display_name)")
+      .eq("project_id", projectId),
+    client
+      .from("team_works_project_comments")
+      .select("id,author_member_id,recipient_member_id,audience,body,created_at")
       .eq("project_id", projectId)
+      .order("created_at", { ascending: false })
+      .limit(200)
   ]);
   if (taskResult.error) throw taskResult.error;
   if (memberResult.error) throw memberResult.error;
+  if (commentResult.error) throw commentResult.error;
 
   return {
     project: {
@@ -260,6 +280,14 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
       projectRole: row.project_role as DeliveryProjectMember["projectRole"],
       displayName:
         (row.team_works_organization_members as { display_name?: string } | null)?.display_name ?? "メンバー"
+    })),
+    comments: (commentResult.data ?? []).map((row) => ({
+      id: row.id as string,
+      authorMemberId: row.author_member_id as string,
+      recipientMemberId: (row.recipient_member_id as string) ?? null,
+      audience: row.audience as string,
+      body: row.body as string,
+      createdAt: row.created_at as string
     }))
   };
 }

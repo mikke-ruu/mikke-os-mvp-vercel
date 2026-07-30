@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -15,9 +15,11 @@ import {
   FolderOpen,
   Info,
   ListChecks,
+  MessageSquare,
   Package,
   Plus,
   Save,
+  Send,
   Settings2,
   Trash2,
   UsersRound
@@ -28,6 +30,7 @@ import { supabase } from "@/lib/supabase/client";
 import {
   loadOperationsClientDirectory,
   loadOperationsPartnerDirectory,
+  sendOperationsDirectMessage,
   type OperationsClientDirectoryEntry,
   type OperationsPartnerDirectoryEntry
 } from "@/lib/team-works-operations-project";
@@ -51,6 +54,7 @@ import {
   updateDeliveryTask,
   type DeliveryMaterial,
   type DeliveryPendingInvite,
+  type DeliveryProjectComment,
   type DeliveryProjectDetail,
   type DeliveryProjectMember,
   type DeliveryTask,
@@ -81,12 +85,12 @@ const taskStatuses = Object.keys(deliveryTaskStatusLabels) as DeliveryTaskStatus
 const ownerRoles = Object.keys(deliveryTaskOwnerRoleLabels) as DeliveryTaskOwnerRole[];
 const submissionTypes = Object.keys(deliveryTaskSubmissionTypeLabels) as DeliveryTaskSubmissionType[];
 
-type DeliveryProjectTab = "overview" | "tasks" | "materials" | "deliverables" | "members" | "settings";
+type DeliveryProjectTab = "overview" | "tasks" | "materials" | "deliverables" | "members" | "messages" | "settings";
 
 // 2026-07-30再編(J-4): 「スケジュール」タブを廃止し、カレンダーは概要へ、
 // 納期設定・逆算配置は工程タブへ移した。旧 ?tab=schedule リンクはどのタブにも
 // 一致しないため自動的に概要へフォールバックする(下のuseStateの初期値判定)。
-// 「資料」タブを新設(J-5)。
+// 「資料」タブ(J-5)・「メッセージ」タブ(K-1)を新設。
 function buildDeliveryTabs(): { id: DeliveryProjectTab; label: string }[] {
   return [
     { id: "overview", label: "概要" },
@@ -94,6 +98,7 @@ function buildDeliveryTabs(): { id: DeliveryProjectTab; label: string }[] {
     { id: "materials", label: "資料" },
     { id: "deliverables", label: "成果物" },
     { id: "members", label: "メンバー" },
+    { id: "messages", label: "メッセージ" },
     { id: "settings", label: "プロジェクト設定" }
   ];
 }
@@ -189,6 +194,7 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
       {activeTab === "materials" ? <MaterialsTab projectId={detail.project.id} /> : null}
       {activeTab === "deliverables" ? <DeliverablesTab detail={detail} myMemberId={myMemberId} /> : null}
       {activeTab === "members" ? <MembersTab detail={detail} onReload={load} /> : null}
+      {activeTab === "messages" ? <MessagesTab detail={detail} onReload={load} /> : null}
       {activeTab === "settings" ? <SettingsTab detail={detail} onReload={load} /> : null}
     </div>
   );
@@ -621,6 +627,186 @@ function MembersTab({ detail, onReload }: { detail: DeliveryProjectDetail; onRel
       ) : null}
     </div>
   );
+}
+
+// メッセージ(K-1): 運営型MessagesTabと同じ見た目・同じteam_works_project_comments
+// テーブルを使う(sendOperationsDirectMessageを直接流用。project_idを見るだけで
+// styleを問わないため納品型でもそのまま動く)。会話相手はクライアント/参加メンバー
+// のみ(本部自身とはやり取りしない)。
+// 成果物ごとの差し戻し理由コメント(deliverable_id付き・recipient_member_id無し)は
+// 既存どおり「成果物」タブ側の各パネルに留め、ここでは人単位の直接メッセージだけを
+// 扱う(2つは文脈が異なるため意図的に分けている)。
+function MessagesTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(() => {
+    const firstClient = detail.members.find((member) => member.projectRole === "client");
+    const firstWorker = detail.members.find((member) => member.projectRole === "worker");
+    return firstClient?.organizationMemberId ?? firstWorker?.organizationMemberId ?? null;
+  });
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const conversationRef = useRef<HTMLElement | null>(null);
+
+  const clients = detail.members.filter((member) => member.projectRole === "client");
+  const workers = detail.members
+    .filter((member) => member.projectRole === "worker")
+    .sort((a, b) => latestDeliveryConversationAt(detail, b.organizationMemberId) - latestDeliveryConversationAt(detail, a.organizationMemberId));
+  const selectedMember = detail.members.find((member) => member.organizationMemberId === selectedMemberId) ?? null;
+  const thread = selectedMember
+    ? detail.comments
+        .filter((comment) => comment.authorMemberId === selectedMember.organizationMemberId || comment.recipientMemberId === selectedMember.organizationMemberId)
+        .slice()
+        .reverse()
+    : [];
+
+  async function send(event: FormEvent) {
+    event.preventDefault();
+    if (!selectedMember) return;
+    setSaving(true);
+    setError("");
+    try {
+      await sendOperationsDirectMessage(supabase, {
+        projectId: detail.project.id,
+        recipientMemberId: selectedMember.organizationMemberId,
+        audience: selectedMember.projectRole === "client" ? "client" : "internal",
+        body: draft
+      });
+      setDraft("");
+      await onReload();
+    } catch (sendError) {
+      setError(sendError instanceof Error ? sendError.message : "送信できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function selectConversation(memberId: string) {
+    setSelectedMemberId(memberId);
+    window.setTimeout(() => conversationRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  }
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={MessageSquare} title="メッセージ" description="クライアントは上部に固定し、参加メンバーは最新のやり取り順に表示します。カードを選ぶと会話を開けます。" />
+
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(260px,0.72fr)_minmax(0,1.28fr)]">
+        <aside className="space-y-4">
+          <DeliveryConversationGroup title="クライアント" helper="プロジェクトの窓口" tone="client" members={clients} detail={detail} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="クライアントはまだいません" />
+          <DeliveryConversationGroup title="参加メンバー" helper="新着メッセージ順" tone="worker" members={workers} detail={detail} selectedMemberId={selectedMemberId} onSelect={selectConversation} empty="参加メンバーはまだいません" />
+        </aside>
+        <section ref={conversationRef} className="min-h-[420px] scroll-mt-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          {!selectedMember ? (
+            <MikkeEmptyState title="会話する相手を選択してください" helper="左の一覧からクライアントまたは参加メンバーを選びます。" />
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--mikke-line)] pb-3">
+                <div>
+                  <p className="text-sm font-extrabold">{selectedMember.displayName}</p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-[var(--mikke-muted)]">{selectedMember.projectRole === "client" ? "クライアント" : "参加メンバー"}</p>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${selectedMember.projectRole === "client" ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-green)]"}`}>
+                  {selectedMember.projectRole === "client" ? "クライアント" : "参加メンバー"}
+                </span>
+              </div>
+              <div className="max-h-[260px] space-y-3 overflow-y-auto py-4 lg:max-h-[420px]">
+                {thread.length === 0 ? (
+                  <p className="py-16 text-center text-xs font-semibold text-[var(--mikke-muted)]">まだやり取りはありません。最初のメッセージを送れます。</p>
+                ) : (
+                  thread.map((comment) => {
+                    const received = comment.authorMemberId === selectedMember.organizationMemberId;
+                    return (
+                      <article key={comment.id} className={`max-w-[88%] rounded-2xl px-3 py-2.5 text-sm leading-6 ${received ? "mr-auto bg-[var(--mikke-surface-soft)]" : "ml-auto bg-[var(--mikke-primary-soft)]"}`}>
+                        <p className="mb-1 text-[10px] font-bold text-[var(--mikke-muted)]">{received ? selectedMember.displayName : "こちら"} ・ {formatDeliveryDateTime(comment.createdAt)}</p>
+                        <p className="whitespace-pre-wrap">{comment.body}</p>
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+              {error ? <p role="alert" className="mb-2 rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+              <form onSubmit={send} className="border-t border-[var(--mikke-line)] pt-3">
+                <label className="sr-only" htmlFor="delivery-direct-message">メッセージ</label>
+                <div className="flex items-end gap-2">
+                  <textarea id="delivery-direct-message" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder={`${selectedMember.displayName}さんへメッセージを送る`} rows={3} className={`${teamWorksProjectInputClass} min-h-[78px] resize-y`} />
+                  <button disabled={saving || !draft.trim()} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[var(--tw-action)] px-3 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:opacity-50">
+                    <Send size={14} /> 送信
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function DeliveryConversationGroup({
+  title,
+  helper,
+  tone,
+  members,
+  detail,
+  selectedMemberId,
+  onSelect,
+  empty
+}: {
+  title: string;
+  helper: string;
+  tone: "client" | "worker";
+  members: DeliveryProjectMember[];
+  detail: DeliveryProjectDetail;
+  selectedMemberId: string | null;
+  onSelect: (id: string) => void;
+  empty: string;
+}) {
+  return (
+    <section>
+      <div className="mb-2 flex items-baseline gap-2">
+        <h2 className="text-xs font-extrabold uppercase tracking-[0.14em] text-[var(--mikke-primary)]">{title}</h2>
+        <span className="text-[10px] font-semibold text-[var(--mikke-muted)]">{helper}</span>
+      </div>
+      {members.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-4 text-xs font-semibold text-[var(--mikke-muted)]">{empty}</div>
+      ) : (
+        <div className="space-y-2">
+          {members.map((member) => {
+            const latest = latestDeliveryConversation(detail, member.organizationMemberId);
+            return (
+              <button
+                key={member.organizationMemberId}
+                type="button"
+                onClick={() => onSelect(member.organizationMemberId)}
+                className={`w-full rounded-xl border p-3 text-left ${member.organizationMemberId === selectedMemberId ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary-soft)]" : "border-[var(--mikke-line)] bg-white"}`}
+              >
+                <span className="flex items-start justify-between gap-2">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-extrabold">{member.displayName}</span>
+                    <span className="mt-1 block truncate text-[11px] font-semibold text-[var(--mikke-muted)]">{latest ? latest.body : "メッセージはまだありません"}</span>
+                  </span>
+                  <span className={`mt-0.5 h-2.5 w-2.5 shrink-0 rounded-full ${tone === "client" ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-green)]"}`} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function latestDeliveryConversation(detail: DeliveryProjectDetail, memberId: string): DeliveryProjectComment | null {
+  return detail.comments.find((comment) => comment.authorMemberId === memberId || comment.recipientMemberId === memberId) ?? null;
+}
+
+function latestDeliveryConversationAt(detail: DeliveryProjectDetail, memberId: string): number {
+  const value = latestDeliveryConversation(detail, memberId)?.createdAt;
+  return value ? new Date(value).getTime() : 0;
+}
+
+function formatDeliveryDateTime(iso: string): string {
+  const date = new Date(iso);
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
 function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
