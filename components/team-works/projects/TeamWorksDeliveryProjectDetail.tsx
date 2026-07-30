@@ -120,6 +120,14 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
     void load();
   }, [load]);
 
+  // 概要・スケジュールから工程タブへ飛び、該当工程まで自動でスクロールする。
+  function jumpToTask(taskId: string) {
+    setActiveTab("tasks");
+    requestAnimationFrame(() => {
+      document.getElementById(`task-${taskId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   if (error) return <MikkeEmptyState title="読み込みに失敗しました" helper={error} />;
   if (detail === undefined) return <p className="text-sm font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>;
   if (detail === null) return <MikkeEmptyState title="このプロジェクトは見つかりませんでした" />;
@@ -164,9 +172,9 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
         </div>
       </nav>
 
-      {activeTab === "overview" ? <OverviewTab detail={detail} onSelectTab={setActiveTab} /> : null}
+      {activeTab === "overview" ? <OverviewTab detail={detail} onJumpToTask={jumpToTask} /> : null}
       {activeTab === "tasks" ? <TaskListSection detail={detail} myMemberId={myMemberId} onReload={load} /> : null}
-      {activeTab === "schedule" ? <ScheduleTab detail={detail} onReload={load} /> : null}
+      {activeTab === "schedule" ? <ScheduleTab detail={detail} onReload={load} onJumpToTask={jumpToTask} /> : null}
       {activeTab === "deliverables" ? <DeliverablesTab detail={detail} myMemberId={myMemberId} /> : null}
       {activeTab === "members" ? <MembersTab detail={detail} onReload={load} /> : null}
       {activeTab === "settings" ? <SettingsTab detail={detail} onReload={load} /> : null}
@@ -196,7 +204,7 @@ function TabIntro({
   );
 }
 
-function OverviewTab({ detail, onSelectTab }: { detail: DeliveryProjectDetail; onSelectTab: (tab: DeliveryProjectTab) => void }) {
+function OverviewTab({ detail, onJumpToTask }: { detail: DeliveryProjectDetail; onJumpToTask: (taskId: string) => void }) {
   const { tasks, members } = detail;
   const completedCount = tasks.filter((task) => task.status === "completed").length;
   const upcoming = tasks
@@ -241,7 +249,7 @@ function OverviewTab({ detail, onSelectTab }: { detail: DeliveryProjectDetail; o
               <button
                 key={`${item.taskId}-${item.kind}-${index}`}
                 type="button"
-                onClick={() => onSelectTab("tasks")}
+                onClick={() => onJumpToTask(item.taskId)}
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold hover:bg-[var(--mikke-surface-soft)]"
               >
                 <CalendarDays size={13} className="shrink-0 text-[var(--mikke-muted)]" />
@@ -257,7 +265,15 @@ function OverviewTab({ detail, onSelectTab }: { detail: DeliveryProjectDetail; o
   );
 }
 
-function ScheduleTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
+function ScheduleTab({
+  detail,
+  onReload,
+  onJumpToTask
+}: {
+  detail: DeliveryProjectDetail;
+  onReload: () => Promise<void>;
+  onJumpToTask: (taskId: string) => void;
+}) {
   const { project, tasks } = detail;
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const calendarItems = buildDeliveryCalendarItems(tasks);
@@ -276,11 +292,19 @@ function ScheduleTab({ detail, onReload }: { detail: DeliveryProjectDetail; onRe
           ) : (
             <div className="mt-2 space-y-1.5">
               {selectedDayTasks.map((task) => (
-                <p key={task.id} className="text-xs font-semibold">
-                  {task.title}・{deliveryTaskStatusLabels[task.status]}
-                  {task.submitDueOn === selectedDay ? "・提出期日" : ""}
-                  {task.dueOn === selectedDay ? "・完了期日" : ""}
-                </p>
+                <button
+                  key={task.id}
+                  type="button"
+                  onClick={() => onJumpToTask(task.id)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold hover:bg-[var(--mikke-surface-soft)]"
+                >
+                  <span>
+                    {task.title}・{deliveryTaskStatusLabels[task.status]}
+                    {task.submitDueOn === selectedDay ? "・提出期日" : ""}
+                    {task.dueOn === selectedDay ? "・完了期日" : ""}
+                  </span>
+                  <span className="shrink-0 text-[var(--tw-title)]">工程を開く</span>
+                </button>
               ))}
             </div>
           )}

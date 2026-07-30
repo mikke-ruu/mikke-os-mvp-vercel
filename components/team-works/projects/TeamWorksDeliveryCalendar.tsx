@@ -6,8 +6,9 @@ import { getJapanDayOff } from "@/lib/japanese-calendar";
 import { deliveryTaskStatusLabels, type DeliveryTask, type DeliveryTaskStatus } from "@/lib/team-works-delivery";
 
 const dowLabels = ["日", "月", "火", "水", "木", "金", "土"];
+const maxChipsPerCell = 2;
 
-export type DeliveryCalendarItemKind = "submit" | "due";
+export type DeliveryCalendarItemKind = "submit" | "due" | "both";
 
 export type DeliveryCalendarItem = {
   id: string;
@@ -18,10 +19,18 @@ export type DeliveryCalendarItem = {
   projectTitle?: string;
 };
 
-// 提出期日(submit_due_on)と完了期日(due_on)の両方をカレンダー項目に展開する。
+type DeliveryCalendarDisplayMode = "both" | "submit" | "due";
+
+// 提出期日(submit_due_on)と完了期日(due_on)をカレンダー項目に展開する。
+// 同じ日なら(確認不要な工程は逆算配置で同日になる)1件にまとめる。
+// 別々に出すと同じ工程が同じ日に2チップ並んで見えてしまうため。
 export function buildDeliveryCalendarItems(tasks: DeliveryTask[]): DeliveryCalendarItem[] {
   const items: DeliveryCalendarItem[] = [];
   for (const task of tasks) {
+    if (task.submitDueOn && task.dueOn && task.submitDueOn === task.dueOn) {
+      items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "both" });
+      continue;
+    }
     if (task.submitDueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.submitDueOn, kind: "submit" });
     if (task.dueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "due" });
   }
@@ -36,12 +45,18 @@ function isOverdue(dateOn: string, status: DeliveryTaskStatus): boolean {
 }
 
 // 色は役割トークン固定: 完了=GREEN、期限超過=ORANGE(要対応)、
-// 提出期日=PINK(締切)、完了期日=BLUE(基準日)。
+// 提出期日=PINK(締切)、完了期日・提出完了同日=BLUE(基準日)。
 function itemTone(item: DeliveryCalendarItem): { bg: string; text: string } {
   if (item.status === "completed") return { bg: "var(--tw-done)", text: "var(--tw-on-tint)" };
   if (isOverdue(item.date, item.status)) return { bg: "var(--tw-action)", text: "var(--tw-on-solid)" };
   if (item.kind === "submit") return { bg: "var(--tw-deadline)", text: "var(--tw-on-tint)" };
   return { bg: "var(--tw-title)", text: "var(--tw-on-solid)" };
+}
+
+function chipLabel(item: DeliveryCalendarItem): string {
+  if (item.kind === "submit") return `提出 ${item.title}`;
+  if (item.kind === "both") return `提出・完了 ${item.title}`;
+  return item.title;
 }
 
 function buildMonthDates(monthDate: Date): Date[] {
@@ -63,63 +78,109 @@ function toDateKey(date: Date): string {
 
 export function TeamWorksDeliveryCalendar({ items, onSelectDay }: { items: DeliveryCalendarItem[]; onSelectDay?: (dateKey: string) => void }) {
   const [monthDate, setMonthDate] = useState(() => new Date());
+  const [displayMode, setDisplayMode] = useState<DeliveryCalendarDisplayMode>("both");
+  const todayKey = toDateKey(new Date());
   const dates = useMemo(() => buildMonthDates(monthDate), [monthDate]);
+
+  const visibleItems = useMemo(() => {
+    if (displayMode === "both") return items;
+    if (displayMode === "submit") return items.filter((item) => item.kind !== "due");
+    return items.filter((item) => item.kind !== "submit");
+  }, [items, displayMode]);
+
   const itemsByDate = useMemo(() => {
     const map = new Map<string, DeliveryCalendarItem[]>();
-    for (const item of items) {
+    for (const item of visibleItems) {
       const list = map.get(item.date) ?? [];
       list.push(item);
       map.set(item.date, list);
     }
     return map;
-  }, [items]);
+  }, [visibleItems]);
 
   return (
-    <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3 sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <button type="button" aria-label="前月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))} className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)]">
-          <ChevronLeft size={16} />
-        </button>
-        <p className="text-sm font-extrabold">{monthDate.getFullYear()}年{monthDate.getMonth() + 1}月</p>
-        <button type="button" aria-label="翌月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))} className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)]">
-          <ChevronRight size={16} />
-        </button>
+    <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button type="button" aria-label="前の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() - 1, 1))} className="grid h-7 w-7 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-muted)]">
+            <ChevronLeft size={14} />
+          </button>
+          <p className="text-sm font-bold">{monthDate.getFullYear()}年 {monthDate.getMonth() + 1}月</p>
+          <button type="button" aria-label="次の月" onClick={() => setMonthDate((value) => new Date(value.getFullYear(), value.getMonth() + 1, 1))} className="grid h-7 w-7 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-muted)]">
+            <ChevronRight size={14} />
+          </button>
+        </div>
+        <div className="flex overflow-hidden rounded-lg border border-[var(--mikke-line)]">
+          {([
+            { value: "both", label: "両方" },
+            { value: "submit", label: "提出期日" },
+            { value: "due", label: "完了期日" }
+          ] as { value: DeliveryCalendarDisplayMode; label: string }[]).map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setDisplayMode(option.value)}
+              className={`px-3 py-1.5 text-xs font-bold ${
+                displayMode === option.value ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[var(--mikke-muted)]">
-        {dowLabels.map((label) => <span key={label}>{label}</span>)}
-      </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1">
+        {dowLabels.map((label) => (
+          <div key={label} className="pb-1 text-center text-[10px] font-bold text-[var(--mikke-muted)]">
+            {label}
+          </div>
+        ))}
         {dates.map((date) => {
           const key = toDateKey(date);
           const inMonth = date.getMonth() === monthDate.getMonth();
+          const isToday = key === todayKey;
           const dayItems = itemsByDate.get(key) ?? [];
           const japanDayOff = getJapanDayOff(date);
+          const visibleDayItems = dayItems.slice(0, maxChipsPerCell);
+          const overflowCount = dayItems.length - visibleDayItems.length;
+
+          if (!inMonth) {
+            return (
+              <div key={key} className="min-h-[60px] rounded-lg border border-[var(--mikke-line)] p-1 opacity-35">
+                <span className="text-[10px] font-semibold text-[var(--mikke-muted)]">{date.getDate()}</span>
+              </div>
+            );
+          }
+
           return (
             <button
               key={key}
               type="button"
               onClick={() => onSelectDay?.(key)}
-              className={`min-h-16 rounded-lg border p-1 text-left ${
+              className={`min-h-[60px] rounded-lg border p-1 text-left ${
                 japanDayOff.isDayOff ? "border-[var(--mikke-pink)] bg-[var(--mikke-pink)]" : "border-[var(--mikke-line)] bg-white"
-              } ${inMonth ? "" : "opacity-40"}`}
+              } ${isToday ? "border-[1.5px] border-[var(--tw-done)]" : ""}`}
             >
-              <span className="block text-[10px] font-bold">{date.getDate()}</span>
-              <span className="mt-1 flex flex-col gap-0.5">
-                {dayItems.slice(0, 2).map((item) => {
-                  const tone = itemTone(item);
-                  return (
-                    <span key={`${item.id}-${item.kind}`} className="truncate rounded px-1 py-0.5 text-[8px] font-bold" style={{ background: tone.bg, color: tone.text }}>
-                      {item.kind === "submit" ? "提出 " : ""}{item.title}
-                    </span>
-                  );
-                })}
-                {dayItems.length > 2 ? <span className="text-[8px] font-bold text-[var(--mikke-muted)]">+{dayItems.length - 2}件</span> : null}
-              </span>
+              <span className={`text-[10px] font-bold ${isToday ? "text-[var(--tw-done)]" : "text-[var(--mikke-muted)]"}`}>{date.getDate()}</span>
+              {japanDayOff.isDayOff ? (
+                <span title={japanDayOff.label ?? undefined} className="mt-0.5 block truncate text-[8px] font-extrabold text-[var(--tw-on-tint)]">
+                  {japanDayOff.label ?? "祝"}
+                </span>
+              ) : null}
+              {visibleDayItems.map((item) => {
+                const tone = itemTone(item);
+                return (
+                  <span key={`${item.id}-${item.kind}`} className="mt-0.5 block truncate rounded px-1 py-[1px] text-[8px] font-bold" style={{ background: tone.bg, color: tone.text }}>
+                    {chipLabel(item)}
+                  </span>
+                );
+              })}
+              {overflowCount > 0 ? <span className="mt-0.5 block text-[8px] font-bold text-[var(--mikke-muted)]">+{overflowCount}</span> : null}
             </button>
           );
         })}
       </div>
-      <div className="mt-3 flex flex-wrap gap-3 text-[10px] font-semibold text-[var(--mikke-muted)]">
+      <div className="mt-3 flex flex-wrap gap-3 text-[10.5px] font-semibold text-[var(--mikke-muted)]">
         <Legend color="var(--tw-title)" label="完了期日" />
         <Legend color="var(--tw-deadline)" label="提出期日" />
         <Legend color="var(--tw-done)" label="完了" />

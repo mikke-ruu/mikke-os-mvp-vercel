@@ -76,11 +76,19 @@ export function TeamWorksDeliveryPortalProjectDetail({ projectId }: { projectId:
             ) : (
               <div className="mt-2 space-y-1.5">
                 {selectedDayTasks.map((task) => (
-                  <p key={task.id} className="text-xs font-semibold">
-                    {task.title}・{deliveryTaskStatusLabels[task.status]}
-                    {task.submitDueOn === selectedDay ? "・提出期日" : ""}
-                    {task.dueOn === selectedDay ? "・完了期日" : ""}
-                  </p>
+                  <button
+                    key={task.id}
+                    type="button"
+                    onClick={() => document.getElementById(`task-${task.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-xs font-semibold hover:bg-[var(--mikke-surface-soft)]"
+                  >
+                    <span>
+                      {task.title}・{deliveryTaskStatusLabels[task.status]}
+                      {task.submitDueOn === selectedDay ? "・提出期日" : ""}
+                      {task.dueOn === selectedDay ? "・完了期日" : ""}
+                    </span>
+                    <span className="shrink-0 text-[var(--tw-title)]">開く</span>
+                  </button>
                 ))}
               </div>
             )}
