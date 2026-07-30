@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 import { fetchOperationsProjects, resolveStaffOrganizationIds } from "@/lib/team-works-operations";
 import { GENERAL_PURPOSE_LABELS } from "@/lib/team-works-labels";
+import { describeClosedDayReason, isClosedDayKey, loadProjectHolidayContext } from "@/lib/team-works-operation-settings";
 
 export type OperationsProject = {
   id: string;
@@ -227,6 +227,10 @@ export async function loadOperationsProjectDetail(
     throw new Error("この運営型プロジェクトの本部画面を開く権限がありません。");
   }
 
+  // 休日設定(組織のデフォルト、またはこのプロジェクトの上書き)。土日祝ブロックの
+  // 判定を組織ごとに変えられるようにする。下の大きなPromise.allと並行して読む。
+  const holidayContextPromise = loadProjectHolidayContext(client, projectId);
+
   let [
     groupResult,
     participantResult,
@@ -349,6 +353,8 @@ export async function loadOperationsProjectDetail(
   ]) {
     if (result.error) throw result.error;
   }
+
+  const { settings: effectiveOperationSettings } = await holidayContextPromise;
 
   const projectMemberRows = (projectMemberResult.data ?? []) as {
     organization_member_id: string;
@@ -508,7 +514,7 @@ export async function loadOperationsProjectDetail(
       sessionDate: row.session_date,
       startTime: row.start_time.slice(0, 5),
       durationMin: row.duration_min,
-      status: isJapanDayOffKey(row.session_date) ? "cancelled" : row.status,
+      status: isClosedDayKey(effectiveOperationSettings, row.session_date) ? "cancelled" : row.status,
       partnerMemberId: row.partner_member_id,
       partnerName: row.partner_member_id ? memberNameById.get(row.partner_member_id) ?? "パートナー" : null,
       zoomUrl: row.zoom_url ?? null,
@@ -1333,8 +1339,9 @@ export async function createOperationsSession(
   projectId: string,
   input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null }
 ) {
-  if (isJapanDayOffKey(input.sessionDate)) {
-    throw new Error("土日祝は休校日のため、レッスンを登録できません。");
+  const { settings, holidayLabel } = await loadProjectHolidayContext(client, projectId);
+  if (isClosedDayKey(settings, input.sessionDate)) {
+    throw new Error(`${describeClosedDayReason(settings, holidayLabel)}のため、レッスンを登録できません。`);
   }
   const { error } = await client.from("team_works_op_sessions").insert({
     project_id: projectId,
@@ -1352,8 +1359,13 @@ export async function updateOperationsSession(
   sessionId: string,
   input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null }
 ) {
-  if (isJapanDayOffKey(input.sessionDate)) {
-    throw new Error("土日祝は休校日のため、レッスンを移動できません。");
+  const sessionRow = await client.from("team_works_op_sessions").select("project_id").eq("id", sessionId).maybeSingle();
+  if (sessionRow.error) throw sessionRow.error;
+  if (sessionRow.data) {
+    const { settings, holidayLabel } = await loadProjectHolidayContext(client, sessionRow.data.project_id as string);
+    if (isClosedDayKey(settings, input.sessionDate)) {
+      throw new Error(`${describeClosedDayReason(settings, holidayLabel)}のため、レッスンを移動できません。`);
+    }
   }
   const { data, error } = await client
     .from("team_works_op_sessions")

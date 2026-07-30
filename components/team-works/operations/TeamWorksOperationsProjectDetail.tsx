@@ -31,6 +31,7 @@ import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { TeamWorksProjectDetail } from "@/components/team-works/projects/TeamWorksProjectDetail";
 import { TeamWorksDeliveryProjectDetail } from "@/components/team-works/projects/TeamWorksDeliveryProjectDetail";
 import { isDatabaseProjectId as isDeliveryDatabaseProjectId } from "@/lib/team-works-operations-project";
+import { TEAM_WORKS_POLL_INTERVAL_MS } from "@/lib/team-works-constants";
 import {
   TeamWorksProjectField,
   teamWorksProjectInputClass
@@ -143,7 +144,10 @@ export function TeamWorksProjectDetailRoute({ projectId }: { projectId: string }
   }, [load]);
 
   useEffect(() => {
-    const timerId = window.setInterval(() => void load(), 5000);
+    const timerId = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      void load();
+    }, TEAM_WORKS_POLL_INTERVAL_MS);
     return () => window.clearInterval(timerId);
   }, [load]);
 
@@ -601,7 +605,7 @@ function ProjectCalendarPanel({
                   ))}
                   {sessions.length >= 3 ? <span className="rounded bg-[var(--mikke-yellow)] px-1 py-0.5 text-[8px] font-extrabold text-[var(--tw-on-tint)]">全{sessions.length}件</span> : null}
                   {holiday ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
-                  {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold text-[var(--tw-on-tint)]">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}
+                  {!holiday && japanDayOff.isDayOff ? <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold text-[var(--tw-on-tint)]">{japanDayOff.isNationalHoliday ? japanDayOff.label : labels.holidayLabel}</span> : null}
                 </span>
               </button>;
             })}
@@ -612,7 +616,7 @@ function ProjectCalendarPanel({
           <h3 className="text-sm font-extrabold">{formatDate(selectedDate)} の予定詳細</h3>
           {selectedJapanDayOff.isDayOff ? (
             <p className="mt-3 rounded-xl bg-[var(--mikke-pink)] px-3 py-2 text-xs font-bold text-[var(--tw-on-tint)]">
-              休校日{selectedJapanDayOff.isNationalHoliday && selectedJapanDayOff.label ? `（${selectedJapanDayOff.label}）` : ""}
+              {labels.holidayLabel}日{selectedJapanDayOff.isNationalHoliday && selectedJapanDayOff.label ? `（${selectedJapanDayOff.label}）` : ""}
             </p>
           ) : null}
           <div className="mt-3 space-y-2">

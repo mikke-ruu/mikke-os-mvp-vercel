@@ -20,6 +20,16 @@ export type DeliveryActionItem = {
 
 const doneLikeTaskStatuses: DeliveryTask["status"][] = ["completed", "cancelled", "archived"];
 
+// ローカル日付のYYYY-MM-DD。toISOString()はUTCに変換するため、日本時間の朝9時までは
+// 前日の日付になり、期限超過判定が朝だけ1日ずれていた。
+function todayDateKey(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function taskById(tasks: DeliveryTask[]) {
   return new Map(tasks.map((task) => [task.id, task]));
 }
@@ -147,7 +157,7 @@ export function buildStaffPendingSummary(input: {
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayDateKey();
   const overdueCount = input.tasks.filter((task) => {
     if (doneLikeTaskStatuses.includes(task.status)) return false;
     const dateOn = task.submitDueOn ?? task.dueOn;

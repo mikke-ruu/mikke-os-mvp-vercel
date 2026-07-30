@@ -3,6 +3,12 @@ import { fetchDeliveryProjects, loadDeliveryProjectDetail } from "@/lib/team-wor
 import { fetchProjectForms, fetchSubmissionsByFormIds } from "@/lib/team-works-delivery-forms";
 import { fetchProjectDeliverables } from "@/lib/team-works-delivery-deliverables";
 import { buildStaffPendingSummary, type DeliveryActionItem } from "@/lib/team-works-delivery-summary";
+import {
+  fetchOrganizationMemberNames,
+  fetchRecentCommentRows,
+  formatDateKey,
+  type RecentOperationsComment
+} from "@/lib/team-works-operations";
 
 // ホーム(本部ダッシュボード)向け。全納品型プロジェクトを横断して
 // 「クライアント待ち/本部確認待ち/期限超過」件数と、直近の期日を合算する。
@@ -17,7 +23,7 @@ export type DeliveryHomeUpcoming = {
   taskId: string;
   taskTitle: string;
   date: string;
-  kind: "submit" | "due";
+  kind: "submit" | "due" | "both";
 };
 
 export type DeliveryHomeSummary = {
@@ -42,7 +48,9 @@ export async function loadDeliveryHomeSummary(client: SupabaseClient): Promise<D
   const projects = await fetchDeliveryProjects(client);
   if (projects.length === 0) return emptySummary;
 
-  const today = new Date().toISOString().slice(0, 10);
+  // toISOString()はUTCに変換するため、日本時間の朝9時までは前日の日付になり、
+  // 期限超過・今後の期日の判定が朝だけ1日ずれていた。ローカル日付で揃える。
+  const today = formatDateKey(new Date());
   let clientWaitingCount = 0;
   let staffReviewCount = 0;
   let overdueCount = 0;
@@ -67,11 +75,15 @@ export async function loadDeliveryHomeSummary(client: SupabaseClient): Promise<D
 
       for (const task of detail.tasks) {
         if (task.status === "completed" || task.status === "cancelled" || task.status === "archived") continue;
-        if (task.submitDueOn && task.submitDueOn >= today) {
-          upcoming.push({ projectId: project.id, projectTitle: project.title, taskId: task.id, taskTitle: task.title, date: task.submitDueOn, kind: "submit" });
-        }
-        if (task.dueOn && task.dueOn >= today) {
-          upcoming.push({ projectId: project.id, projectTitle: project.title, taskId: task.id, taskTitle: task.title, date: task.dueOn, kind: "due" });
+        const hasSubmit = Boolean(task.submitDueOn && task.submitDueOn >= today);
+        const hasDue = Boolean(task.dueOn && task.dueOn >= today);
+        // 提出期日と完了期日が同じ日なら1行にまとめる(Phase Eでカレンダー側に
+        // 適用済みの規則と同じ。ホームの一覧だけ別ロジックだったため揃える)。
+        if (hasSubmit && hasDue && task.submitDueOn === task.dueOn) {
+          upcoming.push({ projectId: project.id, projectTitle: project.title, taskId: task.id, taskTitle: task.title, date: task.dueOn!, kind: "both" });
+        } else {
+          if (hasSubmit) upcoming.push({ projectId: project.id, projectTitle: project.title, taskId: task.id, taskTitle: task.title, date: task.submitDueOn!, kind: "submit" });
+          if (hasDue) upcoming.push({ projectId: project.id, projectTitle: project.title, taskId: task.id, taskTitle: task.title, date: task.dueOn!, kind: "due" });
         }
       }
     })
@@ -93,4 +105,33 @@ export async function loadDeliveryHomeSummary(client: SupabaseClient): Promise<D
     items: items.slice(0, 8),
     upcoming: upcoming.slice(0, 8)
   };
+}
+
+// 納品ダッシュボードのMESSAGESカード用。運営ホームのfetchRecentCommentRowsと
+// 同じteam_works_project_commentsを、納品型プロジェクトの範囲で読むだけ。
+export async function loadDeliveryRecentComments(client: SupabaseClient): Promise<RecentOperationsComment[]> {
+  const projects = await fetchDeliveryProjects(client);
+  if (projects.length === 0) return [];
+
+  const projectIds = projects.map((project) => project.id);
+  const projectTitleById = new Map(projects.map((project) => [project.id, project.title]));
+  const organizationIds = [...new Set(projects.map((project) => project.organizationId))];
+
+  const [memberNameById, commentRows] = await Promise.all([
+    fetchOrganizationMemberNames(client, organizationIds),
+    fetchRecentCommentRows(client, projectIds, 6)
+  ]);
+
+  return commentRows.flatMap((row) => {
+    const projectTitle = projectTitleById.get(row.project_id);
+    if (!projectTitle) return [];
+    return [{
+      id: row.id,
+      projectId: row.project_id,
+      projectTitle,
+      authorName: memberNameById.get(row.author_member_id) ?? "メンバー",
+      body: row.body,
+      createdAt: row.created_at
+    }];
+  });
 }

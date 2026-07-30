@@ -24,6 +24,7 @@ type Props = {
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
 export function SchoolCalendar({ state, updateState }: Props) {
+  const labels = useTeamWorksLabels();
   const todayKey = toDateKey(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
@@ -155,7 +156,7 @@ export function SchoolCalendar({ state, updateState }: Props) {
                     </span>
                   ) : japanDayOff.isDayOff ? (
                     <span title={japanDayOff.label ?? undefined} className="max-w-[72%] truncate rounded-full bg-white px-1.5 py-0.5 text-[9px] font-bold text-[var(--tw-on-tint)]">
-                      {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
+                      {japanDayOff.isNationalHoliday ? japanDayOff.label : labels.holidayLabel}
                     </span>
                   ) : null}
                 </div>

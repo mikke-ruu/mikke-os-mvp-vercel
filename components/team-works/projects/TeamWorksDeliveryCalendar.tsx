@@ -24,15 +24,17 @@ type DeliveryCalendarDisplayMode = "both" | "submit" | "due";
 // 提出期日(submit_due_on)と完了期日(due_on)をカレンダー項目に展開する。
 // 同じ日なら(確認不要な工程は逆算配置で同日になる)1件にまとめる。
 // 別々に出すと同じ工程が同じ日に2チップ並んで見えてしまうため。
-export function buildDeliveryCalendarItems(tasks: DeliveryTask[]): DeliveryCalendarItem[] {
+// projectTitleは省略可(単一プロジェクトの詳細画面ではプロジェクト名は不要。
+// 複数プロジェクトを横断するホームダッシュボードでのみ渡す)。
+export function buildDeliveryCalendarItems(tasks: (DeliveryTask & { projectTitle?: string })[]): DeliveryCalendarItem[] {
   const items: DeliveryCalendarItem[] = [];
   for (const task of tasks) {
     if (task.submitDueOn && task.dueOn && task.submitDueOn === task.dueOn) {
-      items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "both" });
+      items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "both", projectTitle: task.projectTitle });
       continue;
     }
-    if (task.submitDueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.submitDueOn, kind: "submit" });
-    if (task.dueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "due" });
+    if (task.submitDueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.submitDueOn, kind: "submit", projectTitle: task.projectTitle });
+    if (task.dueOn) items.push({ id: task.id, title: task.title, status: task.status, date: task.dueOn, kind: "due", projectTitle: task.projectTitle });
   }
   return items;
 }
@@ -54,9 +56,8 @@ function itemTone(item: DeliveryCalendarItem): { bg: string; text: string } {
 }
 
 function chipLabel(item: DeliveryCalendarItem): string {
-  if (item.kind === "submit") return `提出 ${item.title}`;
-  if (item.kind === "both") return `提出・完了 ${item.title}`;
-  return item.title;
+  const base = item.kind === "submit" ? `提出 ${item.title}` : item.kind === "both" ? `提出・完了 ${item.title}` : item.title;
+  return item.projectTitle ? `${item.projectTitle}・${base}` : base;
 }
 
 function buildMonthDates(monthDate: Date): Date[] {

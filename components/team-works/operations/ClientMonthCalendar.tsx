@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 
 type CalendarSession = {
   id: string;
@@ -54,6 +55,7 @@ export function ClientMonthCalendar({
   selectedDate: string | null;
   onSelectDate: (dateKey: string) => void;
 }) {
+  const labels = useTeamWorksLabels();
   const [monthDate, setMonthDate] = useState(() => {
     const now = new Date();
     const todayKey = toDateKey(now);
@@ -140,7 +142,7 @@ export function ClientMonthCalendar({
                 {dayHolidays.length > 0 ? <span className="rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold">休講</span> : null}
                 {dayHolidays.length === 0 && japanDayOff.isDayOff ? (
                   <span title={japanDayOff.label ?? undefined} className="truncate rounded bg-[var(--mikke-pink)] px-1 py-0.5 text-[8px] font-bold text-[var(--tw-on-tint)]">
-                    {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
+                    {japanDayOff.isNationalHoliday ? japanDayOff.label : labels.holidayLabel}
                   </span>
                 ) : null}
               </span>

@@ -10,6 +10,8 @@ import {
 } from "@/lib/team-works-operations";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
+import { DEFAULT_OPERATION_SETTINGS, isClosedDayKey, type TeamWorksOperationSettings } from "@/lib/team-works-operation-settings";
+import { TeamWorksCalendarProjectLinks } from "./TeamWorksCalendarProjectLinks";
 
 const dowLabels = ["日", "月", "火", "水", "木", "金", "土"];
 const maxChipsPerCell = 2;
@@ -23,7 +25,8 @@ export function TeamWorksMonthCalendar({
   holidayDates,
   projects,
   shiftAvailability = [],
-  onSelectDay
+  onSelectDay,
+  operationSettings = DEFAULT_OPERATION_SETTINGS
 }: {
   monthDate: Date;
   onMonthChange: (nextMonth: Date) => void;
@@ -32,6 +35,7 @@ export function TeamWorksMonthCalendar({
   projects: OperationsProjectSummary[];
   shiftAvailability?: { date: string; names: string[] }[];
   onSelectDay: (dateKey: string) => void;
+  operationSettings?: TeamWorksOperationSettings;
 }) {
   const labels = useTeamWorksLabels();
   const [view, setView] = useState<CalendarView>("month");
@@ -108,6 +112,9 @@ export function TeamWorksMonthCalendar({
             const isToday = dateKey === todayKey;
             const isHoliday = holidayDates.has(dateKey);
             const japanDayOff = getJapanDayOff(date);
+            // 背景色(閉まっているかどうか)は組織の休日設定で決める。祝日名などの
+            // ラベル表示は従来通りgetJapanDayOff基準のまま(表示の意味は変えない)。
+            const isClosed = isClosedDayKey(operationSettings, dateKey);
             const dayEvents = eventsByDate.get(dateKey) ?? [];
             const availablePartnerNames = shiftsByDate.get(dateKey) ?? [];
             const visibleEvents = dayEvents.slice(0, maxChipsPerCell);
@@ -127,7 +134,7 @@ export function TeamWorksMonthCalendar({
                 type="button"
                 onClick={() => onSelectDay(dateKey)}
                 className={`min-h-[60px] rounded-lg border p-1 text-left ${
-                  japanDayOff.isDayOff ? "border-[var(--mikke-pink)] bg-[var(--mikke-pink)]" : "border-[var(--mikke-line)] bg-white"
+                  isClosed ? "border-[var(--mikke-pink)] bg-[var(--mikke-pink)]" : "border-[var(--mikke-line)] bg-white"
                 } ${
                   isToday ? "border-[1.5px] border-[var(--mikke-green)]" : ""
                 }`}
@@ -135,10 +142,10 @@ export function TeamWorksMonthCalendar({
                 <span className={`text-[10px] font-bold ${isToday ? "text-[var(--mikke-success)]" : "text-[var(--mikke-muted)]"}`}>
                   {date.getDate()}
                 </span>
-                {isHoliday ? <span className="mt-0.5 block text-[8px] font-extrabold text-[var(--mikke-accent)]">休校</span> : null}
+                {isHoliday ? <span className="mt-0.5 block text-[8px] font-extrabold text-[var(--mikke-accent)]">{labels.holidayLabel}</span> : null}
                 {!isHoliday && japanDayOff.isDayOff ? (
                   <span title={japanDayOff.label ?? undefined} className="mt-0.5 block truncate text-[8px] font-extrabold text-[var(--tw-on-tint)]">
-                    {japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}
+                    {japanDayOff.isNationalHoliday ? japanDayOff.label : labels.holidayLabel}
                   </span>
                 ) : null}
                 {availablePartnerNames.length > 0 ? (
@@ -190,7 +197,7 @@ export function TeamWorksMonthCalendar({
         ))}
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--mikke-accent)]" />
-          休校
+          {labels.holidayLabel}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-2.5 w-2.5 rounded-[3px] bg-[var(--mikke-pink)]" />
@@ -203,6 +210,10 @@ export function TeamWorksMonthCalendar({
           </span>
         ) : null}
       </div>
+
+      <TeamWorksCalendarProjectLinks
+        projects={projects.map((project) => ({ id: project.id, title: project.title, bg: project.bg }))}
+      />
     </div>
   );
 }

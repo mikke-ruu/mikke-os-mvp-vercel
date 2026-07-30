@@ -1,8 +1,8 @@
 "use client";
 
-import { Clock, MessageSquare, Plus, Users, Wallet } from "lucide-react";
+import { Clock, Plus } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
@@ -13,20 +13,27 @@ import {
   loadOperationsDashboardData,
   type OperationsDashboardData
 } from "@/lib/team-works-operations";
-import { loadDeliveryHomeSummary, type DeliveryHomeSummary } from "@/lib/team-works-delivery-home";
+import { fetchDeliveryProjects } from "@/lib/team-works-delivery";
 import { TeamWorksDayPanel } from "./TeamWorksDayPanel";
-import { TeamWorksDeliveryHomeSection } from "./TeamWorksDeliveryHomeSection";
+import { TeamWorksDeliveryDashboard } from "./TeamWorksDeliveryDashboard";
 import { TeamWorksMonthCalendar } from "./TeamWorksMonthCalendar";
 import { TeamWorksShiftAdminPanel } from "./TeamWorksShiftAdminPanel";
+import { FinanceCard, MessagesCard } from "./TeamWorksHomeCards";
 import { loadStaffPartnerShifts, type PartnerShiftSubmission } from "@/lib/team-works-shifts";
-import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
+import { TEAM_WORKS_POLL_INTERVAL_MS } from "@/lib/team-works-constants";
 
 function startOfCurrentMonth(): Date {
   const now = new Date();
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
+type HomeTab = "ops" | "delivery";
+
 export function TeamWorksOperationsDashboard() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   const [monthDate, setMonthDate] = useState<Date>(startOfCurrentMonth);
   const [data, setData] = useState<OperationsDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,20 +41,25 @@ export function TeamWorksOperationsDashboard() {
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [shiftSubmissions, setShiftSubmissions] = useState<PartnerShiftSubmission[]>([]);
   const [calendarAutoPositioned, setCalendarAutoPositioned] = useState(false);
-  const [deliveryHome, setDeliveryHome] = useState<DeliveryHomeSummary | null>(null);
+  // 納品型が1件でもあるかどうかだけの軽い判定。重いloadDeliveryHomeSummary
+  // (プロジェクト数×4-5クエリ)はTeamWorksDeliveryDashboard側が自分で読む。
+  const [hasDeliveryProjects, setHasDeliveryProjects] = useState(false);
+  const [activeHomeTab, setActiveHomeTab] = useState<HomeTab>(
+    searchParams.get("home") === "delivery" ? "delivery" : "ops"
+  );
 
   const load = useCallback(async (targetMonth: Date) => {
     setLoading(true);
     setError(null);
     try {
-      const [result, shifts, deliverySummary] = await Promise.all([
+      const [result, shifts, deliveryProjects] = await Promise.all([
         loadOperationsDashboardData(supabase, targetMonth),
         loadStaffPartnerShifts(supabase, targetMonth),
-        loadDeliveryHomeSummary(supabase)
+        fetchDeliveryProjects(supabase)
       ]);
       setData(result);
       setShiftSubmissions(shifts);
-      setDeliveryHome(deliverySummary);
+      setHasDeliveryProjects(deliveryProjects.length > 0);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "ダッシュボードの読み込みに失敗しました。");
     } finally {
@@ -60,7 +72,12 @@ export function TeamWorksOperationsDashboard() {
   }, [monthDate, load]);
 
   useEffect(() => {
-    const timerId = window.setInterval(() => void load(monthDate), 5000);
+    const timerId = window.setInterval(() => {
+      // タブが裏に回っている間は読みに行かない(以前は5秒間隔でSupabaseクエリを
+      // 大量消費していた)。
+      if (document.visibilityState === "hidden") return;
+      void load(monthDate);
+    }, TEAM_WORKS_POLL_INTERVAL_MS);
     return () => window.clearInterval(timerId);
   }, [load, monthDate]);
 
@@ -81,6 +98,15 @@ export function TeamWorksOperationsDashboard() {
     }
   }, [calendarAutoPositioned, data, monthDate]);
 
+  const selectHomeTab = useCallback((tab: HomeTab) => {
+    setActiveHomeTab(tab);
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "delivery") params.set("home", "delivery");
+    else params.delete("home");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname);
+  }, [pathname, router, searchParams]);
+
   if (loading && !data) {
     return <p className="text-sm text-[var(--mikke-muted)]">読み込んでいます…</p>;
   }
@@ -89,15 +115,22 @@ export function TeamWorksOperationsDashboard() {
     return <MikkeEmptyState title="読み込みに失敗しました" helper={error} />;
   }
 
-  // 運営型が1件も無くても、納品型プロジェクトがあれば「はじめての
-  // プロジェクトを作る」画面ではなく通常のダッシュボードを表示する。
-  // 以前はhasOperationsProjectsだけで判定していたため、納品型しか
-  // 無いアカウントでも毎回「最初の運営型プロジェクトを作成」に
-  // 案内されてしまっていた。
-  const hasAnyProject = Boolean(data?.hasOperationsProjects) || Boolean(deliveryHome && deliveryHome.projectCount > 0);
-  if (!data || !hasAnyProject) {
+  if (!data) {
     return <FirstOperationsProjectSetup />;
   }
+
+  const hasOperationsProjects = data.hasOperationsProjects;
+
+  // 3状態: 運営型のみ(タブなし・従来通り) / 両方(ページタブで切替) / 納品型のみ(タブなし)。
+  // どちらも無ければ従来通り最初のプロジェクト作成画面。
+  if (!hasOperationsProjects && !hasDeliveryProjects) {
+    return <FirstOperationsProjectSetup />;
+  }
+  if (!hasOperationsProjects && hasDeliveryProjects) {
+    return <TeamWorksDeliveryDashboard />;
+  }
+
+  const bothTypes = hasDeliveryProjects;
 
   const selectedDayEvents = selectedDayKey ? data.monthEvents.filter((event) => event.sessionDate === selectedDayKey) : [];
   const selectedDayHolidays = selectedDayKey ? data.monthHolidays.filter((holiday) => holiday.date === selectedDayKey) : [];
@@ -111,165 +144,194 @@ export function TeamWorksOperationsDashboard() {
 
   return (
     <div className="space-y-6">
-      <TeamWorksDeliveryHomeSection summary={deliveryHome} />
-
-      {data.activePresenceEvents.length > 0 ? (
-        <section aria-live="polite" className="rounded-2xl border border-[var(--mikke-line)] border-l-4 border-l-[var(--tw-done)] bg-white p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Clock size={18} className="text-[var(--tw-on-tint)]" />
-            <h2 className="text-sm font-extrabold">只今のレッスン状況</h2>
-            <span className="rounded-full bg-[var(--tw-done)] px-2 py-0.5 text-[10px] font-extrabold text-[var(--tw-on-tint)]">
-              {data.activePresenceEvents.length}件
-            </span>
-          </div>
-          <div className="grid gap-2 md:grid-cols-2">
-            {data.activePresenceEvents.map((event) => (
-              <Link
-                key={event.id}
-                href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
-                className="flex items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-3"
+      {bothTypes ? (
+        <nav aria-label="ホームの表示切替" className="-mx-4 overflow-x-auto border-b border-[var(--mikke-line)] px-4">
+          <div className="flex min-w-max gap-1">
+            {([
+              { id: "ops", label: "運営" },
+              { id: "delivery", label: "納品" }
+            ] as { id: HomeTab; label: string }[]).map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => selectHomeTab(tab.id)}
+                className={`border-b-2 px-3 py-2.5 text-xs font-bold transition ${
+                  activeHomeTab === tab.id
+                    ? "border-[var(--mikke-accent)] text-[var(--mikke-primary)]"
+                    : "border-transparent text-[var(--mikke-muted)]"
+                }`}
               >
-                <PartnerPresenceLabel status={event.partnerPresenceStatus} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-extrabold">{event.projectTitle}</span>
-                  <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">
-                    {event.sessionDate} {event.startTime} · 担当 {event.partnerName ?? "未定"}
-                  </span>
-                </span>
-                <span className="text-xs font-bold text-[var(--mikke-primary)]">確認</span>
-              </Link>
+                {tab.label}
+              </button>
             ))}
           </div>
-        </section>
+        </nav>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.7fr_1fr]">
-        <TeamWorksMonthCalendar
-          monthDate={monthDate}
-          onMonthChange={(nextMonth) => {
-            setCalendarAutoPositioned(true);
-            setSelectedDayKey(null);
-            setMonthDate(nextMonth);
-          }}
-          events={data.monthEvents}
-          holidayDates={data.monthHolidayDates}
-          projects={data.projects}
-          shiftAvailability={shiftAvailability}
-          onSelectDay={setSelectedDayKey}
-        />
-
-        <div className="flex flex-col gap-4">
-          <FinanceCard />
-          <MessagesCard comments={data.recentComments} />
-        </div>
-      </div>
-
-      <TeamWorksShiftAdminPanel
-        targetMonth={monthDate}
-        submissions={shiftSubmissions}
-        onRefresh={() => load(monthDate)}
-      />
-
-      <MikkeSection title="Today" tone="editorial">
-        <p className="mb-2 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">本日のスケジュール（本部）</p>
-        {data.todayEvents.length === 0 ? (
-          <MikkeEmptyState title="本日の予定はありません" />
-        ) : (
-          <div className="divide-y divide-[var(--mikke-line)] rounded-xl border border-[var(--mikke-line)] bg-white">
-            {data.todayEvents.map((event) => (
-              <div key={event.id} className="flex items-center gap-3 px-3 py-3">
-                <span className="h-8 w-1 shrink-0 rounded-full" style={{ background: event.bg }} />
-                <span className="w-12 shrink-0 text-sm font-bold">{event.startTime}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-bold">
-                    {event.projectTitle}
-                    {event.participantCount > 0 ? ` · 参加${event.participantCount}名` : ""}
-                  </span>
-                  <span className="mt-0.5 flex items-center gap-2 text-xs font-semibold text-[var(--mikke-muted)]">
-                    {event.partnerName ? <span>担当 {event.partnerName}</span> : <span className="text-[var(--mikke-accent)]">担当未定</span>}
-                    <PartnerPresenceLabel status={event.partnerPresenceStatus} />
-                    <span className="inline-flex items-center gap-1">
-                      <Clock size={12} /> {event.durationMin}分
-                    </span>
-                    {event.zoomMeetingId ? <span>Zoom ID {event.zoomMeetingId}</span> : null}
-                  </span>
+      {bothTypes && activeHomeTab === "delivery" ? (
+        <TeamWorksDeliveryDashboard />
+      ) : (
+        <>
+          {data.activePresenceEvents.length > 0 ? (
+            <section aria-live="polite" className="rounded-2xl border border-[var(--mikke-line)] border-l-4 border-l-[var(--tw-done)] bg-white p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <Clock size={18} className="text-[var(--tw-on-tint)]" />
+                <h2 className="text-sm font-extrabold">只今のレッスン状況</h2>
+                <span className="rounded-full bg-[var(--tw-done)] px-2 py-0.5 text-[10px] font-extrabold text-[var(--tw-on-tint)]">
+                  {data.activePresenceEvents.length}件
                 </span>
-                <Link
-                  href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
-                  className="shrink-0 rounded-full border border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)]"
-                >
-                  スケジュール
-                </Link>
               </div>
-            ))}
-          </div>
-        )}
-      </MikkeSection>
-
-      <MikkeSection title="Needs attention" tone="editorial">
-        <p className="mb-2 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">緊急・期日が近い・大事なこと</p>
-        {data.needsAttentionUnassigned.length === 0 ? (
-          <MikkeEmptyState title="対応が必要なことはありません" helper="今後7日間、担当未定のコマはありません。" />
-        ) : (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {data.needsAttentionUnassigned.map((event) => (
-              <Link
-                key={event.id}
-                href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
-                className="rounded-xl border border-l-4 border-[var(--mikke-line)] p-3 text-left"
-                style={{ borderLeftColor: "var(--mikke-orange)" }}
-              >
-                <span className="float-right text-lg font-extrabold text-[var(--mikke-orange)]">!</span>
-                <span className="block text-sm font-bold text-[var(--mikke-orange)]">シフト未決定</span>
-                <span className="mt-1 block text-xs leading-5 text-[var(--mikke-muted)]">
-                  {formatShortDate(event.sessionDate, todayKey)} {event.startTime} {event.projectTitle}、担当未定。
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-        <div className="mt-4 border-t border-[var(--mikke-line)] pt-4">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-extrabold text-[var(--mikke-primary)]">今後のスケジュール（3件）</p>
-            <Link href="/apps/team-works/schedule" className="text-xs font-bold text-[var(--mikke-primary)]">すべて見る</Link>
-          </div>
-          {data.upcomingEvents.length === 0 ? (
-            <p className="text-xs font-semibold text-[var(--mikke-muted)]">今後の予定はありません。</p>
-          ) : (
-            <div className="grid gap-2">
-              {data.upcomingEvents.map((event) => (
-                <Link
-                  key={event.id}
-                  href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
-                  className="grid gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3 transition hover:border-[var(--tw-done)] sm:grid-cols-[90px_1fr_auto] sm:items-center"
-                >
-                  <span className="rounded-lg bg-[var(--tw-planned)] px-2 py-2 text-center text-xs font-extrabold text-[var(--tw-on-tint)]">
-                    {formatShortDate(event.sessionDate, todayKey)} {event.startTime}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold">{event.projectTitle}</span>
-                    <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">
-                      {event.partnerName ? `担当 ${event.partnerName}` : "担当未定"}
-                      {event.zoomMeetingId ? ` · Zoom ID ${event.zoomMeetingId}` : ""}
+              <div className="grid gap-2 md:grid-cols-2">
+                {data.activePresenceEvents.map((event) => (
+                  <Link
+                    key={event.id}
+                    href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
+                    className="flex items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-3"
+                  >
+                    <PartnerPresenceLabel status={event.partnerPresenceStatus} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-extrabold">{event.projectTitle}</span>
+                      <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">
+                        {event.sessionDate} {event.startTime} · 担当 {event.partnerName ?? "未定"}
+                      </span>
                     </span>
-                  </span>
-                  <PartnerPresenceLabel status={event.partnerPresenceStatus} />
-                  <span className="text-xs font-bold text-[var(--mikke-primary)]">開く</span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      </MikkeSection>
+                    <span className="text-xs font-bold text-[var(--mikke-primary)]">確認</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
-      {selectedDayKey ? (
-        <TeamWorksDayPanel
-          dateKey={selectedDayKey}
-          events={selectedDayEvents}
-          holidays={selectedDayHolidays}
-          onClose={() => setSelectedDayKey(null)}
-        />
-      ) : null}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[1.7fr_1fr]">
+            <TeamWorksMonthCalendar
+              monthDate={monthDate}
+              onMonthChange={(nextMonth) => {
+                setCalendarAutoPositioned(true);
+                setSelectedDayKey(null);
+                setMonthDate(nextMonth);
+              }}
+              events={data.monthEvents}
+              holidayDates={data.monthHolidayDates}
+              projects={data.projects}
+              shiftAvailability={shiftAvailability}
+              onSelectDay={setSelectedDayKey}
+              operationSettings={data.operationSettings}
+            />
+
+            <div className="flex flex-col gap-4">
+              <FinanceCard />
+              <MessagesCard comments={data.recentComments} />
+            </div>
+          </div>
+
+          <TeamWorksShiftAdminPanel
+            targetMonth={monthDate}
+            submissions={shiftSubmissions}
+            onRefresh={() => load(monthDate)}
+          />
+
+          <MikkeSection title="Today" tone="editorial">
+            <p className="mb-2 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">本日のスケジュール（本部）</p>
+            {data.todayEvents.length === 0 ? (
+              <MikkeEmptyState title="本日の予定はありません" />
+            ) : (
+              <div className="divide-y divide-[var(--mikke-line)] rounded-xl border border-[var(--mikke-line)] bg-white">
+                {data.todayEvents.map((event) => (
+                  <div key={event.id} className="flex items-center gap-3 px-3 py-3">
+                    <span className="h-8 w-1 shrink-0 rounded-full" style={{ background: event.bg }} />
+                    <span className="w-12 shrink-0 text-sm font-bold">{event.startTime}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold">
+                        {event.projectTitle}
+                        {event.participantCount > 0 ? ` · 参加${event.participantCount}名` : ""}
+                      </span>
+                      <span className="mt-0.5 flex items-center gap-2 text-xs font-semibold text-[var(--mikke-muted)]">
+                        {event.partnerName ? <span>担当 {event.partnerName}</span> : <span className="text-[var(--mikke-accent)]">担当未定</span>}
+                        <PartnerPresenceLabel status={event.partnerPresenceStatus} />
+                        <span className="inline-flex items-center gap-1">
+                          <Clock size={12} /> {event.durationMin}分
+                        </span>
+                        {event.zoomMeetingId ? <span>Zoom ID {event.zoomMeetingId}</span> : null}
+                      </span>
+                    </span>
+                    <Link
+                      href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
+                      className="shrink-0 rounded-full border border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)]"
+                    >
+                      スケジュール
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            )}
+          </MikkeSection>
+
+          <MikkeSection title="Needs attention" tone="editorial">
+            <p className="mb-2 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">緊急・期日が近い・大事なこと</p>
+            {data.needsAttentionUnassigned.length === 0 ? (
+              <MikkeEmptyState title="対応が必要なことはありません" helper="今後7日間、担当未定のコマはありません。" />
+            ) : (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {data.needsAttentionUnassigned.map((event) => (
+                  <Link
+                    key={event.id}
+                    href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
+                    className="rounded-xl border border-l-4 border-[var(--mikke-line)] p-3 text-left"
+                    style={{ borderLeftColor: "var(--mikke-orange)" }}
+                  >
+                    <span className="float-right text-lg font-extrabold text-[var(--mikke-orange)]">!</span>
+                    <span className="block text-sm font-bold text-[var(--mikke-orange)]">シフト未決定</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--mikke-muted)]">
+                      {formatShortDate(event.sessionDate, todayKey)} {event.startTime} {event.projectTitle}、担当未定。
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+            <div className="mt-4 border-t border-[var(--mikke-line)] pt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-extrabold text-[var(--mikke-primary)]">今後のスケジュール（3件）</p>
+                <Link href="/apps/team-works/schedule" className="text-xs font-bold text-[var(--mikke-primary)]">すべて見る</Link>
+              </div>
+              {data.upcomingEvents.length === 0 ? (
+                <p className="text-xs font-semibold text-[var(--mikke-muted)]">今後の予定はありません。</p>
+              ) : (
+                <div className="grid gap-2">
+                  {data.upcomingEvents.map((event) => (
+                    <Link
+                      key={event.id}
+                      href={`/apps/team-works/projects/${event.projectId}?tab=schedule`}
+                      className="grid gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3 transition hover:border-[var(--tw-done)] sm:grid-cols-[90px_1fr_auto] sm:items-center"
+                    >
+                      <span className="rounded-lg bg-[var(--tw-planned)] px-2 py-2 text-center text-xs font-extrabold text-[var(--tw-on-tint)]">
+                        {formatShortDate(event.sessionDate, todayKey)} {event.startTime}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold">{event.projectTitle}</span>
+                        <span className="block text-[11px] font-semibold text-[var(--mikke-muted)]">
+                          {event.partnerName ? `担当 ${event.partnerName}` : "担当未定"}
+                          {event.zoomMeetingId ? ` · Zoom ID ${event.zoomMeetingId}` : ""}
+                        </span>
+                      </span>
+                      <PartnerPresenceLabel status={event.partnerPresenceStatus} />
+                      <span className="text-xs font-bold text-[var(--mikke-primary)]">開く</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </MikkeSection>
+
+          {selectedDayKey ? (
+            <TeamWorksDayPanel
+              dateKey={selectedDayKey}
+              events={selectedDayEvents}
+              holidays={selectedDayHolidays}
+              onClose={() => setSelectedDayKey(null)}
+            />
+          ) : null}
+        </>
+      )}
     </div>
   );
 }
@@ -404,86 +466,4 @@ function formatShortDate(dateKey: string, todayKey: string): string {
   if (dateKey === todayKey) return "本日";
   const date = new Date(`${dateKey}T00:00:00`);
   return `${date.getMonth() + 1}/${date.getDate()}`;
-}
-
-function FinanceCard() {
-  const labels = useTeamWorksLabels();
-  return (
-    <Link href="/apps/team-works/projects" className="block rounded-2xl border border-[#ffd370] bg-white p-4 transition hover:border-[#8bc7ad]">
-      <div className="mb-3 flex items-baseline justify-between">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--mikke-primary)]">
-          <Wallet size={13} /> Finance
-        </span>
-        <span className="text-[11px] font-bold text-[var(--mikke-muted-light)]">今月・本部のみ</span>
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="grid h-16 w-16 shrink-0 place-items-center rounded-full border-[6px] border-[var(--mikke-line-soft)]">
-          <span className="text-xs font-bold text-[var(--mikke-muted-light)]">未設定</span>
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          {[
-            { label: "売上想定", color: "var(--mikke-blue)" },
-            { label: "経費想定", color: "var(--mikke-orange)" },
-            { label: "利益見込み", color: "var(--mikke-green)" }
-          ].map((row) => (
-            <div key={row.label} className="flex items-center justify-between rounded-lg bg-[var(--mikke-surface-soft)] px-2.5 py-1.5 text-xs">
-              <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--mikke-muted)]">
-                <span className="h-2 w-2 rounded-[3px]" style={{ background: row.color }} />
-                {row.label}
-              </span>
-              <span className="font-bold text-[var(--mikke-muted-light)]">—</span>
-            </div>
-          ))}
-        </div>
-      </div>
-      <p className="mt-3 text-[10.5px] leading-5 text-[var(--mikke-muted-light)]">
-        {labels.workers}報酬・請求のレートがまだ設定されていないため集計できません。レート項目を追加すると自動で表示されます。
-      </p>
-    </Link>
-  );
-}
-
-function MessagesCard({ comments }: { comments: OperationsDashboardData["recentComments"] }) {
-  return (
-    <div className="overflow-hidden rounded-2xl border border-[#f9d3d2] bg-white">
-      <div className="flex items-baseline justify-between px-4 pt-4">
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--mikke-primary)]">
-          <MessageSquare size={13} /> Messages
-        </span>
-      </div>
-      <div className="mt-3">
-        {comments.length === 0 ? (
-          <p className="px-4 pb-4 text-xs font-semibold text-[var(--mikke-muted)]">新着メッセージはありません。</p>
-        ) : (
-          <div className="divide-y divide-[var(--mikke-line)]">
-            {comments.map((comment) => (
-              <Link key={comment.id} href={`/apps/team-works/projects/${comment.projectId}?tab=messages`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--mikke-surface-soft)]">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f9d3d2] text-[#3f4eb5]">
-                  <Users size={14} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-bold">
-                    {comment.authorName}（{comment.projectTitle}）
-                  </span>
-                  <span className="block truncate text-[11px] font-semibold text-[var(--mikke-muted)]">{comment.body}</span>
-                </span>
-                <span className="shrink-0 text-[10px] font-semibold text-[var(--mikke-muted-light)]">{formatRelativeTime(comment.createdAt)}</span>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function formatRelativeTime(iso: string): string {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const diffMinutes = Math.floor(diffMs / 60_000);
-  if (diffMinutes < 1) return "たった今";
-  if (diffMinutes < 60) return `${diffMinutes}分前`;
-  const diffHours = Math.floor(diffMinutes / 60);
-  if (diffHours < 24) return `${diffHours}時間前`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}日前`;
 }

@@ -10,6 +10,7 @@ import {
 } from "@/lib/team-works-shifts";
 import { supabase } from "@/lib/supabase/client";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -29,6 +30,7 @@ function statusLabel(status: PartnerShiftSubmission["status"]): string {
 }
 
 export function TeamWorksPartnerShiftPanel() {
+  const labels = useTeamWorksLabels();
   const [targetMonth, setTargetMonth] = useState(nextMonth);
   const [submission, setSubmission] = useState<PartnerShiftSubmission | null>(null);
   const [desiredDays, setDesiredDays] = useState(4);
@@ -150,7 +152,7 @@ export function TeamWorksPartnerShiftPanel() {
                     } ${inMonth ? "" : "opacity-25"} disabled:cursor-default`}
                   >
                     <span className="block">{date.getDate()}</span>
-                    {japanDayOff.isDayOff ? <span className="block truncate text-[8px]">{japanDayOff.isNationalHoliday ? japanDayOff.label : "休校"}</span> : null}
+                    {japanDayOff.isDayOff ? <span className="block truncate text-[8px]">{japanDayOff.isNationalHoliday ? japanDayOff.label : labels.holidayLabel}</span> : null}
                   </button>
                 );
               })}

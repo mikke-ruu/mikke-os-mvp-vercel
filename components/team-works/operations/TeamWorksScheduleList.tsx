@@ -59,7 +59,7 @@ export function TeamWorksScheduleList() {
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-bold sm:truncate">{item.date} <span className="ml-1">{item.taskTitle}</span></span>
                   <span className="mt-0.5 block text-[11px] font-semibold text-[var(--mikke-muted)] sm:text-xs">
-                    {item.projectTitle}・{item.kind === "submit" ? "提出期日" : "完了期日"}
+                    {item.projectTitle}・{item.kind === "submit" ? "提出期日" : item.kind === "due" ? "完了期日" : "提出・完了期日"}
                   </span>
                 </span>
                 <ChevronRight size={16} className="shrink-0 text-[var(--mikke-muted-light)]" />

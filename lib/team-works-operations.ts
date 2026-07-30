@@ -1,6 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StatChipTone } from "@/components/mikkeos/StatChip";
 import { isJapanDayOffKey } from "@/lib/japanese-calendar";
+import {
+  DEFAULT_OPERATION_SETTINGS,
+  isClosedDayKey,
+  loadOrganizationOperationSettingsMap,
+  type TeamWorksOperationSettings
+} from "@/lib/team-works-operation-settings";
 
 /**
  * Team Works R2: 運営型プロジェクトのダッシュボード/スケジュール用データアクセス＋
@@ -57,6 +63,9 @@ export type RecentOperationsComment = {
 
 export type OperationsDashboardData = {
   hasOperationsProjects: boolean;
+  // カレンダーの休日色分けに使う、この本部の既定の休日設定。組織を複数持つ
+  // 本部staffでも1本部の画面としては1つの設定で足りるため、最初の組織のものを使う。
+  operationSettings: TeamWorksOperationSettings;
   projects: OperationsProjectSummary[];
   activePresenceEvents: OperationsCalendarEvent[];
   monthEvents: OperationsCalendarEvent[];
@@ -275,7 +284,7 @@ export async function loadOperationsMessagesOverview(client: SupabaseClient): Pr
   return { projects, recentComments };
 }
 
-async function fetchOrganizationMemberNames(client: SupabaseClient, organizationIds: string[]): Promise<Map<string, string>> {
+export async function fetchOrganizationMemberNames(client: SupabaseClient, organizationIds: string[]): Promise<Map<string, string>> {
   if (organizationIds.length === 0) return new Map();
   const { data, error } = await client
     .from("team_works_organization_members")
@@ -383,7 +392,7 @@ async function fetchRosterCounts(client: SupabaseClient, sessionIds: string[]): 
   return counts;
 }
 
-async function fetchRecentCommentRows(client: SupabaseClient, projectIds: string[], limit: number) {
+export async function fetchRecentCommentRows(client: SupabaseClient, projectIds: string[], limit: number) {
   if (projectIds.length === 0) return [];
   const { data, error } = await client
     .from("team_works_project_comments")
@@ -426,6 +435,7 @@ function assembleEvent(
 export async function loadOperationsDashboardData(client: SupabaseClient, monthDate: Date): Promise<OperationsDashboardData> {
   const empty: OperationsDashboardData = {
     hasOperationsProjects: false,
+    operationSettings: DEFAULT_OPERATION_SETTINGS,
     projects: [],
     activePresenceEvents: [],
     monthEvents: [],
@@ -456,15 +466,22 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
   const attentionEndKey = formatDateKey(addDays(today, 6));
   const upcomingEndKey = formatDateKey(addDays(today, 60));
 
-  const [memberNameById, sessionRows, activePresenceRows, holidayRows, unassignedRows, upcomingRows, commentRows] = await Promise.all([
+  const [memberNameById, sessionRows, activePresenceRows, holidayRows, unassignedRows, upcomingRows, commentRows, orgSettingsById] = await Promise.all([
     fetchOrganizationMemberNames(client, organizationIds),
     fetchSessionRows(client, projectIds, gridStartKey, gridEndKey),
     fetchActivePresenceSessionRows(client, projectIds),
     fetchHolidayRows(client, organizationIds, projectIds, gridStartKey, gridEndKey),
     fetchUnassignedUpcomingSessionRows(client, projectIds, todayKey, attentionEndKey),
     fetchSessionRows(client, projectIds, todayKey, upcomingEndKey),
-    fetchRecentCommentRows(client, projectIds, 6)
+    fetchRecentCommentRows(client, projectIds, 6),
+    loadOrganizationOperationSettingsMap(client, organizationIds)
   ]);
+  const operationSettings = orgSettingsById.get(organizationIds[0]) ?? DEFAULT_OPERATION_SETTINGS;
+  const isClosedForRow = (row: { project_id: string; session_date: string }): boolean => {
+    const organizationId = projectById.get(row.project_id)?.organizationId;
+    const settings = (organizationId && orgSettingsById.get(organizationId)) || DEFAULT_OPERATION_SETTINGS;
+    return isClosedDayKey(settings, row.session_date);
+  };
 
   const sessionIds = sessionRows.map((row) => row.id);
   const rosterCounts = await fetchRosterCounts(client, [...new Set([
@@ -487,7 +504,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
     });
 
   const monthEvents = sessionRows
-    .filter((row) => row.status !== "cancelled" && !isJapanDayOffKey(row.session_date))
+    .filter((row) => row.status !== "cancelled" && !isClosedForRow(row))
     .flatMap((row) => {
       const event = assembleEvent(row, projectById, memberNameById, rosterCounts);
       return event ? [event] : [];
@@ -498,7 +515,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   const needsAttentionUnassigned = unassignedRows
-    .filter((row) => !isJapanDayOffKey(row.session_date))
+    .filter((row) => !isClosedForRow(row))
     .flatMap((row) => {
       const event = assembleEvent(row, projectById, memberNameById, rosterCounts);
       return event ? [event] : [];
@@ -506,7 +523,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
     .sort((a, b) => (a.sessionDate + a.startTime).localeCompare(b.sessionDate + b.startTime));
 
   const upcomingEvents = upcomingRows
-    .filter((row) => row.status === "scheduled" && !isJapanDayOffKey(row.session_date))
+    .filter((row) => row.status === "scheduled" && !isClosedForRow(row))
     .flatMap((row) => {
       const event = assembleEvent(row, projectById, memberNameById, rosterCounts);
       return event ? [event] : [];
@@ -528,6 +545,7 @@ export async function loadOperationsDashboardData(client: SupabaseClient, monthD
 
   return {
     hasOperationsProjects: true,
+    operationSettings,
     projects,
     activePresenceEvents,
     monthEvents,
@@ -594,11 +612,17 @@ export async function loadOperationsScheduleGroups(
   const fromKey = formatDateKey(fromDate);
   const toKey = formatDateKey(addDays(fromDate, days - 1));
 
-  const [memberNameById, sessionRows] = await Promise.all([
+  const [memberNameById, sessionRows, orgSettingsById] = await Promise.all([
     fetchOrganizationMemberNames(client, organizationIds),
-    fetchSessionRows(client, projectIds, fromKey, toKey)
+    fetchSessionRows(client, projectIds, fromKey, toKey),
+    loadOrganizationOperationSettingsMap(client, organizationIds)
   ]);
-  const activeRows = sessionRows.filter((row) => row.status !== "cancelled" && !isJapanDayOffKey(row.session_date));
+  const activeRows = sessionRows.filter((row) => {
+    if (row.status === "cancelled") return false;
+    const organizationId = projectById.get(row.project_id)?.organizationId;
+    const settings = (organizationId && orgSettingsById.get(organizationId)) || DEFAULT_OPERATION_SETTINGS;
+    return !isClosedDayKey(settings, row.session_date);
+  });
   const rosterCounts = await fetchRosterCounts(client, activeRows.map((row) => row.id));
 
   const groupsByDate = new Map<string, OperationsCalendarEvent[]>();

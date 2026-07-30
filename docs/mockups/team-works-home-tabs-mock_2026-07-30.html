@@ -1,0 +1,962 @@
+<title>ホーム ページタブ案 モックアップ</title>
+<style>
+  /* このモックは既存Team Works本番画面(ライトテーマ固定)の再現なので、
+     意図的に単一テーマにしている。 */
+  :root {
+    color-scheme: light;
+
+    --mikke-bg: #f5f6fa;
+    --mikke-surface: #ffffff;
+    --mikke-surface-soft: #f7f8fc;
+    --mikke-line: #e6e8f0;
+    --mikke-line-soft: #eef0f6;
+    --mikke-ink: #2a2f45;
+    --mikke-muted: #7b8196;
+    --mikke-muted-light: #a7adc0;
+    --mikke-primary: #3f4eb5;
+
+    --tw-title: #3f4eb5;
+    --tw-action: #e8663f;
+    --tw-done: #8bc7ad;
+    --tw-planned: #ffd370;
+    --tw-deadline: #f4a0a0;
+    --tw-on-tint: #2a2f45;
+    --tw-on-solid: #ffffff;
+
+    --mikke-green: #6cba97;
+    --mikke-blue: #4a63c8;
+    --mikke-orange: #e8663f;
+    --mikke-pink-soft: #f9d3d2;
+    --mikke-holiday: #fbdde4;
+    --mikke-holiday-ink: #d1567b;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--mikke-bg);
+    color: var(--mikke-ink);
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Yu Gothic", Meiryo, system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* ---------- mockup-only control bar ---------- */
+  .mockbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: #2a2f45;
+    color: #fff;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    font-size: 12px;
+  }
+  .mockbar .tag {
+    background: var(--tw-planned);
+    color: var(--tw-on-tint);
+    font-weight: 800;
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 10.5px;
+    letter-spacing: .04em;
+  }
+  .mockbar .switch { display: inline-flex; gap: 4px; background: rgba(255,255,255,.12); border-radius: 999px; padding: 3px; }
+  .mockbar .switch button {
+    appearance: none; border: 0; background: transparent; color: rgba(255,255,255,.72);
+    font: inherit; font-weight: 700; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  }
+  .mockbar .switch button[aria-pressed="true"] { background: #fff; color: #2a2f45; }
+  .mockbar .hint { color: rgba(255,255,255,.62); }
+
+  /* ---------- app frame ---------- */
+  .app { display: grid; grid-template-columns: 216px 1fr; min-height: calc(100vh - 44px); }
+
+  .sidebar {
+    background: var(--mikke-surface);
+    border-right: 1px solid var(--mikke-line);
+    padding: 22px 14px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .brand { font-size: 11.5px; font-weight: 800; letter-spacing: .14em; padding: 2px 10px 18px; }
+  .navlabel { font-size: 10px; font-weight: 700; color: var(--mikke-muted-light); letter-spacing: .06em; padding: 14px 10px 4px; }
+  .navitem {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 11px; border-radius: 10px;
+    color: var(--mikke-muted); font-size: 13px; font-weight: 700; text-decoration: none;
+  }
+  .navitem .ic { width: 15px; text-align: center; font-size: 12px; opacity: .8; }
+  .navitem.active { background: #a8d8bd; color: #2a5c45; }
+
+  .main { padding: 26px 30px 60px; display: flex; flex-direction: column; max-width: 1240px; }
+
+  .pagetitle {
+    text-align: center; font-size: 16.5px; font-weight: 700;
+    color: var(--tw-title); letter-spacing: .22em; margin: 2px 0 18px;
+  }
+
+  /* ---------- page-level tabs ---------- */
+  .pagetabs {
+    display: flex; gap: 4px;
+    border-bottom: 1px solid var(--mikke-line);
+    margin-bottom: 20px;
+  }
+  .pagetabs.is-hidden { display: none; }
+  .pagetab {
+    appearance: none; border: 0; background: transparent;
+    font: inherit; font-weight: 800; font-size: 13.5px;
+    color: var(--mikke-muted);
+    padding: 10px 18px 12px;
+    border-bottom: 2.5px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .pagetab:focus-visible { outline: 2px solid var(--tw-title); outline-offset: -3px; border-radius: 6px 6px 0 0; }
+  .pagetab .count {
+    font-size: 10px; font-weight: 800;
+    background: var(--mikke-surface-soft); color: var(--mikke-muted);
+    border-radius: 999px; padding: 1px 7px;
+  }
+  .pagetab[aria-selected="true"] { color: var(--tw-title); border-bottom-color: var(--tw-title); }
+  .pagetab[aria-selected="true"] .count { background: var(--tw-title); color: #fff; }
+
+  .page { display: none; flex-direction: column; gap: 24px; }
+  .page.is-active { display: flex; }
+
+  /* モック確認用の状態表示。実装では出さない。 */
+  .stateline {
+    display: flex; align-items: flex-start; gap: 8px;
+    margin: -8px 0 20px;
+    background: #fff8e6; border: 1px dashed #e5c477; border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 11.5px; font-weight: 700; line-height: 1.7; color: #7a5a15;
+  }
+  .stateline b { font-weight: 800; }
+
+  /* ---------- カレンダー下のプロジェクトリンク ---------- */
+  .projlinks {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin-top: 12px; padding-top: 12px;
+    border-top: 1px solid var(--mikke-line-soft);
+  }
+  .projlinks .pl-label { font-size: 10.5px; font-weight: 800; letter-spacing: .06em; color: var(--mikke-muted-light); margin-right: 2px; }
+  .pl-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--mikke-line); border-radius: 999px;
+    background: #fff; padding: 6px 13px;
+    font-size: 11.5px; font-weight: 700; color: var(--mikke-ink); text-decoration: none;
+  }
+  .pl-pill:hover { border-color: var(--tw-done); }
+  .pl-pill .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .pl-pill .go { color: var(--tw-title); font-weight: 800; }
+  .pl-manage { margin-left: auto; font-size: 11.5px; font-weight: 800; color: var(--tw-title); text-decoration: none; }
+
+  /* ---------- 企業設定ビュー ---------- */
+  button.navitem { border: 0; background: transparent; cursor: pointer; font: inherit; width: 100%; text-align: left; }
+  .newbadge {
+    display: inline-block; background: var(--tw-action); color: #fff;
+    border-radius: 999px; padding: 1px 9px;
+    font-size: 9.5px; font-weight: 800; letter-spacing: .1em;
+    margin-left: 9px; vertical-align: 2px;
+  }
+  .setgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .setfield .lb { display: block; font-size: 11.5px; font-weight: 800; margin-bottom: 6px; }
+  .setfield input[type="text"], .setfield input[type="date"] {
+    width: 100%; border: 1px solid var(--mikke-line); border-radius: 10px;
+    padding: 9px 12px; font: inherit; font-size: 13px; background: #fff; color: var(--mikke-ink);
+  }
+  .setfield input:focus-visible { outline: 2px solid var(--tw-title); outline-offset: -1px; }
+  .setfield .eg { display: block; margin-top: 5px; font-size: 10.5px; font-weight: 600; color: var(--mikke-muted-light); }
+  .dowrow { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dowchip {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: 1px solid var(--mikke-line); border-radius: 10px;
+    background: #fff; padding: 8px 12px;
+    font-size: 12.5px; font-weight: 700; cursor: pointer; user-select: none;
+  }
+  .dowchip input { accent-color: var(--mikke-holiday-ink); margin: 0; }
+  .dowchip.closed { background: var(--mikke-holiday); border-color: #f6c8d5; color: var(--mikke-holiday-ink); }
+  .checkline { display: inline-flex; align-items: center; gap: 9px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+  .checkline input { accent-color: var(--mikke-holiday-ink); margin: 0; }
+  .safenote {
+    margin-top: 13px;
+    background: #fff8e6; border: 1px dashed #e5c477; border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 11px; font-weight: 700; line-height: 1.7; color: #7a5a15;
+  }
+  .pointerrow {
+    display: flex; align-items: center; gap: 11px;
+    border: 1px solid var(--mikke-line); border-radius: 12px;
+    background: #fff; padding: 12px 14px;
+    font-size: 12px; font-weight: 700;
+  }
+  .pointerrow .crumb { color: var(--mikke-muted); }
+  .pointerrow .crumb b { color: var(--mikke-ink); font-weight: 800; }
+  .savebtn {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--tw-action); color: #fff; border: 0; border-radius: 11px;
+    padding: 10px 18px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;
+  }
+
+  /* ---------- generic blocks ---------- */
+  .card { background: var(--mikke-surface); border: 1px solid var(--mikke-line); border-radius: 16px; padding: 16px; }
+
+  .sectitle {
+    font-size: 12.5px; font-weight: 800; letter-spacing: .13em;
+    color: var(--tw-title); text-transform: uppercase; margin: 0;
+  }
+  .secsub { font-size: 11.5px; font-weight: 600; color: var(--mikke-muted); margin: 3px 0 12px; }
+  .sechead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .seclink { font-size: 11.5px; font-weight: 700; color: var(--tw-title); text-decoration: none; }
+
+  .empty {
+    background: var(--mikke-surface-soft);
+    border-radius: 12px; padding: 15px;
+    text-align: center; font-size: 12.5px; font-weight: 700; color: var(--mikke-muted);
+  }
+  .empty .sub { display: block; margin-top: 3px; font-size: 11px; font-weight: 600; color: var(--mikke-muted-light); }
+
+  .row2 { display: grid; grid-template-columns: 1.7fr 1fr; gap: 16px; align-items: start; }
+  /* グリッド子のmin-width:autoを殺す。長い工程名チップがカレンダー列を
+     押し広げて右レール(FINANCE/MESSAGES)を潰すのを防ぐ。 */
+  .row2 > * { min-width: 0; }
+  .siderail { display: flex; flex-direction: column; gap: 16px; }
+
+  /* ---------- presence banner ---------- */
+  .presence { border-left: 4px solid var(--tw-done); }
+  .presence .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+  .presence .hd h2 { font-size: 13px; font-weight: 800; margin: 0; }
+  .presence .badge { background: var(--tw-done); color: var(--tw-on-tint); border-radius: 999px; padding: 1px 8px; font-size: 10px; font-weight: 800; }
+  .presence .item { display: flex; align-items: center; gap: 11px; border: 1px solid var(--mikke-line); border-radius: 12px; padding: 10px 12px; }
+  .pill-standby { background: var(--tw-planned); color: var(--tw-on-tint); border-radius: 999px; padding: 2px 9px; font-size: 10px; font-weight: 800; flex: none; }
+
+  /* ---------- calendar ---------- */
+  .calhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .calnav { display: flex; align-items: center; gap: 10px; }
+  .calnav button {
+    width: 26px; height: 26px; border-radius: 8px;
+    border: 1px solid var(--mikke-line); background: #fff;
+    color: var(--mikke-muted); cursor: pointer; font-size: 13px; line-height: 1;
+  }
+  .calnav .month { font-size: 14.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .calview { display: inline-flex; border: 1px solid var(--mikke-line); border-radius: 9px; overflow: hidden; }
+  .calview button {
+    appearance: none; border: 0; background: #fff; color: var(--mikke-muted);
+    font: inherit; font-weight: 700; font-size: 12px; padding: 5px 14px; cursor: pointer;
+    border-left: 1px solid var(--mikke-line);
+  }
+  .calview button:first-child { border-left: 0; }
+  .calview button[aria-pressed="true"] { background: var(--tw-title); color: #fff; }
+
+  /* minmax(0,1fr): チップの文字幅にマスが引っ張られないように */
+  .calgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+  .dow { text-align: center; font-size: 11px; font-weight: 700; color: var(--mikke-muted-light); padding-bottom: 5px; }
+  .cell {
+    border: 1px solid var(--mikke-line); border-radius: 10px;
+    min-height: 62px; padding: 5px 6px; background: #fff;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .cell.out { background: var(--mikke-surface-soft); border-color: var(--mikke-line-soft); }
+  .cell.out .dnum { color: var(--mikke-muted-light); }
+  .cell.holiday { background: var(--mikke-holiday); border-color: #f6c8d5; }
+  .cell.holiday .dnum, .cell.holiday .hlabel { color: var(--mikke-holiday-ink); }
+  .dnum { font-size: 11.5px; font-weight: 800; color: var(--mikke-muted); font-variant-numeric: tabular-nums; }
+  .hlabel { font-size: 10px; font-weight: 700; }
+  .chip {
+    font-size: 9.5px; font-weight: 800; border-radius: 5px; padding: 2px 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 1.45;
+  }
+  .chip.lesson { background: #b9e0cc; color: #2a5c45; }
+  .chip.due { background: #ccd4f2; color: #2f3b8c; }
+  .chip.more { font-size: 9.5px; font-weight: 800; color: var(--mikke-muted-light); }
+
+  .callegend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 11px; font-weight: 700; color: var(--mikke-muted); }
+  .callegend .it { display: inline-flex; align-items: center; gap: 5px; }
+  .callegend .sw { width: 8px; height: 8px; border-radius: 50%; }
+  .callegend .sw.sq { border-radius: 2px; }
+
+  /* ---------- finance / messages ---------- */
+  .finance { border-color: var(--tw-planned); }
+  .railhead { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; }
+  .railtitle { font-size: 10.5px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; color: var(--tw-title); display: inline-flex; align-items: center; gap: 6px; }
+  .railnote { font-size: 10.5px; font-weight: 700; color: var(--mikke-muted-light); }
+  .finbody { display: flex; align-items: center; gap: 15px; }
+  .findial { width: 62px; height: 62px; border-radius: 50%; border: 6px solid var(--mikke-line-soft); display: grid; place-items: center; flex: none; font-size: 11px; font-weight: 700; color: var(--mikke-muted-light); }
+  .finrows { flex: 1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .finrow { display: flex; align-items: center; justify-content: space-between; background: var(--mikke-surface-soft); border-radius: 9px; padding: 6px 10px; font-size: 11.5px; }
+  .finrow .lb { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; color: var(--mikke-muted); }
+  .finrow .sw { width: 7px; height: 7px; border-radius: 2px; }
+  .finrow .vl { font-weight: 800; color: var(--mikke-muted-light); }
+  .finfoot { margin: 12px 0 0; font-size: 10px; line-height: 1.7; color: var(--mikke-muted-light); }
+
+  .messages { border-color: var(--mikke-pink-soft); padding: 16px 0 0; overflow: hidden; }
+  .messages .railhead { padding: 0 16px; }
+  .msgempty { padding: 0 16px 16px; margin: 0; font-size: 11.5px; font-weight: 700; color: var(--mikke-muted); }
+  .msgrow { display: flex; align-items: center; gap: 11px; padding: 11px 16px; border-top: 1px solid var(--mikke-line); }
+  .msgav { width: 32px; height: 32px; border-radius: 50%; background: var(--mikke-pink-soft); color: var(--tw-title); display: grid; place-items: center; flex: none; font-size: 13px; }
+  .msgrow .bd { min-width: 0; flex: 1; }
+  .msgrow .nm { display: block; font-size: 11.5px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msgrow .tx { display: block; font-size: 11px; font-weight: 600; color: var(--mikke-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .msgrow .tm { font-size: 10px; font-weight: 600; color: var(--mikke-muted-light); flex: none; }
+
+  /* ---------- shift ---------- */
+  .shifthead { display: flex; align-items: center; justify-content: space-between; }
+  .shifthead h2 { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 800; color: var(--tw-title); margin: 0; }
+  .shifthead .cnt { font-size: 11.5px; font-weight: 700; color: var(--mikke-muted-light); }
+
+  /* ---------- delivery ---------- */
+  .statrow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 11px; }
+  .statbox { border: 1px solid var(--mikke-line); border-radius: 12px; padding: 11px 13px; }
+  .statbox .lb { font-size: 10.5px; font-weight: 700; color: var(--mikke-muted); }
+  .statbox .vl { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; margin-top: 1px; }
+  .statbox.a .vl { color: var(--tw-deadline); }
+  .statbox.b .vl { color: var(--tw-title); }
+  .statbox.c .vl { color: var(--tw-action); }
+
+  .duelist { display: flex; flex-direction: column; gap: 8px; }
+  .duerow {
+    display: grid; grid-template-columns: 96px 1fr auto; gap: 12px; align-items: center;
+    border: 1px solid var(--mikke-line); border-radius: 12px; background: #fff; padding: 9px 12px;
+    text-decoration: none; color: inherit;
+  }
+  .duepill {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    background: var(--tw-planned); color: var(--tw-on-tint);
+    border-radius: 9px; padding: 7px 8px;
+    font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums;
+  }
+  .duerow .bd { min-width: 0; }
+  .duerow .t { display: block; font-size: 13px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .duerow .s { display: block; font-size: 10.5px; font-weight: 700; color: var(--mikke-muted); margin-top: 1px; }
+  .duerow .go { font-size: 11.5px; font-weight: 800; color: var(--tw-title); }
+
+  /* ---------- needs attention ---------- */
+  .attngrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .attncard { border: 1px solid var(--mikke-line); border-left: 4px solid var(--mikke-orange); border-radius: 12px; padding: 11px 13px; background: #fff; }
+  .attncard .hd { display: flex; align-items: baseline; justify-content: space-between; }
+  .attncard .ti { font-size: 12.5px; font-weight: 800; color: var(--mikke-orange); }
+  .attncard .bang { font-size: 16px; font-weight: 800; color: var(--mikke-orange); }
+  .attncard .bd { font-size: 11px; font-weight: 600; color: var(--mikke-muted); margin-top: 2px; }
+
+  .todayrow { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-top: 1px solid var(--mikke-line); }
+  .todayrow:first-child { border-top: 0; }
+
+  .divider { border-top: 1px solid var(--mikke-line); margin-top: 16px; padding-top: 16px; }
+
+  footer { text-align: center; font-size: 11px; font-weight: 700; color: var(--mikke-muted-light); padding-top: 26px; }
+
+  /* callout explaining a mock decision */
+  .why {
+    display: flex; gap: 9px; align-items: flex-start;
+    background: #eef1fb; border-radius: 12px; padding: 10px 13px;
+    font-size: 11.5px; font-weight: 700; color: #2f3b8c; line-height: 1.7;
+  }
+  .why b { font-weight: 800; }
+</style>
+
+<div class="mockbar">
+  <span class="tag">MOCKUP</span>
+  <span>アカウントを切り替えて確認 →</span>
+  <span class="switch" role="group" aria-label="アカウント切替">
+    <button type="button" data-acct="arisa" aria-pressed="true">運営型のみ（アリサ）</button>
+    <button type="button" data-acct="test" aria-pressed="false">運営型＋納品型（テスト）</button>
+    <button type="button" data-acct="deliveryOnly" aria-pressed="false">納品型のみ</button>
+  </span>
+  <span class="hint">この切替はモック確認用。実装ではプロジェクトの有無で自動判定します。</span>
+</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">TEAM WORKS</div>
+    <button type="button" class="navitem active" id="navHome"><span class="ic">⌂</span>ホーム</button>
+    <div class="navlabel">運営</div>
+    <a class="navitem" href="#"><span class="ic">▤</span>スケジュール管理</a>
+    <a class="navitem" href="#"><span class="ic">◇</span>メッセージ管理</a>
+    <a class="navitem" href="#"><span class="ic">▢</span>プロジェクト管理</a>
+    <a class="navitem" href="#"><span class="ic">◎</span><span id="navWorkers">パートナー管理</span></a>
+    <a class="navitem" href="#"><span class="ic">▣</span>クライアント管理</a>
+    <a class="navitem" href="#"><span class="ic">▥</span>マニュアル管理</a>
+    <div class="navlabel">設定</div>
+    <button type="button" class="navitem" id="navSettings"><span class="ic">⚙</span>企業設定<span class="newbadge">整備</span></button>
+  </aside>
+
+  <main class="main">
+    <h1 class="pagetitle" id="pageTitle">本部ダッシュボード</h1>
+
+    <div id="viewHome">
+    <nav class="pagetabs is-hidden" id="pageTabs" role="tablist" aria-label="ホームの表示切替">
+      <button class="pagetab" role="tab" data-page="ops" aria-selected="true">運営<span class="count" id="cntOps">2</span></button>
+      <button class="pagetab" role="tab" data-page="delivery" aria-selected="false">納品<span class="count" id="cntDelivery">3</span></button>
+    </nav>
+
+    <p class="stateline" id="stateLine"></p>
+
+    <!-- ============ 運営ページ（今の画面のまま・順番も変えない） ============ -->
+    <div class="page is-active" id="pageOps">
+      <section class="card presence" id="opsPresence">
+        <div class="hd">
+          <span>◷</span>
+          <h2>只今のレッスン状況</h2>
+          <span class="badge">1件</span>
+        </div>
+        <div class="item">
+          <span class="pill-standby">スタンバイ</span>
+          <span style="min-width:0;flex:1">
+            <span style="display:block;font-size:13px;font-weight:800">インドネシア校</span>
+            <span style="display:block;font-size:10.5px;font-weight:700;color:var(--mikke-muted)">2026-08-17 13:00 ・ 担当 野田あゆみ</span>
+          </span>
+          <span style="font-size:11.5px;font-weight:800;color:var(--tw-title)">確認</span>
+        </div>
+      </section>
+
+      <div class="row2">
+        <section class="card">
+          <div class="calhead">
+            <div class="calnav">
+              <button type="button" aria-label="前月">‹</button>
+              <span class="month">2026年 7月</span>
+              <button type="button" aria-label="翌月">›</button>
+            </div>
+            <div class="calview" role="group" aria-label="表示単位">
+              <button type="button" aria-pressed="true">月</button>
+              <button type="button" aria-pressed="false">週</button>
+              <button type="button" aria-pressed="false">日</button>
+            </div>
+          </div>
+          <div class="calgrid" id="opsCal"></div>
+          <div class="callegend" id="opsLegend"></div>
+          <div class="projlinks" id="opsProjLinks"></div>
+        </section>
+
+        <div class="siderail">
+          <section class="card finance">
+            <div class="railhead">
+              <span class="railtitle">▤ Finance</span>
+              <span class="railnote">今月・本部のみ</span>
+            </div>
+            <div class="finbody">
+              <div class="findial">未設定</div>
+              <div class="finrows">
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-blue)"></span>売上想定</span><span class="vl">—</span></div>
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-orange)"></span>経費想定</span><span class="vl">—</span></div>
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-green)"></span>利益見込み</span><span class="vl">—</span></div>
+              </div>
+            </div>
+            <p class="finfoot"><span id="finWorkers">パートナー</span>報酬・請求のレートがまだ設定されていないため集計できません。レート項目を追加すると自動で表示されます。</p>
+          </section>
+
+          <section class="card messages">
+            <div class="railhead"><span class="railtitle">◇ Messages</span></div>
+            <div id="msgBody"></div>
+          </section>
+        </div>
+      </div>
+
+      <section class="card">
+        <div class="shifthead">
+          <h2>▤ <span id="shiftTitle">パートナー希望シフト</span></h2>
+          <span class="cnt">0件</span>
+        </div>
+        <p class="secsub">2026年7月分・カレンダーの黄色表示と同じ提出内容です。</p>
+        <div class="empty">この月の希望シフトはまだ提出されていません。</div>
+      </section>
+
+      <section>
+        <h2 class="sectitle">Today</h2>
+        <p class="secsub">本日のスケジュール（本部）</p>
+        <div class="empty">本日の予定はありません</div>
+      </section>
+
+      <section>
+        <h2 class="sectitle">Needs attention</h2>
+        <p class="secsub">緊急・期日が近い・大事なこと</p>
+        <div id="attnBody"></div>
+        <div class="divider">
+          <div class="sechead" style="margin-bottom:10px">
+            <span style="font-size:11.5px;font-weight:800;color:var(--tw-title)">今後のスケジュール（<span id="upcCount">3</span>件）</span>
+            <a class="seclink" href="#">すべて見る</a>
+          </div>
+          <div id="upcBody"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ 納品ページ（カレンダーを冒頭に） ============ -->
+    <div class="page" id="pageDelivery">
+      <div class="row2">
+        <section class="card">
+          <div class="calhead">
+            <div class="calnav">
+              <button type="button" aria-label="前月">‹</button>
+              <span class="month">2026年 8月</span>
+              <button type="button" aria-label="翌月">›</button>
+            </div>
+            <div class="calview" role="group" aria-label="表示単位">
+              <button type="button" aria-pressed="true">月</button>
+              <button type="button" aria-pressed="false">週</button>
+              <button type="button" aria-pressed="false">日</button>
+            </div>
+          </div>
+          <div class="calgrid" id="delCal"></div>
+          <div class="callegend">
+            <span class="it"><span class="sw" style="background:#4a63c8"></span>mikkeOS Official Academy 初期構築</span>
+            <span class="it"><span class="sw sq" style="background:#ccd4f2"></span>提出・完了期日</span>
+            <span class="it"><span class="sw sq" style="background:var(--mikke-holiday)"></span>土日祝</span>
+          </div>
+          <div class="projlinks" id="delProjLinks"></div>
+        </section>
+
+        <div class="siderail">
+          <section class="card finance">
+            <div class="railhead">
+              <span class="railtitle">▤ Finance</span>
+              <span class="railnote">今月・本部のみ</span>
+            </div>
+            <div class="finbody">
+              <div class="findial">未設定</div>
+              <div class="finrows">
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-blue)"></span>売上想定</span><span class="vl">—</span></div>
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-orange)"></span>経費想定</span><span class="vl">—</span></div>
+                <div class="finrow"><span class="lb"><span class="sw" style="background:var(--mikke-green)"></span>利益見込み</span><span class="vl">—</span></div>
+              </div>
+            </div>
+            <p class="finfoot">スタッフ報酬・請求のレートがまだ設定されていないため集計できません。レート項目を追加すると自動で表示されます。</p>
+          </section>
+
+          <section class="card messages">
+            <div class="railhead"><span class="railtitle">◇ Messages</span></div>
+            <p class="msgempty">新着メッセージはありません。</p>
+          </section>
+        </div>
+      </div>
+
+      <!-- 運営ページの NEEDS ATTENTION と同じ見出し・言い回しに揃える -->
+      <section>
+        <h2 class="sectitle">Needs attention</h2>
+        <p class="secsub">緊急・期日が近い・大事なこと</p>
+        <div class="statrow">
+          <div class="statbox a"><div class="lb">クライアント待ち</div><div class="vl">0件</div></div>
+          <div class="statbox b"><div class="lb">本部確認待ち</div><div class="vl">0件</div></div>
+          <div class="statbox c"><div class="lb">期限超過</div><div class="vl">0件</div></div>
+        </div>
+        <div class="empty" style="margin-top:11px">対応が必要なことはありません<span class="sub">期限超過・本部確認待ち・クライアント待ちの工程はありません。</span></div>
+        <div class="divider">
+          <div class="sechead" style="margin-bottom:10px">
+            <span style="font-size:11.5px;font-weight:800;color:var(--tw-title)">今後の期日（8件）</span>
+            <a class="seclink" href="#">すべて見る</a>
+          </div>
+          <div class="duelist" id="delDueList"></div>
+        </div>
+      </section>
+    </div>
+    </div><!-- /viewHome -->
+
+    <!-- ============ 企業設定ビュー（整備案） ============ -->
+    <div id="viewSettings" style="display:none">
+      <div class="page is-active">
+        <section class="card">
+          <div class="sechead">
+            <h2 class="sectitle">表示ラベル設定<span class="newbadge">NEW</span></h2>
+          </div>
+          <p class="secsub">呼び名を事業に合わせて変えられます。変えなければ今まで通りの表示のままです。</p>
+          <div class="setgrid">
+            <label class="setfield">
+              <span class="lb">働く人の呼び名</span>
+              <input type="text" id="setWorkers" value="パートナー">
+              <span class="eg">例）パートナー、スタッフ、講師、キャスト。画面の「◯◯管理」「◯◯希望シフト」などに反映されます。</span>
+            </label>
+            <label class="setfield">
+              <span class="lb">休みの日の呼び名</span>
+              <input type="text" id="setHoliday" value="休校">
+              <span class="eg">例）休校、定休日、休業日。カレンダーの休みの日の表示に反映されます。</span>
+            </label>
+          </div>
+          <p class="safenote" id="setNote"></p>
+        </section>
+
+        <section class="card">
+          <div class="sechead">
+            <h2 class="sectitle">休日設定<span class="newbadge">NEW</span></h2>
+          </div>
+          <p class="secsub">休みの日はカレンダーに色付きで表示され、コマ（レッスン）の登録ができなくなります。</p>
+          <div style="display:flex;flex-direction:column;gap:14px">
+            <div>
+              <span class="lb" style="display:block;font-size:11.5px;font-weight:800;margin-bottom:7px">定休の曜日</span>
+              <div class="dowrow" id="dowRow">
+                <label class="dowchip"><input type="checkbox" value="0">日</label>
+                <label class="dowchip"><input type="checkbox" value="1">月</label>
+                <label class="dowchip"><input type="checkbox" value="2">火</label>
+                <label class="dowchip"><input type="checkbox" value="3">水</label>
+                <label class="dowchip"><input type="checkbox" value="4">木</label>
+                <label class="dowchip"><input type="checkbox" value="5">金</label>
+                <label class="dowchip"><input type="checkbox" value="6">土</label>
+              </div>
+            </div>
+            <label class="checkline"><input type="checkbox" id="chkNational" checked>祝日を休みにする</label>
+            <div class="setgrid">
+              <label class="setfield">
+                <span class="lb">個別の休業日を追加</span>
+                <input type="date">
+                <span class="eg">お盆・年末年始など、曜日に関係ない休みをここに足せます。</span>
+              </label>
+            </div>
+          </div>
+          <p class="safenote">変更しなければ今まで通り「<b>土日祝が休み</b>」のままです。今はこのルールが全組織共通の固定になっているため、土日に営業する事業者はコマを登録できません。この設定で組織ごとに変えられるようにします。校舎・店舗ごとに休みが違う場合は、各プロジェクトの「プロジェクト設定」タブでこの組織設定を<b>プロジェクト単位で上書き</b>できます（未設定なら組織設定に従います）。</p>
+        </section>
+
+        <section class="card">
+          <div class="sechead">
+            <h2 class="sectitle">ポータル表示設定</h2>
+          </div>
+          <p class="secsub">運営型は、プロジェクトごとの「ポータル設定」タブで出す項目を細かく切り替えられます（実装済み）。納品型は今は「クライアント公開」のON/OFFのみ。細かい制御が必要になったら納品型にも同じタブを足します。</p>
+          <div class="pointerrow">
+            <span class="crumb">プロジェクト管理 → 対象プロジェクト → <b>ポータル設定</b> タブ</span>
+            <a class="pl-manage" href="#">開く ›</a>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="sectitle">既存の設定（変更なし）</h2>
+          <p class="secsub" style="margin-bottom:0">企業情報／運用日の設定（シフト提出締め日・支払日）／本部メンバー招待／組織メンバーは、今のままこのページに残ります。</p>
+        </section>
+
+        <div>
+          <button type="button" class="savebtn">設定を保存</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>Team Works by mikke</footer>
+  </main>
+</div>
+
+<script>
+  // ---------- calendar builder ----------
+  // 2026-07-01 は水曜、2026-08-01 は土曜。
+  const MONTHS = {
+    "2026-07": { firstDow: 3, days: 31, prevDays: 30 },
+    "2026-08": { firstDow: 6, days: 31, prevDays: 31 }
+  };
+
+  function buildCalendar(target, monthKey, annotate) {
+    const meta = MONTHS[monthKey];
+    const dowNames = ["日", "月", "火", "水", "木", "金", "土"];
+    let html = dowNames.map((d) => `<div class="dow">${d}</div>`).join("");
+
+    for (let i = 0; i < meta.firstDow; i++) {
+      const d = meta.prevDays - meta.firstDow + 1 + i;
+      html += `<div class="cell out"><span class="dnum">${d}</span></div>`;
+    }
+    for (let d = 1; d <= meta.days; d++) {
+      const dow = (meta.firstDow + d - 1) % 7;
+      const a = annotate(d, dow) || {};
+      const classes = ["cell"];
+      if (a.holiday) classes.push("holiday");
+      let inner = `<span class="dnum">${d}</span>`;
+      if (a.holidayLabel) inner += `<span class="hlabel">${a.holidayLabel}</span>`;
+      for (const chip of a.chips || []) inner += `<span class="chip ${chip.kind}">${chip.text}</span>`;
+      if (a.more) inner += `<span class="chip more">+${a.more}</span>`;
+      html += `<div class="${classes.join(" ")}">${inner}</div>`;
+    }
+    const filled = meta.firstDow + meta.days;
+    const trail = (7 - (filled % 7)) % 7;
+    for (let d = 1; d <= trail; d++) {
+      html += `<div class="cell out"><span class="dnum">${d}</span></div>`;
+    }
+    target.innerHTML = html;
+  }
+
+  // ---------- account datasets ----------
+  const ACCOUNTS = {
+    // アリサさんの組織。運営型のみ → タブは出さない。2枚目のスクショと同じ内容。
+    arisa: {
+      hasOps: true,
+      hasDelivery: false,
+      deliveryCount: 0,
+      workersLabel: "パートナー",
+      projects: [
+        { name: "インドネシア校", color: "#4a63c8" },
+        { name: "スリランカ校", color: "#6cba97" }
+      ],
+      settings: {
+        workers: "パートナー", holiday: "休校",
+        closedDows: [0, 6], national: true,
+        note: "アリサの組織は何も変えなければ現状のまま。「パートナー」「休校」は保存済みの初期値として表示されるだけで、画面は今と同じです。"
+      },
+      opsCalendar: {
+        monthKey: "2026-07",
+        annotate(d, dow) {
+          const isWeekend = dow === 0 || dow === 6;
+          if (d === 20) return { holiday: true, holidayLabel: "海の日" };
+          if (d === 31) return { chips: [
+            { kind: "lesson", text: "スリランカ校 12:30" },
+            { kind: "lesson", text: "スリランカ校 13:40" }
+          ], more: 1 };
+          if (isWeekend) return { holiday: true, holidayLabel: "休校" };
+          return null;
+        },
+        legend: [
+          { color: "#4a63c8", label: "インドネシア校" },
+          { color: "#6cba97", label: "スリランカ校" },
+          { color: "#e8663f", label: "休校" },
+          { color: "var(--mikke-holiday)", label: "土日祝", square: true }
+        ]
+      },
+      showPresence: true,
+      messages: [
+        { name: "joes.style.a（スリランカ校）", body: "tesuto", time: "4日前" }
+      ],
+      attention: [
+        "7/31 12:30 スリランカ校、担当未定。",
+        "7/31 13:40 スリランカ校、担当未定。",
+        "7/31 14:50 スリランカ校、担当未定。",
+        "8/4 12:30 スリランカ校、担当未定。",
+        "8/4 13:40 スリランカ校、担当未定。",
+        "8/4 14:50 スリランカ校、担当未定。"
+      ],
+      upcoming: [
+        { pill: "7/31 12:30", title: "スリランカ校", sub: "担当未定 ・ Zoom ID 123456789" },
+        { pill: "7/31 13:40", title: "スリランカ校", sub: "担当未定 ・ Zoom ID 123456789" },
+        { pill: "7/31 14:50", title: "スリランカ校", sub: "担当未定 ・ Zoom ID 123456789" }
+      ],
+      opsCount: 2
+    },
+
+    // 検証用の組織。運営型1件＋納品型3件 → タブが出る。1枚目のスクショの内容。
+    test: {
+      hasOps: true,
+      hasDelivery: true,
+      deliveryCount: 3,
+      workersLabel: "スタッフ",
+      projects: [
+        { name: "テスト事業", color: "#4a63c8" }
+      ],
+      settings: {
+        workers: "スタッフ", holiday: "休校",
+        closedDows: [0, 6], national: true,
+        note: "新規組織の初期値は「スタッフ」。呼び名も休みの日も、この画面から事業に合わせて変えられます。"
+      },
+      opsCalendar: {
+        monthKey: "2026-07",
+        annotate(d, dow) {
+          const isWeekend = dow === 0 || dow === 6;
+          if (d === 20) return { holiday: true, holidayLabel: "海の日" };
+          if (isWeekend) return { holiday: true, holidayLabel: "休校" };
+          return null;
+        },
+        legend: [
+          { color: "#4a63c8", label: "テスト事業" },
+          { color: "#e8663f", label: "休校" },
+          { color: "var(--mikke-holiday)", label: "土日祝", square: true }
+        ]
+      },
+      showPresence: false,
+      messages: [],
+      attention: [],
+      upcoming: [],
+      opsCount: 1
+    },
+
+    // 納品型しか使っていない組織。タブは出さず、納品の画面だけを出す。
+    // 今のコードではここで運営型ダッシュボードが出てしまい、空のカレンダー・
+    // 空の希望シフト・空のTODAYがずっと並んでいた。
+    deliveryOnly: {
+      hasOps: false,
+      hasDelivery: true,
+      deliveryCount: 3,
+      workersLabel: "スタッフ",
+      projects: [],
+      settings: {
+        workers: "スタッフ", holiday: "休校",
+        closedDows: [0, 6], national: true,
+        note: "納品型だけの組織では、休日設定はコマ登録に影響しません（運営型プロジェクトを作ったときに効きます）。"
+      },
+      opsCalendar: null,
+      showPresence: false,
+      messages: [],
+      attention: [],
+      upcoming: [],
+      opsCount: 0
+    }
+  };
+
+  // 納品型の期日。提出期日と完了期日が同じ日なら1件にまとめてある。
+  const DELIVERY_DUES = [
+    { date: "08-04", day: 4, title: "Official Program全体仕様を確定する", kind: "提出期日" },
+    { date: "08-06", day: 6, title: "Official Program全体仕様を確定する", kind: "完了期日" },
+    { date: "08-10", day: 10, title: "受講料・月額費用・登録料・本部発注費を確定する", kind: "提出・完了期日" },
+    { date: "08-14", day: 14, title: "Official Academy本部とTrainerの役割分担を確定する", kind: "提出・完了期日" },
+    { date: "08-18", day: 18, title: "Official Program総合Pageを完成する", kind: "提出・完了期日" },
+    { date: "08-22", day: 22, title: "講座申込・相談・問い合わせ導線を設定する", kind: "提出・完了期日" },
+    { date: "08-26", day: 26, title: "mikkeOS Member 1日ワークショップを設計する", kind: "提出・完了期日" },
+    { date: "08-30", day: 30, title: "Memberワークショップ用スライド・ワーク資料を制作する", kind: "提出・完了期日" }
+  ];
+
+  function renderDeliveryPage() {
+    const byDay = new Map(DELIVERY_DUES.map((x) => [x.day, x]));
+    buildCalendar(document.getElementById("delCal"), "2026-08", (d, dow) => {
+      const isWeekend = dow === 0 || dow === 6;
+      const due = byDay.get(d);
+      const out = {};
+      if (d === 11) { out.holiday = true; out.holidayLabel = "山の日"; }
+      else if (isWeekend) { out.holiday = true; out.holidayLabel = "休校"; }
+      if (due) out.chips = [{ kind: "due", text: due.title }];
+      return out;
+    });
+
+    document.getElementById("delDueList").innerHTML = DELIVERY_DUES.map((x) => `
+      <a class="duerow" href="#">
+        <span class="duepill">▤ ${x.date}</span>
+        <span class="bd">
+          <span class="t">${x.title}</span>
+          <span class="s">mikkeOS Official Academy 初期構築 ・ ${x.kind}</span>
+        </span>
+        <span class="go">開く ›</span>
+      </a>
+    `).join("");
+
+    // カレンダー下: 各プロジェクトの詳細へ直接飛べるリンク（要望）
+    const delProjects = [
+      { name: "mikkeOS Official Academy 初期構築", color: "#4a63c8" },
+      { name: "認定講座サイト 制作", color: "#6cba97" },
+      { name: "Trainer教材 制作", color: "#e8a63f" }
+    ];
+    document.getElementById("delProjLinks").innerHTML =
+      `<span class="pl-label">プロジェクト（${delProjects.length}件）</span>`
+      + delProjects.map((p) => `<a class="pl-pill" href="#"><span class="dot" style="background:${p.color}"></span>${p.name}<span class="go">›</span></a>`).join("")
+      + `<a class="pl-manage" href="#">プロジェクト管理へ ›</a>`;
+  }
+
+  function renderAccount(key) {
+    const acct = ACCOUNTS[key];
+
+    // 用語ラベル（組織設定で変わる既存の仕組みに合わせる）
+    document.getElementById("navWorkers").textContent = `${acct.workersLabel}管理`;
+    document.getElementById("finWorkers").textContent = acct.workersLabel;
+    document.getElementById("shiftTitle").textContent = `${acct.workersLabel}希望シフト`;
+
+    // タブは「運営型と納品型の両方がある時だけ」出す。
+    // 種類が1つしかない組織にはタブを出さず、その種類の画面だけを出す。
+    // これがアリサさんの画面（運営型のみ）を守る仕組みでもある。
+    const bothTypes = acct.hasOps && acct.hasDelivery;
+    document.getElementById("pageTabs").classList.toggle("is-hidden", !bothTypes);
+    document.getElementById("cntOps").textContent = String(acct.opsCount);
+    document.getElementById("cntDelivery").textContent = String(acct.deliveryCount);
+    selectPage(bothTypes ? "ops" : acct.hasDelivery ? "delivery" : "ops");
+
+    // モック確認用の状態表示
+    document.getElementById("stateLine").innerHTML = bothTypes
+      ? `<span>◉</span><span><b>運営型と納品型の両方がある組織。</b>上のタブでページを切り替えます。初期表示は運営。</span>`
+      : acct.hasDelivery
+        ? `<span>◉</span><span><b>納品型しか使っていない組織。</b>タブは出さず、納品の画面だけを表示します。運営型向けのカレンダー・希望シフト・TODAY・NEEDS ATTENTIONは出しません（今はここに空の枠が並んでいました）。</span>`
+        : `<span>◉</span><span><b>運営型しか使っていない組織＝アリサさんの画面。</b>タブは出さず、今と全く同じ内容・同じ順番です。</span>`;
+
+    // 只今のレッスン状況は該当があるときだけ（既存の挙動そのまま）
+    document.getElementById("opsPresence").style.display = acct.showPresence ? "" : "none";
+
+    // 運営カレンダー（運営型が無い組織では運営ページ自体を出さない）
+    if (acct.opsCalendar) {
+      buildCalendar(document.getElementById("opsCal"), acct.opsCalendar.monthKey, acct.opsCalendar.annotate);
+      document.getElementById("opsLegend").innerHTML = acct.opsCalendar.legend
+        .map((l) => `<span class="it"><span class="sw ${l.square ? "sq" : ""}" style="background:${l.color}"></span>${l.label}</span>`)
+        .join("");
+    }
+
+    // 運営カレンダー下のプロジェクトリンク（要望: 左メニューを経由せず直接飛べるように）
+    document.getElementById("opsProjLinks").innerHTML = acct.projects.length === 0 ? "" :
+      `<span class="pl-label">プロジェクト（${acct.projects.length}件）</span>`
+      + acct.projects.map((p) => `<a class="pl-pill" href="#"><span class="dot" style="background:${p.color}"></span>${p.name}<span class="go">›</span></a>`).join("")
+      + `<a class="pl-manage" href="#">プロジェクト管理へ ›</a>`;
+
+    // 企業設定ビューの値（組織ごとの保存値を再現）
+    const s = acct.settings;
+    document.getElementById("setWorkers").value = s.workers;
+    document.getElementById("setHoliday").value = s.holiday;
+    for (const cb of document.querySelectorAll("#dowRow input")) {
+      const on = s.closedDows.includes(Number(cb.value));
+      cb.checked = on;
+      cb.closest(".dowchip").classList.toggle("closed", on);
+    }
+    document.getElementById("chkNational").checked = s.national;
+    document.getElementById("setNote").textContent = s.note;
+
+    // メッセージ
+    document.getElementById("msgBody").innerHTML = acct.messages.length === 0
+      ? `<p class="msgempty">新着メッセージはありません。</p>`
+      : acct.messages.map((m) => `
+          <div class="msgrow">
+            <span class="msgav">◎</span>
+            <span class="bd"><span class="nm">${m.name}</span><span class="tx">${m.body}</span></span>
+            <span class="tm">${m.time}</span>
+          </div>
+        `).join("");
+
+    // Needs attention
+    document.getElementById("attnBody").innerHTML = acct.attention.length === 0
+      ? `<div class="empty">対応が必要なことはありません<span class="sub">今後7日間、担当未定のコマはありません。</span></div>`
+      : `<div class="attngrid">${acct.attention.map((t) => `
+          <div class="attncard">
+            <div class="hd"><span class="ti">シフト未決定</span><span class="bang">!</span></div>
+            <div class="bd">${t}</div>
+          </div>
+        `).join("")}</div>`;
+
+    // 今後のスケジュール
+    document.getElementById("upcCount").textContent = String(acct.upcoming.length);
+    document.getElementById("upcBody").innerHTML = acct.upcoming.length === 0
+      ? `<p style="font-size:11.5px;font-weight:700;color:var(--mikke-muted);margin:0">今後の予定はありません。</p>`
+      : `<div class="duelist">${acct.upcoming.map((u) => `
+          <a class="duerow" href="#">
+            <span class="duepill">${u.pill}</span>
+            <span class="bd"><span class="t">${u.title}</span><span class="s">${u.sub}</span></span>
+            <span class="go">開く ›</span>
+          </a>
+        `).join("")}</div>`;
+  }
+
+  function selectPage(page) {
+    for (const btn of document.querySelectorAll(".pagetab")) {
+      btn.setAttribute("aria-selected", String(btn.dataset.page === page));
+    }
+    document.getElementById("pageOps").classList.toggle("is-active", page === "ops");
+    document.getElementById("pageDelivery").classList.toggle("is-active", page === "delivery");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+
+  for (const btn of document.querySelectorAll(".pagetab")) {
+    btn.addEventListener("click", () => selectPage(btn.dataset.page));
+  }
+  for (const btn of document.querySelectorAll(".mockbar .switch button")) {
+    btn.addEventListener("click", () => {
+      for (const other of document.querySelectorAll(".mockbar .switch button")) {
+        other.setAttribute("aria-pressed", String(other === btn));
+      }
+      renderAccount(btn.dataset.acct);
+    });
+  }
+
+  // ---------- ビュー切替（ホーム / 企業設定） ----------
+  function selectView(view) {
+    document.getElementById("viewHome").style.display = view === "home" ? "" : "none";
+    document.getElementById("viewSettings").style.display = view === "settings" ? "" : "none";
+    document.getElementById("pageTitle").textContent = view === "home" ? "本部ダッシュボード" : "企業設定";
+    document.getElementById("navHome").classList.toggle("active", view === "home");
+    document.getElementById("navSettings").classList.toggle("active", view === "settings");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }
+  document.getElementById("navHome").addEventListener("click", () => selectView("home"));
+  document.getElementById("navSettings").addEventListener("click", () => selectView("settings"));
+
+  // 定休曜日チップの見た目をチェック状態に追従させる
+  for (const cb of document.querySelectorAll("#dowRow input")) {
+    cb.addEventListener("change", () => cb.closest(".dowchip").classList.toggle("closed", cb.checked));
+  }
+
+  renderDeliveryPage();
+  renderAccount("arisa");
+</script>
