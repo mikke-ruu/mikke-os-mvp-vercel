@@ -13,7 +13,9 @@ import {
   loadOperationsDashboardData,
   type OperationsDashboardData
 } from "@/lib/team-works-operations";
+import { loadDeliveryHomeSummary, type DeliveryHomeSummary } from "@/lib/team-works-delivery-home";
 import { TeamWorksDayPanel } from "./TeamWorksDayPanel";
+import { TeamWorksDeliveryHomeSection } from "./TeamWorksDeliveryHomeSection";
 import { TeamWorksMonthCalendar } from "./TeamWorksMonthCalendar";
 import { TeamWorksShiftAdminPanel } from "./TeamWorksShiftAdminPanel";
 import { loadStaffPartnerShifts, type PartnerShiftSubmission } from "@/lib/team-works-shifts";
@@ -32,17 +34,20 @@ export function TeamWorksOperationsDashboard() {
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [shiftSubmissions, setShiftSubmissions] = useState<PartnerShiftSubmission[]>([]);
   const [calendarAutoPositioned, setCalendarAutoPositioned] = useState(false);
+  const [deliveryHome, setDeliveryHome] = useState<DeliveryHomeSummary | null>(null);
 
   const load = useCallback(async (targetMonth: Date) => {
     setLoading(true);
     setError(null);
     try {
-      const [result, shifts] = await Promise.all([
+      const [result, shifts, deliverySummary] = await Promise.all([
         loadOperationsDashboardData(supabase, targetMonth),
-        loadStaffPartnerShifts(supabase, targetMonth)
+        loadStaffPartnerShifts(supabase, targetMonth),
+        loadDeliveryHomeSummary(supabase)
       ]);
       setData(result);
       setShiftSubmissions(shifts);
+      setDeliveryHome(deliverySummary);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "ダッシュボードの読み込みに失敗しました。");
     } finally {
@@ -84,7 +89,13 @@ export function TeamWorksOperationsDashboard() {
     return <MikkeEmptyState title="読み込みに失敗しました" helper={error} />;
   }
 
-  if (!data || !data.hasOperationsProjects) {
+  // 運営型が1件も無くても、納品型プロジェクトがあれば「はじめての
+  // プロジェクトを作る」画面ではなく通常のダッシュボードを表示する。
+  // 以前はhasOperationsProjectsだけで判定していたため、納品型しか
+  // 無いアカウントでも毎回「最初の運営型プロジェクトを作成」に
+  // 案内されてしまっていた。
+  const hasAnyProject = Boolean(data?.hasOperationsProjects) || Boolean(deliveryHome && deliveryHome.projectCount > 0);
+  if (!data || !hasAnyProject) {
     return <FirstOperationsProjectSetup />;
   }
 
@@ -100,6 +111,8 @@ export function TeamWorksOperationsDashboard() {
 
   return (
     <div className="space-y-6">
+      <TeamWorksDeliveryHomeSection summary={deliveryHome} />
+
       {data.activePresenceEvents.length > 0 ? (
         <section aria-live="polite" className="rounded-2xl border border-[var(--mikke-line)] border-l-4 border-l-[var(--tw-done)] bg-white p-4">
           <div className="mb-3 flex items-center gap-2">
