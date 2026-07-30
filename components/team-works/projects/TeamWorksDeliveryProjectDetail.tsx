@@ -23,17 +23,27 @@ import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeListRow } from "@/components/mikkeos/MikkeListRow";
 import { supabase } from "@/lib/supabase/client";
 import {
+  loadOperationsClientDirectory,
+  loadOperationsPartnerDirectory,
+  type OperationsClientDirectoryEntry,
+  type OperationsPartnerDirectoryEntry
+} from "@/lib/team-works-operations-project";
+import {
+  addDeliveryProjectMember,
   autoScheduleDeliveryTasks,
   createDeliveryTask,
   deliveryTaskOwnerRoleLabels,
   emptyDeliveryTaskInstruction,
   deliveryTaskStatusLabels,
   deliveryTaskSubmissionTypeLabels,
+  fetchDeliveryProjectPendingInvites,
   loadDeliveryProjectDetail,
   resolveMyDeliveryProjectMembership,
+  revokeDeliveryProjectInvite,
   updateDeliveryProjectDueOn,
   updateDeliveryProjectSettings,
   updateDeliveryTask,
+  type DeliveryPendingInvite,
   type DeliveryProjectDetail,
   type DeliveryProjectMember,
   type DeliveryTask,
@@ -158,7 +168,7 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
       {activeTab === "tasks" ? <TaskListSection detail={detail} myMemberId={myMemberId} onReload={load} /> : null}
       {activeTab === "schedule" ? <ScheduleTab detail={detail} onReload={load} /> : null}
       {activeTab === "deliverables" ? <DeliverablesTab detail={detail} myMemberId={myMemberId} /> : null}
-      {activeTab === "members" ? <MembersTab detail={detail} /> : null}
+      {activeTab === "members" ? <MembersTab detail={detail} onReload={load} /> : null}
       {activeTab === "settings" ? <SettingsTab detail={detail} onReload={load} /> : null}
     </div>
   );
@@ -304,20 +314,171 @@ function DeliverablesTab({ detail, myMemberId }: { detail: DeliveryProjectDetail
   );
 }
 
-function MembersTab({ detail }: { detail: DeliveryProjectDetail }) {
+// プロジェクト作成後もメンバーを追加できるようにする。名簿の相手がまだ
+// ポータルにログインしていない場合は招待を送り(黙って無視しない)、
+// 「招待中」に並べる。相手がログインすると自動で「参加中」へ移る。
+function MembersTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
   const { members } = detail;
+  const [invites, setInvites] = useState<DeliveryPendingInvite[] | undefined>(undefined);
+  const [partners, setPartners] = useState<OperationsPartnerDirectoryEntry[]>([]);
+  const [clients, setClients] = useState<OperationsClientDirectoryEntry[]>([]);
+  const [selectedDirectoryValue, setSelectedDirectoryValue] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [busyInviteId, setBusyInviteId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const loadExtras = useCallback(async () => {
+    try {
+      const [inviteRows, partnerRows, clientRows] = await Promise.all([
+        fetchDeliveryProjectPendingInvites(supabase, detail.project.id),
+        loadOperationsPartnerDirectory(supabase),
+        loadOperationsClientDirectory(supabase)
+      ]);
+      setInvites(inviteRows);
+      setPartners(partnerRows.filter((partner) => partner.status !== "archived"));
+      setClients(clientRows.filter((client) => client.status !== "archived"));
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "読み込めませんでした。");
+    }
+  }, [detail.project.id]);
+
+  useEffect(() => {
+    void loadExtras();
+  }, [loadExtras]);
+
+  async function addMember() {
+    if (!selectedDirectoryValue) return;
+    const [table, directoryId] = selectedDirectoryValue.split(":");
+    const directoryTable = table === "partner" ? "team_works_partners" : "team_works_clients";
+    const projectRole = table === "partner" ? "worker" : "client";
+    setAdding(true);
+    setError("");
+    setMessage("");
+    try {
+      const result = await addDeliveryProjectMember(supabase, { projectId: detail.project.id, directoryTable, directoryId, projectRole });
+      if (result.status === "assigned") {
+        setMessage(`${result.displayName}さんをメンバーに追加しました。`);
+      } else if (result.status === "invited") {
+        setMessage(`${result.displayName}さんに参加のお願いを送りました。相手がログインすると自動でメンバーになります。`);
+      } else {
+        setError("名簿から選択した相手が見つかりませんでした。");
+      }
+      setSelectedDirectoryValue("");
+      await Promise.all([onReload(), loadExtras()]);
+    } catch (addError) {
+      setError(addError instanceof Error ? addError.message : "追加できませんでした。");
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function revoke(inviteId: string) {
+    setBusyInviteId(inviteId);
+    setError("");
+    try {
+      await revokeDeliveryProjectInvite(supabase, inviteId);
+      await loadExtras();
+    } catch (revokeError) {
+      setError(revokeError instanceof Error ? revokeError.message : "取り消せませんでした。");
+    } finally {
+      setBusyInviteId(null);
+    }
+  }
+
+  const placeholderLabelCounts = new Map<string, number>();
+  for (const task of detail.tasks) {
+    if (task.assigneeLabel) placeholderLabelCounts.set(task.assigneeLabel, (placeholderLabelCounts.get(task.assigneeLabel) ?? 0) + 1);
+  }
+
   return (
     <div className="space-y-5">
-      <TabIntro icon={UsersRound} title="メンバー" description="このプロジェクトに参加しているメンバーです。" />
-      {members.length === 0 ? (
-        <MikkeEmptyState title="参加メンバーはまだいません" />
-      ) : (
-        <div className="space-y-2">
-          {members.map((member) => (
-            <MikkeListRow key={member.organizationMemberId} title={member.displayName} label={projectRoleLabel(member.projectRole)} icon={UsersRound} />
-          ))}
+      <TabIntro icon={UsersRound} title="メンバー" description="参加中・招待中・仮の担当名をまとめて確認します。" />
+
+      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <p className="text-sm font-extrabold">参加中</p>
+        {members.length === 0 ? (
+          <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">参加メンバーはまだいません。</p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {members.map((member) => (
+              <MikkeListRow key={member.organizationMemberId} title={member.displayName} label={projectRoleLabel(member.projectRole)} icon={UsersRound} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <p className="text-sm font-extrabold">名簿から追加</p>
+        <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">
+          まだポータルにログインしていない相手を選んだ場合は、参加のお願い(招待)を送ります。
+        </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <select value={selectedDirectoryValue} onChange={(event) => setSelectedDirectoryValue(event.target.value)} className={teamWorksProjectInputClass}>
+            <option value="">選択してください</option>
+            <optgroup label="担当メンバー(パートナー名簿)">
+              {partners.map((partner) => <option key={partner.id} value={`partner:${partner.id}`}>{partner.displayName}</option>)}
+            </optgroup>
+            <optgroup label="クライアント(クライアント名簿)">
+              {clients.map((client) => <option key={client.id} value={`client:${client.id}`}>{client.displayName}</option>)}
+            </optgroup>
+          </select>
+          <button
+            type="button"
+            onClick={() => void addMember()}
+            disabled={!selectedDirectoryValue || adding}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]"
+          >
+            <Plus size={14} /> 追加
+          </button>
         </div>
-      )}
+        {error ? <p role="alert" className="mt-2 rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+        {message ? <p className="mt-2 text-xs font-bold text-[var(--tw-done)]">{message}</p> : null}
+      </div>
+
+      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <p className="text-sm font-extrabold">招待中</p>
+        {invites === undefined ? (
+          <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>
+        ) : invites.length === 0 ? (
+          <p className="mt-2 text-xs font-semibold text-[var(--mikke-muted)]">招待中の相手はいません。</p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            {invites.map((invite) => (
+              <div key={invite.id} className="flex items-center gap-3 rounded-lg border border-[var(--mikke-line)] p-2.5">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-bold">{invite.email}</span>
+                  <span className="text-xs font-semibold text-[var(--mikke-muted)]">
+                    {invite.role === "worker" ? "担当メンバー" : "クライアント"}・招待中(期限 {invite.expiresAt.slice(0, 10)})
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void revoke(invite.id)}
+                  disabled={busyInviteId === invite.id}
+                  className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-muted)] disabled:opacity-40"
+                >
+                  招待を取り消す
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {placeholderLabelCounts.size > 0 ? (
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          <p className="text-sm font-extrabold">仮の担当名</p>
+          <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">
+            実メンバーが決まったら、上の「名簿から追加」でメンバーに加えたあと、「工程」タブでその工程の担当を差し替えてください。
+          </p>
+          <ul className="mt-2 space-y-1">
+            {[...placeholderLabelCounts.entries()].map(([label, count]) => (
+              <li key={label} className="text-xs font-semibold">{label}・{count}件の工程</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -526,7 +687,7 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
               {ownerRoles.map((role) => <option key={role} value={role}>{deliveryTaskOwnerRoleLabels[role]}</option>)}
             </select>
           </TeamWorksProjectField>
-          <TeamWorksProjectField label="担当メンバー" helper="名簿にまだいない場合は下の「仮の担当名」を使ってください。">
+          <TeamWorksProjectField label="担当メンバー" helper="ここに出るのは参加中のメンバーだけです。招待中でまだログインしていない相手や、名簿にまだいない相手は「仮の担当名」を使ってください(「メンバー」タブで招待できます)。">
             <select value={form.assigneeMemberId} onChange={(event) => setForm({ ...form, assigneeMemberId: event.target.value })} className={teamWorksProjectInputClass}>
               <option value="">未割当</option>
               {detail.members.map((member) => <option key={member.organizationMemberId} value={member.organizationMemberId}>{member.displayName}</option>)}

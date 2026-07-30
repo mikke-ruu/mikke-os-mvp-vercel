@@ -255,6 +255,8 @@ export function TeamWorksProjectGenerator() {
         setSaving(false);
         return;
       }
+      // 招待が必要だった相手(result.invitedMembers)は、プロジェクト詳細の
+      // 「メンバー」タブに「招待中」として表示されるため、ここでは案内しない。
       router.push(`/apps/team-works/projects/${result.projectId}`);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "プロジェクトを作成できませんでした。");
@@ -479,7 +481,7 @@ export function TeamWorksProjectGenerator() {
 
           {skippedNames.length > 0 ? (
             <p role="alert" className="mt-4 rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">
-              プロジェクトは作成しましたが、次のメンバーはまだポータルへログインしていないため追加できませんでした: {skippedNames.join("、")}。ログイン後、プロジェクト詳細から改めて追加してください。
+              プロジェクトは作成しましたが、次のメンバーは名簿から見つからなかったため追加できませんでした: {skippedNames.join("、")}。名簿を確認のうえ、プロジェクト詳細から改めて追加してください。
             </p>
           ) : null}
           {submitError ? <p role="alert" className="mt-4 rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{submitError}</p> : null}

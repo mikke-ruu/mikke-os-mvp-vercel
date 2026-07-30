@@ -451,15 +451,22 @@ export async function updateDeliveryTask(
   if (error) throw error;
 }
 
+export type DeliveryMemberAddResult =
+  | { status: "assigned"; organizationMemberId: string; displayName: string; email: string }
+  | { status: "invited"; displayName: string; email: string; expiresAt: string }
+  | { status: "not_found" };
+
 // 運営型の同等機能(addOperationsPartnerToProject)は、シフト承認前提の
 // オファー/招待の仕組み(パートナーがポータルで承諾するまで保留)に深く
 // 依存しているため納品型には転用しない。納品型はシフト調整という概念が
-// 無いので、既にポータンにログイン済みの名簿の相手を直接メンバーに
-// 追加するだけのシンプルな形にする。
+// 無いので「招待 → 相手がログインしたら自動でメンバー」のシンプルな形にする。
+// 相手がすでにポータルにログイン済みなら即座にメンバーへ、まだなら
+// team_works_member_invitesへ招待を作る(既存トリガーteam_works_mark_invite_accepted
+// が、相手のログイン時に自動でteam_works_project_membersへ追加してくれる。P8-c)。
 async function addDirectoryMemberToDeliveryProject(
   client: SupabaseClient,
   input: { projectId: string; organizationId: string; directoryTable: "team_works_partners" | "team_works_clients"; directoryId: string; projectRole: "worker" | "client" }
-): Promise<{ organizationMemberId: string; displayName: string } | null> {
+): Promise<DeliveryMemberAddResult> {
   const { data: directoryRow, error: directoryError } = await client
     .from(input.directoryTable)
     .select("id,display_name,email,status")
@@ -467,10 +474,12 @@ async function addDirectoryMemberToDeliveryProject(
     .eq("organization_id", input.organizationId)
     .maybeSingle();
   if (directoryError) throw directoryError;
-  if (!directoryRow || directoryRow.status === "archived") return null;
+  if (!directoryRow || directoryRow.status === "archived") return { status: "not_found" };
 
   const normalizedEmail = (directoryRow.email as string).trim().toLowerCase();
+  const displayName = directoryRow.display_name as string;
   const targetRole = input.projectRole === "worker" ? "worker" : "client_user";
+
   const activeMemberResult = await client.rpc("team_works_find_active_member", {
     target_organization_id: input.organizationId,
     target_role: targetRole,
@@ -478,21 +487,117 @@ async function addDirectoryMemberToDeliveryProject(
   });
   if (activeMemberResult.error) throw activeMemberResult.error;
   const activeMemberRow = ((activeMemberResult.data ?? []) as { member_id: string }[])[0];
-  if (!activeMemberRow) return null;
 
-  const { error: memberError } = await client.from("team_works_project_members").upsert(
-    {
-      project_id: input.projectId,
+  if (activeMemberRow) {
+    const { error: memberError } = await client.from("team_works_project_members").upsert(
+      {
+        project_id: input.projectId,
+        organization_id: input.organizationId,
+        organization_member_id: activeMemberRow.member_id,
+        project_role: input.projectRole
+      },
+      { onConflict: "project_id,organization_member_id" }
+    );
+    if (memberError) throw memberError;
+    return { status: "assigned", organizationMemberId: activeMemberRow.member_id, displayName, email: normalizedEmail };
+  }
+
+  const pendingInviteResult = await client
+    .from("team_works_member_invites")
+    .select("expires_at")
+    .eq("organization_id", input.organizationId)
+    .eq("project_id", input.projectId)
+    .eq("email", normalizedEmail)
+    .eq("role", targetRole)
+    .eq("status", "pending")
+    .gte("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (pendingInviteResult.error) throw pendingInviteResult.error;
+  if (pendingInviteResult.data) {
+    return { status: "invited", displayName, email: normalizedEmail, expiresAt: pendingInviteResult.data.expires_at as string };
+  }
+
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError || !userData.user) throw new Error("ログイン情報を確認できませんでした。");
+
+  const { data: inviteRow, error: inviteError } = await client
+    .from("team_works_member_invites")
+    .insert({
       organization_id: input.organizationId,
-      organization_member_id: activeMemberRow.member_id,
-      project_role: input.projectRole
-    },
-    { onConflict: "project_id,organization_member_id" }
-  );
-  if (memberError) throw memberError;
+      project_id: input.projectId,
+      email: normalizedEmail,
+      role: targetRole,
+      created_by_user_id: userData.user.id
+    })
+    .select("expires_at")
+    .single();
+  if (inviteError) throw inviteError;
 
-  return { organizationMemberId: activeMemberRow.member_id, displayName: directoryRow.display_name as string };
+  return { status: "invited", displayName, email: normalizedEmail, expiresAt: inviteRow.expires_at as string };
 }
+
+// メンバータブから、プロジェクト作成後にも名簿の相手を追加できるようにする公開版。
+export async function addDeliveryProjectMember(
+  client: SupabaseClient,
+  input: { projectId: string; directoryTable: "team_works_partners" | "team_works_clients"; directoryId: string; projectRole: "worker" | "client" }
+): Promise<DeliveryMemberAddResult> {
+  const { data: projectRow, error: projectError } = await client
+    .from("team_works_projects")
+    .select("id,organization_id,style")
+    .eq("id", input.projectId)
+    .maybeSingle();
+  if (projectError) throw projectError;
+  const project = projectRow as { id: string; organization_id: string; style: string } | null;
+  if (!project || project.style !== "delivery") throw new Error("納品型プロジェクトが見つかりませんでした。");
+  return addDirectoryMemberToDeliveryProject(client, {
+    projectId: project.id,
+    organizationId: project.organization_id,
+    directoryTable: input.directoryTable,
+    directoryId: input.directoryId,
+    projectRole: input.projectRole
+  });
+}
+
+// 招待中(まだログインしていない相手)の一覧。承諾すると自動でmemberに
+// なるため(トリガー)、statusが'pending'のものだけを対象にする。
+export type DeliveryPendingInvite = {
+  id: string;
+  email: string;
+  role: "worker" | "client_user";
+  expiresAt: string;
+};
+
+export async function fetchDeliveryProjectPendingInvites(client: SupabaseClient, projectId: string): Promise<DeliveryPendingInvite[]> {
+  const { data, error } = await client
+    .from("team_works_member_invites")
+    .select("id,email,role,expires_at")
+    .eq("project_id", projectId)
+    .eq("status", "pending")
+    .gte("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    email: row.email as string,
+    role: row.role as "worker" | "client_user",
+    expiresAt: row.expires_at as string
+  }));
+}
+
+export async function revokeDeliveryProjectInvite(client: SupabaseClient, inviteId: string): Promise<void> {
+  const { error } = await client
+    .from("team_works_member_invites")
+    .update({ status: "revoked", updated_at: new Date().toISOString() })
+    .eq("id", inviteId);
+  if (error) throw error;
+}
+
+// 注意: team_works_project_membersにはDELETE/アーカイブ用のRLSポリシーが
+// 無く(P8-a時点で未整備)、この計画では新規ポリシーを追加しない方針のため、
+// 「参加中メンバーをプロジェクトから外す」機能はここでは実装していない。
+// 必要になったら別途RLSポリシーの追加を検討すること。
 
 export type DeliveryStepTemplateStep = {
   title: string;
@@ -597,15 +702,17 @@ export async function createDeliveryProjectWithSetup(
       instruction?: Partial<DeliveryTaskInstruction>;
     }[];
   }
-): Promise<{ projectId: string; skippedMembers: string[] }> {
+): Promise<{ projectId: string; skippedMembers: string[]; invitedMembers: string[] }> {
   const projectId = await createDeliveryProject(client, { organizationName: input.organizationName, title: input.title });
   const { organizationId } = await ensureStaffOrganizationContext(client, input.organizationName);
 
   const skippedMembers: string[] = [];
+  const invitedMembers: string[] = [];
   const memberIdByDirectoryId = new Map<string, string>();
   for (const member of input.members) {
     const result = await addDirectoryMemberToDeliveryProject(client, { projectId, organizationId, ...member });
-    if (result) memberIdByDirectoryId.set(member.directoryId, result.organizationMemberId);
+    if (result.status === "assigned") memberIdByDirectoryId.set(member.directoryId, result.organizationMemberId);
+    else if (result.status === "invited") invitedMembers.push(member.directoryId);
     else skippedMembers.push(member.directoryId);
   }
 
@@ -632,7 +739,7 @@ export async function createDeliveryProjectWithSetup(
     })
   );
 
-  return { projectId, skippedMembers };
+  return { projectId, skippedMembers, invitedMembers };
 }
 
 export type DeliveryCalendarTask = DeliveryTask & { projectTitle: string };
