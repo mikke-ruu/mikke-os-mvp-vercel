@@ -13,6 +13,7 @@ import {
   type DeliveryProjectMember,
   type DeliveryTask
 } from "@/lib/team-works-delivery";
+import type { TeamWorksDeliveryFeatureSettings } from "@/lib/team-works-feature-settings";
 import { fetchTaskForms, type DeliveryProjectForm } from "@/lib/team-works-delivery-forms";
 import { buildDeliveryCalendarItems, TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
 import { TeamWorksDeliveryClientDeliverablePanel } from "./TeamWorksDeliveryClientDeliverablePanel";
@@ -126,7 +127,7 @@ export function TeamWorksDeliveryPortalProjectDetail({
         ) : (
           <div className="space-y-3">
             {tasks.map((task) => (
-              <PortalTaskCard key={task.id} projectId={project.id} task={task} myMembership={myMembership} />
+              <PortalTaskCard key={task.id} projectId={project.id} task={task} myMembership={myMembership} featureSettings={project.featureSettings} />
             ))}
           </div>
         )}
@@ -135,17 +136,27 @@ export function TeamWorksDeliveryPortalProjectDetail({
   );
 }
 
-function PortalTaskCard({ projectId, task, myMembership }: { projectId: string; task: DeliveryTask; myMembership: DeliveryProjectMember | null }) {
+function PortalTaskCard({
+  projectId,
+  task,
+  myMembership,
+  featureSettings
+}: {
+  projectId: string;
+  task: DeliveryTask;
+  myMembership: DeliveryProjectMember | null;
+  featureSettings: TeamWorksDeliveryFeatureSettings;
+}) {
   const [forms, setForms] = useState<DeliveryProjectForm[] | undefined>(undefined);
 
   useEffect(() => {
-    if (task.submissionType !== "form") return;
+    if (task.submissionType !== "form" || !featureSettings.forms) return;
     let cancelled = false;
     fetchTaskForms(supabase, task.id)
       .then((rows) => { if (!cancelled) setForms(rows); })
       .catch(() => { if (!cancelled) setForms([]); });
     return () => { cancelled = true; };
-  }, [task.id, task.submissionType]);
+  }, [task.id, task.submissionType, featureSettings.forms]);
 
   const isAssignedWorker = myMembership?.projectRole === "worker" && task.assigneeMemberId === myMembership.organizationMemberId;
   const isClient = myMembership?.projectRole === "client";
@@ -176,7 +187,7 @@ function PortalTaskCard({ projectId, task, myMembership }: { projectId: string; 
         </div>
       ) : null}
 
-      {task.submissionType === "form" && myMembership && forms && forms.length > 0 ? (
+      {task.submissionType === "form" && featureSettings.forms && myMembership && forms && forms.length > 0 ? (
         <div className="space-y-3 border-t border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
           {forms.map((form) => (
             <TeamWorksDeliveryFormSubmissionPanel key={form.id} projectId={projectId} form={form} memberId={myMembership.organizationMemberId} />
@@ -190,7 +201,7 @@ function PortalTaskCard({ projectId, task, myMembership }: { projectId: string; 
         </div>
       ) : null}
 
-      {(task.submissionType === "file" || task.submissionType === "url") && isClient && myMembership ? (
+      {(task.submissionType === "file" || task.submissionType === "url") && featureSettings.clientReview && isClient && myMembership ? (
         <div className="border-t border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
           <TeamWorksDeliveryClientDeliverablePanel projectId={projectId} task={task} memberId={myMembership.organizationMemberId} />
         </div>

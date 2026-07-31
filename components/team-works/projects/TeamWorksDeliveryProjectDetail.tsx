@@ -1165,6 +1165,10 @@ const emptyNewTaskForm: NewTaskForm = {
 };
 
 function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryProjectDetail; myMemberId: string | null; onReload: () => Promise<void> }) {
+  const featureSettings = detail.project.featureSettings;
+  // forms=falseなら提出フォームの選択肢自体を出さない。clientReview=falseなら
+  // 「クライアントの確認が必要」チェック自体を出さない(機能とポータルの設定と連動、§L-4)。
+  const availableSubmissionTypes = featureSettings.forms ? submissionTypes : submissionTypes.filter((type) => type !== "form");
   const [form, setForm] = useState<NewTaskForm>(emptyNewTaskForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -1258,7 +1262,7 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
           </TeamWorksProjectField>
           <TeamWorksProjectField label="何を提出するか">
             <select value={form.submissionType} onChange={(event) => setForm({ ...form, submissionType: event.target.value as DeliveryTaskSubmissionType })} className={teamWorksProjectInputClass}>
-              {submissionTypes.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
+              {availableSubmissionTypes.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
             </select>
           </TeamWorksProjectField>
           <TeamWorksProjectField label="標準日数" helper="納期からの逆算配置に使う所要日数(未設定なら3日)">
@@ -1267,7 +1271,9 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
         </div>
         <div className="flex flex-wrap gap-4 text-xs font-bold">
           <label className="flex items-center gap-2"><input type="checkbox" checked={form.needsInternalReview} onChange={(event) => setForm({ ...form, needsInternalReview: event.target.checked })} />本部の確認が必要</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={form.needsClientReview} onChange={(event) => setForm({ ...form, needsClientReview: event.target.checked })} />クライアントの確認が必要</label>
+          {featureSettings.clientReview ? (
+            <label className="flex items-center gap-2"><input type="checkbox" checked={form.needsClientReview} onChange={(event) => setForm({ ...form, needsClientReview: event.target.checked })} />クライアントの確認が必要</label>
+          ) : null}
           <label className="flex items-center gap-2"><input type="checkbox" checked={form.clientVisible} onChange={(event) => setForm({ ...form, clientVisible: event.target.checked })} />クライアントに表示する</label>
         </div>
 
@@ -1310,6 +1316,7 @@ function TaskListSection({ detail, myMemberId, onReload }: { detail: DeliveryPro
                 task={task}
                 members={detail.members}
                 myMemberId={myMemberId}
+                featureSettings={featureSettings}
                 expanded={expandedTaskId === task.id}
                 onToggle={() => setExpandedTaskId((current) => (current === task.id ? null : task.id))}
                 onReload={onReload}
@@ -1326,6 +1333,7 @@ function TaskRow({
   task,
   members,
   myMemberId,
+  featureSettings,
   expanded,
   onToggle,
   onReload
@@ -1333,6 +1341,7 @@ function TaskRow({
   task: DeliveryTask;
   members: DeliveryProjectDetail["members"];
   myMemberId: string | null;
+  featureSettings: TeamWorksDeliveryFeatureSettings;
   expanded: boolean;
   onToggle: () => void;
   onReload: () => Promise<void>;
@@ -1340,6 +1349,7 @@ function TaskRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const assignee = members.find((member) => member.organizationMemberId === task.assigneeMemberId);
+  const availableSubmissionTypes = featureSettings.forms ? submissionTypes : submissionTypes.filter((type) => type !== "form");
 
   async function apply(patch: Parameters<typeof updateDeliveryTask>[2]) {
     setBusy(true);
@@ -1412,7 +1422,7 @@ function TaskRow({
           </TeamWorksProjectField>
           <TeamWorksProjectField label="何を提出するか">
             <select defaultValue={task.submissionType} disabled={busy} onChange={(event) => void apply({ submissionType: event.target.value as DeliveryTaskSubmissionType })} className={teamWorksProjectInputClass}>
-              {submissionTypes.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
+              {availableSubmissionTypes.map((type) => <option key={type} value={type}>{deliveryTaskSubmissionTypeLabels[type]}</option>)}
             </select>
           </TeamWorksProjectField>
           <TeamWorksProjectField label="標準日数" helper="納期からの逆算配置に使う所要日数(未設定なら3日)">
@@ -1427,13 +1437,15 @@ function TaskRow({
           </TeamWorksProjectField>
           <div className="flex flex-wrap items-center gap-4 text-xs font-bold md:col-span-2">
             <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.needsInternalReview} disabled={busy} onChange={(event) => void apply({ needsInternalReview: event.target.checked })} />本部の確認が必要</label>
-            <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.needsClientReview} disabled={busy} onChange={(event) => void apply({ needsClientReview: event.target.checked })} />クライアントの確認が必要</label>
+            {featureSettings.clientReview ? (
+              <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.needsClientReview} disabled={busy} onChange={(event) => void apply({ needsClientReview: event.target.checked })} />クライアントの確認が必要</label>
+            ) : null}
             <label className="flex items-center gap-2"><input type="checkbox" defaultChecked={task.clientVisible} disabled={busy} onChange={(event) => void apply({ clientVisible: event.target.checked })} />クライアントに表示する</label>
           </div>
           <div className="md:col-span-2">
             <TaskInstructionSection task={task} onReload={onReload} />
           </div>
-          {task.submissionType === "form" ? (
+          {task.submissionType === "form" && featureSettings.forms ? (
             <div className="md:col-span-2">
               <TaskFormsPanel task={task} members={members} myMemberId={myMemberId} />
             </div>
