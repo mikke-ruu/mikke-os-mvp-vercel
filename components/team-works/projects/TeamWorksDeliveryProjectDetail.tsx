@@ -342,6 +342,7 @@ function MaterialsTab({ projectId }: { projectId: string }) {
   const [materials, setMaterials] = useState<DeliveryMaterial[] | undefined>(undefined);
   const [addOpen, setAddOpen] = useState(false);
   const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
   const [materialUrl, setMaterialUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -365,8 +366,9 @@ function MaterialsTab({ projectId }: { projectId: string }) {
     setSaving(true);
     setError("");
     try {
-      await createDeliveryMaterial(supabase, projectId, { title, materialUrl });
+      await createDeliveryMaterial(supabase, projectId, { title, body, materialUrl });
       setTitle("");
+      setBody("");
       setMaterialUrl("");
       setAddOpen(false);
       await load();
@@ -409,6 +411,9 @@ function MaterialsTab({ projectId }: { projectId: string }) {
             <TeamWorksProjectField label="タイトル" required>
               <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="例：講座テキストの見本（第2版）" className={teamWorksProjectInputClass} required />
             </TeamWorksProjectField>
+            <TeamWorksProjectField label="本文（任意）" helper="手順やメモをそのまま書けます。URLと併用も可能です">
+              <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={4} placeholder="例：撮影の手順、共有時の注意点など" className={`${teamWorksProjectInputClass} min-h-[100px] resize-y`} />
+            </TeamWorksProjectField>
             <TeamWorksProjectField label="URL" helper="Drive・Notion・Dropboxなどの共有リンクを想定しています">
               <input value={materialUrl} onChange={(event) => setMaterialUrl(event.target.value)} placeholder="https://…" className={teamWorksProjectInputClass} />
             </TeamWorksProjectField>
@@ -428,24 +433,37 @@ function MaterialsTab({ projectId }: { projectId: string }) {
       ) : (
         <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
           {materials.map((material) => (
-            <div key={material.id} className="flex items-center gap-3 px-4 py-3">
-              <FolderOpen size={16} className="shrink-0 text-[var(--mikke-muted)]" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-bold">{material.title}</span>
-                {material.materialUrl ? (
-                  <a href={material.materialUrl} target="_blank" rel="noreferrer" className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-[var(--tw-title)]">
-                    <ExternalLink size={11} className="shrink-0" /> {material.materialUrl}
-                  </a>
-                ) : null}
-              </span>
-              <button
-                type="button"
-                onClick={() => void remove(material.id)}
-                disabled={busyId === material.id}
-                className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2.5 py-1.5 text-xs font-bold text-[var(--mikke-muted)] disabled:opacity-40"
-              >
-                <Trash2 size={13} />
-              </button>
+            <div key={material.id} className="px-4 py-3">
+              <div className="flex items-center gap-3">
+                <FolderOpen size={16} className="shrink-0 text-[var(--mikke-muted)]" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate text-sm font-bold">{material.title}</span>
+                    {material.body ? (
+                      <span className="shrink-0 rounded-full bg-[var(--mikke-surface-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-muted)]">本文あり</span>
+                    ) : null}
+                  </span>
+                  {material.materialUrl ? (
+                    <a href={material.materialUrl} target="_blank" rel="noreferrer" className="mt-0.5 flex items-center gap-1 truncate text-xs font-semibold text-[var(--tw-title)]">
+                      <ExternalLink size={11} className="shrink-0" /> {material.materialUrl}
+                    </a>
+                  ) : null}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void remove(material.id)}
+                  disabled={busyId === material.id}
+                  className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2.5 py-1.5 text-xs font-bold text-[var(--mikke-muted)] disabled:opacity-40"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+              {material.body ? (
+                <details className="mt-2 ml-7 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-2">
+                  <summary className="cursor-pointer text-xs font-bold text-[var(--mikke-muted)]">本文を開く</summary>
+                  <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-[var(--mikke-text)]">{material.body}</p>
+                </details>
+              ) : null}
             </div>
           ))}
         </div>
@@ -958,12 +976,15 @@ function DeliveryFeatureSettingsTab({ detail, onReload }: { detail: DeliveryProj
           <Save size={15} /> {saving ? "保存中…" : "保存"}
         </button>
       </form>
+
+      <DeliveryPortalPreview projectId={detail.project.id} members={detail.members} />
     </div>
   );
 }
 
 function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
   const [title, setTitle] = useState(detail.project.title);
+  const [description, setDescription] = useState(detail.project.description ?? "");
   const [clientVisible, setClientVisible] = useState(detail.project.clientVisible);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -976,7 +997,7 @@ function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onRe
     setError("");
     setMessage("");
     try {
-      await updateDeliveryProjectSettings(supabase, detail.project.id, { title: title.trim(), clientVisible });
+      await updateDeliveryProjectSettings(supabase, detail.project.id, { title: title.trim(), description, clientVisible });
       setMessage("保存しました。");
       await onReload();
     } catch (updateError) {
@@ -993,6 +1014,9 @@ function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onRe
         <TeamWorksProjectField label="プロジェクト名" required>
           <input value={title} onChange={(event) => setTitle(event.target.value)} className={teamWorksProjectInputClass} required />
         </TeamWorksProjectField>
+        <TeamWorksProjectField label="説明" helper="この案件の目的・範囲・共有事項など。クライアントと参加メンバーのポータルにも表示されます">
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className={`${teamWorksProjectInputClass} min-h-[78px] resize-y`} />
+        </TeamWorksProjectField>
         <label className="flex items-center gap-2 text-xs font-bold">
           <input type="checkbox" checked={clientVisible} onChange={(event) => setClientVisible(event.target.checked)} />
           クライアントにプロジェクト全体を公開する
@@ -1004,8 +1028,6 @@ function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onRe
         </button>
       </form>
 
-      <DeliveryPortalPreview projectId={detail.project.id} members={detail.members} />
-
       <TeamWorksProjectArchivePanel projectId={detail.project.id} projectTitle={detail.project.title} />
     </div>
   );
@@ -1014,11 +1036,26 @@ function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onRe
 // ポータルプレビュー(K-2): 「クライアントにはこう見えます」を、想像図ではなく
 // 実データ・実部品(TeamWorksDeliveryPortalProjectDetail)で確認できるようにする。
 // previewMembershipで役割を差し替え、readOnlyで操作を封じる。
+// M-2(2026-07-31): メンバーが1人もいなくても、架空メンバー(サンプル)でそのまま
+// プレビューを描画する(あゆみ指摘「メンバーがいなくても今見える状態が分かるといい」)。
+// ダミーIDでのクエリは単に空データを返すだけなので、実装(props注入)を変えずに済む。
+const SAMPLE_DELIVERY_CLIENT: DeliveryProjectMember = {
+  organizationMemberId: "00000000-0000-0000-0000-000000000000",
+  projectRole: "client",
+  displayName: "クライアント（サンプル）"
+};
+const SAMPLE_DELIVERY_WORKER: DeliveryProjectMember = {
+  organizationMemberId: "00000000-0000-0000-0000-000000000000",
+  projectRole: "worker",
+  displayName: "参加メンバー（サンプル）"
+};
+
 function DeliveryPortalPreview({ projectId, members }: { projectId: string; members: DeliveryProjectMember[] }) {
   const [previewRole, setPreviewRole] = useState<"client" | "worker">("client");
   const client = members.find((member) => member.projectRole === "client");
   const worker = members.find((member) => member.projectRole === "worker");
-  const previewMembership = previewRole === "client" ? client : worker;
+  const isSample = previewRole === "client" ? !client : !worker;
+  const previewMembership = previewRole === "client" ? client ?? SAMPLE_DELIVERY_CLIENT : worker ?? SAMPLE_DELIVERY_WORKER;
 
   return (
     <div className="max-w-2xl space-y-3">
@@ -1044,22 +1081,15 @@ function DeliveryPortalPreview({ projectId, members }: { projectId: string; memb
       <p className="text-xs font-semibold text-[var(--mikke-muted)]">
         実際のデータをそのまま読み取り専用で表示します。ここから操作はできません。
       </p>
-      {!previewMembership ? (
-        <MikkeEmptyState
-          title={previewRole === "client" ? "クライアントがまだいません" : "参加メンバーがまだいません"}
-          helper="「メンバー」タブから追加すると、ここでプレビューできます。"
-        />
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
-          <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">
-            <span className="h-2 w-2 rounded-full bg-[var(--tw-done)]" />
-            {previewMembership.displayName} さんの画面
-          </div>
-          <div className="max-h-[520px] overflow-y-auto bg-[var(--mikke-surface-soft)] p-4">
-            <TeamWorksDeliveryPortalProjectDetail projectId={projectId} previewMembership={previewMembership} readOnly />
-          </div>
+      <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
+        <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">
+          <span className={`h-2 w-2 rounded-full ${isSample ? "bg-[var(--mikke-muted)]" : "bg-[var(--tw-done)]"}`} />
+          {isSample ? `サンプル表示・「メンバー」タブから追加すると実データで確認できます` : `${previewMembership.displayName} さんの画面`}
         </div>
-      )}
+        <div className="max-h-[520px] overflow-y-auto bg-[var(--mikke-surface-soft)] p-4">
+          <TeamWorksDeliveryPortalProjectDetail projectId={projectId} previewMembership={previewMembership} readOnly />
+        </div>
+      </div>
     </div>
   );
 }

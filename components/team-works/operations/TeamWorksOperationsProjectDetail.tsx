@@ -1995,6 +1995,10 @@ function PortalTab({
 // クライアント/パートナーポータルは「今ログインしている本人」に依存した作りの
 // ため、staff向けの専用ロード関数(loadOperationsClientPortalPreview /
 // loadOperationsPartnerPortalPreview)を通して実データを読み取り専用で描画する。
+// M-2(2026-07-31): メンバーが1人もいなくても架空メンバー(サンプル)で
+// プレビューを続行する(あゆみ指摘「メンバーがいなくても今見える状態が分かるといい」)。
+const SAMPLE_OPERATIONS_MEMBER_ID = "00000000-0000-0000-0000-000000000000";
+
 function OperationsPortalPreview({ projectId }: { projectId: string }) {
   const labels = useTeamWorksLabels();
   const [previewRole, setPreviewRole] = useState<"client" | "worker">("client");
@@ -2018,6 +2022,9 @@ function OperationsPortalPreview({ projectId }: { projectId: string }) {
   const client = members.find((member) => member.projectRole === "client");
   const worker = members.find((member) => member.projectRole === "worker");
   const previewMember = previewRole === "client" ? client : worker;
+  const isSample = !previewMember;
+  const targetOrganizationMemberId = previewMember?.organizationMemberId ?? SAMPLE_OPERATIONS_MEMBER_ID;
+  const sampleDisplayName = previewRole === "client" ? "クライアント（サンプル）" : `${labels.workers}（サンプル）`;
 
   return (
     <div className="max-w-3xl space-y-3">
@@ -2044,26 +2051,31 @@ function OperationsPortalPreview({ projectId }: { projectId: string }) {
         実際のデータをそのまま読み取り専用で表示します。ここから操作はできません。
       </p>
       {loadError ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{loadError}</p> : null}
-      {!previewMember ? (
-        <MikkeEmptyState
-          title={previewRole === "client" ? "クライアントがまだいません" : `${labels.workers}がまだいません`}
-          helper={`「${labels.workers}」タブや招待からメンバーを追加すると、ここでプレビューできます。`}
-        />
-      ) : (
-        <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
-          <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">
-            <span className="h-2 w-2 rounded-full bg-[var(--tw-done)]" />
-            {previewMember.displayName} さんの画面
-          </div>
-          <div className="max-h-[520px] overflow-y-auto bg-[var(--mikke-surface-soft)] p-4">
-            {previewRole === "client" ? (
-              <TeamWorksOperationsClientPortalPreview projectId={projectId} targetOrganizationMemberId={previewMember.organizationMemberId} readOnly />
-            ) : (
-              <TeamWorksOperationsPartnerPortalPreview projectId={projectId} targetOrganizationMemberId={previewMember.organizationMemberId} readOnly />
-            )}
-          </div>
+      <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
+        <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">
+          <span className={`h-2 w-2 rounded-full ${isSample ? "bg-[var(--mikke-muted)]" : "bg-[var(--tw-done)]"}`} />
+          {isSample
+            ? `サンプル表示・「${labels.workers}」タブや招待からメンバーを追加すると実データで確認できます`
+            : `${previewMember.displayName} さんの画面`}
         </div>
-      )}
+        <div className="max-h-[520px] overflow-y-auto bg-[var(--mikke-surface-soft)] p-4">
+          {previewRole === "client" ? (
+            <TeamWorksOperationsClientPortalPreview
+              projectId={projectId}
+              targetOrganizationMemberId={targetOrganizationMemberId}
+              sampleDisplayName={isSample ? sampleDisplayName : undefined}
+              readOnly
+            />
+          ) : (
+            <TeamWorksOperationsPartnerPortalPreview
+              projectId={projectId}
+              targetOrganizationMemberId={targetOrganizationMemberId}
+              sampleDisplayName={isSample ? sampleDisplayName : undefined}
+              readOnly
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -61,7 +61,13 @@ export type OperationsPartnerSession = {
 export type OperationsPartnerPortalData = {
   memberName: string | null;
   projectCount: number;
-  projects: { id: string; title: string; manuals: OperationsPartnerManual[]; featureSettings: TeamWorksOperationsFeatureSettings }[];
+  projects: {
+    id: string;
+    title: string;
+    description: string | null;
+    manuals: OperationsPartnerManual[];
+    featureSettings: TeamWorksOperationsFeatureSettings;
+  }[];
   offers: { projectId: string; projectTitle: string; organizationMemberId: string; requestedAt: string }[];
   today: OperationsPartnerSession[];
   upcoming: OperationsPartnerSession[];
@@ -72,6 +78,7 @@ type ProjectMemberRow = { project_id: string; organization_member_id: string };
 type ProjectRow = {
   id: string;
   title: string;
+  description: string | null;
   style: string;
   status: string;
   feature_settings?: Partial<TeamWorksOperationsFeatureSettings> | null;
@@ -214,10 +221,15 @@ export async function loadOperationsPartnerPortal(
 // staffが指定したtargetOrganizationMemberIdをそのプロジェクトの確定済みメンバー
 // として扱う(RLSはstaffに対してプロジェクトの全データ読み取りを許可しているため、
 // クエリ自体はそのまま成立する。計画書§K-2実装状況の設計どおり)。
+// sampleDisplayName(M-2): 担当パートナーがまだ1人もいないプロジェクトでも
+// 「今見える状態」を確認したい、というあゆみ要望への対応。実在しないIDを渡して
+// この引数を指定した場合のみ架空メンバーとして続行する(担当コマがpartner_member_id
+// に紐づく都合上、サンプル時は予定0件の枠のみになる。実メンバーがいればそちらを優先)。
 export async function loadOperationsPartnerPortalPreview(
   client: SupabaseClient,
   projectId: string,
-  targetOrganizationMemberId: string
+  targetOrganizationMemberId: string,
+  sampleDisplayName?: string
 ): Promise<OperationsPartnerPortalData> {
   const memberResult = await client
     .from("team_works_organization_members")
@@ -225,8 +237,12 @@ export async function loadOperationsPartnerPortalPreview(
     .eq("id", targetOrganizationMemberId)
     .maybeSingle();
   if (memberResult.error) throw memberResult.error;
-  if (!memberResult.data) return { memberName: null, projectCount: 0, projects: [], offers: [], today: [], upcoming: [] };
-  const members = [memberResult.data as MemberRow];
+  if (!memberResult.data && !sampleDisplayName) {
+    return { memberName: null, projectCount: 0, projects: [], offers: [], today: [], upcoming: [] };
+  }
+  const members = [
+    (memberResult.data as MemberRow | null) ?? { id: targetOrganizationMemberId, display_name: sampleDisplayName as string }
+  ];
   const projectMembers: ProjectMemberRow[] = [{ project_id: projectId, organization_member_id: targetOrganizationMemberId }];
   return buildPartnerPortalData(client, members, projectMembers, [], projectMembers);
 }
@@ -246,14 +262,14 @@ async function buildPartnerPortalData(
 
   let projectResult = await client
     .from("team_works_projects")
-    .select("id,title,style,status,feature_settings")
+    .select("id,title,description,style,status,feature_settings")
     .in("id", projectIds)
     .eq("style", "operations")
     .eq("status", "active");
   if (projectResult.error && isMissingSupabaseField(projectResult.error, ["feature_settings"])) {
     projectResult = await client
       .from("team_works_projects")
-      .select("id,title,style,status")
+      .select("id,title,description,style,status")
       .in("id", projectIds)
       .eq("style", "operations")
       .eq("status", "active") as typeof projectResult;
@@ -267,6 +283,7 @@ async function buildPartnerPortalData(
     .map((project) => ({
       id: project.id,
       title: project.title,
+      description: project.description,
       manuals: [] as OperationsPartnerManual[],
       featureSettings: resolveOperationsFeatureSettings(project.feature_settings ?? null)
     }));

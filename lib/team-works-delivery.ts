@@ -124,7 +124,7 @@ export type DeliveryProjectComment = {
 };
 
 export type DeliveryProjectDetail = {
-  project: DeliveryProjectSummary & { featureSettings: TeamWorksDeliveryFeatureSettings };
+  project: DeliveryProjectSummary & { description: string | null; featureSettings: TeamWorksDeliveryFeatureSettings };
   tasks: DeliveryTask[];
   members: DeliveryProjectMember[];
   comments: DeliveryProjectComment[];
@@ -241,13 +241,13 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
   if (!isDatabaseProjectId(projectId)) return null;
   let projectResult = await client
     .from("team_works_projects")
-    .select("id,organization_id,title,status,client_visible,style,delivery_due_on,feature_settings")
+    .select("id,organization_id,title,description,status,client_visible,style,delivery_due_on,feature_settings")
     .eq("id", projectId)
     .maybeSingle();
   if (projectResult.error && isMissingSupabaseField(projectResult.error, ["feature_settings"])) {
     projectResult = await client
       .from("team_works_projects")
-      .select("id,organization_id,title,status,client_visible,style,delivery_due_on")
+      .select("id,organization_id,title,description,status,client_visible,style,delivery_due_on")
       .eq("id", projectId)
       .maybeSingle() as typeof projectResult;
   }
@@ -283,6 +283,7 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
       id: projectRow.id as string,
       organizationId: projectRow.organization_id as string,
       title: projectRow.title as string,
+      description: (projectRow.description as string) ?? null,
       status: projectRow.status as string,
       clientVisible: Boolean(projectRow.client_visible),
       dueOn: (projectRow.delivery_due_on as string) ?? null,
@@ -363,10 +364,11 @@ export async function updateDeliveryProjectDueOn(client: SupabaseClient, project
 export async function updateDeliveryProjectSettings(
   client: SupabaseClient,
   projectId: string,
-  patch: Partial<{ title: string; clientVisible: boolean }>
+  patch: Partial<{ title: string; description: string; clientVisible: boolean }>
 ): Promise<void> {
   const payload: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (patch.title !== undefined) payload.title = patch.title;
+  if (patch.description !== undefined) payload.description = patch.description.trim() || null;
   if (patch.clientVisible !== undefined) payload.client_visible = patch.clientVisible;
   const { error } = await client.from("team_works_projects").update(payload).eq("id", projectId);
   if (error) throw error;
@@ -801,21 +803,31 @@ export type DeliveryMaterial = {
   id: string;
   no: number;
   title: string;
+  body: string | null;
   materialUrl: string | null;
 };
 
 export async function fetchDeliveryMaterials(client: SupabaseClient, projectId: string): Promise<DeliveryMaterial[]> {
-  const { data, error } = await client
+  let result = await client
     .from("team_works_manuals")
-    .select("id,no,title,material_url")
+    .select("id,no,title,body,material_url")
     .eq("project_id", projectId)
     .eq("status", "active")
     .order("no");
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
+  if (result.error && isMissingSupabaseField(result.error, ["body"])) {
+    result = await client
+      .from("team_works_manuals")
+      .select("id,no,title,material_url")
+      .eq("project_id", projectId)
+      .eq("status", "active")
+      .order("no") as typeof result;
+  }
+  if (result.error) throw result.error;
+  return (result.data ?? []).map((row) => ({
     id: row.id as string,
     no: row.no as number,
     title: row.title as string,
+    body: (row as { body?: string | null }).body ?? null,
     materialUrl: (row.material_url as string) ?? null
   }));
 }
@@ -823,9 +835,10 @@ export async function fetchDeliveryMaterials(client: SupabaseClient, projectId: 
 export async function createDeliveryMaterial(
   client: SupabaseClient,
   projectId: string,
-  input: { title: string; materialUrl: string }
+  input: { title: string; body?: string; materialUrl: string }
 ): Promise<void> {
   const title = input.title.trim();
+  const body = input.body?.trim() ?? "";
   const materialUrl = input.materialUrl.trim();
   if (!title) throw new Error("資料のタイトルを入力してください。");
   const { data: lastRow, error: lastError } = await client
@@ -841,6 +854,7 @@ export async function createDeliveryMaterial(
     project_id: projectId,
     no: nextNo,
     title,
+    body: body || null,
     material_type: materialUrl ? "link" : "none",
     material_url: materialUrl || null
   });

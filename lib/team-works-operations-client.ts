@@ -71,6 +71,7 @@ export type OperationsClientPortalData = {
   projects: {
     id: string;
     title: string;
+    description: string | null;
     clientMemberId: string;
     organizationId: string;
     organizationName: string;
@@ -140,10 +141,15 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
 // staffが対象のorganization_member_idを直接指定する。RLSはstaffに対して
 // プロジェクトの全データ読み取りを許可しているため、自己解決とactivate RPCの
 // 呼び出しをスキップしてもデータは取得できる(計画書§K-2実装状況の設計どおり)。
+// sampleDisplayName(M-2): クライアントがまだ1人もいないプロジェクトでも
+// 「今見える状態」を確認したい、というあゆみ要望への対応。呼び出し側が
+// 実在しないIDを渡してこの引数を指定した場合のみ、架空メンバーとして
+// 組み立てを続行する(見つかった実メンバーがあればそちらを優先)。
 export async function loadOperationsClientPortalPreview(
   client: SupabaseClient,
   projectId: string,
-  targetOrganizationMemberId: string
+  targetOrganizationMemberId: string,
+  sampleDisplayName?: string
 ): Promise<OperationsClientPortalData> {
   const memberResult = await client
     .from("team_works_organization_members")
@@ -151,8 +157,13 @@ export async function loadOperationsClientPortalPreview(
     .eq("id", targetOrganizationMemberId)
     .maybeSingle();
   if (memberResult.error) throw memberResult.error;
-  if (!memberResult.data) return emptyClientPortalData(null);
-  const members = [memberResult.data as { id: string; display_name: string }];
+  if (!memberResult.data && !sampleDisplayName) return emptyClientPortalData(null);
+  const members = [
+    (memberResult.data as { id: string; display_name: string } | null) ?? {
+      id: targetOrganizationMemberId,
+      display_name: sampleDisplayName as string
+    }
+  ];
   const clientMemberships = [{ project_id: projectId, organization_member_id: targetOrganizationMemberId }];
   return buildClientPortalData(client, members, clientMemberships);
 }
@@ -167,14 +178,14 @@ async function buildClientPortalData(
 
   let projectResult = await client
     .from("team_works_projects")
-    .select("id,title,organization_id,client_partner_contact_visible,feature_settings")
+    .select("id,title,description,organization_id,client_partner_contact_visible,feature_settings")
     .in("id", projectIds)
     .eq("style", "operations")
     .eq("status", "active");
   if (projectResult.error && isMissingSupabaseField(projectResult.error, ["feature_settings"])) {
     projectResult = await client
       .from("team_works_projects")
-      .select("id,title,organization_id,client_partner_contact_visible")
+      .select("id,title,description,organization_id,client_partner_contact_visible")
       .in("id", projectIds)
       .eq("style", "operations")
       .eq("status", "active") as typeof projectResult;
@@ -183,6 +194,7 @@ async function buildClientPortalData(
   const projectRows = (projectResult.data ?? []) as {
     id: string;
     title: string;
+    description: string | null;
     organization_id: string;
     client_partner_contact_visible: boolean;
     feature_settings?: Partial<TeamWorksOperationsFeatureSettings> | null;
@@ -202,6 +214,7 @@ async function buildClientPortalData(
       ? [{
           id: project.id,
           title: project.title,
+          description: project.description,
           clientMemberId,
           organizationId: project.organization_id,
           organizationName: organizationNameById.get(project.organization_id) ?? "組織",

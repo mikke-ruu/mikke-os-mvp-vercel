@@ -109,10 +109,12 @@ export function TeamWorksOperationsPartnerPortal() {
 export function TeamWorksOperationsPartnerPortalPreview({
   projectId,
   targetOrganizationMemberId,
+  sampleDisplayName,
   readOnly = true
 }: {
   projectId: string;
   targetOrganizationMemberId: string;
+  sampleDisplayName?: string;
   readOnly?: boolean;
 }) {
   const [data, setData] = useState<OperationsPartnerPortalData | null | undefined>(undefined);
@@ -121,11 +123,11 @@ export function TeamWorksOperationsPartnerPortalPreview({
   const load = useCallback(async () => {
     setError(null);
     try {
-      setData(await loadOperationsPartnerPortalPreview(supabase, projectId, targetOrganizationMemberId));
+      setData(await loadOperationsPartnerPortalPreview(supabase, projectId, targetOrganizationMemberId, sampleDisplayName));
     } catch (loadError) {
       setError(toErrorMessage(loadError, "プレビューを読み込めませんでした。"));
     }
-  }, [projectId, targetOrganizationMemberId]);
+  }, [projectId, targetOrganizationMemberId, sampleDisplayName]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -339,6 +341,11 @@ function PartnerProject({
         <p className="text-lg font-extrabold">{title}</p>
         <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">担当レッスンだけを表示しています。</p>
       </div>
+      {project.description ? (
+        <p className="whitespace-pre-wrap rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 text-xs font-semibold leading-6 text-[var(--mikke-muted)]">
+          {project.description}
+        </p>
+      ) : null}
       <nav className="flex gap-1 rounded-xl bg-[var(--mikke-surface-soft)] p-1" aria-label={`${title}内のページ`}>
         <button type="button" onClick={() => onTabChange("calendar")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "calendar" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><CalendarDays size={14} />カレンダー</button>
         <button type="button" onClick={() => onTabChange("schedule")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "schedule" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><List size={14} />スケジュール</button>

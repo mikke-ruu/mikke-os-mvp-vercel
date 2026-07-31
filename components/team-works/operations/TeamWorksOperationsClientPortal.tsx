@@ -158,10 +158,12 @@ export function TeamWorksOperationsClientPortal() {
 export function TeamWorksOperationsClientPortalPreview({
   projectId,
   targetOrganizationMemberId,
+  sampleDisplayName,
   readOnly = true
 }: {
   projectId: string;
   targetOrganizationMemberId: string;
+  sampleDisplayName?: string;
   readOnly?: boolean;
 }) {
   const [data, setData] = useState<OperationsClientPortalData | null | undefined>(undefined);
@@ -172,11 +174,11 @@ export function TeamWorksOperationsClientPortalPreview({
   const load = useCallback(async () => {
     setError(null);
     try {
-      setData(await loadOperationsClientPortalPreview(supabase, projectId, targetOrganizationMemberId));
+      setData(await loadOperationsClientPortalPreview(supabase, projectId, targetOrganizationMemberId, sampleDisplayName));
     } catch (loadError) {
       setError(toErrorMessage(loadError, "プレビューを読み込めませんでした。"));
     }
-  }, [projectId, targetOrganizationMemberId]);
+  }, [projectId, targetOrganizationMemberId, sampleDisplayName]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -367,6 +369,11 @@ function ProjectView({
 
   return (
     <div className="space-y-5">
+      {project.description ? (
+        <p className="whitespace-pre-wrap rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 text-xs font-semibold leading-6 text-[var(--mikke-muted)]">
+          {project.description}
+        </p>
+      ) : null}
       <nav aria-label="校内のページ" className="flex gap-1 overflow-x-auto rounded-xl bg-[var(--mikke-surface-soft)] p-1">
         {tabs.map((tab) => (
           <button

@@ -86,6 +86,11 @@ export function TeamWorksDeliveryPortalProjectDetail({
       <section className="border-b border-[var(--mikke-line)] pb-5">
         <h2 className="text-2xl font-bold tracking-normal">{project.title}</h2>
         <p className="mt-1 text-xs font-bold text-[var(--mikke-muted)]">タスク {tasks.length}件</p>
+        {project.description ? (
+          <p className="mt-3 whitespace-pre-wrap rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 text-xs font-semibold leading-6 text-[var(--mikke-muted)]">
+            {project.description}
+          </p>
+        ) : null}
       </section>
 
       {myMembership ? <TeamWorksDeliveryMyActionsPanel detail={detail} myMembership={myMembership} /> : null}
