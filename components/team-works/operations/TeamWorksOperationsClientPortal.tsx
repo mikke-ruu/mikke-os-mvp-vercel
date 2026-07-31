@@ -472,6 +472,9 @@ function SessionRosterPanel({
       </button>
       {open ? (
         <div className="border-t border-[var(--mikke-line)] p-3">
+          {session.workDescription ? (
+            <p className="mb-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs font-semibold text-[var(--mikke-text)]">作業内容：{session.workDescription}</p>
+          ) : null}
           {session.zoomUrl || session.zoomMeetingId ? (
             <div className="mb-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3">
               <p className="text-xs font-extrabold text-[var(--mikke-primary)]">Zoom</p>

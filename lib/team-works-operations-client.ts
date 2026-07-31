@@ -32,6 +32,7 @@ export type OperationsClientSession = {
   zoomUrl: string | null;
   zoomMeetingId: string | null;
   zoomPasscode: string | null;
+  workDescription: string | null;
   roster: {
     id: string;
     participantId: string;
@@ -225,14 +226,14 @@ async function buildClientPortalData(
   const today = dateKey(new Date());
   const through = dateKey(addDays(new Date(), 60));
   let [sessionResult, groupResult, participantResult, projectMemberResult, messageResult, holidayResult] = await Promise.all([
-    client.from("team_works_op_sessions").select("id,project_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode").in("project_id", operationsProjectIds).gte("session_date", today).lte("session_date", through).order("session_date").order("start_time"),
+    client.from("team_works_op_sessions").select("id,project_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,work_description").in("project_id", operationsProjectIds).gte("session_date", today).lte("session_date", through).order("session_date").order("start_time"),
     client.from("team_works_groups").select("id,project_id,name").in("project_id", operationsProjectIds).neq("status", "archived").is("archived_at", null).order("name"),
     client.from("team_works_participants").select("id,project_id,group_id,name,level").in("project_id", operationsProjectIds).neq("status", "archived").is("archived_at", null).order("name"),
     client.from("team_works_project_members").select("project_id,organization_member_id,project_role").in("project_id", operationsProjectIds),
     client.from("team_works_project_comments").select("id,project_id,author_member_id,recipient_member_id,body,created_at").in("project_id", operationsProjectIds).eq("audience", "client").order("created_at", { ascending: false }).limit(100),
     client.from("team_works_holidays").select("id,project_id,organization_id,holiday_date,memo").in("organization_id", organizationIds).or(`project_id.in.(${operationsProjectIds.join(",")}),project_id.is.null`)
   ]);
-  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode"])) {
+  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "work_description"])) {
     sessionResult = await client
       .from("team_works_op_sessions")
       .select("id,project_id,session_date,start_time,duration_min,status,partner_member_id")
@@ -246,7 +247,7 @@ async function buildClientPortalData(
     if (result.error) throw result.error;
   }
 
-  const sessions = (sessionResult.data ?? []) as { id: string; project_id: string; session_date: string; start_time: string; duration_min: number; status: string; partner_member_id: string | null; zoom_url: string | null; zoom_meeting_id: string | null; zoom_passcode: string | null }[];
+  const sessions = (sessionResult.data ?? []) as { id: string; project_id: string; session_date: string; start_time: string; duration_min: number; status: string; partner_member_id: string | null; zoom_url: string | null; zoom_meeting_id: string | null; zoom_passcode: string | null; work_description?: string | null }[];
   const groups = (groupResult.data ?? []) as { id: string; project_id: string; name: string }[];
   const participants = (participantResult.data ?? []) as { id: string; project_id: string; group_id: string | null; name: string; level: string | null }[];
   const projectMembers = (projectMemberResult.data ?? []) as { project_id: string; organization_member_id: string; project_role: string }[];
@@ -303,6 +304,7 @@ async function buildClientPortalData(
       zoomUrl: session.zoom_url ?? null,
       zoomMeetingId: session.zoom_meeting_id ?? null,
       zoomPasscode: session.zoom_passcode ?? null,
+      workDescription: session.work_description ?? null,
       roster: rosterRows.filter((row) => row.session_id === session.id).flatMap((row) => {
         const participant = participantById.get(row.participant_id);
         return participant ? [{ id: row.id, participantId: row.participant_id, orderIndex: row.order_index, participantName: participant.name }] : [];
