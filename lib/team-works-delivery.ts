@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveStaffOrganizationIds } from "@/lib/team-works-operations";
 import { ensureStaffOrganizationContext, isDatabaseProjectId } from "@/lib/team-works-operations-project";
+import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
+import {
+  resolveDeliveryFeatureSettings,
+  type TeamWorksDeliveryFeatureSettings
+} from "@/lib/team-works-feature-settings";
 
 // 納品型(style='delivery')プロジェクトのSupabase読み書き。
 // テーブル自体はP8-a/P8-cで既に用意されていたが、UIはlocalStorageのままだった。
@@ -119,7 +124,7 @@ export type DeliveryProjectComment = {
 };
 
 export type DeliveryProjectDetail = {
-  project: DeliveryProjectSummary;
+  project: DeliveryProjectSummary & { featureSettings: TeamWorksDeliveryFeatureSettings };
   tasks: DeliveryTask[];
   members: DeliveryProjectMember[];
   comments: DeliveryProjectComment[];
@@ -234,11 +239,19 @@ export async function fetchMyDeliveryProjects(client: SupabaseClient): Promise<D
 
 export async function loadDeliveryProjectDetail(client: SupabaseClient, projectId: string): Promise<DeliveryProjectDetail | null> {
   if (!isDatabaseProjectId(projectId)) return null;
-  const { data: projectRow, error: projectError } = await client
+  let projectResult = await client
     .from("team_works_projects")
-    .select("id,organization_id,title,status,client_visible,style,delivery_due_on")
+    .select("id,organization_id,title,status,client_visible,style,delivery_due_on,feature_settings")
     .eq("id", projectId)
     .maybeSingle();
+  if (projectResult.error && isMissingSupabaseField(projectResult.error, ["feature_settings"])) {
+    projectResult = await client
+      .from("team_works_projects")
+      .select("id,organization_id,title,status,client_visible,style,delivery_due_on")
+      .eq("id", projectId)
+      .maybeSingle() as typeof projectResult;
+  }
+  const { data: projectRow, error: projectError } = projectResult;
   if (projectError) throw projectError;
   if (!projectRow || projectRow.style !== "delivery") return null;
 
@@ -272,7 +285,10 @@ export async function loadDeliveryProjectDetail(client: SupabaseClient, projectI
       title: projectRow.title as string,
       status: projectRow.status as string,
       clientVisible: Boolean(projectRow.client_visible),
-      dueOn: (projectRow.delivery_due_on as string) ?? null
+      dueOn: (projectRow.delivery_due_on as string) ?? null,
+      featureSettings: resolveDeliveryFeatureSettings(
+        (projectRow as { feature_settings?: Partial<TeamWorksDeliveryFeatureSettings> | null }).feature_settings ?? null
+      )
     },
     tasks: (taskResult.data ?? []).map(toTask),
     members: (memberResult.data ?? []).map((row) => ({

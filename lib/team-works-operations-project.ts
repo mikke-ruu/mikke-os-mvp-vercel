@@ -3,6 +3,10 @@ import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 import { fetchOperationsProjects, resolveStaffOrganizationIds } from "@/lib/team-works-operations";
 import { GENERAL_PURPOSE_LABELS } from "@/lib/team-works-labels";
 import { describeClosedDayReason, isClosedDayKey, loadProjectHolidayContext } from "@/lib/team-works-operation-settings";
+import {
+  resolveOperationsFeatureSettings,
+  type TeamWorksOperationsFeatureSettings
+} from "@/lib/team-works-feature-settings";
 
 export type OperationsProject = {
   id: string;
@@ -19,6 +23,7 @@ export type OperationsProject = {
   zoomUrl: string | null;
   zoomMeetingId: string | null;
   zoomPasscode: string | null;
+  featureSettings: TeamWorksOperationsFeatureSettings;
 };
 
 export type OperationsGroup = {
@@ -180,6 +185,7 @@ type ProjectRow = {
   zoom_url: string | null;
   zoom_meeting_id: string | null;
   zoom_passcode: string | null;
+  feature_settings: Partial<TeamWorksOperationsFeatureSettings> | null;
 };
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -201,11 +207,11 @@ export async function loadOperationsProjectDetail(
   let projectResult = await client
     .from("team_works_projects")
     .select(
-      "id,organization_id,title,description,status,style,contract_started_on,contract_ended_on,client_visible,payouts_enabled,invoices_enabled,client_partner_contact_visible,zoom_url,zoom_meeting_id,zoom_passcode"
+      "id,organization_id,title,description,status,style,contract_started_on,contract_ended_on,client_visible,payouts_enabled,invoices_enabled,client_partner_contact_visible,zoom_url,zoom_meeting_id,zoom_passcode,feature_settings"
     )
     .eq("id", projectId)
     .maybeSingle();
-  if (projectResult.error && isMissingSupabaseField(projectResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode"])) {
+  if (projectResult.error && isMissingSupabaseField(projectResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "feature_settings"])) {
     projectResult = await client
       .from("team_works_projects")
       .select("id,organization_id,title,description,status,style,contract_started_on,contract_ended_on,client_visible,payouts_enabled,invoices_enabled,client_partner_contact_visible")
@@ -215,10 +221,11 @@ export async function loadOperationsProjectDetail(
   if (projectResult.error) throw projectResult.error;
   const projectRow = projectResult.data
     ? {
-        ...(projectResult.data as Omit<ProjectRow, "zoom_url" | "zoom_meeting_id" | "zoom_passcode">),
+        ...(projectResult.data as Omit<ProjectRow, "zoom_url" | "zoom_meeting_id" | "zoom_passcode" | "feature_settings">),
         zoom_url: (projectResult.data as Partial<ProjectRow>).zoom_url ?? null,
         zoom_meeting_id: (projectResult.data as Partial<ProjectRow>).zoom_meeting_id ?? null,
-        zoom_passcode: (projectResult.data as Partial<ProjectRow>).zoom_passcode ?? null
+        zoom_passcode: (projectResult.data as Partial<ProjectRow>).zoom_passcode ?? null,
+        feature_settings: (projectResult.data as Partial<ProjectRow>).feature_settings ?? null
       }
     : null;
   if (!projectRow || projectRow.style !== "operations") return null;
@@ -450,7 +457,8 @@ export async function loadOperationsProjectDetail(
       clientPartnerContactVisible: projectRow.client_partner_contact_visible,
       zoomUrl: projectRow.zoom_url,
       zoomMeetingId: projectRow.zoom_meeting_id,
-      zoomPasscode: projectRow.zoom_passcode
+      zoomPasscode: projectRow.zoom_passcode,
+      featureSettings: resolveOperationsFeatureSettings(projectRow.feature_settings)
     },
     groups: ((groupResult.data ?? []) as { id: string; name: string; status: string }[]).map((row) => ({
       id: row.id,

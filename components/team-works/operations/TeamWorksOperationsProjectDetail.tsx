@@ -81,6 +81,7 @@ import {
   type OperationsProjectMember
 } from "@/lib/team-works-operations-project";
 import { generateSessionsForProject } from "@/lib/team-works-operations";
+import { updateProjectFeatureSettings, type TeamWorksOperationsFeatureSettings } from "@/lib/team-works-feature-settings";
 import { TeamWorksOperationsShell } from "./TeamWorksOperationsShell";
 
 type ProjectTab =
@@ -94,18 +95,18 @@ type ProjectTab =
   | "portal"
   | "settings";
 
-function buildTabs(labels: TeamWorksLabels): { id: ProjectTab; label: string }[] {
+function buildTabs(labels: TeamWorksLabels, settings: TeamWorksOperationsFeatureSettings): { id: ProjectTab; label: string }[] {
   return [
     { id: "overview", label: "概要" },
     { id: "schedule", label: "スケジュール" },
     { id: "messages", label: "メッセージ" },
     { id: "partners", label: labels.workers },
-    { id: "roster", label: "名簿" },
-    { id: "reports", label: "報告" },
-    { id: "manuals", label: "マニュアル" },
-    { id: "portal", label: "ポータル設定" },
+    settings.roster ? { id: "roster" as const, label: "名簿" } : null,
+    settings.reports ? { id: "reports" as const, label: "報告" } : null,
+    settings.manuals ? { id: "manuals" as const, label: "マニュアル" } : null,
+    { id: "portal", label: "機能とポータルの設定" },
     { id: "settings", label: "プロジェクト設定" }
-  ];
+  ].filter((tab): tab is { id: ProjectTab; label: string } => tab !== null);
 }
 
 async function checkDeliveryProjectExists(client: typeof supabase, projectId: string): Promise<boolean> {
@@ -188,7 +189,7 @@ function OperationsProjectDetail({
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get("tab");
   const labels = useTeamWorksLabels();
-  const tabs = buildTabs(labels);
+  const tabs = buildTabs(labels, data.project.featureSettings);
   const [activeTab, setActiveTab] = useState<ProjectTab>(
     tabs.some((tab) => tab.id === requestedTab) ? requestedTab as ProjectTab : "overview"
   );
@@ -264,7 +265,7 @@ function OperationsProjectDetail({
           </p>
         ) : null}
 
-        {activeTab === "overview" ? <OverviewTab data={data} saving={saving} mutate={mutate} onSelectTab={setActiveTab} /> : null}
+        {activeTab === "overview" ? <OverviewTab data={data} tabs={tabs} saving={saving} mutate={mutate} onSelectTab={setActiveTab} /> : null}
         {activeTab === "schedule" ? <ScheduleTab data={data} saving={saving} mutate={mutate} /> : null}
         {activeTab === "roster" ? <RosterTab data={data} saving={saving} mutate={mutate} /> : null}
         {activeTab === "partners" ? <PartnersTab data={data} onSelectTab={setActiveTab} /> : null}
@@ -278,18 +279,33 @@ function OperationsProjectDetail({
   );
 }
 
+const PROJECT_TAB_ICONS: Record<ProjectTab, typeof CalendarDays> = {
+  overview: CalendarDays,
+  schedule: CalendarDays,
+  messages: MessageSquare,
+  partners: Clock3,
+  roster: Users,
+  reports: FileCheck2,
+  manuals: BookOpen,
+  portal: Settings2,
+  settings: FileCheck2
+};
+
 function OverviewTab({
   data,
+  tabs,
   saving,
   mutate,
   onSelectTab
 }: {
   data: OperationsProjectDetailData;
+  tabs: { id: ProjectTab; label: string }[];
   saving: boolean;
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
   onSelectTab: (tab: ProjectTab) => void;
 }) {
   const labels = useTeamWorksLabels();
+  const featureSettings = data.project.featureSettings;
   const nowKey = toDateKey(new Date());
   const activeSessions = data.sessions.filter((session) => session.status !== "cancelled");
   const liveSessions = activeSessions
@@ -356,13 +372,17 @@ function OverviewTab({
 
       <ProjectCalendarPanel data={data} saving={saving} mutate={mutate} />
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className={`grid gap-3 ${featureSettings.roster ? "grid-cols-3" : "grid-cols-2"}`}>
         <MetricCard icon={CalendarDays} tone="blue" label="今週のコマ" value={String(weekCount)} onClick={() => onSelectTab("schedule")} />
         <MetricCard icon={Users} tone="green" label={labels.workers} value={`${data.partners.length}名`} onClick={() => onSelectTab("partners")} />
-        <MetricCard icon={GraduationCap} tone="pink" label="対象者" value={`${data.participants.length}名`} onClick={() => onSelectTab("roster")} />
+        {featureSettings.roster ? (
+          <MetricCard icon={GraduationCap} tone="pink" label="対象者" value={`${data.participants.length}名`} onClick={() => onSelectTab("roster")} />
+        ) : null}
       </div>
       <p className="-mt-3 text-[11px] font-semibold text-[var(--mikke-muted)]">
-        {labels.workers}はこのプロジェクトの参加人数、対象者はクライアント側の総登録者数です。
+        {featureSettings.roster
+          ? `${labels.workers}はこのプロジェクトの参加人数、対象者はクライアント側の総登録者数です。`
+          : `${labels.workers}はこのプロジェクトの参加人数です。`}
       </p>
 
       <OverviewListSection
@@ -385,7 +405,7 @@ function OverviewTab({
         )}
       </OverviewListSection>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className={`grid gap-5 ${featureSettings.reports ? "lg:grid-cols-2" : ""}`}>
         <OverviewListSection
           icon={MessageSquare}
           title="Messages"
@@ -401,52 +421,47 @@ function OverviewTab({
           )}
         </OverviewListSection>
 
-        <OverviewListSection
-          icon={FileCheck2}
-          title="Reports"
-          subtitle="最近の報告"
-          onViewAll={() => onSelectTab("reports")}
-        >
-          {data.reports.length === 0 ? (
-            <MikkeEmptyState title="最近の報告はありません" />
-          ) : (
-            data.reports.slice(0, 3).map((report) => (
-              <ListRow
-                key={report.id}
-                title={`${report.submitterName} · ${report.formName}`}
-                helper={reportStatusLabel(report.status)}
-                badge={reportStatusLabel(report.status)}
-                onClick={() => onSelectTab("reports")}
-              />
-            ))
-          )}
-        </OverviewListSection>
+        {featureSettings.reports ? (
+          <OverviewListSection
+            icon={FileCheck2}
+            title="Reports"
+            subtitle="最近の報告"
+            onViewAll={() => onSelectTab("reports")}
+          >
+            {data.reports.length === 0 ? (
+              <MikkeEmptyState title="最近の報告はありません" />
+            ) : (
+              data.reports.slice(0, 3).map((report) => (
+                <ListRow
+                  key={report.id}
+                  title={`${report.submitterName} · ${report.formName}`}
+                  helper={reportStatusLabel(report.status)}
+                  badge={reportStatusLabel(report.status)}
+                  onClick={() => onSelectTab("reports")}
+                />
+              ))
+            )}
+          </OverviewListSection>
+        ) : null}
       </div>
 
       <MikkeSection title="More" tone="editorial">
         <p className="mb-3 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">その他</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
-          {[
-            ["overview", "概要", CalendarDays],
-            ["schedule", "スケジュール", CalendarDays],
-            ["messages", "メッセージ", MessageSquare],
-            ["partners", labels.workers, Clock3],
-            ["roster", "名簿", Users],
-            ["reports", "報告", FileCheck2],
-            ["manuals", "マニュアル", BookOpen],
-            ["portal", "ポータル設定", Settings2],
-            ["settings", "プロジェクト設定", FileCheck2]
-          ].map(([id, label, Icon]) => (
-            <button
-              key={String(id)}
-              type="button"
-              onClick={() => onSelectTab(id as ProjectTab)}
-              className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-2 py-3 text-xs font-bold"
-            >
-              <Icon size={19} className="text-[var(--mikke-primary)]" />
-              {String(label)}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const Icon = PROJECT_TAB_ICONS[tab.id];
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onSelectTab(tab.id)}
+                className="flex min-h-20 flex-col items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-2 py-3 text-xs font-bold"
+              >
+                <Icon size={19} className="text-[var(--mikke-primary)]" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </MikkeSection>
     </div>
@@ -858,7 +873,7 @@ function RosterTab({
   return (
     <div className="space-y-5">
       <TabIntro icon={Users} title="名簿" description="紙の名簿から対象者を追加し、グループと進捗を確認します。グループの作成・編集はクライアントポータルで行います。" />
-      {nextSession ? (
+      {nextSession && data.project.featureSettings.attendance ? (
         <MikkeSection title="Next roster" tone="editorial">
           <p className="mb-3 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">
             {formatDate(nextSession.sessionDate)} {nextSession.startTime} · {nextSession.partnerName ?? "担当未定"}
@@ -1865,25 +1880,89 @@ function PortalTab({
   const [payoutsEnabled, setPayoutsEnabled] = useState(data.project.payoutsEnabled);
   const [invoicesEnabled, setInvoicesEnabled] = useState(data.project.invoicesEnabled);
   const [clientPartnerContactVisible, setClientPartnerContactVisible] = useState(data.project.clientPartnerContactVisible);
+  const [featureSettings, setFeatureSettings] = useState<TeamWorksOperationsFeatureSettings>(data.project.featureSettings);
+
+  function setFeature<K extends keyof TeamWorksOperationsFeatureSettings>(key: K, value: boolean) {
+    setFeatureSettings((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "roster" && !value) next.attendance = false;
+      return next;
+    });
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     await mutate(
-      () =>
-        updateOperationsProjectVisibility(supabase, data.project.id, {
+      async () => {
+        await updateOperationsProjectVisibility(supabase, data.project.id, {
           clientVisible,
           payoutsEnabled,
           invoicesEnabled,
           clientPartnerContactVisible
-        }),
-      "ポータル設定を更新しました。"
+        });
+        await updateProjectFeatureSettings(supabase, data.project.id, featureSettings);
+      },
+      "機能とポータルの設定を更新しました。"
     );
   }
 
   return (
     <div className="space-y-5">
-      <TabIntro icon={Settings2} title="ポータル設定" description="このプロジェクトで使う機能をチェックリスト式で設定します。RLSによる認可はこの設定とは独立して常に適用されます。" />
+      <TabIntro icon={Settings2} title="機能とポータルの設定" description="このプロジェクトで使う機能をチェックリスト式で設定します。RLSによる認可はこの設定とは独立して常に適用されます。" />
       <form onSubmit={submit} className="max-w-3xl space-y-4">
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+          <PortalFeatureHeading title="この事業で使う機能" helper="使わない機能はOFFにできます。名簿をOFFにすると出席も自動でOFFになります" />
+          <div className="mt-3 space-y-3">
+            <FeatureCheck
+              checked={featureSettings.roster}
+              onChange={(value) => setFeature("roster", value)}
+              title="名簿"
+              helper="生徒・参加者の一覧とグループ分け。名簿を使わない業種はOFFにできます"
+              tags={[{ label: "本部：名簿タブ", tone: "hq" }, { label: "クライアント：名簿タブ", tone: "client" }]}
+            />
+            <FeatureCheck
+              checked={featureSettings.attendance}
+              onChange={(value) => setFeature("attendance", value)}
+              disabled={!featureSettings.roster}
+              title="出席"
+              helper="コマごとの出席記録。名簿がOFFのときは自動的にOFFになります"
+              tags={[
+                { label: "本部：コマの出席欄", tone: "hq" },
+                { label: "クライアント：出席順の確定", tone: "client" },
+                { label: "スタッフ：レッスン中の名簿", tone: "staff" }
+              ]}
+            />
+            <FeatureCheck
+              checked={featureSettings.shifts}
+              onChange={(value) => setFeature("shifts", value)}
+              title="希望シフト"
+              helper={`${labels.workers}が空いている日を提出し、本部が承認する仕組み`}
+              tags={[{ label: "本部：ホームの希望シフト", tone: "hq" }, { label: `スタッフ：希望シフト提出`, tone: "staff" }]}
+            />
+            <FeatureCheck
+              checked={featureSettings.reports}
+              onChange={(value) => setFeature("reports", value)}
+              title="報告"
+              helper="案件についての報告フォームの提出・確認"
+              tags={[{ label: "本部：報告タブ", tone: "hq" }, { label: "スタッフ：報告の提出", tone: "staff" }]}
+            />
+            <FeatureCheck
+              checked={featureSettings.manuals}
+              onChange={(value) => setFeature("manuals", value)}
+              title="マニュアル"
+              helper="工程やレッスンの手順書。クライアントには表示されません"
+              tags={[{ label: "本部：マニュアルタブ", tone: "hq" }, { label: "スタッフ：マニュアル閲覧", tone: "staff" }]}
+            />
+            <FeatureCheck
+              checked={featureSettings.lessons}
+              onChange={(value) => setFeature("lessons", value)}
+              title="レッスン画面"
+              helper="ポータルのレッスンカレンダー・Zoom表示（本部のスケジュール管理は常に表示されます）"
+              tags={[{ label: "クライアント：カレンダー", tone: "client" }, { label: "スタッフ：レッスン画面・Zoom", tone: "staff" }]}
+            />
+          </div>
+          <FeatureTagLegend />
+        </div>
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
           <PortalFeatureHeading title="クライアントに表示" helper="クライアント担当者が使う画面に表示する内容" />
           <div className="mt-3 space-y-3">
@@ -1896,13 +1975,6 @@ function PortalTab({
           <PortalFeatureHeading title={`${labels.workers}に表示`} helper={`担当${labels.workers}が使う画面に表示する内容`} />
           <div className="mt-3 space-y-3">
             <FeatureCheck checked={payoutsEnabled} onChange={setPayoutsEnabled} title="報酬記録" helper={`対象${labels.workers}の報酬画面に必要な報酬情報を表示する`} />
-            <FeatureCheck checked title="マニュアル" helper={`本部と担当${labels.workers}だけに常時表示し、クライアントには表示しない`} disabled />
-          </div>
-        </div>
-        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-          <PortalFeatureHeading title="共通・常時" helper="運営に必要なため両ポータルで常に使う内容" />
-          <div className="mt-3">
-            <FeatureCheck checked title="名簿・進捗" helper={`クライアントと担当${labels.workers}の名簿・進捗画面に常時表示する`} disabled />
           </div>
         </div>
         <div className="max-w-2xl">
@@ -2187,18 +2259,22 @@ function SaveButton({ saving, label }: { saving: boolean; label: string }) {
   );
 }
 
+type FeatureTag = { label: string; tone: "hq" | "client" | "staff" };
+
 function FeatureCheck({
   checked,
   onChange,
   title,
   helper,
-  disabled = false
+  disabled = false,
+  tags
 }: {
   checked: boolean;
   onChange?: (value: boolean) => void;
   title: string;
   helper: string;
   disabled?: boolean;
+  tags?: FeatureTag[];
 }) {
   return (
     <label className="flex items-start gap-3 rounded-xl border border-[var(--mikke-line)] p-3">
@@ -2212,8 +2288,43 @@ function FeatureCheck({
       <span>
         <span className="block text-sm font-bold">{title}</span>
         <span className="mt-0.5 block text-xs leading-5 font-semibold text-[var(--mikke-muted)]">{helper}</span>
+        {tags && tags.length > 0 ? <FeatureTags tags={tags} /> : null}
       </span>
     </label>
+  );
+}
+
+const featureTagToneClass: Record<FeatureTag["tone"], string> = {
+  hq: "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]",
+  client: "bg-[var(--mikke-pink)] text-[#1b1b1f]",
+  staff: "bg-[var(--mikke-green)] text-[#1b1b1f]"
+};
+
+function FeatureTags({ tags }: { tags: FeatureTag[] }) {
+  return (
+    <span className="mt-1.5 flex flex-wrap gap-1.5">
+      {tags.map((tag) => (
+        <span key={tag.label} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${featureTagToneClass[tag.tone]}`}>
+          {tag.label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+function FeatureTagLegend() {
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-2 text-[10px] font-bold text-[var(--mikke-muted)]">
+      <span className="flex items-center gap-1.5">
+        <span className="h-2.5 w-2.5 rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" />本部
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-[var(--mikke-pink)]" />クライアント
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="h-2.5 w-2.5 rounded-full bg-[var(--mikke-green)]" />スタッフ
+      </span>
+    </div>
   );
 }
 

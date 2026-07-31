@@ -73,6 +73,11 @@ import {
   type DeliveryProjectForm
 } from "@/lib/team-works-delivery-forms";
 import { formatDateKey } from "@/lib/team-works-operations";
+import {
+  DEFAULT_DELIVERY_FEATURE_SETTINGS,
+  updateProjectFeatureSettings,
+  type TeamWorksDeliveryFeatureSettings
+} from "@/lib/team-works-feature-settings";
 import { buildDeliveryCalendarItems, TeamWorksDeliveryCalendar } from "./TeamWorksDeliveryCalendar";
 import { TeamWorksDeliveryPortalProjectDetail } from "./TeamWorksDeliveryPortalProjectDetail";
 import { TeamWorksDeliveryDeliverableAdminPanel } from "./TeamWorksDeliveryDeliverableAdminPanel";
@@ -87,22 +92,32 @@ const taskStatuses = Object.keys(deliveryTaskStatusLabels) as DeliveryTaskStatus
 const ownerRoles = Object.keys(deliveryTaskOwnerRoleLabels) as DeliveryTaskOwnerRole[];
 const submissionTypes = Object.keys(deliveryTaskSubmissionTypeLabels) as DeliveryTaskSubmissionType[];
 
-type DeliveryProjectTab = "overview" | "tasks" | "materials" | "deliverables" | "members" | "messages" | "settings";
+type DeliveryProjectTab = "overview" | "tasks" | "materials" | "deliverables" | "members" | "messages" | "features" | "settings";
 
 // 2026-07-30再編(J-4): 「スケジュール」タブを廃止し、カレンダーは概要へ、
 // 納期設定・逆算配置は工程タブへ移した。旧 ?tab=schedule リンクはどのタブにも
 // 一致しないため自動的に概要へフォールバックする(下のuseStateの初期値判定)。
 // 「資料」タブ(J-5)・「メッセージ」タブ(K-1)を新設。
-function buildDeliveryTabs(): { id: DeliveryProjectTab; label: string }[] {
+// 「機能とポータルの設定」タブ(L-4)を新設。materials=falseで「資料」タブ、
+// messages=falseで「メッセージ」タブがそれぞれ消える。
+function buildDeliveryTabs(settings: TeamWorksDeliveryFeatureSettings): { id: DeliveryProjectTab; label: string }[] {
   return [
     { id: "overview", label: "概要" },
     { id: "tasks", label: "工程" },
-    { id: "materials", label: "資料" },
+    settings.materials ? { id: "materials" as const, label: "資料" } : null,
     { id: "deliverables", label: "成果物" },
     { id: "members", label: "メンバー" },
-    { id: "messages", label: "メッセージ" },
+    settings.messages ? { id: "messages" as const, label: "メッセージ" } : null,
+    { id: "features", label: "機能とポータルの設定" },
     { id: "settings", label: "プロジェクト設定" }
-  ];
+  ].filter((tab): tab is { id: DeliveryProjectTab; label: string } => tab !== null);
+}
+
+// タブ算出は初回レンダー(detail読み込み前)にも走るため、未読み込みの間は
+// 全機能ON扱いにしておく(読み込み後にnullチェックを通ってnavが実際に描画される
+// 頃にはdetailが入っているので、その時点で正しい設定に切り替わる)。
+function detailFeatureSettings(detail: DeliveryProjectDetail | null | undefined): TeamWorksDeliveryFeatureSettings {
+  return detail?.project.featureSettings ?? DEFAULT_DELIVERY_FEATURE_SETTINGS;
 }
 
 // Supabase接続版の納品型プロジェクト詳細。外枠(戻る矢印・タイトル・種別バッジ・
@@ -113,11 +128,11 @@ function buildDeliveryTabs(): { id: DeliveryProjectTab; label: string }[] {
 export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: string }) {
   const searchParams = useSearchParams();
   const requestedTab = searchParams.get("tab");
-  const tabs = buildDeliveryTabs();
+  const [detail, setDetail] = useState<DeliveryProjectDetail | null | undefined>(undefined);
+  const tabs = buildDeliveryTabs(detailFeatureSettings(detail));
   const [activeTab, setActiveTab] = useState<DeliveryProjectTab>(
     tabs.some((tab) => tab.id === requestedTab) ? (requestedTab as DeliveryProjectTab) : "overview"
   );
-  const [detail, setDetail] = useState<DeliveryProjectDetail | null | undefined>(undefined);
   const [myMembership, setMyMembership] = useState<DeliveryProjectMember | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -197,6 +212,7 @@ export function TeamWorksDeliveryProjectDetail({ projectId }: { projectId: strin
       {activeTab === "deliverables" ? <DeliverablesTab detail={detail} myMemberId={myMemberId} /> : null}
       {activeTab === "members" ? <MembersTab detail={detail} onReload={load} /> : null}
       {activeTab === "messages" ? <MessagesTab detail={detail} onReload={load} /> : null}
+      {activeTab === "features" ? <DeliveryFeatureSettingsTab detail={detail} onReload={load} /> : null}
       {activeTab === "settings" ? <SettingsTab detail={detail} onReload={load} /> : null}
     </div>
   );
@@ -809,6 +825,141 @@ function latestDeliveryConversationAt(detail: DeliveryProjectDetail, memberId: s
 function formatDeliveryDateTime(iso: string): string {
   const date = new Date(iso);
   return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+type DeliveryFeatureTag = { label: string; tone: "hq" | "client" | "staff" };
+
+const deliveryFeatureTagToneClass: Record<DeliveryFeatureTag["tone"], string> = {
+  hq: "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]",
+  client: "bg-[var(--mikke-pink)] text-[#1b1b1f]",
+  staff: "bg-[var(--mikke-green)] text-[#1b1b1f]"
+};
+
+function DeliveryFeatureCheck({
+  checked,
+  onChange,
+  title,
+  helper,
+  tags
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  title: string;
+  helper: string;
+  tags: DeliveryFeatureTag[];
+}) {
+  return (
+    <label className="flex items-start gap-3 rounded-xl border border-[var(--mikke-line)] p-3">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        className="mt-0.5 h-4 w-4 accent-[var(--mikke-primary)]"
+      />
+      <span>
+        <span className="block text-sm font-bold">{title}</span>
+        <span className="mt-0.5 block text-xs leading-5 font-semibold text-[var(--mikke-muted)]">{helper}</span>
+        <span className="mt-1.5 flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <span key={tag.label} className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${deliveryFeatureTagToneClass[tag.tone]}`}>
+              {tag.label}
+            </span>
+          ))}
+        </span>
+      </span>
+    </label>
+  );
+}
+
+// 機能とポータルの設定(L-4): 運営型と同じ考え方(feature_settings列を共用)。
+// 納品型には名簿・シフトが無いため項目は別立て(materials/forms/clientReview/messages)。
+// クライアントポータル全体のON/OFFは既存clientVisible列と意味が重複するため、
+// ここには含めずプロジェクト設定タブの既存チェックボックスに寄せている(§L-4の注記どおり)。
+function DeliveryFeatureSettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
+  const [settings, setSettings] = useState<TeamWorksDeliveryFeatureSettings>(detail.project.featureSettings);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+
+  function setFeature<K extends keyof TeamWorksDeliveryFeatureSettings>(key: K, value: boolean) {
+    setSettings((current) => ({ ...current, [key]: value }));
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      await updateProjectFeatureSettings(supabase, detail.project.id, settings);
+      setMessage("機能とポータルの設定を更新しました。");
+      await onReload();
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "保存できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <TabIntro icon={Settings2} title="機能とポータルの設定" description="このプロジェクトで使う機能をチェックリスト式で設定します。RLSによる認可はこの設定とは独立して常に適用されます。" />
+      <form onSubmit={submit} className="max-w-2xl space-y-4">
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+          <div className="space-y-3">
+            <DeliveryFeatureCheck
+              checked={settings.materials}
+              onChange={(value) => setFeature("materials", value)}
+              title="資料"
+              helper="成果物として提出する前の参考ファイル・URLの共有"
+              tags={[
+                { label: "本部：資料タブ", tone: "hq" },
+                { label: "スタッフ：資料の閲覧", tone: "staff" },
+                { label: "クライアント：公開した資料のみ", tone: "client" }
+              ]}
+            />
+            <DeliveryFeatureCheck
+              checked={settings.forms}
+              onChange={(value) => setFeature("forms", value)}
+              title="提出フォーム"
+              helper="工程の提出物をフォーム形式で作成・記入する機能"
+              tags={[{ label: "本部：フォーム作成・確認", tone: "hq" }, { label: "クライアント：記入・提出", tone: "client" }]}
+            />
+            <DeliveryFeatureCheck
+              checked={settings.clientReview}
+              onChange={(value) => setFeature("clientReview", value)}
+              title="クライアント確認"
+              helper="クライアントによる提出物の承認・差し戻し"
+              tags={[{ label: "クライアント：承認／差し戻し", tone: "client" }]}
+            />
+            <DeliveryFeatureCheck
+              checked={settings.messages}
+              onChange={(value) => setFeature("messages", value)}
+              title="メッセージ"
+              helper="本部・スタッフ・クライアント間のメッセージのやり取り"
+              tags={[{ label: "本部・スタッフ・クライアント", tone: "hq" }]}
+            />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-2 text-[10px] font-bold text-[var(--mikke-muted)]">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]" />本部
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--mikke-pink)]" />クライアント
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--mikke-green)]" />スタッフ
+            </span>
+          </div>
+        </div>
+        {error ? <p role="alert" className="rounded-lg border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{error}</p> : null}
+        {message ? <p className="text-xs font-bold text-[var(--tw-done)]">{message}</p> : null}
+        <button type="submit" disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:opacity-50">
+          <Save size={15} /> {saving ? "保存中…" : "保存"}
+        </button>
+      </form>
+    </div>
+  );
 }
 
 function SettingsTab({ detail, onReload }: { detail: DeliveryProjectDetail; onReload: () => Promise<void> }) {
