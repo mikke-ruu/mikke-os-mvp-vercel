@@ -8,6 +8,7 @@ import { ClientMonthCalendar } from "@/components/team-works/operations/ClientMo
 import { TeamWorksClientProjectsShell } from "@/components/team-works/client-projects/TeamWorksClientProjectsShell";
 import { TeamWorksClientSelfProfile } from "@/components/team-works/operations/TeamWorksDirectorySelfProfile";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
+import type { TeamWorksLabels } from "@/lib/team-works-labels";
 import { supabase } from "@/lib/supabase/client";
 import {
   approveOperationsClientProject,
@@ -28,10 +29,13 @@ type MutationNotice = { tone: "success" | "error"; text: string };
 
 // 機能とポータルの設定(Phase L)に連動: lessons=falseでカレンダータブ、
 // roster=falseで名簿タブを非表示にする。メッセージは常時表示。
-function projectTabsFor(project: OperationsClientPortalData["projects"][number]): { id: ProjectTab; label: string }[] {
+function projectTabsFor(
+  project: OperationsClientPortalData["projects"][number],
+  labels: TeamWorksLabels
+): { id: ProjectTab; label: string }[] {
   return [
     project.featureSettings.lessons ? { id: "calendar" as const, label: "カレンダー" } : null,
-    project.featureSettings.roster ? { id: "roster" as const, label: "名簿" } : null,
+    project.featureSettings.roster ? { id: "roster" as const, label: labels.rosterNoun } : null,
     { id: "messages" as const, label: "メッセージ" }
   ].filter((tab): tab is { id: ProjectTab; label: string } => tab !== null);
 }
@@ -42,6 +46,7 @@ function todayKey(): string {
 }
 
 export function TeamWorksOperationsClientPortal() {
+  const labels = useTeamWorksLabels();
   const [data, setData] = useState<OperationsClientPortalData | null>(null);
   const [pending, setPending] = useState<OperationsClientPendingProject[]>([]);
   const [activeView, setActiveView] = useState<string>("home");
@@ -102,7 +107,7 @@ export function TeamWorksOperationsClientPortal() {
   const showOrgLabel = Boolean(data && new Set(data.projects.map((project) => project.organizationId)).size > 1);
 
   return (
-    <TeamWorksClientProjectsShell title="クライアントポータル" subtitle="総合ホームと各校のカレンダー・名簿・メッセージを確認・更新できます。" displayName={data?.memberName}>
+    <TeamWorksClientProjectsShell title={`${labels.clientNoun}ポータル`} subtitle={`総合ホームと各プロジェクトのカレンダー・${labels.rosterNoun}・メッセージを確認・更新できます。`} displayName={data?.memberName}>
       {notice ? <p className="mb-4 rounded-xl bg-[var(--mikke-primary-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]">{notice}</p> : null}
       {error ? <div className="mb-4"><MikkeEmptyState title="操作できませんでした" helper={error} /></div> : null}
       {pending.length > 0 ? <PendingApprovals pending={pending} approvingId={approvingId} onApprove={approve} /> : null}
@@ -260,6 +265,7 @@ function HomeView({
   onSelectDate: (dateKey: string) => void;
   onGoToProjectTab: (projectId: string, tab: ProjectTab, dateKey?: string) => void;
 }) {
+  const labels = useTeamWorksLabels();
   const today = todayKey();
   const daySessions = data.sessions.filter((session) => session.sessionDate === selectedDate && session.status !== "cancelled");
   const todaySessions = data.sessions.filter((session) => session.sessionDate === today && session.status !== "cancelled");
@@ -272,7 +278,7 @@ function HomeView({
   return (
     <div className="space-y-7">
       <MikkeSection title="総合カレンダー" tone="editorial">
-        <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">日付を選ぶと、下にその日の全校の予定を表示します。予定を押すと、その校のカレンダーで出席編集ができます。</p>
+        <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">{`日付を選ぶと、下にその日の全プロジェクトの予定を表示します。予定を押すと、そのカレンダーで${labels.attendanceNoun}編集ができます。`}</p>
         <ClientMonthCalendar sessions={data.sessions} holidays={data.holidays} selectedDate={selectedDate} onSelectDate={onSelectDate} />
         <div className="mt-4 space-y-2">
           {daySessions.length ? daySessions.map((session) => (
@@ -284,7 +290,7 @@ function HomeView({
             >
               <p className="text-xs font-bold text-[var(--mikke-primary)]">{session.projectTitle}</p>
               <p className="mt-1 text-sm font-extrabold">{session.startTime}〜{endTime(session.startTime, session.durationMin)} · 担当 {session.partnerName ?? "担当未定"}</p>
-              <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">出席者 {session.roster.length}名</p>
+              <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{labels.attendanceNoun} {session.roster.length}名</p>
             </button>
           )) : <MikkeEmptyState title="この日の予定はありません" />}
         </div>
@@ -313,7 +319,7 @@ function HomeView({
           icon={<CalendarDays size={18} />}
           onClick={nextSession ? () => onGoToProjectTab(nextSession.projectId, "calendar", nextSession.sessionDate) : undefined}
         />
-        <HomeAction title="未確定の出席" detail={`${unresolvedRosterCount}件`} icon={<UsersRound size={18} />} />
+        <HomeAction title={`未確定の${labels.attendanceNoun}`} detail={`${unresolvedRosterCount}件`} icon={<UsersRound size={18} />} />
         <HomeAction
           title="メッセージ"
           detail={unreadLikeCount ? `${unreadLikeCount}件のメッセージ` : "新着メッセージはありません"}
@@ -358,8 +364,9 @@ function ProjectView({
   onSelectDate: (dateKey: string) => void;
   mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice>;
 }) {
+  const labels = useTeamWorksLabels();
   const project = data.projects.find((item) => item.id === projectId);
-  const tabs = project ? projectTabsFor(project) : [];
+  const tabs = project ? projectTabsFor(project, labels) : [];
   useEffect(() => {
     if (project && tabs.length && !tabs.some((tab) => tab.id === projectTab)) {
       onProjectTabChange(tabs[0].id);
@@ -408,6 +415,7 @@ function ProjectCalendarTab({
   onSelectDate: (dateKey: string) => void;
   mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice>;
 }) {
+  const labels = useTeamWorksLabels();
   const projectSessions = data.sessions.filter((session) => session.projectId === project.id);
   const projectHolidays = data.holidays.filter((holiday) => holiday.projectId === project.id || (holiday.projectId === null && holiday.organizationId === project.organizationId));
   const daySessions = projectSessions.filter((session) => session.sessionDate === selectedDate && session.status !== "cancelled");
@@ -418,7 +426,7 @@ function ProjectCalendarTab({
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.9fr)]">
       <MikkeSection title="カレンダー" tone="editorial">
-        <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">日付を選ぶと、右側で予定の詳細と出席順を確認・編集できます。</p>
+        <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">{`日付を選ぶと、右側で予定の詳細と${labels.attendanceNoun}順を確認・編集できます。`}</p>
         <ClientMonthCalendar sessions={projectSessions} holidays={projectHolidays} selectedDate={selectedDate} onSelectDate={onSelectDate} />
       </MikkeSection>
       <MikkeSection title={`${formatDate(selectedDate)} の予定`} tone="editorial">
@@ -530,14 +538,14 @@ function RosterEditor({
   return (
     <div className="rounded-2xl border border-[#f9d3d2] bg-white p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-bold text-[var(--mikke-muted)]">出席順を確定</p>
+        <p className="text-xs font-bold text-[var(--mikke-muted)]">{labels.attendanceNoun}順を確定</p>
         <p className="rounded-full bg-[#ffd370]/25 px-2.5 py-1 text-[11px] font-bold">選択済み {selectedIds.length}名</p>
       </div>
       <div className="mb-4 rounded-2xl border border-[#ffd370] bg-[#ffd370]/15 p-3">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <p className="text-xs font-extrabold">今回の出席順</p>
-            <p className="mt-0.5 text-[10px] font-semibold text-[var(--mikke-muted)]">クラス名簿で選んだ順に追加されます。ここで名前ごと上下に移動できます。</p>
+            <p className="text-xs font-extrabold">今回の{labels.attendanceNoun}順</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-[var(--mikke-muted)]">{`${labels.rosterNoun}で選んだ順に追加されます。ここで名前ごと上下に移動できます。`}</p>
           </div>
         </div>
         {selectedParticipants.length ? (
@@ -555,11 +563,11 @@ function RosterEditor({
             ))}
           </ol>
         ) : (
-          <p className="rounded-xl border border-dashed border-[#ffd370] bg-white px-3 py-3 text-center text-xs font-bold text-[var(--mikke-muted)]">下のクラス名簿から、出席する人を順番に選んでください。</p>
+          <p className="rounded-xl border border-dashed border-[#ffd370] bg-white px-3 py-3 text-center text-xs font-bold text-[var(--mikke-muted)]">{`下の${labels.rosterNoun}から、${labels.attendanceNoun}する${labels.participantNoun}を順番に選んでください。`}</p>
         )}
       </div>
-      <p className="mb-2 text-xs font-extrabold text-[var(--mikke-primary)]">クラス名簿</p>
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="名簿をグループで絞り込み">
+      <p className="mb-2 text-xs font-extrabold text-[var(--mikke-primary)]">{labels.rosterNoun}</p>
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label={`${labels.rosterNoun}を${labels.groupNoun}で絞り込み`}>
         <button type="button" onClick={() => setGroupFilter("all")} className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold ${groupFilter === "all" ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>すべて（{participants.length}）</button>
         {groups.map((group, index) => {
           const count = participants.filter((participant) => participant.groupId === group.id).length;
@@ -577,8 +585,8 @@ function RosterEditor({
             </label>
           );
         })}
-        {!participants.length ? <MikkeEmptyState title="名簿はまだありません" helper="名簿タブから対象者を登録してください。" /> : null}
-        {participants.length && !visibleParticipants.length ? <MikkeEmptyState title="このグループにはまだ登録がありません" /> : null}
+        {!participants.length ? <MikkeEmptyState title={`${labels.rosterNoun}はまだありません`} helper={`${labels.rosterNoun}タブから${labels.participantNoun}を登録してください。`} /> : null}
+        {participants.length && !visibleParticipants.length ? <MikkeEmptyState title={`この${labels.groupNoun}にはまだ登録がありません`} /> : null}
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => void mutate(() => saveOperationsClientSessionRoster(supabase, { projectId: session.projectId, sessionId: session.id, participantIds: selectedIds }), `出席順を確定しました。本部と担当${labels.workers}に共有されます。`).then(setSaveNotice)} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">出席順を保存</button>
@@ -589,6 +597,7 @@ function RosterEditor({
 }
 
 function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPortalData; project: OperationsClientPortalData["projects"][number]; mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice> }) {
+  const labels = useTeamWorksLabels();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [level, setLevel] = useState("");
@@ -612,7 +621,7 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
     event.preventDefault();
     const result = await mutate(
       () => saveOperationsClientParticipant(supabase, { projectId: project.id, participantId: editingId ?? undefined, name, level, groupId: groupId || null }),
-      editingId ? "名簿を更新しました。" : "対象者を登録しました。"
+      editingId ? `${labels.rosterNoun}を更新しました。` : `${labels.participantNoun}を登録しました。`
     );
     setParticipantNotice(result);
     if (result.tone === "error") return;
@@ -623,7 +632,7 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
     event.preventDefault();
     const result = await mutate(
       () => saveOperationsClientGroup(supabase, { projectId: project.id, groupId: editingGroupId ?? undefined, name: groupName }),
-      editingGroupId ? "グループ名を更新しました。" : "グループを追加しました。"
+      editingGroupId ? `${labels.groupNoun}名を更新しました。` : `${labels.groupNoun}を追加しました。`
     );
     setGroupNotice(result);
     if (result.tone === "error") return;
@@ -633,11 +642,11 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
 
   return (
     <div className="space-y-5">
-      <MikkeSection title="グループ" tone="editorial">
-        <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">クライアント側でクラスや曜日などのグループを作成・変更します。</p>
+      <MikkeSection title={labels.groupNoun} tone="editorial">
+        <p className="-mt-2 mb-3 text-xs font-semibold text-[var(--mikke-muted)]">{`${labels.clientNoun}側でクラスや曜日などの${labels.groupNoun}を作成・変更します。`}</p>
         <form onSubmit={submitGroup} className="flex flex-col gap-2 rounded-2xl border border-[#ffd370] bg-[#ffd370]/15 p-4 sm:flex-row">
-          <input value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder="グループ名" required className="min-w-0 flex-1 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
-          <button className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">{editingGroupId ? "名前を更新" : "グループ追加"}</button>
+          <input value={groupName} onChange={(event) => setGroupName(event.target.value)} placeholder={`${labels.groupNoun}名`} required className="min-w-0 flex-1 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
+          <button className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">{editingGroupId ? "名前を更新" : `${labels.groupNoun}追加`}</button>
           {editingGroupId ? <button type="button" onClick={() => { setEditingGroupId(null); setGroupName(""); }} className="rounded-xl border border-[var(--mikke-line)] px-4 py-2.5 text-sm font-bold">取消</button> : null}
           <InlineMutationNotice notice={groupNotice} />
         </form>
@@ -646,19 +655,19 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
             const tones = ["bg-[#f75a3b]/12", "bg-[#f9d3d2]/45", "bg-[#ffd370]/30", "bg-[#8bc7ad]/30"];
             return <button key={group.id} type="button" onClick={() => { setEditingGroupId(group.id); setGroupName(group.name); }} className={`rounded-full px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)] ${tones[index % tones.length]}`}>{group.name}・編集</button>;
           })}
-          {!groups.length ? <p className="text-xs font-semibold text-[var(--mikke-muted)]">グループはまだありません。</p> : null}
+          {!groups.length ? <p className="text-xs font-semibold text-[var(--mikke-muted)]">{labels.groupNoun}はまだありません。</p> : null}
         </div>
       </MikkeSection>
 
-      <MikkeSection title="名簿" tone="editorial">
+      <MikkeSection title={labels.rosterNoun} tone="editorial">
         <form onSubmit={submit} className="grid gap-3 rounded-2xl border border-[#f9d3d2] bg-[#f9d3d2]/15 p-4 sm:grid-cols-2">
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="対象者名" required className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
           <input value={level} onChange={(event) => setLevel(event.target.value)} placeholder="補足（任意）" className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm" />
-          <select value={groupId} onChange={(event) => setGroupId(event.target.value)} className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm"><option value="">グループ未設定</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select>
-          <div className="flex flex-wrap items-center gap-2"><button className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">{editingId ? "名簿を更新" : <span className="inline-flex items-center gap-1"><Plus size={15} />名簿に登録</span>}</button><InlineMutationNotice notice={participantNotice} /></div>
+          <select value={groupId} onChange={(event) => setGroupId(event.target.value)} className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm"><option value="">{labels.groupNoun}未設定</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select>
+          <div className="flex flex-wrap items-center gap-2"><button className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white">{editingId ? `${labels.rosterNoun}を更新` : <span className="inline-flex items-center gap-1"><Plus size={15} />{labels.rosterNoun}に登録</span>}</button><InlineMutationNotice notice={participantNotice} /></div>
         </form>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">{participants.map((participant) => <button key={participant.id} type="button" onClick={() => edit(participant)} className="rounded-xl border border-[var(--mikke-line)] bg-white p-3 text-left"><p className="font-extrabold">{participant.name}</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{participant.groupId ? groupNameById.get(participant.groupId) ?? "グループ" : "グループ未設定"}{participant.level ? ` ／ ${participant.level}` : ""}</p></button>)}</div>
-        {!participants.length ? <MikkeEmptyState title="名簿はまだありません" helper="上のフォームから対象者を登録してください。" /> : null}
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">{participants.map((participant) => <button key={participant.id} type="button" onClick={() => edit(participant)} className="rounded-xl border border-[var(--mikke-line)] bg-white p-3 text-left"><p className="font-extrabold">{participant.name}</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{participant.groupId ? groupNameById.get(participant.groupId) ?? labels.groupNoun : `${labels.groupNoun}未設定`}{participant.level ? ` ／ ${participant.level}` : ""}</p></button>)}</div>
+        {!participants.length ? <MikkeEmptyState title={`${labels.rosterNoun}はまだありません`} helper={`上のフォームから${labels.participantNoun}を登録してください。`} /> : null}
       </MikkeSection>
     </div>
   );

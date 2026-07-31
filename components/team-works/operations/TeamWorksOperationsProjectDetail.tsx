@@ -108,9 +108,9 @@ function buildTabs(labels: TeamWorksLabels, settings: TeamWorksOperationsFeature
     { id: "schedule", label: "スケジュール" },
     { id: "messages", label: "メッセージ" },
     { id: "partners", label: labels.workers },
-    settings.roster ? { id: "roster" as const, label: "名簿" } : null,
-    settings.reports ? { id: "reports" as const, label: "報告" } : null,
-    settings.manuals ? { id: "manuals" as const, label: "マニュアル" } : null,
+    settings.roster ? { id: "roster" as const, label: labels.rosterNoun } : null,
+    settings.reports ? { id: "reports" as const, label: labels.reportNoun } : null,
+    settings.manuals ? { id: "manuals" as const, label: labels.manualNoun } : null,
     { id: "portal", label: "機能とポータルの設定" },
     { id: "settings", label: "プロジェクト設定" }
   ].filter((tab): tab is { id: ProjectTab; label: string } => tab !== null);
@@ -858,6 +858,7 @@ function RosterTab({
   saving: boolean;
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
+  const labels = useTeamWorksLabels();
   const [participantName, setParticipantName] = useState("");
   const [groupId, setGroupId] = useState("");
   const [level, setLevel] = useState("");
@@ -878,7 +879,7 @@ function RosterTab({
           level,
           cautions
         }),
-      "名簿に追加しました。"
+      `${labels.rosterNoun}に追加しました。`
     );
     setParticipantName("");
     setLevel("");
@@ -887,14 +888,14 @@ function RosterTab({
 
   return (
     <div className="space-y-5">
-      <TabIntro icon={Users} title="名簿" description="紙の名簿から対象者を追加し、グループと進捗を確認します。グループの作成・編集はクライアントポータルで行います。" />
+      <TabIntro icon={Users} title={labels.rosterNoun} description={`${labels.participantNoun}を追加し、${labels.groupNoun}と進捗を確認します。${labels.groupNoun}の作成・編集は${labels.clientNoun}ポータルで行います。`} />
       {nextSession && data.project.featureSettings.attendance ? (
         <MikkeSection title="Next roster" tone="editorial">
           <p className="mb-3 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">
             {formatDate(nextSession.sessionDate)} {nextSession.startTime} · {nextSession.partnerName ?? "担当未定"}
           </p>
           {nextSession.roster.length === 0 ? (
-            <MikkeEmptyState title="このコマの名簿はまだありません" helper="出席順①②③は、コマ編集機能で設定予定です。" />
+            <MikkeEmptyState title={`このコマの${labels.rosterNoun}はまだありません`} helper={`${labels.attendanceNoun}順①②③は、コマ編集機能で設定予定です。`} />
           ) : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {nextSession.roster.map((entry) => (
@@ -919,7 +920,7 @@ function RosterTab({
             ))}
           </div>
           {data.participants.length === 0 ? (
-            <MikkeEmptyState title="名簿はまだ空です" />
+            <MikkeEmptyState title={`${labels.rosterNoun}はまだ空です`} />
           ) : (
             <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
               {data.participants.map((participant) => (
@@ -930,7 +931,7 @@ function RosterTab({
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-bold">{participant.name}</span>
                     <span className="block text-xs font-semibold text-[var(--mikke-muted)]">
-                      {participant.groupId ? groupNameById.get(participant.groupId) ?? "グループ" : "グループ未設定"}
+                      {participant.groupId ? groupNameById.get(participant.groupId) ?? labels.groupNoun : `${labels.groupNoun}未設定`}
                       {participant.level ? ` ／ ${participant.level}` : ""}
                     </span>
                     {participant.cautions ? (
@@ -968,12 +969,12 @@ function RosterTab({
         <div className="space-y-4">
           <form onSubmit={submitParticipant} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
             <h3 className="flex items-center gap-2 text-sm font-extrabold">
-              <Plus size={16} className="text-[var(--mikke-primary)]" /> 名簿に追加
+              <Plus size={16} className="text-[var(--mikke-primary)]" /> {labels.rosterNoun}に追加
             </h3>
             <TeamWorksProjectField label="名前" required className="mt-3">
               <input value={participantName} onChange={(event) => setParticipantName(event.target.value)} className={teamWorksProjectInputClass} />
             </TeamWorksProjectField>
-            <TeamWorksProjectField label="グループ" className="mt-3">
+            <TeamWorksProjectField label={labels.groupNoun} className="mt-3">
               <select value={groupId} onChange={(event) => setGroupId(event.target.value)} className={teamWorksProjectInputClass}>
                 <option value="">未設定</option>
                 {data.groups.map((group) => (
@@ -987,7 +988,7 @@ function RosterTab({
             <TeamWorksProjectField label="注意事項" className="mt-3">
               <textarea value={cautions} onChange={(event) => setCautions(event.target.value)} rows={2} className={teamWorksProjectInputClass} />
             </TeamWorksProjectField>
-            <SaveButton saving={saving} label="名簿に追加" />
+            <SaveButton saving={saving} label={`${labels.rosterNoun}に追加`} />
           </form>
         </div>
       </div>
@@ -1409,12 +1410,12 @@ function ManualsTab({
           expressions: editingManual.expressions.filter((value): value is string => typeof value === "string"),
           cautions: editingManual.cautions ?? ""
         }),
-        "マニュアルを更新しました。"
+        `${labels.manualNoun}を更新しました。`
       );
     } else {
       await mutate(
         () => createOperationsManual(supabase, data.project.id, { no: manualNo, title, body, materialUrl }),
-        "マニュアルを追加しました。"
+        `${labels.manualNoun}を追加しました。`
       );
     }
     edit();
@@ -1422,11 +1423,11 @@ function ManualsTab({
 
   return (
     <div className="space-y-5">
-      <TabIntro icon={BookOpen} title="マニュアル" description="共通雛形から複製した内容を、このプロジェクト専用に育てます。" />
+      <TabIntro icon={BookOpen} title={labels.manualNoun} description="共通雛形から複製した内容を、このプロジェクト専用に育てます。" />
       <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr]">
         <MikkeSection title="Manuals" tone="editorial">
           {data.manuals.length === 0 ? (
-            <MikkeEmptyState title="マニュアルはまだありません" />
+            <MikkeEmptyState title={`${labels.manualNoun}はまだありません`} />
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
               {data.manuals.map((manual) => (
@@ -1446,7 +1447,7 @@ function ManualsTab({
         </MikkeSection>
         <form onSubmit={submit} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
           <h3 className="flex items-center gap-2 text-sm font-extrabold">
-            <Plus size={16} className="text-[var(--mikke-primary)]" /> {editingId ? "マニュアル編集" : "マニュアル追加"}
+            <Plus size={16} className="text-[var(--mikke-primary)]" /> {editingId ? `${labels.manualNoun}編集` : `${labels.manualNoun}追加`}
           </h3>
           <TeamWorksProjectField label="番号" required className="mt-3">
             <input type="number" min={1} value={manualNo} disabled={Boolean(editingId)} onChange={(event) => setManualNo(Number(event.target.value))} className={teamWorksProjectInputClass} />
@@ -1460,7 +1461,7 @@ function ManualsTab({
           <TeamWorksProjectField label="教材リンク" helper="任意。ファイル教材はprivate storage対応時に追加します。" className="mt-3">
             <input type="url" value={materialUrl} onChange={(event) => setMaterialUrl(event.target.value)} className={teamWorksProjectInputClass} />
           </TeamWorksProjectField>
-          <SaveButton saving={saving} label={editingId ? "マニュアルを更新" : "マニュアルを追加"} />
+          <SaveButton saving={saving} label={editingId ? `${labels.manualNoun}を更新` : `${labels.manualNoun}を追加`} />
           {editingId ? <button type="button" onClick={() => edit()} className="mt-2 w-full rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold">編集を取り消す</button> : null}
         </form>
       </div>
@@ -1472,9 +1473,9 @@ function ReportsTab({ data }: { data: OperationsProjectDetailData }) {
   const labels = useTeamWorksLabels();
   return (
     <div className="space-y-5">
-      <TabIntro icon={FileCheck2} title="報告" description="既存のフォーム提出を、運営型プロジェクトの報告としてまとめて表示します。" />
+      <TabIntro icon={FileCheck2} title={labels.reportNoun} description={`既存のフォーム提出を、運営型プロジェクトの${labels.reportNoun}としてまとめて表示します。`} />
       {data.reports.length === 0 ? (
-        <MikkeEmptyState title="報告はまだありません" helper={`R4の${labels.workers}ポータルから授業・業務報告を提出すると、ここに表示されます。`} />
+        <MikkeEmptyState title={`${labels.reportNoun}はまだありません`} helper={`R4の${labels.workers}ポータルから授業・業務報告を提出すると、ここに表示されます。`} />
       ) : (
         <div className="divide-y divide-[var(--mikke-line)] overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
           {data.reports.map((report) => (
@@ -1891,7 +1892,15 @@ function PortalTab({
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
   const labels = useTeamWorksLabels();
-  const [clientVisible, setClientVisible] = useState(data.project.clientVisible);
+  // O-1(2026-08-01): 「クライアントポータル全体」のチェックは運営型の画面から外した。
+  // 実体のclient_visible列を読んでいるのは納品型のタスク・成果物のRLSだけで、運営型の
+  // クライアントポータルは読み込み側(buildClientPortalData)もop_sessionsのRLSも
+  // この列を参照していない=OFFにしても何も起きず混乱するため(あゆみ指摘)。
+  // 列は納品型が使っているので消さず、ここでは読み込んだ値をそのまま保存し直して
+  // 現状を維持する。将来プロジェクト単位の非公開を運営型でも効かせたくなったら、
+  // 既存行が全てfalseなので「既存の運営型プロジェクトを一括trueにするmigration」と
+  // セットでRLS込みの再設計が要る(でないとアリサのポータルが全部消える)。
+  const clientVisible = data.project.clientVisible;
   const [payoutsEnabled, setPayoutsEnabled] = useState(data.project.payoutsEnabled);
   const [invoicesEnabled, setInvoicesEnabled] = useState(data.project.invoicesEnabled);
   const [clientPartnerContactVisible, setClientPartnerContactVisible] = useState(data.project.clientPartnerContactVisible);
@@ -1942,25 +1951,25 @@ function PortalTab({
       <TabIntro icon={Settings2} title="機能とポータルの設定" description="このプロジェクトで使う機能をチェックリスト式で設定します。RLSによる認可はこの設定とは独立して常に適用されます。" />
       <form onSubmit={submit} className="max-w-3xl space-y-4">
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-          <PortalFeatureHeading title="この事業で使う機能" helper="使わない機能はOFFにできます。名簿をOFFにすると出席も自動でOFFになります" />
+          <PortalFeatureHeading title="この事業で使う機能" helper={`使わない機能はOFFにできます。${labels.rosterNoun}をOFFにすると${labels.attendanceNoun}も自動でOFFになります`} />
           <div className="mt-3 space-y-3">
             <FeatureCheck
               checked={featureSettings.roster}
               onChange={(value) => setFeature("roster", value)}
-              title="名簿"
-              helper="生徒・参加者の一覧とグループ分け。名簿を使わない業種はOFFにできます"
-              tags={[{ label: "本部：名簿タブ", tone: "hq" }, { label: "クライアント：名簿タブ", tone: "client" }]}
+              title={labels.rosterNoun}
+              helper={`${labels.participantNoun}の一覧と${labels.groupNoun}分け。${labels.rosterNoun}を使わない業種はOFFにできます`}
+              tags={[{ label: `本部：${labels.rosterNoun}タブ`, tone: "hq" }, { label: `${labels.clientNoun}：${labels.rosterNoun}タブ`, tone: "client" }]}
             />
             <FeatureCheck
               checked={featureSettings.attendance}
               onChange={(value) => setFeature("attendance", value)}
               disabled={!featureSettings.roster}
-              title="出席"
-              helper="コマごとの出席記録。名簿がOFFのときは自動的にOFFになります"
+              title={labels.attendanceNoun}
+              helper={`コマごとの${labels.attendanceNoun}記録。${labels.rosterNoun}がOFFのときは自動的にOFFになります`}
               tags={[
-                { label: "本部：コマの出席欄", tone: "hq" },
-                { label: "クライアント：出席順の確定", tone: "client" },
-                { label: "スタッフ：レッスン中の名簿", tone: "staff" }
+                { label: `本部：コマの${labels.attendanceNoun}欄`, tone: "hq" },
+                { label: `${labels.clientNoun}：${labels.attendanceNoun}順の確定`, tone: "client" },
+                { label: `スタッフ：${labels.sessionNoun}中の${labels.rosterNoun}`, tone: "staff" }
               ]}
             />
             <FeatureCheck
@@ -1973,23 +1982,23 @@ function PortalTab({
             <FeatureCheck
               checked={featureSettings.reports}
               onChange={(value) => setFeature("reports", value)}
-              title="報告"
-              helper="案件についての報告フォームの提出・確認"
-              tags={[{ label: "本部：報告タブ", tone: "hq" }, { label: "スタッフ：報告の提出", tone: "staff" }]}
+              title={labels.reportNoun}
+              helper={`案件についての${labels.reportNoun}フォームの提出・確認`}
+              tags={[{ label: `本部：${labels.reportNoun}タブ`, tone: "hq" }, { label: `スタッフ：${labels.reportNoun}の提出`, tone: "staff" }]}
             />
             <FeatureCheck
               checked={featureSettings.manuals}
               onChange={(value) => setFeature("manuals", value)}
-              title="マニュアル"
-              helper="工程やレッスンの手順書。クライアントには表示されません"
-              tags={[{ label: "本部：マニュアルタブ", tone: "hq" }, { label: "スタッフ：マニュアル閲覧", tone: "staff" }]}
+              title={labels.manualNoun}
+              helper={`工程や${labels.sessionNoun}の手順書。${labels.clientNoun}には表示されません`}
+              tags={[{ label: `本部：${labels.manualNoun}タブ`, tone: "hq" }, { label: `スタッフ：${labels.manualNoun}閲覧`, tone: "staff" }]}
             />
             <FeatureCheck
               checked={featureSettings.lessons}
               onChange={(value) => setFeature("lessons", value)}
-              title="クライアントのカレンダー"
-              helper={`クライアントポータルのカレンダー表示（本部・${labels.workers}のスケジュールは常に表示されます）`}
-              tags={[{ label: "クライアント：カレンダー", tone: "client" }]}
+              title={`${labels.clientNoun}のカレンダー`}
+              helper={`${labels.clientNoun}ポータルのカレンダー表示（本部・${labels.workers}のスケジュールは常に表示されます）`}
+              tags={[{ label: `${labels.clientNoun}：カレンダー`, tone: "client" }]}
             />
           </div>
           <FeatureTagLegend />
@@ -2011,7 +2020,7 @@ function PortalTab({
               checked={featureSettings.workWindow.presence}
               onChange={(value) => setWorkWindow("presence", value)}
               title="開始・終了ボタン"
-              helper="本部へ開始・終了を通知するボタン（スタンバイ・レッスン開始・終了）"
+              helper={`本部へ開始・終了を通知するボタン（${labels.startAction}・${labels.endAction}）`}
               tags={[{ label: `スタッフ：作業窓`, tone: "staff" }]}
             />
             <FeatureCheck
@@ -2025,26 +2034,25 @@ function PortalTab({
               checked={featureSettings.workWindow.roster}
               onChange={(value) => setWorkWindow("roster", value)}
               disabled={!featureSettings.attendance}
-              title="クライアントタスク（名簿・生徒送り）"
-              helper="出席順に沿って生徒を送りながら記録する機能。出席がOFFのときは自動的にOFFになります"
+              title={`${labels.clientNoun}タスク（${labels.rosterNoun}・${labels.participantNoun}送り）`}
+              helper={`${labels.attendanceNoun}順に沿って${labels.participantNoun}を送りながら記録する機能。${labels.attendanceNoun}がOFFのときは自動的にOFFになります`}
               tags={[{ label: `スタッフ：作業窓`, tone: "staff" }]}
             />
             <FeatureCheck
               checked={featureSettings.workWindow.manualLink}
               onChange={(value) => setWorkWindow("manualLink", value)}
               disabled={!featureSettings.manuals}
-              title="マニュアル連動"
-              helper="名簿の生徒に合わせて進捗マニュアルを表示。マニュアルがOFFのときは自動的にOFFになります"
+              title={`${labels.manualNoun}連動`}
+              helper={`${labels.rosterNoun}の${labels.participantNoun}に合わせて進捗${labels.manualNoun}を表示。${labels.manualNoun}がOFFのときは自動的にOFFになります`}
               tags={[{ label: `スタッフ：作業窓`, tone: "staff" }]}
             />
           </div>
         </div>
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-          <PortalFeatureHeading title="クライアントに表示" helper="クライアント担当者が使う画面に表示する内容" />
+          <PortalFeatureHeading title={`${labels.clientNoun}に表示`} helper={`${labels.clientNoun}担当者が使う画面に表示する内容`} />
           <div className="mt-3 space-y-3">
-            <FeatureCheck checked={clientVisible} onChange={setClientVisible} title="クライアントポータル全体" helper="自プロジェクトのスケジュール・提出物・メッセージを表示する" />
             <FeatureCheck checked={clientPartnerContactVisible} onChange={setClientPartnerContactVisible} title={`担当${labels.workers}連絡先`} helper={`連絡先とメッセージに担当${labels.workers}を表示する。オフの場合は本部窓口のみ`} />
-            <FeatureCheck checked={invoicesEnabled} onChange={setInvoicesEnabled} title="請求記録" helper="クライアントの請求先画面に必要な請求情報を表示する" />
+            <FeatureCheck checked={invoicesEnabled} onChange={setInvoicesEnabled} title="請求記録" helper={`${labels.clientNoun}の請求先画面に必要な請求情報を表示する`} />
           </div>
         </div>
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">

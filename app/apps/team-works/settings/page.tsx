@@ -55,7 +55,14 @@ function TeamWorksSettingsContent() {
     holidayLabel: DEFAULT_LABELS.holidayLabel,
     sessionNoun: DEFAULT_LABELS.sessionNoun,
     startAction: DEFAULT_LABELS.startAction,
-    endAction: DEFAULT_LABELS.endAction
+    endAction: DEFAULT_LABELS.endAction,
+    rosterNoun: DEFAULT_LABELS.rosterNoun,
+    participantNoun: DEFAULT_LABELS.participantNoun,
+    groupNoun: DEFAULT_LABELS.groupNoun,
+    attendanceNoun: DEFAULT_LABELS.attendanceNoun,
+    clientNoun: DEFAULT_LABELS.clientNoun,
+    manualNoun: DEFAULT_LABELS.manualNoun,
+    reportNoun: DEFAULT_LABELS.reportNoun
   });
   const [savingLabels, setSavingLabels] = useState(false);
   const [labelsNotice, setLabelsNotice] = useState("");
@@ -98,13 +105,9 @@ function TeamWorksSettingsContent() {
           loadTeamWorksLabels(supabase, organizationProfile.id),
           loadOrganizationOperationSettings(supabase, organizationProfile.id)
         ]);
-        setLabelForm({
-          workers: orgLabels.workers,
-          holidayLabel: orgLabels.holidayLabel,
-          sessionNoun: orgLabels.sessionNoun,
-          startAction: orgLabels.startAction,
-          endAction: orgLabels.endAction
-        });
+        // orgLabelsはresolve済みの完全なTeamWorksLabelsなのでそのまま入れる
+        // (キーを増やすたびにここを書き足す手間と、書き忘れの事故を避ける)。
+        setLabelForm(orgLabels);
         setOperationForm({
           closedWeekdays: orgOperationSettings.closedWeekdays,
           closeOnNationalHolidays: orgOperationSettings.closeOnNationalHolidays
@@ -156,13 +159,17 @@ function TeamWorksSettingsContent() {
     setError("");
     setLabelsNotice("");
     try {
-      await updateTeamWorksLabels(supabase, organization.id, {
-        workers: labelForm.workers.trim() || DEFAULT_LABELS.workers,
-        holidayLabel: labelForm.holidayLabel.trim() || DEFAULT_LABELS.holidayLabel,
-        sessionNoun: labelForm.sessionNoun.trim() || DEFAULT_LABELS.sessionNoun,
-        startAction: labelForm.startAction.trim() || DEFAULT_LABELS.startAction,
-        endAction: labelForm.endAction.trim() || DEFAULT_LABELS.endAction
-      });
+      // 空欄はDEFAULT_LABELS(=アリサの現行文言)に戻す。キーごとに書き並べると
+      // 追加時の書き忘れで「保存したらそのラベルだけ既定に戻る」事故になるため、
+      // DEFAULT_LABELSのキーを回して機械的に組み立てる。
+      const trimmedLabels = (Object.keys(DEFAULT_LABELS) as (keyof TeamWorksLabels)[]).reduce(
+        (accumulator, key) => {
+          accumulator[key] = labelForm[key].trim() || DEFAULT_LABELS[key];
+          return accumulator;
+        },
+        {} as TeamWorksLabels
+      );
+      await updateTeamWorksLabels(supabase, organization.id, trimmedLabels);
       setLabelsNotice("表示ラベル設定を保存しました。");
       await reload();
     } catch (saveError) {
@@ -287,6 +294,34 @@ function TeamWorksSettingsContent() {
             <TeamWorksProjectField label="終了ボタンの呼び名" required>
               <input value={labelForm.endAction} onChange={(event) => setLabelForm({ ...labelForm, endAction: event.target.value })} className={teamWorksProjectInputClass} />
               <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）レッスン終了、退勤、施術終了。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="対象一覧の呼び名" required>
+              <input value={labelForm.rosterNoun} onChange={(event) => setLabelForm({ ...labelForm, rosterNoun: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）名簿、作業リスト、点検箇所。クライアントが用意する一覧そのものの呼び名です。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="対象1件の呼び名" required>
+              <input value={labelForm.participantNoun} onChange={(event) => setLabelForm({ ...labelForm, participantNoun: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）生徒、作業箇所、お客様。家事代行なら「トイレ」「お風呂」が1件にあたります。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="まとまりの呼び名" required>
+              <input value={labelForm.groupNoun} onChange={(event) => setLabelForm({ ...labelForm, groupNoun: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）グループ、クラス、エリア、フロア。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="実施記録の呼び名" required>
+              <input value={labelForm.attendanceNoun} onChange={(event) => setLabelForm({ ...labelForm, attendanceNoun: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）出席、実施、対応。その回にどれを何の順でやるかを決める操作の呼び名です。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="依頼元の呼び名" required>
+              <input value={labelForm.clientNoun} onChange={(event) => setLabelForm({ ...labelForm, clientNoun: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）クライアント、発注元、依頼主、店舗。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="手順書の呼び名" required>
+              <input value={labelForm.manualNoun} onChange={(event) => setLabelForm({ ...labelForm, manualNoun: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）マニュアル、手順書、作業書。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="報告の呼び名" required>
+              <input value={labelForm.reportNoun} onChange={(event) => setLabelForm({ ...labelForm, reportNoun: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）報告、日報、作業レポート。</span>
             </TeamWorksProjectField>
             <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
               <button disabled={savingLabels || !organization} className="rounded-xl bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{savingLabels ? "保存中…" : "表示ラベル設定を保存"}</button>

@@ -360,7 +360,7 @@ function PartnerProject({
         <button type="button" onClick={() => onTabChange("calendar")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "calendar" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><CalendarDays size={14} />カレンダー</button>
         <button type="button" onClick={() => onTabChange("schedule")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "schedule" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><List size={14} />スケジュール</button>
         {project.featureSettings.manuals ? (
-          <button type="button" onClick={() => onTabChange("manuals")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "manuals" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><BookOpen size={14} />マニュアル</button>
+          <button type="button" onClick={() => onTabChange("manuals")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "manuals" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><BookOpen size={14} />{labels.manualNoun}</button>
         ) : null}
       </nav>
       {tab === "calendar" ? (
@@ -385,6 +385,7 @@ function PartnerProject({
 }
 
 function PartnerManualLibrary({ manuals }: { manuals: OperationsPartnerManual[] }) {
+  const labels = useTeamWorksLabels();
   const [selectedManualNo, setSelectedManualNo] = useState(manuals[0]?.no ?? 1);
   useEffect(() => {
     if (!manuals.some((manual) => manual.no === selectedManualNo)) {
@@ -394,11 +395,11 @@ function PartnerManualLibrary({ manuals }: { manuals: OperationsPartnerManual[] 
   const manual = manuals.find((item) => item.no === selectedManualNo) ?? null;
 
   return (
-    <MikkeSection title="マニュアル" tone="editorial">
-      <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">担当予定がない日も、プロジェクトのマニュアルをいつでも確認できます。</p>
+    <MikkeSection title={labels.manualNoun} tone="editorial">
+      <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">{`担当予定がない日も、プロジェクトの${labels.manualNoun}をいつでも確認できます。`}</p>
       {manuals.length ? (
         <div className="grid gap-5 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <nav className="space-y-2" aria-label="マニュアル一覧">
+          <nav className="space-y-2" aria-label={`${labels.manualNoun}一覧`}>
             {manuals.map((item) => (
               <button
                 key={item.no}
@@ -424,7 +425,7 @@ function PartnerManualLibrary({ manuals }: { manuals: OperationsPartnerManual[] 
             </article>
           ) : null}
         </div>
-      ) : <MikkeEmptyState title="マニュアルはまだ共有されていません" helper="本部のマニュアル管理で「組織共有」を有効にすると表示されます。" />}
+      ) : <MikkeEmptyState title={`${labels.manualNoun}はまだ共有されていません`} helper={`本部の${labels.manualNoun}管理で「組織共有」を有効にすると表示されます。`} />}
     </MikkeSection>
   );
 }
@@ -444,7 +445,7 @@ function PartnerScheduleRow({ session, workWindow }: { session: OperationsPartne
       <div className="min-w-0 flex-1">
         <p className="text-xs font-bold text-[var(--mikke-primary)]">{formatDate(session.sessionDate)}・{session.projectTitle}</p>
         <p className="mt-1 text-sm font-extrabold">{session.startTime}〜{endTime(session.startTime, session.durationMin)}　{session.roster.length}名</p>
-        <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-muted)]">{targetMinutes ? `1人あたり目安 ${targetMinutes}分` : "名簿未設定"}{session.zoomMeetingId ? ` ／ Zoom ID ${session.zoomMeetingId}` : ""}</p>
+        <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-muted)]">{targetMinutes ? `1人あたり目安 ${targetMinutes}分` : `${labels.rosterNoun}未設定`}{session.zoomMeetingId ? ` ／ Zoom ID ${session.zoomMeetingId}` : ""}</p>
         {session.workDescription ? <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-text)]">作業内容：{session.workDescription}</p> : null}
       </div>
       {showLessonWindowLink ? (
@@ -675,8 +676,8 @@ export function TeamWorksPartnerLessonConsole({
           <section className="hidden min-h-0 flex-col border-r border-[var(--mikke-line)] lg:flex">
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--mikke-line)] px-4 py-3">
               <div>
-                <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--mikke-primary)]">出席順</p>
-                <p className="mt-0.5 text-[11px] font-semibold text-[var(--mikke-muted)]">{targetMinutes ? `1人あたり目安 ${targetMinutes}分` : "生徒を押すと評価・引継ぎを開きます"}</p>
+                <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--mikke-primary)]">{labels.attendanceNoun}順</p>
+                <p className="mt-0.5 text-[11px] font-semibold text-[var(--mikke-muted)]">{targetMinutes ? `1人あたり目安 ${targetMinutes}分` : `${labels.participantNoun}を押すと評価・引継ぎを開きます`}</p>
               </div>
               <span className="text-xs font-bold text-[var(--mikke-muted)]">{session.roster.filter((item) => item.completedAt).length}/{session.roster.length} 完了</span>
             </div>
@@ -714,7 +715,7 @@ export function TeamWorksPartnerLessonConsole({
               <div className="flex shrink-0 items-center justify-between border-b border-[var(--mikke-line)] bg-white px-4 py-3">
                 <div>
                   <p className="text-sm font-extrabold">{selectedStudent.participantName}の記録</p>
-                  <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">タイマーとマニュアルは背面上部に残ります</p>
+                  <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">{`タイマーと${labels.manualNoun}は背面上部に残ります`}</p>
                 </div>
                 <button type="button" onClick={() => setMobileRecordOpen(false)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">閉じる</button>
               </div>
@@ -738,7 +739,7 @@ export function TeamWorksPartnerLessonConsole({
         </div>
       ) : (
         <div className="p-5">
-          <MikkeEmptyState title="名簿はまだ設定されていません" helper="本部が出席順を設定すると、この画面に表示されます。" />
+          <MikkeEmptyState title={`${labels.rosterNoun}はまだ設定されていません`} helper={`本部が${labels.attendanceNoun}順を設定すると、この画面に表示されます。`} />
         </div>
       )}
     </article>
@@ -768,6 +769,8 @@ function MobileStudentDock({
   onOpenRecord: () => void;
   showTimer?: boolean;
 }) {
+  // フックは早期returnより前に呼ぶ必要があるためここで取得する。
+  const labels = useTeamWorksLabels();
   if (!selectedStudent) return null;
 
   return (
@@ -776,7 +779,7 @@ function MobileStudentDock({
         <div className="min-w-0">
           <p className="truncate text-sm font-extrabold">{selectedStudent.participantName}</p>
           <p className="mt-0.5 text-[10px] font-bold text-[var(--mikke-muted)]">
-            出席順 {selectedStudent.orderIndex}・進捗 No.{selectedStudent.currentManualNo}
+            {labels.attendanceNoun}順 {selectedStudent.orderIndex}・進捗 No.{selectedStudent.currentManualNo}
             {targetMinutes ? `・目安 ${targetMinutes}分` : ""}
           </p>
         </div>
@@ -795,7 +798,7 @@ function MobileStudentDock({
         ) : null}
       </div>
       <div className="flex items-center gap-2 border-t border-[var(--mikke-line)] px-3 py-2">
-        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-0.5" aria-label="生徒を選択">
+        <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-0.5" aria-label={`${labels.participantNoun}を選択`}>
           {roster.map((item) => (
             <button
               key={item.id}
@@ -1054,10 +1057,10 @@ function LessonReport({ session, onSubmitted }: { session: OperationsPartnerSess
         progress: session.roster.map((item) => ({ participantId: item.participantId, manualNo: item.currentManualNo })),
         body
       });
-      setNotice({ tone: "success", text: "本部へ報告を提出しました。" });
+      setNotice({ tone: "success", text: `本部へ${labels.reportNoun}を提出しました。` });
       await onSubmitted();
     } catch (error) {
-      setNotice({ tone: "error", text: toErrorMessage(error, "報告を提出できませんでした。") });
+      setNotice({ tone: "error", text: toErrorMessage(error, `${labels.reportNoun}を提出できませんでした。`) });
     } finally {
       setSaving(false);
     }
@@ -1069,7 +1072,7 @@ function LessonReport({ session, onSubmitted }: { session: OperationsPartnerSess
       <form onSubmit={submit} className="border-t border-[var(--mikke-line)] p-4">
         <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={2} placeholder="クラス全体の様子、本部への連絡" className="w-full resize-none rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-sm" />
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button type="submit" disabled={saving || session.reportSubmitted} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{session.reportSubmitted ? "提出済み" : saving ? "提出中…" : "報告を提出"}</button>
+          <button type="submit" disabled={saving || session.reportSubmitted} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{session.reportSubmitted ? "提出済み" : saving ? "提出中…" : `${labels.reportNoun}を提出`}</button>
           <SaveFeedback notice={notice} />
         </div>
       </form>
