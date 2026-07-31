@@ -13,6 +13,7 @@ import {
   approveOperationsClientProject,
   loadOperationsClientPendingProjects,
   loadOperationsClientPortal,
+  loadOperationsClientPortalPreview,
   saveOperationsClientGroup,
   saveOperationsClientParticipant,
   saveOperationsClientSessionRoster,
@@ -147,6 +148,62 @@ export function TeamWorksOperationsClientPortal() {
         <MikkeEmptyState title="参加中の運営型プロジェクトはありません" helper="本部からクライアントとして招待されると、ここに承認のお知らせが届きます。" />
       ) : null}
     </TeamWorksClientProjectsShell>
+  );
+}
+
+// K-2運営型プレビュー: 本部staffがプロジェクト詳細の「機能とポータルの設定」タブから
+// 「クライアントにはこう見えます」を確認するための埋め込み用コンポーネント。
+// アプリ全体のシェル(サイドバー等)は使わず、対象プロジェクトのProjectViewだけを
+// 読み取り専用で描画する(納品型のDeliveryPortalPreviewと同じ考え方)。
+export function TeamWorksOperationsClientPortalPreview({
+  projectId,
+  targetOrganizationMemberId,
+  readOnly = true
+}: {
+  projectId: string;
+  targetOrganizationMemberId: string;
+  readOnly?: boolean;
+}) {
+  const [data, setData] = useState<OperationsClientPortalData | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+  const [projectTab, setProjectTab] = useState<ProjectTab>("calendar");
+  const [selectedDate, setSelectedDate] = useState<string>(() => todayKey());
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setData(await loadOperationsClientPortalPreview(supabase, projectId, targetOrganizationMemberId));
+    } catch (loadError) {
+      setError(toErrorMessage(loadError, "プレビューを読み込めませんでした。"));
+    }
+  }, [projectId, targetOrganizationMemberId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function mutate(): Promise<MutationNotice> {
+    // プレビューは読み取り専用(readOnlyのpointer-events-noneで操作自体を封じている)。
+    return { tone: "success", text: "" };
+  }
+
+  if (error) return <MikkeEmptyState title="読み込みに失敗しました" helper={error} />;
+  if (data === undefined) return <p className="text-sm font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>;
+  const project = data?.projects[0];
+  if (!data || !project) {
+    return <MikkeEmptyState title="このクライアントの表示を確認できません" helper="対象者がこのプロジェクトの有効なクライアントメンバーか確認してください。" />;
+  }
+
+  return (
+    <div className={readOnly ? "pointer-events-none select-none" : ""}>
+      <ProjectView
+        data={data}
+        projectId={project.id}
+        projectTab={projectTab}
+        onProjectTabChange={setProjectTab}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        mutate={mutate}
+      />
+    </div>
   );
 }
 

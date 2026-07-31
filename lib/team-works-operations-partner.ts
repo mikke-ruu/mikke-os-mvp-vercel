@@ -205,6 +205,40 @@ export async function loadOperationsPartnerPortal(
     const pairOffers = offerRowsByMembership.get(`${membership.project_id}:${membership.organization_member_id}`) ?? [];
     return pairOffers.length === 0 || pairOffers.some((offer) => offer.status === "accepted");
   });
+  return buildPartnerPortalData(client, members, projectMembers, waitingOffers, acceptedProjectMembers);
+}
+
+// K-2運営型プレビュー: 本部staffが「機能とポータルの設定」タブから
+// 「担当パートナーにはこう見える」を確認するための読み込み。通常のloadOperationsPartnerPortal
+// と違い「今ログインしている本人」の自己解決・オファー状態は考慮せず、
+// staffが指定したtargetOrganizationMemberIdをそのプロジェクトの確定済みメンバー
+// として扱う(RLSはstaffに対してプロジェクトの全データ読み取りを許可しているため、
+// クエリ自体はそのまま成立する。計画書§K-2実装状況の設計どおり)。
+export async function loadOperationsPartnerPortalPreview(
+  client: SupabaseClient,
+  projectId: string,
+  targetOrganizationMemberId: string
+): Promise<OperationsPartnerPortalData> {
+  const memberResult = await client
+    .from("team_works_organization_members")
+    .select("id,display_name")
+    .eq("id", targetOrganizationMemberId)
+    .maybeSingle();
+  if (memberResult.error) throw memberResult.error;
+  if (!memberResult.data) return { memberName: null, projectCount: 0, projects: [], offers: [], today: [], upcoming: [] };
+  const members = [memberResult.data as MemberRow];
+  const projectMembers: ProjectMemberRow[] = [{ project_id: projectId, organization_member_id: targetOrganizationMemberId }];
+  return buildPartnerPortalData(client, members, projectMembers, [], projectMembers);
+}
+
+async function buildPartnerPortalData(
+  client: SupabaseClient,
+  members: MemberRow[],
+  projectMembers: ProjectMemberRow[],
+  waitingOffers: { project_id: string; organization_member_id: string; status: string; requested_at: string }[],
+  acceptedProjectMembers: ProjectMemberRow[]
+): Promise<OperationsPartnerPortalData> {
+  const memberIds = members.map((member) => member.id);
   const projectIds = [...new Set(projectMembers.map((row) => row.project_id))];
   if (projectIds.length === 0) {
     return { memberName: members[0]?.display_name ?? null, projectCount: 0, projects: [], offers: [], today: [], upcoming: [] };

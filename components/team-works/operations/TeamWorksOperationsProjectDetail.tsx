@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  Eye,
   FileCheck2,
   FolderKanban,
   GraduationCap,
@@ -82,6 +83,8 @@ import {
 } from "@/lib/team-works-operations-project";
 import { generateSessionsForProject } from "@/lib/team-works-operations";
 import { updateProjectFeatureSettings, type TeamWorksOperationsFeatureSettings } from "@/lib/team-works-feature-settings";
+import { TeamWorksOperationsClientPortalPreview } from "./TeamWorksOperationsClientPortal";
+import { TeamWorksOperationsPartnerPortalPreview } from "./TeamWorksOperationsPartnerPortal";
 import { TeamWorksOperationsShell } from "./TeamWorksOperationsShell";
 
 type ProjectTab =
@@ -1981,6 +1984,86 @@ function PortalTab({
           <SaveButton saving={saving} label="設定を保存" />
         </div>
       </form>
+
+      <OperationsPortalPreview projectId={data.project.id} />
+    </div>
+  );
+}
+
+// K-2(運営型): 「この設定でクライアント/パートナーに何が見えるか」を本部が
+// 確認できるプレビュー。納品型のDeliveryPortalPreviewと同じ考え方だが、
+// クライアント/パートナーポータルは「今ログインしている本人」に依存した作りの
+// ため、staff向けの専用ロード関数(loadOperationsClientPortalPreview /
+// loadOperationsPartnerPortalPreview)を通して実データを読み取り専用で描画する。
+function OperationsPortalPreview({ projectId }: { projectId: string }) {
+  const labels = useTeamWorksLabels();
+  const [previewRole, setPreviewRole] = useState<"client" | "worker">("client");
+  const [members, setMembers] = useState<OperationsProjectMember[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void loadOperationsProjectMembers(supabase, projectId)
+      .then((result) => {
+        if (active) setMembers(result.members.filter((member) => member.status === "active"));
+      })
+      .catch((error) => {
+        if (active) setLoadError(error instanceof Error ? error.message : "メンバーを読み込めませんでした。");
+      });
+    return () => {
+      active = false;
+    };
+  }, [projectId]);
+
+  const client = members.find((member) => member.projectRole === "client");
+  const worker = members.find((member) => member.projectRole === "worker");
+  const previewMember = previewRole === "client" ? client : worker;
+
+  return (
+    <div className="max-w-3xl space-y-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="flex items-center gap-1.5 text-sm font-extrabold"><Eye size={15} /> ポータルプレビュー</p>
+        <div className="inline-flex overflow-hidden rounded-lg border border-[var(--mikke-line)]">
+          <button
+            type="button"
+            onClick={() => setPreviewRole("client")}
+            className={`px-3 py-1.5 text-xs font-bold ${previewRole === "client" ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"}`}
+          >
+            クライアント視点
+          </button>
+          <button
+            type="button"
+            onClick={() => setPreviewRole("worker")}
+            className={`border-l border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold ${previewRole === "worker" ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"}`}
+          >
+            {labels.workers}視点
+          </button>
+        </div>
+      </div>
+      <p className="text-xs font-semibold text-[var(--mikke-muted)]">
+        実際のデータをそのまま読み取り専用で表示します。ここから操作はできません。
+      </p>
+      {loadError ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{loadError}</p> : null}
+      {!previewMember ? (
+        <MikkeEmptyState
+          title={previewRole === "client" ? "クライアントがまだいません" : `${labels.workers}がまだいません`}
+          helper={`「${labels.workers}」タブや招待からメンバーを追加すると、ここでプレビューできます。`}
+        />
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
+          <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">
+            <span className="h-2 w-2 rounded-full bg-[var(--tw-done)]" />
+            {previewMember.displayName} さんの画面
+          </div>
+          <div className="max-h-[520px] overflow-y-auto bg-[var(--mikke-surface-soft)] p-4">
+            {previewRole === "client" ? (
+              <TeamWorksOperationsClientPortalPreview projectId={projectId} targetOrganizationMemberId={previewMember.organizationMemberId} readOnly />
+            ) : (
+              <TeamWorksOperationsPartnerPortalPreview projectId={projectId} targetOrganizationMemberId={previewMember.organizationMemberId} readOnly />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

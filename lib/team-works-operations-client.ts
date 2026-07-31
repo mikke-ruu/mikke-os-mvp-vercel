@@ -131,6 +131,37 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
     .in("organization_member_id", memberIds);
   if (membershipResult.error) throw membershipResult.error;
   const clientMemberships = (membershipResult.data ?? []) as { project_id: string; organization_member_id: string }[];
+  return buildClientPortalData(client, members, clientMemberships);
+}
+
+// K-2運営型プレビュー: 本部staffが「機能とポータルの設定」タブから
+// 「クライアントにはこう見える」を確認するための読み込み。通常のloadOperationsClientPortal
+// はauth.getUser()で「今ログインしている本人」を解決するが、プレビューでは
+// staffが対象のorganization_member_idを直接指定する。RLSはstaffに対して
+// プロジェクトの全データ読み取りを許可しているため、自己解決とactivate RPCの
+// 呼び出しをスキップしてもデータは取得できる(計画書§K-2実装状況の設計どおり)。
+export async function loadOperationsClientPortalPreview(
+  client: SupabaseClient,
+  projectId: string,
+  targetOrganizationMemberId: string
+): Promise<OperationsClientPortalData> {
+  const memberResult = await client
+    .from("team_works_organization_members")
+    .select("id,display_name")
+    .eq("id", targetOrganizationMemberId)
+    .maybeSingle();
+  if (memberResult.error) throw memberResult.error;
+  if (!memberResult.data) return emptyClientPortalData(null);
+  const members = [memberResult.data as { id: string; display_name: string }];
+  const clientMemberships = [{ project_id: projectId, organization_member_id: targetOrganizationMemberId }];
+  return buildClientPortalData(client, members, clientMemberships);
+}
+
+async function buildClientPortalData(
+  client: SupabaseClient,
+  members: { id: string; display_name: string }[],
+  clientMemberships: { project_id: string; organization_member_id: string }[]
+): Promise<OperationsClientPortalData> {
   const projectIds = [...new Set(clientMemberships.map((row) => row.project_id))];
   if (projectIds.length === 0) return emptyClientPortalData(members[0]?.display_name ?? null);
 

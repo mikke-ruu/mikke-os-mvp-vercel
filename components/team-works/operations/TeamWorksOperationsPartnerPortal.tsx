@@ -33,6 +33,7 @@ import { TeamWorksPartnerShiftPanel } from "@/components/team-works/operations/T
 import { supabase } from "@/lib/supabase/client";
 import {
   loadOperationsPartnerPortal,
+  loadOperationsPartnerPortalPreview,
   respondToOperationsPartnerOffer,
   saveOperationsPartnerStudentHandoff,
   submitOperationsPartnerReport,
@@ -98,6 +99,46 @@ export function TeamWorksOperationsPartnerPortal() {
       {error ? <MikkeEmptyState title="読み込みに失敗しました" helper={error} /> : null}
       {data ? <PartnerPortalBody data={data} onRefresh={load} /> : null}
     </MikkeAppShell>
+  );
+}
+
+// K-2運営型プレビュー: 本部staffがプロジェクト詳細の「機能とポータルの設定」タブから
+// 「担当パートナーにはこう見えます」を確認するための埋め込み用コンポーネント。
+// アプリ全体のシェルは使わず、PartnerPortalBodyだけを読み取り専用で描画する
+// (納品型のDeliveryPortalPreviewと同じ考え方)。
+export function TeamWorksOperationsPartnerPortalPreview({
+  projectId,
+  targetOrganizationMemberId,
+  readOnly = true
+}: {
+  projectId: string;
+  targetOrganizationMemberId: string;
+  readOnly?: boolean;
+}) {
+  const [data, setData] = useState<OperationsPartnerPortalData | null | undefined>(undefined);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      setData(await loadOperationsPartnerPortalPreview(supabase, projectId, targetOrganizationMemberId));
+    } catch (loadError) {
+      setError(toErrorMessage(loadError, "プレビューを読み込めませんでした。"));
+    }
+  }, [projectId, targetOrganizationMemberId]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  if (error) return <MikkeEmptyState title="読み込みに失敗しました" helper={error} />;
+  if (data === undefined) return <p className="text-sm font-semibold text-[var(--mikke-muted)]">読み込んでいます…</p>;
+  if (!data || data.projectCount === 0) {
+    return <MikkeEmptyState title="この担当者の表示を確認できません" helper="対象者がこのプロジェクトの担当メンバーか確認してください。" />;
+  }
+
+  return (
+    <div className={readOnly ? "pointer-events-none select-none" : ""}>
+      <PartnerPortalBody data={data} onRefresh={load} />
+    </div>
   );
 }
 
