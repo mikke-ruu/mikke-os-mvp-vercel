@@ -50,6 +50,7 @@ export type OperationsPartnerSession = {
   zoomMeetingId: string | null;
   zoomPasscode: string | null;
   zoomUsesProjectDefault: boolean;
+  workDescription: string | null;
   partnerPresenceStatus: "not_started" | "standby" | "in_progress" | "ended";
   partnerStandbyAt: string | null;
   partnerEndedAt: string | null;
@@ -97,6 +98,7 @@ type SessionRow = {
   partner_presence_status: "not_started" | "standby" | "in_progress" | "ended";
   partner_standby_at: string | null;
   partner_ended_at: string | null;
+  work_description?: string | null;
 };
 type RosterRow = {
   id: string;
@@ -288,7 +290,6 @@ async function buildPartnerPortalData(
       featureSettings: resolveOperationsFeatureSettings(project.feature_settings ?? null)
     }));
   const operationsProjectIds = portalProjects.map((project) => project.id);
-  const lessonsProjectIds = portalProjects.filter((project) => project.featureSettings.lessons).map((project) => project.id);
   const offers = waitingOffers.flatMap((offer) => {
     const projectTitle = projectTitleById.get(offer.project_id);
     return projectTitle ? [{ projectId: offer.project_id, projectTitle, organizationMemberId: offer.organization_member_id, requestedAt: offer.requested_at }] : [];
@@ -331,36 +332,28 @@ async function buildPartnerPortalData(
     manuals: project.featureSettings.manuals ? manuals.filter((manual) => manual.project_id === project.id).map(mapManual) : []
   }));
 
-  // lessons=falseのプロジェクトは「レッスン画面・Zoom」自体を出さないため、
-  // セッション取得の対象から除外する(本部のスケジュール管理には影響しない)。
-  if (lessonsProjectIds.length === 0) {
-    return {
-      memberName: members[0]?.display_name ?? null,
-      projectCount: operationsProjectIds.length,
-      projects: projectsWithManuals,
-      offers,
-      today: [],
-      upcoming: []
-    };
-  }
-
+  // N-1(2026-07-31): 予定(スケジュール)は本部が組む以上、担当者には常に見える
+  // べきもの。以前はlessons=falseのプロジェクトをここで丸ごと除外していたが、
+  // それは「レッスン画面(作業窓)の中身」の話であって「予定が見えるか」とは
+  // 別の軸だったため撤回した(あゆみ指摘)。作業窓の部品出し分けはworkWindow設定
+  // (TeamWorksPartnerLessonConsole側)で行う。
   const today = dateKey(new Date());
   const through = dateKey(addDays(new Date(), 30));
   let sessionResult = await client
     .from("team_works_op_sessions")
-    .select("id,project_id,session_date,start_time,duration_min,status,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,partner_standby_at,partner_ended_at")
-    .in("project_id", lessonsProjectIds)
+    .select("id,project_id,session_date,start_time,duration_min,status,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,partner_standby_at,partner_ended_at,work_description")
+    .in("project_id", operationsProjectIds)
     .in("partner_member_id", memberIds)
     .gte("session_date", today)
     .lte("session_date", through)
     .neq("status", "cancelled")
     .order("session_date")
     .order("start_time");
-  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default"])) {
+  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default", "work_description"])) {
     sessionResult = await client
       .from("team_works_op_sessions")
       .select("id,project_id,session_date,start_time,duration_min,status")
-      .in("project_id", lessonsProjectIds)
+      .in("project_id", operationsProjectIds)
       .in("partner_member_id", memberIds)
       .gte("session_date", today)
       .lte("session_date", through)
@@ -425,6 +418,7 @@ async function buildPartnerPortalData(
     zoomMeetingId: session.zoom_meeting_id ?? null,
     zoomPasscode: session.zoom_passcode ?? null,
     zoomUsesProjectDefault: session.zoom_uses_project_default ?? true,
+    workDescription: session.work_description ?? null,
     partnerPresenceStatus: session.partner_presence_status ?? "not_started",
     partnerStandbyAt: session.partner_standby_at ?? null,
     partnerEndedAt: session.partner_ended_at ?? null,

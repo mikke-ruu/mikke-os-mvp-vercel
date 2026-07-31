@@ -32,6 +32,10 @@ import { TeamWorksPartnerSelfProfile } from "@/components/team-works/operations/
 import { TeamWorksPartnerShiftPanel } from "@/components/team-works/operations/TeamWorksPartnerShiftPanel";
 import { supabase } from "@/lib/supabase/client";
 import {
+  DEFAULT_WORK_WINDOW_SETTINGS,
+  type TeamWorksWorkWindowSettings
+} from "@/lib/team-works-feature-settings";
+import {
   loadOperationsPartnerPortal,
   loadOperationsPartnerPortalPreview,
   respondToOperationsPartnerOffer,
@@ -76,7 +80,7 @@ export function TeamWorksOperationsPartnerPortal() {
     <MikkeAppShell
       appName="Team Works"
       title={`${labels.workers}ポータル`}
-      subtitle="担当レッスンを、名簿とマニュアルを見ながら進行"
+      subtitle={`担当${labels.sessionNoun}を、名簿とマニュアルを見ながら進行`}
       currentApp={{ label: "Team", href: "/apps/team-works/portal/worker", icon: CalendarDays }}
       theme="green"
       footerLabel="Team Works by mikke"
@@ -145,6 +149,7 @@ export function TeamWorksOperationsPartnerPortalPreview({
 }
 
 export function TeamWorksPartnerLessonWindow({ sessionId }: { sessionId: string }) {
+  const labels = useTeamWorksLabels();
   const [data, setData] = useState<OperationsPartnerPortalData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
@@ -152,17 +157,18 @@ export function TeamWorksPartnerLessonWindow({ sessionId }: { sessionId: string 
     try {
       setData(await loadOperationsPartnerPortal(supabase));
     } catch (loadError) {
-      setError(toErrorMessage(loadError, "レッスンを読み込めませんでした。"));
+      setError(toErrorMessage(loadError, `${labels.sessionNoun}を読み込めませんでした。`));
     }
-  }, []);
+  }, [labels.sessionNoun]);
 
   useEffect(() => { void load(); }, [load]);
   const session = data ? [...data.today, ...data.upcoming].find((item) => item.id === sessionId) ?? null : null;
+  const workWindow = data && session ? data.projects.find((project) => project.id === session.projectId)?.featureSettings.workWindow ?? DEFAULT_WORK_WINDOW_SETTINGS : DEFAULT_WORK_WINDOW_SETTINGS;
 
-  if (error) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)] p-4"><MikkeEmptyState title="レッスンを開けませんでした" helper={error} /></main>;
+  if (error) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)] p-4"><MikkeEmptyState title={`${labels.sessionNoun}を開けませんでした`} helper={error} /></main>;
   if (!data) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)]"><p className="text-sm font-bold text-[var(--mikke-muted)]">読み込み中…</p></main>;
-  if (!session) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)] p-4"><MikkeEmptyState title="このレッスンは表示できません" helper="担当変更または日程変更後の可能性があります。スケジュールから開き直してください。" /></main>;
-  return <main className="h-dvh overflow-hidden bg-white"><TeamWorksPartnerLessonConsole session={session} onRefresh={load} standalone /></main>;
+  if (!session) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)] p-4"><MikkeEmptyState title={`この${labels.sessionNoun}は表示できません`} helper="担当変更または日程変更後の可能性があります。スケジュールから開き直してください。" /></main>;
+  return <main className="h-dvh overflow-hidden bg-white"><TeamWorksPartnerLessonConsole session={session} onRefresh={load} standalone workWindow={workWindow} /></main>;
 }
 
 function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalData; onRefresh: () => Promise<void> }) {
@@ -250,7 +256,7 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
         />
       ) : (
         <MikkeEmptyState
-          title="担当レッスンはありません"
+          title={`担当${labels.sessionNoun}はありません`}
           helper={data.projectCount ? `${data.projectCount}件のプロジェクトに参加しています。` : "本部から参加依頼が届くと、ここで確認できます。"}
         />
       )}
@@ -277,19 +283,22 @@ function PartnerHome({
   onOpenProject: (projectId: string, tab: "calendar" | "schedule" | "manuals") => void;
   onOpenShifts: () => void;
 }) {
+  const labels = useTeamWorksLabels();
   const daySessions = sessions.filter((session) => session.sessionDate === selectedDate);
   const nextSession = sessions[0] ?? null;
+  const workWindowByProjectId = new Map(data.projects.map((project) => [project.id, project.featureSettings.workWindow]));
+  const workWindowFor = (session: OperationsPartnerSession) => workWindowByProjectId.get(session.projectId) ?? DEFAULT_WORK_WINDOW_SETTINGS;
   return (
     <div className="space-y-7">
       <MikkeSection title="総合カレンダー" tone="editorial">
-        <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">担当中の全プロジェクトをまとめて表示します。予定からレッスン専用画面を別窓で開けます。</p>
+        <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">担当中の全プロジェクトをまとめて表示します。予定から{labels.sessionNoun}専用画面を別窓で開けます。</p>
         <ClientMonthCalendar sessions={sessions} holidays={[]} selectedDate={selectedDate} onSelectDate={onSelectDate} />
         <div className="mt-4 space-y-2">
-          {daySessions.length ? daySessions.map((session) => <PartnerScheduleRow key={session.id} session={session} />) : <MikkeEmptyState title="この日の担当はありません" />}
+          {daySessions.length ? daySessions.map((session) => <PartnerScheduleRow key={session.id} session={session} workWindow={workWindowFor(session)} />) : <MikkeEmptyState title="この日の担当はありません" />}
         </div>
       </MikkeSection>
       <MikkeSection title="本日のスケジュール" tone="editorial">
-        {data.today.length ? <div className="space-y-2">{data.today.map((session) => <PartnerScheduleRow key={session.id} session={session} />)}</div> : <MikkeEmptyState title="本日の担当はありません" />}
+        {data.today.length ? <div className="space-y-2">{data.today.map((session) => <PartnerScheduleRow key={session.id} session={session} workWindow={workWindowFor(session)} />)}</div> : <MikkeEmptyState title="本日の担当はありません" />}
       </MikkeSection>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {shiftsEnabled ? (
@@ -303,7 +312,7 @@ function PartnerHome({
         ) : null}
         <PartnerHomeAction
           icon={<CalendarDays size={18} />}
-          title="次回レッスン"
+          title={`次回${labels.sessionNoun}`}
           detail={nextSession ? `${nextSession.projectTitle}・${formatDate(nextSession.sessionDate)} ${nextSession.startTime}` : "予定はありません"}
           onClick={nextSession ? () => onOpenProject(nextSession.projectId, "schedule") : undefined}
           tone="pink"
@@ -332,6 +341,7 @@ function PartnerProject({
   tab: "calendar" | "schedule" | "manuals";
   onTabChange: (tab: "calendar" | "schedule" | "manuals") => void;
 }) {
+  const labels = useTeamWorksLabels();
   const projectSessions = sessions.filter((session) => session.projectId === projectId);
   const title = project.title;
   const daySessions = projectSessions.filter((session) => session.sessionDate === selectedDate);
@@ -339,7 +349,7 @@ function PartnerProject({
     <div className="space-y-5">
       <div>
         <p className="text-lg font-extrabold">{title}</p>
-        <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">担当レッスンだけを表示しています。</p>
+        <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">担当{labels.sessionNoun}だけを表示しています。</p>
       </div>
       {project.description ? (
         <p className="whitespace-pre-wrap rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 text-xs font-semibold leading-6 text-[var(--mikke-muted)]">
@@ -359,13 +369,13 @@ function PartnerProject({
             <ClientMonthCalendar sessions={projectSessions} holidays={[]} selectedDate={selectedDate} onSelectDate={onSelectDate} />
           </MikkeSection>
           <MikkeSection title={`${formatDate(selectedDate)} の担当`} tone="editorial">
-            {daySessions.length ? <div className="space-y-2">{daySessions.map((session) => <PartnerScheduleRow key={session.id} session={session} />)}</div> : <MikkeEmptyState title="この日の担当はありません" />}
+            {daySessions.length ? <div className="space-y-2">{daySessions.map((session) => <PartnerScheduleRow key={session.id} session={session} workWindow={project.featureSettings.workWindow} />)}</div> : <MikkeEmptyState title="この日の担当はありません" />}
           </MikkeSection>
         </div>
       ) : tab === "schedule" ? (
         <MikkeSection title="スケジュール" tone="editorial">
-          <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">「レッスン画面」を押すと、Zoomの横に置ける専用窓で開きます。</p>
-          <div className="space-y-2">{projectSessions.map((session) => <PartnerScheduleRow key={session.id} session={session} />)}</div>
+          <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">「{labels.sessionNoun}画面」を押すと、Zoomの横に置ける専用窓で開きます。</p>
+          <div className="space-y-2">{projectSessions.map((session) => <PartnerScheduleRow key={session.id} session={session} workWindow={project.featureSettings.workWindow} />)}</div>
         </MikkeSection>
       ) : project.featureSettings.manuals ? (
         <PartnerManualLibrary manuals={project.manuals} />
@@ -419,18 +429,29 @@ function PartnerManualLibrary({ manuals }: { manuals: OperationsPartnerManual[] 
   );
 }
 
-function PartnerScheduleRow({ session }: { session: OperationsPartnerSession }) {
+// 作業窓(N-2): 部品が全てOFFなら「レッスン画面」を開く導線自体を隠す
+// (開いても何も操作できる部品が無いため)。
+function isWorkWindowAllOff(workWindow: TeamWorksWorkWindowSettings): boolean {
+  return !workWindow.zoom && !workWindow.presence && !workWindow.timer && !workWindow.roster && !workWindow.manualLink;
+}
+
+function PartnerScheduleRow({ session, workWindow }: { session: OperationsPartnerSession; workWindow: TeamWorksWorkWindowSettings }) {
+  const labels = useTeamWorksLabels();
   const targetMinutes = session.roster.length ? Math.floor(session.durationMin / session.roster.length) : null;
+  const showLessonWindowLink = !isWorkWindowAllOff(workWindow);
   return (
     <article className="flex flex-col gap-3 rounded-xl border border-[var(--mikke-line)] bg-white p-3 sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
         <p className="text-xs font-bold text-[var(--mikke-primary)]">{formatDate(session.sessionDate)}・{session.projectTitle}</p>
         <p className="mt-1 text-sm font-extrabold">{session.startTime}〜{endTime(session.startTime, session.durationMin)}　{session.roster.length}名</p>
         <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-muted)]">{targetMinutes ? `1人あたり目安 ${targetMinutes}分` : "名簿未設定"}{session.zoomMeetingId ? ` ／ Zoom ID ${session.zoomMeetingId}` : ""}</p>
+        {session.workDescription ? <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-text)]">作業内容：{session.workDescription}</p> : null}
       </div>
-      <button type="button" onClick={() => openLessonWindow(session.id)} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)]">
-        <ExternalLink size={14} />レッスン画面
-      </button>
+      {showLessonWindowLink ? (
+        <button type="button" onClick={() => openLessonWindow(session.id)} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)]">
+          <ExternalLink size={14} />{labels.sessionNoun}画面
+        </button>
+      ) : null}
     </article>
   );
 }
@@ -462,7 +483,18 @@ function openLessonWindow(sessionId: string) {
   if (!popup) window.location.href = url;
 }
 
-export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone = false }: { session: OperationsPartnerSession; onRefresh: () => Promise<void>; standalone?: boolean }) {
+export function TeamWorksPartnerLessonConsole({
+  session,
+  onRefresh,
+  standalone = false,
+  workWindow = DEFAULT_WORK_WINDOW_SETTINGS
+}: {
+  session: OperationsPartnerSession;
+  onRefresh: () => Promise<void>;
+  standalone?: boolean;
+  workWindow?: TeamWorksWorkWindowSettings;
+}) {
+  const labels = useTeamWorksLabels();
   const [presence, setPresence] = useState(session.partnerPresenceStatus);
   const [presenceBusy, setPresenceBusy] = useState(false);
   const [presenceNotice, setPresenceNotice] = useState<SaveNotice>(null);
@@ -502,12 +534,12 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
       setPresenceNotice({
         tone: "success",
         text: next === "not_started"
-          ? "スタンバイ前に戻しました。"
+          ? `${labels.startAction}前に戻しました。`
           : next === "standby"
-            ? "本部へスタンバイを通知しました。"
+            ? `本部へ${labels.startAction}を通知しました。`
             : next === "ended"
-              ? "レッスン終了を通知しました。"
-              : "本部へレッスン開始を通知しました。"
+              ? `${labels.endAction}を通知しました。`
+              : `本部へ${labels.sessionNoun}開始を通知しました。`
       });
       await onRefresh();
       return true;
@@ -552,11 +584,14 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
               <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{formatDate(session.sessionDate)}</span>
               <span className="inline-flex items-center gap-1"><Clock size={13} />{session.startTime}〜{endTime(session.startTime, session.durationMin)}</span>
               <span className="inline-flex items-center gap-1"><UsersRound size={13} />{session.roster.length}名</span>
-              {!controlsCollapsed && session.zoomMeetingId ? <span>Zoom ID {session.zoomMeetingId}</span> : null}
-              {!controlsCollapsed && session.zoomPasscode ? <span>パスコード {session.zoomPasscode}</span> : null}
+              {workWindow.zoom && !controlsCollapsed && session.zoomMeetingId ? <span>Zoom ID {session.zoomMeetingId}</span> : null}
+              {workWindow.zoom && !controlsCollapsed && session.zoomPasscode ? <span>パスコード {session.zoomPasscode}</span> : null}
             </p>
+            {session.workDescription ? (
+              <p className="mt-1 text-xs font-bold text-[var(--mikke-text)]">作業内容：{session.workDescription}</p>
+            ) : null}
           </div>
-          {controlsCollapsed ? (
+          {!workWindow.presence && !workWindow.zoom ? null : controlsCollapsed && workWindow.presence ? (
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <SaveFeedback notice={presenceNotice} />
               <button type="button" onClick={() => setControlsCollapsed(false)} className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[var(--mikke-line)] bg-white px-3 text-[11px] font-bold text-[var(--mikke-primary)]">
@@ -565,55 +600,65 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
             </div>
           ) : (
           <div className="flex flex-wrap items-center gap-2">
-            {presence === "not_started" ? (
-              <button type="button" disabled={presenceBusy} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
-                <Check size={15} />スタンバイ
-              </button>
-            ) : null}
-            {presence === "standby" ? (
+            {workWindow.presence ? (
               <>
-                <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
-                  <Play size={14} />レッスン開始
-                </button>
-                <button type="button" disabled={presenceBusy} onClick={() => void changePresence("not_started")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
-                  <RotateCcw size={13} />スタンバイ前に戻す
-                </button>
+                {presence === "not_started" ? (
+                  <button type="button" disabled={presenceBusy} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                    <Check size={15} />{labels.startAction}
+                  </button>
+                ) : null}
+                {presence === "standby" ? (
+                  <>
+                    <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
+                      <Play size={14} />{labels.sessionNoun}開始
+                    </button>
+                    <button type="button" disabled={presenceBusy} onClick={() => void changePresence("not_started")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                      <RotateCcw size={13} />{labels.startAction}前に戻す
+                    </button>
+                  </>
+                ) : null}
+                {presence === "in_progress" ? (
+                  <button type="button" disabled={presenceBusy} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                    <RotateCcw size={13} />{labels.startAction}に戻す
+                  </button>
+                ) : null}
               </>
             ) : null}
-            {presence === "in_progress" ? (
-              <button type="button" disabled={presenceBusy} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
-                <RotateCcw size={13} />スタンバイに戻す
-              </button>
+            {workWindow.zoom ? (
+              session.zoomUrl ? (
+                <a href={session.zoomUrl} target="_blank" rel="noreferrer" onClick={() => setControlsCollapsed(true)} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#2d8cff] px-4 py-2 text-xs font-bold text-white">
+                  <ExternalLink size={14} />Zoomを開く
+                </a>
+              ) : (
+                <span className="inline-flex min-h-10 items-center rounded-xl border border-dashed border-[var(--mikke-line)] px-3 text-xs font-bold text-[var(--mikke-muted)]">Zoomリンク未設定</span>
+              )
             ) : null}
-            {session.zoomUrl ? (
-              <a href={session.zoomUrl} target="_blank" rel="noreferrer" onClick={() => setControlsCollapsed(true)} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[#2d8cff] px-4 py-2 text-xs font-bold text-white">
-                <ExternalLink size={14} />Zoomを開く
-              </a>
-            ) : (
-              <span className="inline-flex min-h-10 items-center rounded-xl border border-dashed border-[var(--mikke-line)] px-3 text-xs font-bold text-[var(--mikke-muted)]">Zoomリンク未設定</span>
-            )}
-            {presence !== "ended" ? (
-              <button type="button" disabled={presenceBusy} onClick={() => void changePresence("ended")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--tw-action)] bg-white px-4 py-2 text-xs font-bold text-[var(--tw-action)] disabled:opacity-50">
-                <Square size={13} />レッスン終了
-              </button>
-            ) : (
-              <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
-                <RotateCcw size={13} />レッスン中に戻す
-              </button>
-            )}
-            <SaveFeedback notice={presenceNotice} />
-            {presence !== "not_started" ? (
-              <button type="button" onClick={() => setControlsCollapsed(true)} className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-xs font-bold text-[var(--mikke-primary)]">
-                操作を畳む <ChevronDown size={13} className="rotate-180" />
-              </button>
+            {workWindow.presence ? (
+              <>
+                {presence !== "ended" ? (
+                  <button type="button" disabled={presenceBusy} onClick={() => void changePresence("ended")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--tw-action)] bg-white px-4 py-2 text-xs font-bold text-[var(--tw-action)] disabled:opacity-50">
+                    <Square size={13} />{labels.endAction}
+                  </button>
+                ) : (
+                  <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                    <RotateCcw size={13} />{labels.sessionNoun}中に戻す
+                  </button>
+                )}
+                <SaveFeedback notice={presenceNotice} />
+                {presence !== "not_started" ? (
+                  <button type="button" onClick={() => setControlsCollapsed(true)} className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-xs font-bold text-[var(--mikke-primary)]">
+                    操作を畳む <ChevronDown size={13} className="rotate-180" />
+                  </button>
+                ) : null}
+              </>
             ) : null}
           </div>
           )}
         </div>
-        {!controlsCollapsed ? <PartnerZoomSettings session={session} onUpdated={onRefresh} /> : null}
+        {workWindow.zoom && !controlsCollapsed ? <PartnerZoomSettings session={session} onUpdated={onRefresh} /> : null}
       </header>
 
-      {session.roster.length ? (
+      {!workWindow.roster ? null : session.roster.length ? (
         <div className="relative flex min-h-0 flex-1 flex-col lg:grid lg:grid-cols-[minmax(380px,1.05fr)_minmax(300px,0.95fr)]">
           <MobileStudentDock
             roster={session.roster}
@@ -625,6 +670,7 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
             onToggleTimer={() => void toggleTimer()}
             onResetTimer={() => { setTimerRunning(false); setElapsedSeconds(0); }}
             onOpenRecord={() => setMobileRecordOpen(true)}
+            showTimer={workWindow.timer}
           />
           <section className="hidden min-h-0 flex-col border-r border-[var(--mikke-line)] lg:flex">
             <div className="flex shrink-0 items-center justify-between border-b border-[var(--mikke-line)] px-4 py-3">
@@ -648,18 +694,21 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
                   timerRunning={timerRunning}
                   onToggleTimer={() => void toggleTimer()}
                   onResetTimer={() => { setTimerRunning(false); setElapsedSeconds(0); }}
+                  showTimer={workWindow.timer}
                 />
               ))}
             </ol>
             <LessonReport session={session} onSubmitted={onRefresh} />
           </section>
-          <ManualPanel
-            manuals={session.manuals}
-            selectedManualNo={selectedManualNo}
-            onSelectManual={setSelectedManualNo}
-            student={selectedStudent}
-            visible
-          />
+          {workWindow.manualLink ? (
+            <ManualPanel
+              manuals={session.manuals}
+              selectedManualNo={selectedManualNo}
+              onSelectManual={setSelectedManualNo}
+              student={selectedStudent}
+              visible
+            />
+          ) : null}
           {mobileRecordOpen && selectedStudent ? (
             <section className="absolute inset-x-0 bottom-0 z-30 flex max-h-[72%] flex-col overflow-hidden rounded-t-2xl border border-[var(--mikke-line)] bg-white shadow-2xl lg:hidden">
               <div className="flex shrink-0 items-center justify-between border-b border-[var(--mikke-line)] bg-white px-4 py-3">
@@ -692,7 +741,6 @@ export function TeamWorksPartnerLessonConsole({ session, onRefresh, standalone =
           <MikkeEmptyState title="名簿はまだ設定されていません" helper="本部が出席順を設定すると、この画面に表示されます。" />
         </div>
       )}
-
     </article>
   );
 }
@@ -706,7 +754,8 @@ function MobileStudentDock({
   timerRunning,
   onToggleTimer,
   onResetTimer,
-  onOpenRecord
+  onOpenRecord,
+  showTimer = true
 }: {
   roster: OperationsPartnerRosterItem[];
   selectedStudent: OperationsPartnerRosterItem | null;
@@ -717,6 +766,7 @@ function MobileStudentDock({
   onToggleTimer: () => void;
   onResetTimer: () => void;
   onOpenRecord: () => void;
+  showTimer?: boolean;
 }) {
   if (!selectedStudent) return null;
 
@@ -730,17 +780,19 @@ function MobileStudentDock({
             {targetMinutes ? `・目安 ${targetMinutes}分` : ""}
           </p>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Timer size={14} className="text-[var(--mikke-primary)]" />
-          <span className="font-mono text-sm font-extrabold tabular-nums">{formatElapsed(elapsedSeconds)}</span>
-          <button type="button" onClick={onToggleTimer} className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-[var(--mikke-primary)] px-2.5 text-[11px] font-bold text-white">
-            {timerRunning ? <Pause size={12} /> : <Play size={12} />}
-            {timerRunning ? "停止" : elapsedSeconds ? "再開" : "開始"}
-          </button>
-          <button type="button" onClick={onResetTimer} aria-label="タイマーをリセット" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]">
-            <RotateCcw size={13} />
-          </button>
-        </div>
+        {showTimer ? (
+          <div className="flex items-center gap-1.5">
+            <Timer size={14} className="text-[var(--mikke-primary)]" />
+            <span className="font-mono text-sm font-extrabold tabular-nums">{formatElapsed(elapsedSeconds)}</span>
+            <button type="button" onClick={onToggleTimer} className="inline-flex min-h-8 items-center gap-1 rounded-lg bg-[var(--mikke-primary)] px-2.5 text-[11px] font-bold text-white">
+              {timerRunning ? <Pause size={12} /> : <Play size={12} />}
+              {timerRunning ? "停止" : elapsedSeconds ? "再開" : "開始"}
+            </button>
+            <button type="button" onClick={onResetTimer} aria-label="タイマーをリセット" className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]">
+              <RotateCcw size={13} />
+            </button>
+          </div>
+        ) : null}
       </div>
       <div className="flex items-center gap-2 border-t border-[var(--mikke-line)] px-3 py-2">
         <div className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-0.5" aria-label="生徒を選択">
@@ -985,6 +1037,7 @@ function PartnerZoomSettings({ session, onUpdated }: { session: OperationsPartne
 }
 
 function LessonReport({ session, onSubmitted }: { session: OperationsPartnerSession; onSubmitted: () => Promise<void> }) {
+  const labels = useTeamWorksLabels();
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<SaveNotice>(null);
@@ -1012,7 +1065,7 @@ function LessonReport({ session, onSubmitted }: { session: OperationsPartnerSess
 
   return (
     <details className="border-t border-[var(--mikke-line)]">
-      <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-[var(--mikke-primary)]">レッスン全体の報告</summary>
+      <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-[var(--mikke-primary)]">{labels.sessionNoun}全体の報告</summary>
       <form onSubmit={submit} className="border-t border-[var(--mikke-line)] p-4">
         <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={2} placeholder="クラス全体の様子、本部への連絡" className="w-full resize-none rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-sm" />
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1055,9 +1108,10 @@ function SaveFeedback({ notice }: { notice: SaveNotice }) {
 }
 
 function PresenceBadge({ status }: { status: OperationsPartnerSession["partnerPresenceStatus"] }) {
-  const labels = {
+  const orgLabels = useTeamWorksLabels();
+  const statusLabels = {
     not_started: "未開始",
-    standby: "スタンバイ",
+    standby: orgLabels.startAction,
     in_progress: "実施中",
     ended: "終了"
   };
@@ -1069,7 +1123,7 @@ function PresenceBadge({ status }: { status: OperationsPartnerSession["partnerPr
         : status === "ended"
           ? "border border-[var(--mikke-line)] text-[var(--mikke-muted)]"
           : "bg-white text-[var(--mikke-muted)]";
-  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${className}`}>{labels[status]}</span>;
+  return <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${className}`}>{statusLabels[status]}</span>;
 }
 
 function ManualList({ label, values }: { label: string; values: string[] }) {

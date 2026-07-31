@@ -6,19 +6,28 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export type TeamWorksLabels = {
   workers: string;
   holidayLabel: string;
+  sessionNoun: string; // コマ・作業窓の呼び名(N-3)。「レッスン画面」「レッスン開始」等の名詞部分
+  startAction: string; // 開始ボタンの呼び名。「スタンバイ」に相当
+  endAction: string; // 終了ボタンの呼び名。「レッスン終了」に相当
 };
 
 // 既存組織(label_settingsがnullの行)向けフォールバック。
 // アリサの組織を含む全既存行がこの値を引き続き表示する。
 export const DEFAULT_LABELS: TeamWorksLabels = {
   workers: "パートナー",
-  holidayLabel: "休校"
+  holidayLabel: "休校",
+  sessionNoun: "レッスン",
+  startAction: "スタンバイ",
+  endAction: "レッスン終了"
 };
 
 // 新規組織の作成経路が明示的に書き込む一般用の初期値。
 export const GENERAL_PURPOSE_LABELS: TeamWorksLabels = {
   workers: "スタッフ",
-  holidayLabel: "休校"
+  holidayLabel: "休校",
+  sessionNoun: "作業",
+  startAction: "作業開始",
+  endAction: "作業終了"
 };
 
 export function resolveTeamWorksLabels(overrides: Partial<TeamWorksLabels> | null | undefined): TeamWorksLabels {

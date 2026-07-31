@@ -50,7 +50,13 @@ function TeamWorksSettingsContent() {
     paymentDay: ""
   });
   const [organizationNotice, setOrganizationNotice] = useState("");
-  const [labelForm, setLabelForm] = useState({ workers: DEFAULT_LABELS.workers, holidayLabel: DEFAULT_LABELS.holidayLabel });
+  const [labelForm, setLabelForm] = useState({
+    workers: DEFAULT_LABELS.workers,
+    holidayLabel: DEFAULT_LABELS.holidayLabel,
+    sessionNoun: DEFAULT_LABELS.sessionNoun,
+    startAction: DEFAULT_LABELS.startAction,
+    endAction: DEFAULT_LABELS.endAction
+  });
   const [savingLabels, setSavingLabels] = useState(false);
   const [labelsNotice, setLabelsNotice] = useState("");
   const [operationForm, setOperationForm] = useState({
@@ -92,7 +98,13 @@ function TeamWorksSettingsContent() {
           loadTeamWorksLabels(supabase, organizationProfile.id),
           loadOrganizationOperationSettings(supabase, organizationProfile.id)
         ]);
-        setLabelForm({ workers: orgLabels.workers, holidayLabel: orgLabels.holidayLabel });
+        setLabelForm({
+          workers: orgLabels.workers,
+          holidayLabel: orgLabels.holidayLabel,
+          sessionNoun: orgLabels.sessionNoun,
+          startAction: orgLabels.startAction,
+          endAction: orgLabels.endAction
+        });
         setOperationForm({
           closedWeekdays: orgOperationSettings.closedWeekdays,
           closeOnNationalHolidays: orgOperationSettings.closeOnNationalHolidays
@@ -146,7 +158,10 @@ function TeamWorksSettingsContent() {
     try {
       await updateTeamWorksLabels(supabase, organization.id, {
         workers: labelForm.workers.trim() || DEFAULT_LABELS.workers,
-        holidayLabel: labelForm.holidayLabel.trim() || DEFAULT_LABELS.holidayLabel
+        holidayLabel: labelForm.holidayLabel.trim() || DEFAULT_LABELS.holidayLabel,
+        sessionNoun: labelForm.sessionNoun.trim() || DEFAULT_LABELS.sessionNoun,
+        startAction: labelForm.startAction.trim() || DEFAULT_LABELS.startAction,
+        endAction: labelForm.endAction.trim() || DEFAULT_LABELS.endAction
       });
       setLabelsNotice("表示ラベル設定を保存しました。");
       await reload();
@@ -260,6 +275,18 @@ function TeamWorksSettingsContent() {
             <TeamWorksProjectField label="休みの日の呼び名" required>
               <input value={labelForm.holidayLabel} onChange={(event) => setLabelForm({ ...labelForm, holidayLabel: event.target.value })} className={teamWorksProjectInputClass} />
               <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）休校、定休日、休業日。カレンダーの休みの日の表示に反映されます。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="コマ・作業窓の呼び名" required>
+              <input value={labelForm.sessionNoun} onChange={(event) => setLabelForm({ ...labelForm, sessionNoun: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）レッスン、作業、施術。「◯◯画面」「◯◯開始」などに反映されます。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="開始ボタンの呼び名" required>
+              <input value={labelForm.startAction} onChange={(event) => setLabelForm({ ...labelForm, startAction: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）スタンバイ、出勤、受付開始。担当が現場入りを本部へ知らせるボタンです。</span>
+            </TeamWorksProjectField>
+            <TeamWorksProjectField label="終了ボタンの呼び名" required>
+              <input value={labelForm.endAction} onChange={(event) => setLabelForm({ ...labelForm, endAction: event.target.value })} className={teamWorksProjectInputClass} />
+              <span className="mt-1 block text-[11px] leading-5 font-semibold text-[var(--mikke-muted)]">例）レッスン終了、退勤、施術終了。</span>
             </TeamWorksProjectField>
             <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
               <button disabled={savingLabels || !organization} className="rounded-xl bg-[var(--tw-action)] px-4 py-2.5 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{savingLabels ? "保存中…" : "表示ラベル設定を保存"}</button>

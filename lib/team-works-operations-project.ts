@@ -72,6 +72,7 @@ export type OperationsScheduleRule = {
   status: string;
   partnerMemberId: string | null;
   partnerName: string | null;
+  workDescription: string | null;
 };
 
 export type OperationsProjectSession = {
@@ -87,6 +88,7 @@ export type OperationsProjectSession = {
   zoomMeetingId: string | null;
   zoomPasscode: string | null;
   zoomUsesProjectDefault: boolean;
+  workDescription: string | null;
   partnerPresenceStatus: "not_started" | "standby" | "in_progress" | "ended";
   roster: {
     id: string;
@@ -276,14 +278,14 @@ export async function loadOperationsProjectDetail(
       .eq("project_id", projectId),
     client
       .from("team_works_schedule_rules")
-      .select("id,weekday,start_time,duration_min,status,partner_member_id")
+      .select("id,weekday,start_time,duration_min,status,partner_member_id,work_description")
       .eq("project_id", projectId)
       .neq("status", "archived")
       .order("weekday")
       .order("start_time"),
     client
       .from("team_works_op_sessions")
-      .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status")
+      .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,work_description")
       .eq("project_id", projectId)
       .gte("session_date", dateKey(addDays(new Date(), -14)))
       .lte("session_date", dateKey(addDays(new Date(), 90)))
@@ -333,7 +335,7 @@ export async function loadOperationsProjectDetail(
       .is("archived_at", null)
       .order("no") as typeof manualResult;
   }
-  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default", "partner_presence_status"])) {
+  if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default", "partner_presence_status", "work_description"])) {
     sessionResult = await client
       .from("team_works_op_sessions")
       .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id")
@@ -342,6 +344,15 @@ export async function loadOperationsProjectDetail(
       .lte("session_date", dateKey(addDays(new Date(), 90)))
       .order("session_date")
       .order("start_time") as typeof sessionResult;
+  }
+  if (ruleResult.error && isMissingSupabaseField(ruleResult.error, ["work_description"])) {
+    ruleResult = await client
+      .from("team_works_schedule_rules")
+      .select("id,weekday,start_time,duration_min,status,partner_member_id")
+      .eq("project_id", projectId)
+      .neq("status", "archived")
+      .order("weekday")
+      .order("start_time") as typeof ruleResult;
   }
 
   for (const result of [
@@ -399,6 +410,7 @@ export async function loadOperationsProjectDetail(
     zoom_passcode: string | null;
     zoom_uses_project_default: boolean;
     partner_presence_status: "not_started" | "standby" | "in_progress" | "ended";
+    work_description?: string | null;
   }[];
   const sessionIds = sessionRows.map((row) => row.id);
   const rosterRows: {
@@ -507,6 +519,7 @@ export async function loadOperationsProjectDetail(
       duration_min: number;
       status: string;
       partner_member_id: string | null;
+      work_description?: string | null;
     }[]).map((row) => ({
       id: row.id,
       weekday: row.weekday,
@@ -514,7 +527,8 @@ export async function loadOperationsProjectDetail(
       durationMin: row.duration_min,
       status: row.status,
       partnerMemberId: row.partner_member_id,
-      partnerName: row.partner_member_id ? memberNameById.get(row.partner_member_id) ?? "パートナー" : null
+      partnerName: row.partner_member_id ? memberNameById.get(row.partner_member_id) ?? "パートナー" : null,
+      workDescription: row.work_description ?? null
     })),
     sessions: sessionRows.map((row) => ({
       id: row.id,
@@ -529,6 +543,7 @@ export async function loadOperationsProjectDetail(
       zoomMeetingId: row.zoom_meeting_id ?? null,
       zoomPasscode: row.zoom_passcode ?? null,
       zoomUsesProjectDefault: row.zoom_uses_project_default ?? true,
+      workDescription: row.work_description ?? null,
       partnerPresenceStatus: row.partner_presence_status ?? "not_started",
       roster: rosterRows
         .filter((roster) => roster.session_id === row.id)
@@ -1308,64 +1323,77 @@ export async function createOperationsGroup(client: SupabaseClient, projectId: s
 export async function createOperationsScheduleRule(
   client: SupabaseClient,
   projectId: string,
-  input: { weekday: number; startTime: string; durationMin: number; partnerMemberId: string | null }
+  input: { weekday: number; startTime: string; durationMin: number; partnerMemberId: string | null; workDescription?: string | null }
 ) {
-  const { error } = await client.from("team_works_schedule_rules").insert({
+  const payload: Record<string, unknown> = {
     project_id: projectId,
     weekday: Math.min(6, Math.max(0, Math.round(input.weekday))),
     start_time: input.startTime,
     duration_min: Math.max(1, Math.round(input.durationMin)),
     partner_member_id: input.partnerMemberId || null,
+    work_description: input.workDescription?.trim() || null,
     status: "active"
-  });
+  };
+  let { error } = await client.from("team_works_schedule_rules").insert(payload);
+  if (error && isMissingSupabaseField(error, ["work_description"])) {
+    const { work_description: _workDescription, ...payloadWithoutWorkDescription } = payload;
+    ({ error } = await client.from("team_works_schedule_rules").insert(payloadWithoutWorkDescription));
+  }
   if (error) throw error;
 }
 
 export async function updateOperationsScheduleRule(
   client: SupabaseClient,
   ruleId: string,
-  input: { weekday: number; startTime: string; durationMin: number; partnerMemberId: string | null }
+  input: { weekday: number; startTime: string; durationMin: number; partnerMemberId: string | null; workDescription?: string | null }
 ) {
-  const { data, error } = await client
-    .from("team_works_schedule_rules")
-    .update({
-      weekday: Math.min(6, Math.max(0, Math.round(input.weekday))),
-      start_time: input.startTime,
-      duration_min: Math.max(1, Math.round(input.durationMin)),
-      partner_member_id: input.partnerMemberId || null,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", ruleId)
-    .select("id")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("週次パターンを更新できませんでした。権限と対象を確認してください。");
+  const payload: Record<string, unknown> = {
+    weekday: Math.min(6, Math.max(0, Math.round(input.weekday))),
+    start_time: input.startTime,
+    duration_min: Math.max(1, Math.round(input.durationMin)),
+    partner_member_id: input.partnerMemberId || null,
+    work_description: input.workDescription?.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+  let result = await client.from("team_works_schedule_rules").update(payload).eq("id", ruleId).select("id").maybeSingle();
+  if (result.error && isMissingSupabaseField(result.error, ["work_description"])) {
+    const { work_description: _workDescription, ...payloadWithoutWorkDescription } = payload;
+    result = await client.from("team_works_schedule_rules").update(payloadWithoutWorkDescription).eq("id", ruleId).select("id").maybeSingle();
+  }
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error("週次パターンを更新できませんでした。権限と対象を確認してください。");
 }
 
 export async function createOperationsSession(
   client: SupabaseClient,
   projectId: string,
-  input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null }
+  input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null; workDescription?: string | null }
 ) {
   const { settings, holidayLabel } = await loadProjectHolidayContext(client, projectId);
   if (isClosedDayKey(settings, input.sessionDate)) {
     throw new Error(`${describeClosedDayReason(settings, holidayLabel)}のため、レッスンを登録できません。`);
   }
-  const { error } = await client.from("team_works_op_sessions").insert({
+  const payload: Record<string, unknown> = {
     project_id: projectId,
     session_date: input.sessionDate,
     start_time: input.startTime,
     duration_min: Math.max(1, Math.round(input.durationMin)),
     partner_member_id: input.partnerMemberId || null,
+    work_description: input.workDescription?.trim() || null,
     status: "scheduled"
-  });
+  };
+  let { error } = await client.from("team_works_op_sessions").insert(payload);
+  if (error && isMissingSupabaseField(error, ["work_description"])) {
+    const { work_description: _workDescription, ...payloadWithoutWorkDescription } = payload;
+    ({ error } = await client.from("team_works_op_sessions").insert(payloadWithoutWorkDescription));
+  }
   if (error) throw error;
 }
 
 export async function updateOperationsSession(
   client: SupabaseClient,
   sessionId: string,
-  input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null }
+  input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null; workDescription?: string | null }
 ) {
   const sessionRow = await client.from("team_works_op_sessions").select("project_id").eq("id", sessionId).maybeSingle();
   if (sessionRow.error) throw sessionRow.error;
@@ -1375,20 +1403,23 @@ export async function updateOperationsSession(
       throw new Error(`${describeClosedDayReason(settings, holidayLabel)}のため、レッスンを移動できません。`);
     }
   }
-  const { data, error } = await client
-    .from("team_works_op_sessions")
-    .update({
-      session_date: input.sessionDate,
-      start_time: input.startTime,
-      duration_min: Math.max(1, Math.round(input.durationMin)),
-      partner_member_id: input.partnerMemberId || null,
-      updated_at: new Date().toISOString()
-    })
-    .eq("id", sessionId)
-    .select("id")
-    .maybeSingle();
-  if (error) throw error;
-  if (!data) throw new Error("予定を更新できませんでした。権限と対象を確認してください。");
+  const payload: Record<string, unknown> = {
+    session_date: input.sessionDate,
+    start_time: input.startTime,
+    duration_min: Math.max(1, Math.round(input.durationMin)),
+    partner_member_id: input.partnerMemberId || null,
+    updated_at: new Date().toISOString()
+  };
+  // workDescription省略時は既存値を保持する(未指定=変更なし。他のUIから
+  // 日時・担当だけを更新するときに作業内容を消してしまわないため)。
+  if (input.workDescription !== undefined) payload.work_description = input.workDescription?.trim() || null;
+  let result = await client.from("team_works_op_sessions").update(payload).eq("id", sessionId).select("id").maybeSingle();
+  if (result.error && isMissingSupabaseField(result.error, ["work_description"])) {
+    const { work_description: _workDescription, ...payloadWithoutWorkDescription } = payload;
+    result = await client.from("team_works_op_sessions").update(payloadWithoutWorkDescription).eq("id", sessionId).select("id").maybeSingle();
+  }
+  if (result.error) throw result.error;
+  if (!result.data) throw new Error("予定を更新できませんでした。権限と対象を確認してください。");
 }
 
 export async function updateOperationsSessionZoom(

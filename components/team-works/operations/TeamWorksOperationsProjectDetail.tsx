@@ -82,7 +82,11 @@ import {
   type OperationsProjectMember
 } from "@/lib/team-works-operations-project";
 import { generateSessionsForProject } from "@/lib/team-works-operations";
-import { updateProjectFeatureSettings, type TeamWorksOperationsFeatureSettings } from "@/lib/team-works-feature-settings";
+import {
+  updateProjectFeatureSettings,
+  type TeamWorksOperationsFeatureSettings,
+  type TeamWorksWorkWindowSettings
+} from "@/lib/team-works-feature-settings";
 import { TeamWorksOperationsClientPortalPreview } from "./TeamWorksOperationsClientPortal";
 import { TeamWorksOperationsPartnerPortalPreview } from "./TeamWorksOperationsPartnerPortal";
 import { TeamWorksOperationsShell } from "./TeamWorksOperationsShell";
@@ -334,7 +338,7 @@ function OverviewTab({
         <section aria-live="polite" className="rounded-2xl border border-[var(--mikke-line)] border-l-4 border-l-[var(--tw-done)] bg-white p-4">
           <div className="mb-3 flex items-center gap-2">
             <Clock3 size={18} className="text-[var(--tw-on-tint)]" />
-            <h2 className="text-sm font-extrabold">只今のレッスン状況</h2>
+            <h2 className="text-sm font-extrabold">只今の{labels.sessionNoun}状況</h2>
           </div>
           <div className="grid gap-2 md:grid-cols-2">
             {liveSessions.map((session) => (
@@ -487,6 +491,7 @@ function ProjectCalendarPanel({
   const [startTime, setStartTime] = useState("13:00");
   const [finishTime, setFinishTime] = useState("14:00");
   const [partnerMemberId, setPartnerMemberId] = useState("");
+  const [workDescription, setWorkDescription] = useState("");
   const [scheduleMode, setScheduleMode] = useState<"once" | "weekly">("once");
   const [holidayMemo, setHolidayMemo] = useState("");
   const calendarDates = useMemo(() => monthCalendarDates(monthDate), [monthDate]);
@@ -525,7 +530,8 @@ function ProjectCalendarPanel({
             sessionDate: selectedDate,
             startTime,
             durationMin,
-            partnerMemberId: partnerMemberId || null
+            partnerMemberId: partnerMemberId || null,
+            workDescription
           });
           return;
         }
@@ -533,7 +539,8 @@ function ProjectCalendarPanel({
           weekday: firstDate.getDay(),
           startTime,
           durationMin,
-          partnerMemberId: partnerMemberId || null
+          partnerMemberId: partnerMemberId || null,
+          workDescription
         });
         await generateSessionsForProject(
           supabase,
@@ -550,6 +557,7 @@ function ProjectCalendarPanel({
         : "予定を登録しました。"
     );
     setAdding(false);
+    setWorkDescription("");
   };
 
   const addHoliday = async () => {
@@ -666,6 +674,7 @@ function ProjectCalendarPanel({
               ) : null}
             </fieldset>
             <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{data.partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            <input value={workDescription} onChange={(event) => setWorkDescription(event.target.value)} placeholder="作業内容（任意）" className={teamWorksProjectInputClass} />
             <button disabled={saving} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">{scheduleMode === "weekly" ? "毎週の予定を登録" : "登録"}</button>
           </form> : !selectedJapanDayOff.isDayOff ? <button type="button" onClick={() => setAdding(true)} className="mt-3 w-full rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-bold text-[var(--mikke-primary)]">＋ 予定追加</button> : null}
           {!selectedHoliday ? <div className="mt-2 flex gap-2"><input value={holidayMemo} onChange={(event) => setHolidayMemo(event.target.value)} placeholder="休講メモ（任意）" className={teamWorksProjectInputClass} /><button type="button" disabled={saving} onClick={() => void addHoliday()} className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2 text-xs font-bold">休講</button></div> : null}
@@ -681,6 +690,7 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
   const [startTime, setStartTime] = useState(session.startTime);
   const [finishTime, setFinishTime] = useState(endTime(session.startTime, session.durationMin));
   const [partnerMemberId, setPartnerMemberId] = useState(session.partnerMemberId ?? "");
+  const [workDescription, setWorkDescription] = useState(session.workDescription ?? "");
   const [useProjectDefault, setUseProjectDefault] = useState(session.zoomUsesProjectDefault);
   const [zoomUrl, setZoomUrl] = useState(session.zoomUrl ?? "");
   const [zoomMeetingId, setZoomMeetingId] = useState(session.zoomMeetingId ?? "");
@@ -693,6 +703,7 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
         <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left text-xs font-bold">
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2"><span><span className={dateLabel ? "mr-2 text-[var(--mikke-primary)] underline decoration-[var(--mikke-line)] underline-offset-4" : ""}>{dateLabel}</span>{session.startTime}〜{endTime(session.startTime, session.durationMin)}　担当 {session.partnerName ?? "未定"}　名簿{session.roster.length}名</span><PartnerPresenceBadge status={session.partnerPresenceStatus} /></span>
+            {session.workDescription ? <span className="mt-1 block text-[11px] font-semibold text-[var(--mikke-text)]">作業内容：{session.workDescription}</span> : null}
             <span className="mt-1 block text-[11px] font-semibold text-[var(--mikke-muted)]">Zoom ID：{session.zoomMeetingId ?? "未設定"}</span>
           </span>
           <span className="shrink-0 text-[var(--mikke-primary)]">{open ? "閉じる" : "編集"}</span>
@@ -729,8 +740,9 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
               <label className="text-[11px] font-bold text-[var(--mikke-muted)]">終了時間<input type="time" value={finishTime} onChange={(event) => setFinishTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="終了時間" /></label>
             </div>
             <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label={`担当${labels.workers}`}><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            <input value={workDescription} onChange={(event) => setWorkDescription(event.target.value)} placeholder="作業内容（任意）" className={teamWorksProjectInputClass} aria-label="作業内容" />
             <div className="flex gap-2">
-              <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null }), "予定を更新しました。")} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">予定を保存</button>
+              <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null, workDescription }), "予定を更新しました。")} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">予定を保存</button>
               {session.generatedFromRuleId ? (
                 <button
                   type="button"
@@ -1888,9 +1900,25 @@ function PortalTab({
   function setFeature<K extends keyof TeamWorksOperationsFeatureSettings>(key: K, value: boolean) {
     setFeatureSettings((current) => {
       const next = { ...current, [key]: value };
-      if (key === "roster" && !value) next.attendance = false;
+      if (key === "roster" && !value) {
+        next.attendance = false;
+        next.workWindow = { ...next.workWindow, roster: false };
+      }
+      if (key === "attendance" && !value) {
+        next.workWindow = { ...next.workWindow, roster: false };
+      }
+      if (key === "manuals" && !value) {
+        next.workWindow = { ...next.workWindow, manualLink: false };
+      }
       return next;
     });
+  }
+
+  function setWorkWindow<K extends keyof TeamWorksWorkWindowSettings>(key: K, value: boolean) {
+    setFeatureSettings((current) => ({
+      ...current,
+      workWindow: { ...current.workWindow, [key]: value }
+    }));
   }
 
   async function submit(event: FormEvent) {
@@ -1959,12 +1987,57 @@ function PortalTab({
             <FeatureCheck
               checked={featureSettings.lessons}
               onChange={(value) => setFeature("lessons", value)}
-              title="レッスン画面"
-              helper="ポータルのレッスンカレンダー・Zoom表示（本部のスケジュール管理は常に表示されます）"
-              tags={[{ label: "クライアント：カレンダー", tone: "client" }, { label: "スタッフ：レッスン画面・Zoom", tone: "staff" }]}
+              title="クライアントのカレンダー"
+              helper={`クライアントポータルのカレンダー表示（本部・${labels.workers}のスケジュールは常に表示されます）`}
+              tags={[{ label: "クライアント：カレンダー", tone: "client" }]}
             />
           </div>
           <FeatureTagLegend />
+        </div>
+        <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+          <PortalFeatureHeading
+            title="作業窓（スタッフの作業画面）"
+            helper={`${labels.workers}がコマを開いたときの画面の部品をON/OFFできます。Zoomを使わない・タイムカード式にしたい等、業種に合わせて選べます`}
+          />
+          <div className="mt-3 space-y-3">
+            <FeatureCheck
+              checked={featureSettings.workWindow.zoom}
+              onChange={(value) => setWorkWindow("zoom", value)}
+              title="Zoom"
+              helper="Zoom情報の表示・変更ボタン"
+              tags={[{ label: `スタッフ：作業窓`, tone: "staff" }]}
+            />
+            <FeatureCheck
+              checked={featureSettings.workWindow.presence}
+              onChange={(value) => setWorkWindow("presence", value)}
+              title="開始・終了ボタン"
+              helper="本部へ開始・終了を通知するボタン（スタンバイ・レッスン開始・終了）"
+              tags={[{ label: `スタッフ：作業窓`, tone: "staff" }]}
+            />
+            <FeatureCheck
+              checked={featureSettings.workWindow.timer}
+              onChange={(value) => setWorkWindow("timer", value)}
+              title="経過タイマー"
+              helper={`${labels.workers}1人あたりの目安時間・経過時間の表示`}
+              tags={[{ label: `スタッフ：作業窓`, tone: "staff" }]}
+            />
+            <FeatureCheck
+              checked={featureSettings.workWindow.roster}
+              onChange={(value) => setWorkWindow("roster", value)}
+              disabled={!featureSettings.attendance}
+              title="クライアントタスク（名簿・生徒送り）"
+              helper="出席順に沿って生徒を送りながら記録する機能。出席がOFFのときは自動的にOFFになります"
+              tags={[{ label: `スタッフ：作業窓`, tone: "staff" }]}
+            />
+            <FeatureCheck
+              checked={featureSettings.workWindow.manualLink}
+              onChange={(value) => setWorkWindow("manualLink", value)}
+              disabled={!featureSettings.manuals}
+              title="マニュアル連動"
+              helper="名簿の生徒に合わせて進捗マニュアルを表示。マニュアルがOFFのときは自動的にOFFになります"
+              tags={[{ label: `スタッフ：作業窓`, tone: "staff" }]}
+            />
+          </div>
         </div>
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
           <PortalFeatureHeading title="クライアントに表示" helper="クライアント担当者が使う画面に表示する内容" />

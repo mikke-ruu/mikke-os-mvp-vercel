@@ -670,16 +670,32 @@ export async function loadOperationsScheduleGroups(
 
 async function insertSessionsSkippingConflicts(
   client: SupabaseClient,
-  rows: { project_id: string; generated_from_rule_id: string; partner_member_id: string | null; session_date: string; start_time: string; duration_min: number }[]
+  rows: {
+    project_id: string;
+    generated_from_rule_id: string;
+    partner_member_id: string | null;
+    session_date: string;
+    start_time: string;
+    duration_min: number;
+    work_description: string | null;
+  }[]
 ): Promise<number> {
   if (rows.length === 0) return 0;
-  const bulkResult = await client.from("team_works_op_sessions").insert(rows).select("id");
+  let bulkResult = await client.from("team_works_op_sessions").insert(rows).select("id");
+  if (bulkResult.error && isMissingSupabaseField(bulkResult.error, ["work_description"])) {
+    const rowsWithoutWorkDescription = rows.map(({ work_description: _workDescription, ...rest }) => rest);
+    bulkResult = await client.from("team_works_op_sessions").insert(rowsWithoutWorkDescription).select("id") as typeof bulkResult;
+  }
   if (!bulkResult.error) return bulkResult.data?.length ?? rows.length;
 
   // 一括insertが競合(unique制約)で失敗した場合は1件ずつ試して衝突分だけ読み飛ばす。
   let created = 0;
   for (const row of rows) {
-    const singleResult = await client.from("team_works_op_sessions").insert(row);
+    let singleResult = await client.from("team_works_op_sessions").insert(row);
+    if (singleResult.error && isMissingSupabaseField(singleResult.error, ["work_description"])) {
+      const { work_description: _workDescription, ...rowWithoutWorkDescription } = row;
+      singleResult = await client.from("team_works_op_sessions").insert(rowWithoutWorkDescription);
+    }
     if (!singleResult.error) created += 1;
     else if (singleResult.error.code !== "23505") throw singleResult.error;
   }
@@ -702,10 +718,10 @@ export async function generateSessionsForProject(
   const fromKey = formatDateKey(fromDate);
   const toKey = formatDateKey(addDays(fromDate, totalDays - 1));
 
-  const [rulesResult, holidayRows, existingResult] = await Promise.all([
+  let [rulesResult, holidayRows, existingResult] = await Promise.all([
     client
       .from("team_works_schedule_rules")
-      .select("id,partner_member_id,weekday,start_time,duration_min")
+      .select("id,partner_member_id,weekday,start_time,duration_min,work_description")
       .eq("project_id", project.id)
       .eq("status", "active"),
     fetchHolidayRows(client, [project.organizationId], [project.id], fromKey, toKey),
@@ -716,10 +732,17 @@ export async function generateSessionsForProject(
       .gte("session_date", fromKey)
       .lte("session_date", toKey)
   ]);
+  if (rulesResult.error && isMissingSupabaseField(rulesResult.error, ["work_description"])) {
+    rulesResult = await client
+      .from("team_works_schedule_rules")
+      .select("id,partner_member_id,weekday,start_time,duration_min")
+      .eq("project_id", project.id)
+      .eq("status", "active") as typeof rulesResult;
+  }
   if (rulesResult.error) throw rulesResult.error;
   if (existingResult.error) throw existingResult.error;
 
-  const rules = (rulesResult.data ?? []) as { id: string; partner_member_id: string | null; weekday: number; start_time: string; duration_min: number }[];
+  const rules = (rulesResult.data ?? []) as { id: string; partner_member_id: string | null; weekday: number; start_time: string; duration_min: number; work_description?: string | null }[];
   const holidayDateSet = new Set(holidayRows.map((holiday) => holiday.date));
   const occupiedSlotKeys = new Set(
     ((existingResult.data ?? []) as { session_date: string; start_time: string; partner_member_id: string | null }[]).map((row) =>
@@ -727,7 +750,15 @@ export async function generateSessionsForProject(
     )
   );
 
-  const rows: { project_id: string; generated_from_rule_id: string; partner_member_id: string | null; session_date: string; start_time: string; duration_min: number }[] = [];
+  const rows: {
+    project_id: string;
+    generated_from_rule_id: string;
+    partner_member_id: string | null;
+    session_date: string;
+    start_time: string;
+    duration_min: number;
+    work_description: string | null;
+  }[] = [];
   let skippedHolidayDateCount = 0;
   let skippedExistingSlotCount = 0;
 
@@ -752,7 +783,8 @@ export async function generateSessionsForProject(
         partner_member_id: rule.partner_member_id,
         session_date: dateKey,
         start_time: rule.start_time,
-        duration_min: rule.duration_min
+        duration_min: rule.duration_min,
+        work_description: rule.work_description ?? null
       });
     }
   }

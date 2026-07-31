@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
+import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import { supabase } from "@/lib/supabase/client";
 import { createOperationsProject } from "@/lib/team-works-operations-project";
 import {
@@ -34,6 +35,7 @@ export function TeamWorksOperationsDashboard() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const labels = useTeamWorksLabels();
 
   const [monthDate, setMonthDate] = useState<Date>(startOfCurrentMonth);
   const [data, setData] = useState<OperationsDashboardData | null>(null);
@@ -193,7 +195,7 @@ export function TeamWorksOperationsDashboard() {
             <section aria-live="polite" className="rounded-2xl border border-[var(--mikke-line)] border-l-4 border-l-[var(--tw-done)] bg-white p-4">
               <div className="mb-3 flex items-center gap-2">
                 <Clock size={18} className="text-[var(--tw-on-tint)]" />
-                <h2 className="text-sm font-extrabold">只今のレッスン状況</h2>
+                <h2 className="text-sm font-extrabold">只今の{labels.sessionNoun}状況</h2>
                 <span className="rounded-full bg-[var(--tw-done)] px-2 py-0.5 text-[10px] font-extrabold text-[var(--tw-on-tint)]">
                   {data.activePresenceEvents.length}件
                 </span>

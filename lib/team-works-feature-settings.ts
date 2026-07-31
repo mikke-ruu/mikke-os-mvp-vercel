@@ -7,13 +7,43 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // (docs/MIKKEOS_TEAM_WORKS_GENERALIZE_PLAN_2026-07-30.md §4)。
 //
 // RLSとは独立。これは表示の設定であって権限の設定ではない。
+// 作業窓(N-2・2026-07-31): スタッフがコマを開いたときの画面(現行の「レッスン
+// コンソール」)を部品単位でON/OFFできるようにしたもの。業種によって
+// Zoomを使わない・タイムカード式にしたい等、必要な部品が変わるため。
+// 全項目デフォルトtrue=アリサの現行レッスンコンソールと完全一致。
+// (timerは計画書では新機能としてデフォルトfalse想定だったが、実装時に
+// レッスンコンソールへ既存の生徒ごとの目安タイマーが既に常時表示されている
+// ことが判明したため、そちらをON/OFFする項目として再利用する。既存動作を
+// 変えないためデフォルトtrueに修正した。)
+export type TeamWorksWorkWindowSettings = {
+  zoom: boolean; // Zoom情報の表示・変更
+  presence: boolean; // 開始/終了ボタン(プレゼンス通知)
+  timer: boolean; // 生徒ごとの目安タイマー表示
+  roster: boolean; // クライアントタスク(名簿・生徒送り)。attendance=falseなら強制false
+  manualLink: boolean; // 名簿とマニュアルの連動表示。manuals=falseなら強制false
+};
+
+export const DEFAULT_WORK_WINDOW_SETTINGS: TeamWorksWorkWindowSettings = {
+  zoom: true,
+  presence: true,
+  timer: true,
+  roster: true,
+  manualLink: true
+};
+
 export type TeamWorksOperationsFeatureSettings = {
   roster: boolean; // 名簿(参加者・グループ)
   attendance: boolean; // 出席(コマの名簿・出席記録)
   shifts: boolean; // 希望シフト(パートナーの提出・本部承認)
   reports: boolean; // 報告
   manuals: boolean; // マニュアル
-  lessons: boolean; // ポータルのレッスン画面(コマ表示・Zoom)
+  // クライアントポータルのカレンダー表示。N-1(2026-07-31)でスタッフ側の
+  // スケジュール表示(予定そのもの)からは切り離した。予定は本部が組む以上、
+  // スタッフには常に見える必要があるため(=lessons=falseでもスタッフの
+  // スケジュールは消えない)。スタッフ側の「レッスン画面(作業窓)」の中身は
+  // workWindowで別途制御する。
+  lessons: boolean;
+  workWindow: TeamWorksWorkWindowSettings;
 };
 
 export const DEFAULT_OPERATIONS_FEATURE_SETTINGS: TeamWorksOperationsFeatureSettings = {
@@ -22,16 +52,23 @@ export const DEFAULT_OPERATIONS_FEATURE_SETTINGS: TeamWorksOperationsFeatureSett
   shifts: true,
   reports: true,
   manuals: true,
-  lessons: true
+  lessons: true,
+  workWindow: DEFAULT_WORK_WINDOW_SETTINGS
 };
 
 // attendanceはrosterに依存する(名簿が無ければ出席も取れない)。
 // UIでは「名簿をOFFにすると出席もOFFになります」と表示すること。
+// workWindowはjsonbの入れ子のため、浅いスプレッドだけでは部分保存時に
+// 残りの部品が消えてしまう。DEFAULTとの深いマージをここで行う。
 export function resolveOperationsFeatureSettings(
   overrides: Partial<TeamWorksOperationsFeatureSettings> | null | undefined
 ): TeamWorksOperationsFeatureSettings {
   const resolved = { ...DEFAULT_OPERATIONS_FEATURE_SETTINGS, ...(overrides ?? {}) };
+  const workWindow = { ...DEFAULT_WORK_WINDOW_SETTINGS, ...(overrides?.workWindow ?? {}) };
   if (!resolved.roster) resolved.attendance = false;
+  if (!resolved.attendance) workWindow.roster = false;
+  if (!resolved.manuals) workWindow.manualLink = false;
+  resolved.workWindow = workWindow;
   return resolved;
 }
 
