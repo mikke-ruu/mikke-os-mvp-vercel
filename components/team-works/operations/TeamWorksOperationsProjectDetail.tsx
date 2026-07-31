@@ -2101,80 +2101,108 @@ function OperationsPortalPreview({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
 
-  const client = members.find((member) => member.projectRole === "client");
-  const worker = members.find((member) => member.projectRole === "worker");
-  const previewMember = previewRole === "client" ? client : worker;
-  const isSample = !previewMember;
-  const targetOrganizationMemberId = previewMember?.organizationMemberId ?? SAMPLE_OPERATIONS_MEMBER_ID;
-  const sampleDisplayName = previewRole === "client" ? "クライアント（サンプル）" : `${labels.workers}（サンプル）`;
+  // Phase P(2026-08-01): あゆみ提案で役割を2つに分けた。
+  //   ・上の「ポータルプレビュー」= 常にサンプルデータ。設定した機能が
+  //     どう見えるかの確認用で、招待前でも中身のある画面が見られる。
+  //   ・下の「実際の画面を見に行く」= 実データ。「名簿が入れられない」等の
+  //     問い合わせを受けたときに、その人に今何が見えているかを確認して案内する用。
+  // 以前はプレビューがメンバーの有無で実データ/サンプルを勝手に切り替えていて、
+  // どちらを見ているのか分からなかった。
+  const portalMembers = members.filter((member) =>
+    previewRole === "client" ? member.projectRole === "client" : member.projectRole === "worker"
+  );
+  const sampleDisplayName = previewRole === "client" ? `${labels.clientNoun}（サンプル）` : `${labels.workers}（サンプル）`;
+  const portalPath = previewRole === "client" ? "client" : "worker";
 
   return (
-    <div className="max-w-3xl space-y-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="flex items-center gap-1.5 text-sm font-extrabold"><Eye size={15} /> ポータルプレビュー</p>
-        <div className="inline-flex overflow-hidden rounded-lg border border-[var(--mikke-line)]">
-          <button
-            type="button"
-            onClick={() => setPreviewRole("client")}
-            className={`px-3 py-1.5 text-xs font-bold ${previewRole === "client" ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"}`}
-          >
-            クライアント視点
-          </button>
-          <button
-            type="button"
-            onClick={() => setPreviewRole("worker")}
-            className={`border-l border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold ${previewRole === "worker" ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"}`}
-          >
-            {labels.workers}視点
-          </button>
+    <div className="max-w-3xl space-y-5">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="flex items-center gap-1.5 text-sm font-extrabold"><Eye size={15} /> ポータルプレビュー（サンプル）</p>
+          <div className="inline-flex overflow-hidden rounded-lg border border-[var(--mikke-line)]">
+            <button
+              type="button"
+              onClick={() => setPreviewRole("client")}
+              className={`px-3 py-1.5 text-xs font-bold ${previewRole === "client" ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"}`}
+            >
+              {labels.clientNoun}視点
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewRole("worker")}
+              className={`border-l border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold ${previewRole === "worker" ? "bg-[var(--mikke-primary)] text-white" : "bg-white text-[var(--mikke-muted)]"}`}
+            >
+              {labels.workers}視点
+            </button>
+          </div>
         </div>
-      </div>
-      <p className="text-xs font-semibold text-[var(--mikke-muted)]">
-        実際のデータをそのまま読み取り専用で表示します。ここから操作はできません。
-      </p>
-      {/* O-3: 埋め込みプレビューはコマを開けない(=作業窓を確認できない)ため、
-          本物のポータルを別タブで開く入口をここに置く。開いた先も読み取り専用。 */}
-      {previewMember ? (
+        <p className="text-xs font-semibold text-[var(--mikke-muted)]">
+          上でONにした機能が、その相手にどう見えるかをサンプルデータで表示します。実際の予定や{labels.rosterNoun}は入っていません。
+        </p>
+        <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
+          <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">
+            <span className="h-2 w-2 rounded-full bg-[var(--mikke-muted)]" />
+            サンプルデータで表示中・保存や送信はできません
+          </div>
+          <div className="max-h-[520px] overflow-y-auto bg-[var(--mikke-surface-soft)] p-4">
+            {previewRole === "client" ? (
+              <TeamWorksOperationsClientPortalPreview
+                projectId={projectId}
+                targetOrganizationMemberId={SAMPLE_OPERATIONS_MEMBER_ID}
+                sampleDisplayName={sampleDisplayName}
+                useSampleData
+                readOnly
+              />
+            ) : (
+              <TeamWorksOperationsPartnerPortalPreview
+                projectId={projectId}
+                targetOrganizationMemberId={SAMPLE_OPERATIONS_MEMBER_ID}
+                sampleDisplayName={sampleDisplayName}
+                useSampleData
+                readOnly
+              />
+            )}
+          </div>
+        </div>
         <a
-          href={`/apps/team-works/portal/${previewRole === "client" ? "client" : "worker"}?as=${encodeURIComponent(previewMember.organizationMemberId)}`}
+          href={`/apps/team-works/portal/${portalPath}?as=sample&project=${encodeURIComponent(projectId)}`}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--mikke-primary)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]"
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--mikke-primary)] underline underline-offset-4"
         >
           <ExternalLink size={14} />
-          {previewMember.displayName} さんとして実際の画面を開く
-          {previewRole === "worker" ? `（コマを開くと${labels.sessionNoun}画面も確認できます）` : ""}
+          サンプルを実際の画面サイズで開く
+          {previewRole === "worker" ? `（コマを押すと${labels.sessionNoun}画面も確認できます）` : ""}
         </a>
-      ) : (
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+        <p className="flex items-center gap-1.5 text-sm font-extrabold"><ExternalLink size={15} /> 実際の画面を見に行く（実データ）</p>
         <p className="text-xs font-semibold text-[var(--mikke-muted)]">
-          メンバーを追加すると、その人として実際のポータル画面を開いて確認できます。
+          その人に今どう見えているかを、本物の画面のまま確認できます。「{labels.rosterNoun}が入れられない」などの問い合わせに、同じ画面を見ながら案内するときに使います。読み取り専用で、保存や送信はできません。
         </p>
-      )}
-      {loadError ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{loadError}</p> : null}
-      <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
-        <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">
-          <span className={`h-2 w-2 rounded-full ${isSample ? "bg-[var(--mikke-muted)]" : "bg-[var(--tw-done)]"}`} />
-          {isSample
-            ? `サンプル表示・「${labels.workers}」タブや招待からメンバーを追加すると実データで確認できます`
-            : `${previewMember.displayName} さんの画面`}
-        </div>
-        <div className="max-h-[520px] overflow-y-auto bg-[var(--mikke-surface-soft)] p-4">
-          {previewRole === "client" ? (
-            <TeamWorksOperationsClientPortalPreview
-              projectId={projectId}
-              targetOrganizationMemberId={targetOrganizationMemberId}
-              sampleDisplayName={isSample ? sampleDisplayName : undefined}
-              readOnly
-            />
-          ) : (
-            <TeamWorksOperationsPartnerPortalPreview
-              projectId={projectId}
-              targetOrganizationMemberId={targetOrganizationMemberId}
-              sampleDisplayName={isSample ? sampleDisplayName : undefined}
-              readOnly
-            />
-          )}
-        </div>
+        {loadError ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{loadError}</p> : null}
+        {portalMembers.length ? (
+          <ul className="space-y-2">
+            {portalMembers.map((member) => (
+              <li key={member.organizationMemberId} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2">
+                <span className="text-xs font-bold">{member.displayName}</span>
+                <a
+                  href={`/apps/team-works/portal/${portalPath}?as=${encodeURIComponent(member.organizationMemberId)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--mikke-primary)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)]"
+                >
+                  <ExternalLink size={13} />この人の画面を開く
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-semibold text-[var(--mikke-muted)]">
+            まだ{previewRole === "client" ? labels.clientNoun : labels.workers}が招待されていません。招待すると、その人の実際の画面をここから開けるようになります。
+          </p>
+        )}
       </div>
     </div>
   );

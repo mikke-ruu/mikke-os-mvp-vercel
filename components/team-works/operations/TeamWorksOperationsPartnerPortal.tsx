@@ -29,6 +29,7 @@ import { ClientMonthCalendar } from "@/components/team-works/operations/ClientMo
 import { useTeamWorksPortalRoles } from "@/components/team-works/useTeamWorksPortalRoles";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import { TeamWorksViewAsBanner, useIsViewAs, useViewAs } from "@/components/team-works/TeamWorksViewAsContext";
+import { buildSamplePartnerPortalData, loadSampleProjectShell } from "@/lib/team-works-portal-sample-data";
 import { TeamWorksPartnerSelfProfile } from "@/components/team-works/operations/TeamWorksDirectorySelfProfile";
 import { TeamWorksPartnerShiftPanel } from "@/components/team-works/operations/TeamWorksPartnerShiftPanel";
 import { supabase } from "@/lib/supabase/client";
@@ -57,13 +58,28 @@ type SaveNotice = { tone: "success" | "error"; text: string } | null;
 // viewAsMemberId(O-3): 本部staffが「その人として」スタッフポータルを見るモード。
 // 読み込みをloadOperationsPartnerPortalAsに切り替え、TeamWorksViewAsProviderで
 // 配下の操作ボタンを止める。通常のログイン表示ではundefined=既存の挙動。
-export function TeamWorksOperationsPartnerPortal({ viewAsMemberId }: { viewAsMemberId?: string } = {}) {
+export function TeamWorksOperationsPartnerPortal({
+  viewAsMemberId,
+  sampleProjectId
+}: { viewAsMemberId?: string; sampleProjectId?: string } = {}) {
+  const sampleLabels = useTeamWorksLabels();
   const [data, setData] = useState<OperationsPartnerPortalData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
+      if (sampleProjectId) {
+        // Phase P: 担当がまだ決まっていないプロジェクトでも作業窓まで確認できるように、
+        // 中身をこの場で組み立てる(DBには書かない)。
+        const shell = await loadSampleProjectShell(supabase, sampleProjectId);
+        if (!shell) {
+          setError("このプロジェクトのサンプル表示を作れませんでした。");
+          return;
+        }
+        setData(buildSamplePartnerPortalData(shell, sampleLabels));
+        return;
+      }
       setData(
         viewAsMemberId
           ? await loadOperationsPartnerPortalAs(supabase, viewAsMemberId)
@@ -72,7 +88,7 @@ export function TeamWorksOperationsPartnerPortal({ viewAsMemberId }: { viewAsMem
     } catch (loadError) {
       setError(toErrorMessage(loadError, "担当スケジュールを読み込めませんでした。"));
     }
-  }, [viewAsMemberId]);
+  }, [viewAsMemberId, sampleProjectId, sampleLabels]);
 
   useEffect(() => {
     void load();
@@ -124,24 +140,32 @@ export function TeamWorksOperationsPartnerPortalPreview({
   projectId,
   targetOrganizationMemberId,
   sampleDisplayName,
+  useSampleData = false,
   readOnly = true
 }: {
   projectId: string;
   targetOrganizationMemberId: string;
   sampleDisplayName?: string;
+  useSampleData?: boolean;
   readOnly?: boolean;
 }) {
+  const previewLabels = useTeamWorksLabels();
   const [data, setData] = useState<OperationsPartnerPortalData | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
+      if (useSampleData) {
+        const shell = await loadSampleProjectShell(supabase, projectId);
+        setData(shell ? buildSamplePartnerPortalData(shell, previewLabels) : null);
+        return;
+      }
       setData(await loadOperationsPartnerPortalPreview(supabase, projectId, targetOrganizationMemberId, sampleDisplayName));
     } catch (loadError) {
       setError(toErrorMessage(loadError, "プレビューを読み込めませんでした。"));
     }
-  }, [projectId, targetOrganizationMemberId, sampleDisplayName]);
+  }, [projectId, targetOrganizationMemberId, sampleDisplayName, useSampleData, previewLabels]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -161,13 +185,26 @@ export function TeamWorksOperationsPartnerPortalPreview({
 // viewAsMemberId(O-3): 作業窓こそ本部が一番確認したい画面(あゆみ「作業窓についても
 // 見たいです」)。埋め込みプレビューはpointer-events-noneでコマを開けなかったため、
 // ここを「〜として表示」で直接開けるようにした。
-export function TeamWorksPartnerLessonWindow({ sessionId, viewAsMemberId }: { sessionId: string; viewAsMemberId?: string }) {
+export function TeamWorksPartnerLessonWindow({
+  sessionId,
+  viewAsMemberId,
+  sampleProjectId
+}: { sessionId: string; viewAsMemberId?: string; sampleProjectId?: string }) {
   const labels = useTeamWorksLabels();
   const [data, setData] = useState<OperationsPartnerPortalData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     setError(null);
     try {
+      if (sampleProjectId) {
+        const shell = await loadSampleProjectShell(supabase, sampleProjectId);
+        if (!shell) {
+          setError(`${labels.sessionNoun}のサンプル表示を作れませんでした。`);
+          return;
+        }
+        setData(buildSamplePartnerPortalData(shell, labels));
+        return;
+      }
       setData(
         viewAsMemberId
           ? await loadOperationsPartnerPortalAs(supabase, viewAsMemberId)
@@ -176,7 +213,7 @@ export function TeamWorksPartnerLessonWindow({ sessionId, viewAsMemberId }: { se
     } catch (loadError) {
       setError(toErrorMessage(loadError, `${labels.sessionNoun}を読み込めませんでした。`));
     }
-  }, [labels.sessionNoun, viewAsMemberId]);
+  }, [labels, viewAsMemberId, sampleProjectId]);
 
   useEffect(() => { void load(); }, [load]);
   const session = data ? [...data.today, ...data.upcoming].find((item) => item.id === sessionId) ?? null : null;
@@ -186,7 +223,7 @@ export function TeamWorksPartnerLessonWindow({ sessionId, viewAsMemberId }: { se
   if (!data) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)]"><p className="text-sm font-bold text-[var(--mikke-muted)]">読み込み中…</p></main>;
   if (!session) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)] p-4"><MikkeEmptyState title={`この${labels.sessionNoun}は表示できません`} helper="担当変更または日程変更後の可能性があります。スケジュールから開き直してください。" /></main>;
   // 通常のスタッフ表示では従来どおり作業窓だけを全画面で出す(バナー用の枠も作らない)。
-  if (!viewAsMemberId) {
+  if (!viewAsMemberId && !sampleProjectId) {
     return <main className="h-dvh overflow-hidden bg-white"><TeamWorksPartnerLessonConsole session={session} onRefresh={load} standalone workWindow={workWindow} /></main>;
   }
   return (
@@ -478,7 +515,7 @@ function PartnerScheduleRow({ session, workWindow }: { session: OperationsPartne
         {session.workDescription ? <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-text)]">作業内容：{session.workDescription}</p> : null}
       </div>
       {showLessonWindowLink ? (
-        <button type="button" onClick={() => openLessonWindow(session.id, viewAs?.organizationMemberId)} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)]">
+        <button type="button" onClick={() => openLessonWindow(session.id, viewAs?.organizationMemberId, viewAs?.sampleProjectId)} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)]">
           <ExternalLink size={14} />{labels.sessionNoun}画面
         </button>
       ) : null}
@@ -509,10 +546,13 @@ function PartnerProfileDetails() {
 
 // 表示モード中は作業窓のURLにも as= を引き継ぐ(引き継がないと別窓が
 // 「本人=staff」として開いてしまい、担当コマが無いので何も出ない)。
-function openLessonWindow(sessionId: string, viewAsMemberId?: string) {
-  const url = viewAsMemberId
-    ? `/apps/team-works/portal/worker/lesson/${sessionId}?as=${encodeURIComponent(viewAsMemberId)}`
-    : `/apps/team-works/portal/worker/lesson/${sessionId}`;
+function openLessonWindow(sessionId: string, viewAsMemberId?: string, sampleProjectId?: string) {
+  const base = `/apps/team-works/portal/worker/lesson/${sessionId}`;
+  const url = sampleProjectId
+    ? `${base}?as=sample&project=${encodeURIComponent(sampleProjectId)}`
+    : viewAsMemberId
+      ? `${base}?as=${encodeURIComponent(viewAsMemberId)}`
+      : base;
   const popup = window.open(url, `team-works-lesson-${sessionId}`, "popup=yes,width=920,height=900,resizable=yes,scrollbars=no");
   if (!popup) window.location.href = url;
 }

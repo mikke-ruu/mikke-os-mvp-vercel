@@ -20,6 +20,9 @@ export type TeamWorksViewAs = {
   organizationMemberId: string;
   displayName: string | null;
   role: "client" | "worker";
+  // サンプル表示のときだけ入る。作業窓を開くURLに引き継ぐために必要で、
+  // propsで深く渡すと中間のコンポーネントが全部関係者になってしまうため文脈に載せる。
+  sampleProjectId?: string;
 };
 
 const TeamWorksViewAsContext = createContext<TeamWorksViewAs | null>(null);

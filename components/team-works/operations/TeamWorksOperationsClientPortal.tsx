@@ -10,6 +10,7 @@ import { TeamWorksClientSelfProfile } from "@/components/team-works/operations/T
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import { TeamWorksViewAsBanner, useIsViewAs } from "@/components/team-works/TeamWorksViewAsContext";
 import type { TeamWorksLabels } from "@/lib/team-works-labels";
+import { buildSampleClientPortalData, loadSampleProjectShell } from "@/lib/team-works-portal-sample-data";
 import { supabase } from "@/lib/supabase/client";
 import {
   approveOperationsClientProject,
@@ -51,7 +52,10 @@ function todayKey(): string {
 // 読み込みはloadOperationsClientPortalAsに切り替わり、書き込みはmutate/approveの
 // 入口で全て止まる(どのボタンを押しても実行されない)。通常のログイン表示では
 // undefinedのまま=既存の挙動。
-export function TeamWorksOperationsClientPortal({ viewAsMemberId }: { viewAsMemberId?: string } = {}) {
+export function TeamWorksOperationsClientPortal({
+  viewAsMemberId,
+  sampleProjectId
+}: { viewAsMemberId?: string; sampleProjectId?: string } = {}) {
   const labels = useTeamWorksLabels();
   const [data, setData] = useState<OperationsClientPortalData | null>(null);
   const [pending, setPending] = useState<OperationsClientPendingProject[]>([]);
@@ -65,6 +69,15 @@ export function TeamWorksOperationsClientPortal({ viewAsMemberId }: { viewAsMemb
   const load = useCallback(async () => {
     setError(null);
     try {
+      if (sampleProjectId) {
+        // Phase P: まだクライアントを招待していないプロジェクトでも「どう見えるか」を
+        // 確認するためのサンプル表示。中身はDBではなくこの場で組み立てる。
+        const shell = await loadSampleProjectShell(supabase, sampleProjectId);
+        setData(shell ? buildSampleClientPortalData(shell, labels) : null);
+        setPending([]);
+        if (!shell) setError("このプロジェクトのサンプル表示を作れませんでした。");
+        return;
+      }
       if (viewAsMemberId) {
         // 承認待ちは「本人が承認する」ためのものなので、表示モードでは出さない。
         setData(await loadOperationsClientPortalAs(supabase, viewAsMemberId));
@@ -80,14 +93,14 @@ export function TeamWorksOperationsClientPortal({ viewAsMemberId }: { viewAsMemb
     } catch (loadError) {
       setError(toErrorMessage(loadError, "クライアントポータルを読み込めませんでした。"));
     }
-  }, [viewAsMemberId]);
+  }, [viewAsMemberId, sampleProjectId, labels]);
 
   useEffect(() => { void load(); }, [load]);
 
   async function mutate(action: () => Promise<void>, message: string): Promise<MutationNotice> {
     // 表示モードの歯止め。ボタン側のdisabledは見た目のためで、実際に書き込みを
     // 止めているのはここ(どの操作経路から来ても必ずここを通る)。
-    if (viewAsMemberId) return { tone: "error", text: "表示モードでは保存できません。" };
+    if (viewAsMemberId || sampleProjectId) return { tone: "error", text: "表示モードでは保存できません。" };
     setError(null);
     try {
       await action();
@@ -99,7 +112,7 @@ export function TeamWorksOperationsClientPortal({ viewAsMemberId }: { viewAsMemb
   }
 
   async function approve(project: OperationsClientPendingProject) {
-    if (viewAsMemberId) return;
+    if (viewAsMemberId || sampleProjectId) return;
     setApprovingId(project.projectId);
     setError(null);
     setNotice(null);
@@ -181,13 +194,16 @@ export function TeamWorksOperationsClientPortalPreview({
   projectId,
   targetOrganizationMemberId,
   sampleDisplayName,
+  useSampleData = false,
   readOnly = true
 }: {
   projectId: string;
   targetOrganizationMemberId: string;
   sampleDisplayName?: string;
+  useSampleData?: boolean;
   readOnly?: boolean;
 }) {
+  const labels = useTeamWorksLabels();
   const [data, setData] = useState<OperationsClientPortalData | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [projectTab, setProjectTab] = useState<ProjectTab>("calendar");
@@ -196,11 +212,17 @@ export function TeamWorksOperationsClientPortalPreview({
   const load = useCallback(async () => {
     setError(null);
     try {
+      if (useSampleData) {
+        // Phase P: メンバー未招待でも中身のある画面を見せる。
+        const shell = await loadSampleProjectShell(supabase, projectId);
+        setData(shell ? buildSampleClientPortalData(shell, labels) : null);
+        return;
+      }
       setData(await loadOperationsClientPortalPreview(supabase, projectId, targetOrganizationMemberId, sampleDisplayName));
     } catch (loadError) {
       setError(toErrorMessage(loadError, "プレビューを読み込めませんでした。"));
     }
-  }, [projectId, targetOrganizationMemberId, sampleDisplayName]);
+  }, [projectId, targetOrganizationMemberId, sampleDisplayName, useSampleData, labels]);
 
   useEffect(() => { void load(); }, [load]);
 

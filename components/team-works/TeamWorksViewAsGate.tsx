@@ -5,23 +5,28 @@ import { useSearchParams } from "next/navigation";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { supabase } from "@/lib/supabase/client";
 import { TeamWorksViewAsProvider, type TeamWorksViewAs } from "@/components/team-works/TeamWorksViewAsContext";
+import { SAMPLE_MEMBER_ID } from "@/lib/team-works-portal-sample-data";
 
-// O-3: ポータルのルートで ?as=<organization_member_id> を読み取り、
-// 対象者の表示名を解決してからTeamWorksViewAsProviderを張る。
+// O-3 / Phase P: ポータルのルートで URL パラメータを読み取り、表示モードを決める。
 //
-// 権限について: RLS上、対象メンバー行を読めるのは同じ組織のstaff(と本人)だけなので、
-// 権限のないユーザーがURLを直打ちしても表示名すら解決できず下の「表示できません」で
-// 止まる。ポータル本体の読み込み(loadOperations*PortalAs)も同じRLSの下で動くため、
+//   ?as=<organization_member_id>        … その実在メンバーとして表示
+//   ?as=sample&project=<project_id>     … 招待前でもサンプルデータで表示
+//
+// 権限について: RLS上、対象メンバー行やプロジェクト行を読めるのは同じ組織の
+// staff(と本人)だけなので、権限のないユーザーがURLを直打ちしても解決できず
+// 下の「表示できません」で止まる。ポータル本体の読み込みも同じRLSの下で動くため、
 // ここは入口の分かりやすさのためのチェックであって、認可の本体ではない。
 export function TeamWorksViewAsGate({
   role,
   children
 }: {
   role: TeamWorksViewAs["role"];
-  children: (viewAsMemberId: string | undefined) => ReactNode;
+  children: (args: { viewAsMemberId?: string; sampleProjectId?: string }) => ReactNode;
 }) {
   const searchParams = useSearchParams();
   const asMemberId = searchParams.get("as") ?? undefined;
+  const sampleProjectId = searchParams.get("project") ?? undefined;
+  const isSample = asMemberId === SAMPLE_MEMBER_ID;
   const [viewAs, setViewAs] = useState<TeamWorksViewAs | null>(null);
   const [denied, setDenied] = useState(false);
 
@@ -30,6 +35,13 @@ export function TeamWorksViewAsGate({
     if (!asMemberId) {
       setViewAs(null);
       setDenied(false);
+      return;
+    }
+    if (isSample) {
+      // サンプルは対象メンバーが存在しないので、解決するものが無い。
+      // プロジェクトIDが無いと何も組み立てられないため、その場合だけ弾く。
+      setDenied(!sampleProjectId);
+      setViewAs(sampleProjectId ? { organizationMemberId: SAMPLE_MEMBER_ID, displayName: "サンプル", role, sampleProjectId } : null);
       return;
     }
     void supabase
@@ -49,7 +61,7 @@ export function TeamWorksViewAsGate({
     return () => {
       active = false;
     };
-  }, [asMemberId, role]);
+  }, [asMemberId, isSample, sampleProjectId, role]);
 
   if (asMemberId && denied) {
     return (
@@ -66,5 +78,13 @@ export function TeamWorksViewAsGate({
     return <p className="p-6 text-sm font-semibold text-[var(--mikke-muted)]">読み込み中…</p>;
   }
 
-  return <TeamWorksViewAsProvider value={viewAs}>{children(viewAs?.organizationMemberId)}</TeamWorksViewAsProvider>;
+  return (
+    <TeamWorksViewAsProvider value={viewAs}>
+      {children(
+        isSample
+          ? { sampleProjectId }
+          : { viewAsMemberId: viewAs?.organizationMemberId }
+      )}
+    </TeamWorksViewAsProvider>
+  );
 }

@@ -10,7 +10,9 @@ function PartnerLessonContent() {
   const params = useParams<{ sessionId: string }>();
   return (
     <TeamWorksViewAsGate role="worker">
-      {(viewAsMemberId) => <TeamWorksPartnerLessonWindow sessionId={params.sessionId} viewAsMemberId={viewAsMemberId} />}
+      {({ viewAsMemberId, sampleProjectId }) => (
+        <TeamWorksPartnerLessonWindow sessionId={params.sessionId} viewAsMemberId={viewAsMemberId} sampleProjectId={sampleProjectId} />
+      )}
     </TeamWorksViewAsGate>
   );
 }
