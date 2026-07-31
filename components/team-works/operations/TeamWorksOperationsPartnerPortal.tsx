@@ -28,6 +28,7 @@ import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { ClientMonthCalendar } from "@/components/team-works/operations/ClientMonthCalendar";
 import { useTeamWorksPortalRoles } from "@/components/team-works/useTeamWorksPortalRoles";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
+import { TeamWorksViewAsBanner, useIsViewAs, useViewAs } from "@/components/team-works/TeamWorksViewAsContext";
 import { TeamWorksPartnerSelfProfile } from "@/components/team-works/operations/TeamWorksDirectorySelfProfile";
 import { TeamWorksPartnerShiftPanel } from "@/components/team-works/operations/TeamWorksPartnerShiftPanel";
 import { supabase } from "@/lib/supabase/client";
@@ -37,6 +38,7 @@ import {
 } from "@/lib/team-works-feature-settings";
 import {
   loadOperationsPartnerPortal,
+  loadOperationsPartnerPortalAs,
   loadOperationsPartnerPortalPreview,
   respondToOperationsPartnerOffer,
   saveOperationsPartnerStudentHandoff,
@@ -52,18 +54,25 @@ import {
 
 type SaveNotice = { tone: "success" | "error"; text: string } | null;
 
-export function TeamWorksOperationsPartnerPortal() {
+// viewAsMemberId(O-3): 本部staffが「その人として」スタッフポータルを見るモード。
+// 読み込みをloadOperationsPartnerPortalAsに切り替え、TeamWorksViewAsProviderで
+// 配下の操作ボタンを止める。通常のログイン表示ではundefined=既存の挙動。
+export function TeamWorksOperationsPartnerPortal({ viewAsMemberId }: { viewAsMemberId?: string } = {}) {
   const [data, setData] = useState<OperationsPartnerPortalData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setData(await loadOperationsPartnerPortal(supabase));
+      setData(
+        viewAsMemberId
+          ? await loadOperationsPartnerPortalAs(supabase, viewAsMemberId)
+          : await loadOperationsPartnerPortal(supabase)
+      );
     } catch (loadError) {
       setError(toErrorMessage(loadError, "担当スケジュールを読み込めませんでした。"));
     }
-  }, []);
+  }, [viewAsMemberId]);
 
   useEffect(() => {
     void load();
@@ -99,6 +108,7 @@ export function TeamWorksOperationsPartnerPortal() {
         </p>
       </div>
 
+      <TeamWorksViewAsBanner />
       {!data && !error ? <p className="text-sm font-semibold text-[var(--mikke-muted)]">読み込み中…</p> : null}
       {error ? <MikkeEmptyState title="読み込みに失敗しました" helper={error} /> : null}
       {data ? <PartnerPortalBody data={data} onRefresh={load} /> : null}
@@ -148,18 +158,25 @@ export function TeamWorksOperationsPartnerPortalPreview({
   );
 }
 
-export function TeamWorksPartnerLessonWindow({ sessionId }: { sessionId: string }) {
+// viewAsMemberId(O-3): 作業窓こそ本部が一番確認したい画面(あゆみ「作業窓についても
+// 見たいです」)。埋め込みプレビューはpointer-events-noneでコマを開けなかったため、
+// ここを「〜として表示」で直接開けるようにした。
+export function TeamWorksPartnerLessonWindow({ sessionId, viewAsMemberId }: { sessionId: string; viewAsMemberId?: string }) {
   const labels = useTeamWorksLabels();
   const [data, setData] = useState<OperationsPartnerPortalData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async () => {
     setError(null);
     try {
-      setData(await loadOperationsPartnerPortal(supabase));
+      setData(
+        viewAsMemberId
+          ? await loadOperationsPartnerPortalAs(supabase, viewAsMemberId)
+          : await loadOperationsPartnerPortal(supabase)
+      );
     } catch (loadError) {
       setError(toErrorMessage(loadError, `${labels.sessionNoun}を読み込めませんでした。`));
     }
-  }, [labels.sessionNoun]);
+  }, [labels.sessionNoun, viewAsMemberId]);
 
   useEffect(() => { void load(); }, [load]);
   const session = data ? [...data.today, ...data.upcoming].find((item) => item.id === sessionId) ?? null : null;
@@ -168,7 +185,18 @@ export function TeamWorksPartnerLessonWindow({ sessionId }: { sessionId: string 
   if (error) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)] p-4"><MikkeEmptyState title={`${labels.sessionNoun}を開けませんでした`} helper={error} /></main>;
   if (!data) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)]"><p className="text-sm font-bold text-[var(--mikke-muted)]">読み込み中…</p></main>;
   if (!session) return <main className="grid h-dvh place-items-center bg-[var(--mikke-surface-soft)] p-4"><MikkeEmptyState title={`この${labels.sessionNoun}は表示できません`} helper="担当変更または日程変更後の可能性があります。スケジュールから開き直してください。" /></main>;
-  return <main className="h-dvh overflow-hidden bg-white"><TeamWorksPartnerLessonConsole session={session} onRefresh={load} standalone workWindow={workWindow} /></main>;
+  // 通常のスタッフ表示では従来どおり作業窓だけを全画面で出す(バナー用の枠も作らない)。
+  if (!viewAsMemberId) {
+    return <main className="h-dvh overflow-hidden bg-white"><TeamWorksPartnerLessonConsole session={session} onRefresh={load} standalone workWindow={workWindow} /></main>;
+  }
+  return (
+    <main className="flex h-dvh flex-col overflow-hidden bg-white">
+      <div className="shrink-0 px-3 pt-3"><TeamWorksViewAsBanner /></div>
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <TeamWorksPartnerLessonConsole session={session} onRefresh={load} standalone workWindow={workWindow} />
+      </div>
+    </main>
+  );
 }
 
 function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalData; onRefresh: () => Promise<void> }) {
@@ -438,6 +466,7 @@ function isWorkWindowAllOff(workWindow: TeamWorksWorkWindowSettings): boolean {
 
 function PartnerScheduleRow({ session, workWindow }: { session: OperationsPartnerSession; workWindow: TeamWorksWorkWindowSettings }) {
   const labels = useTeamWorksLabels();
+  const viewAs = useViewAs();
   const targetMinutes = session.roster.length ? Math.floor(session.durationMin / session.roster.length) : null;
   const showLessonWindowLink = !isWorkWindowAllOff(workWindow);
   return (
@@ -449,7 +478,7 @@ function PartnerScheduleRow({ session, workWindow }: { session: OperationsPartne
         {session.workDescription ? <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-text)]">作業内容：{session.workDescription}</p> : null}
       </div>
       {showLessonWindowLink ? (
-        <button type="button" onClick={() => openLessonWindow(session.id)} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)]">
+        <button type="button" onClick={() => openLessonWindow(session.id, viewAs?.organizationMemberId)} className="inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)]">
           <ExternalLink size={14} />{labels.sessionNoun}画面
         </button>
       ) : null}
@@ -478,8 +507,12 @@ function PartnerProfileDetails() {
   );
 }
 
-function openLessonWindow(sessionId: string) {
-  const url = `/apps/team-works/portal/worker/lesson/${sessionId}`;
+// 表示モード中は作業窓のURLにも as= を引き継ぐ(引き継がないと別窓が
+// 「本人=staff」として開いてしまい、担当コマが無いので何も出ない)。
+function openLessonWindow(sessionId: string, viewAsMemberId?: string) {
+  const url = viewAsMemberId
+    ? `/apps/team-works/portal/worker/lesson/${sessionId}?as=${encodeURIComponent(viewAsMemberId)}`
+    : `/apps/team-works/portal/worker/lesson/${sessionId}`;
   const popup = window.open(url, `team-works-lesson-${sessionId}`, "popup=yes,width=920,height=900,resizable=yes,scrollbars=no");
   if (!popup) window.location.href = url;
 }
@@ -496,6 +529,7 @@ export function TeamWorksPartnerLessonConsole({
   workWindow?: TeamWorksWorkWindowSettings;
 }) {
   const labels = useTeamWorksLabels();
+  const isViewAs = useIsViewAs();
   const [presence, setPresence] = useState(session.partnerPresenceStatus);
   const [presenceBusy, setPresenceBusy] = useState(false);
   const [presenceNotice, setPresenceNotice] = useState<SaveNotice>(null);
@@ -604,22 +638,22 @@ export function TeamWorksPartnerLessonConsole({
             {workWindow.presence ? (
               <>
                 {presence === "not_started" ? (
-                  <button type="button" disabled={presenceBusy} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                  <button type="button" disabled={presenceBusy || isViewAs} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
                     <Check size={15} />{labels.startAction}
                   </button>
                 ) : null}
                 {presence === "standby" ? (
                   <>
-                    <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
+                    <button type="button" disabled={presenceBusy || isViewAs} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-[var(--tw-action)] px-4 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
                       <Play size={14} />{labels.sessionNoun}開始
                     </button>
-                    <button type="button" disabled={presenceBusy} onClick={() => void changePresence("not_started")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                    <button type="button" disabled={presenceBusy || isViewAs} onClick={() => void changePresence("not_started")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
                       <RotateCcw size={13} />{labels.startAction}前に戻す
                     </button>
                   </>
                 ) : null}
                 {presence === "in_progress" ? (
-                  <button type="button" disabled={presenceBusy} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                  <button type="button" disabled={presenceBusy || isViewAs} onClick={() => void changePresence("standby")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
                     <RotateCcw size={13} />{labels.startAction}に戻す
                   </button>
                 ) : null}
@@ -637,11 +671,11 @@ export function TeamWorksPartnerLessonConsole({
             {workWindow.presence ? (
               <>
                 {presence !== "ended" ? (
-                  <button type="button" disabled={presenceBusy} onClick={() => void changePresence("ended")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--tw-action)] bg-white px-4 py-2 text-xs font-bold text-[var(--tw-action)] disabled:opacity-50">
+                  <button type="button" disabled={presenceBusy || isViewAs} onClick={() => void changePresence("ended")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--tw-action)] bg-white px-4 py-2 text-xs font-bold text-[var(--tw-action)] disabled:opacity-50">
                     <Square size={13} />{labels.endAction}
                   </button>
                 ) : (
-                  <button type="button" disabled={presenceBusy} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+                  <button type="button" disabled={presenceBusy || isViewAs} onClick={() => void changePresence("in_progress")} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
                     <RotateCcw size={13} />{labels.sessionNoun}中に戻す
                   </button>
                 )}
@@ -850,6 +884,7 @@ function StudentAccordion({
   onResetTimer: () => void;
   showTimer?: boolean;
 }) {
+  const isViewAs = useIsViewAs();
   const [assessment, setAssessment] = useState<OperationsPartnerAssessment>(item.assessment);
   const [handoffNote, setHandoffNote] = useState(item.handoffNote);
   const [saving, setSaving] = useState(false);
@@ -913,11 +948,11 @@ function StudentAccordion({
             <textarea value={handoffNote} onChange={(event) => setHandoffNote(event.target.value)} rows={2} placeholder="できたこと、つまずいた点、次回試したいこと" className="mt-1 w-full resize-none rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs leading-5" />
           </label>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" disabled={saving} onClick={() => void save(false)} className="min-h-9 rounded-lg border border-[var(--mikke-primary)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
+            <button type="button" disabled={saving || isViewAs} onClick={() => void save(false)} className="min-h-9 rounded-lg border border-[var(--mikke-primary)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">
               {saving ? "保存中…" : "記録を保存"}
             </button>
             {!item.completedAt ? (
-              <button type="button" disabled={saving} onClick={() => void save(true)} className="min-h-9 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
+              <button type="button" disabled={saving || isViewAs} onClick={() => void save(true)} className="min-h-9 rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">
                 この生徒を完了して次へ
               </button>
             ) : <span className="text-xs font-bold text-[var(--tw-on-tint)]">対応済み</span>}
@@ -994,6 +1029,7 @@ function ManualPanel({
 }
 
 function PartnerZoomSettings({ session, onUpdated }: { session: OperationsPartnerSession; onUpdated: () => Promise<void> }) {
+  const isViewAs = useIsViewAs();
   const [open, setOpen] = useState(false);
   const [useProjectDefault, setUseProjectDefault] = useState(session.zoomUsesProjectDefault);
   const [zoomUrl, setZoomUrl] = useState(session.zoomUrl ?? "");
@@ -1031,7 +1067,7 @@ function PartnerZoomSettings({ session, onUpdated }: { session: OperationsPartne
           </>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" disabled={saving} onClick={() => void save()} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{saving ? "保存中…" : "Zoom設定を保存"}</button>
+          <button type="button" disabled={saving || isViewAs} onClick={() => void save()} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{saving ? "保存中…" : "Zoom設定を保存"}</button>
           <SaveFeedback notice={notice} />
         </div>
       </div>
@@ -1041,6 +1077,7 @@ function PartnerZoomSettings({ session, onUpdated }: { session: OperationsPartne
 
 function LessonReport({ session, onSubmitted }: { session: OperationsPartnerSession; onSubmitted: () => Promise<void> }) {
   const labels = useTeamWorksLabels();
+  const isViewAs = useIsViewAs();
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<SaveNotice>(null);
@@ -1072,7 +1109,7 @@ function LessonReport({ session, onSubmitted }: { session: OperationsPartnerSess
       <form onSubmit={submit} className="border-t border-[var(--mikke-line)] p-4">
         <textarea value={body} onChange={(event) => setBody(event.target.value)} rows={2} placeholder="クラス全体の様子、本部への連絡" className="w-full resize-none rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-sm" />
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button type="submit" disabled={saving || session.reportSubmitted} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{session.reportSubmitted ? "提出済み" : saving ? "提出中…" : `${labels.reportNoun}を提出`}</button>
+          <button type="submit" disabled={saving || isViewAs || session.reportSubmitted} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)] disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{session.reportSubmitted ? "提出済み" : saving ? "提出中…" : `${labels.reportNoun}を提出`}</button>
           <SaveFeedback notice={notice} />
         </div>
       </form>

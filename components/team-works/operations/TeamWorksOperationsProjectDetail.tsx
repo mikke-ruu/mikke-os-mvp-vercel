@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   CircleDollarSign,
   Clock3,
+  ExternalLink,
   Eye,
   FileCheck2,
   FolderKanban,
@@ -2131,6 +2132,24 @@ function OperationsPortalPreview({ projectId }: { projectId: string }) {
       <p className="text-xs font-semibold text-[var(--mikke-muted)]">
         実際のデータをそのまま読み取り専用で表示します。ここから操作はできません。
       </p>
+      {/* O-3: 埋め込みプレビューはコマを開けない(=作業窓を確認できない)ため、
+          本物のポータルを別タブで開く入口をここに置く。開いた先も読み取り専用。 */}
+      {previewMember ? (
+        <a
+          href={`/apps/team-works/portal/${previewRole === "client" ? "client" : "worker"}?as=${encodeURIComponent(previewMember.organizationMemberId)}`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--mikke-primary)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]"
+        >
+          <ExternalLink size={14} />
+          {previewMember.displayName} さんとして実際の画面を開く
+          {previewRole === "worker" ? `（コマを開くと${labels.sessionNoun}画面も確認できます）` : ""}
+        </a>
+      ) : (
+        <p className="text-xs font-semibold text-[var(--mikke-muted)]">
+          メンバーを追加すると、その人として実際のポータル画面を開いて確認できます。
+        </p>
+      )}
       {loadError ? <p role="alert" className="rounded-xl border border-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-action)]">{loadError}</p> : null}
       <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)]">
         <div className="flex items-center gap-2 bg-[var(--mikke-text)] px-4 py-2 text-xs font-bold text-white">

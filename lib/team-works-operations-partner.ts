@@ -249,6 +249,53 @@ export async function loadOperationsPartnerPortalPreview(
   return buildPartnerPortalData(client, members, projectMembers, [], projectMembers);
 }
 
+// O-3(2026-08-01)「〜として表示」: 本部staffが、対象スタッフに実際どう見えているかを
+// 本物のポータル画面のまま確認するための読み込み。Preview版がprojectId固定なのに対し、
+// こちらは対象者が実際に担当している全プロジェクトを解決する(本人がログインしたときと同じ姿)。
+// オファーの絞り込みもloadOperationsPartnerPortalと同じ扱いにする。
+// RLSは変更していない(staffは元々組織の全データを読める)。
+export async function loadOperationsPartnerPortalAs(
+  client: SupabaseClient,
+  organizationMemberId: string
+): Promise<OperationsPartnerPortalData> {
+  const memberResult = await client
+    .from("team_works_organization_members")
+    .select("id,display_name")
+    .eq("id", organizationMemberId)
+    .maybeSingle();
+  if (memberResult.error) throw memberResult.error;
+  if (!memberResult.data) {
+    return { memberName: null, projectCount: 0, projects: [], offers: [], today: [], upcoming: [] };
+  }
+  const members = [memberResult.data as MemberRow];
+
+  const projectMemberResult = await client
+    .from("team_works_project_members")
+    .select("project_id,organization_member_id")
+    .eq("project_role", "worker")
+    .eq("organization_member_id", organizationMemberId);
+  if (projectMemberResult.error) throw projectMemberResult.error;
+  const projectMembers = (projectMemberResult.data ?? []) as ProjectMemberRow[];
+
+  const offerResult = await client
+    .from("team_works_project_partner_offers")
+    .select("project_id,organization_member_id,status,requested_at")
+    .eq("organization_member_id", organizationMemberId);
+  if (offerResult.error) throw offerResult.error;
+  const offerRows = (offerResult.data ?? []) as { project_id: string; organization_member_id: string; status: string; requested_at: string }[];
+  const waitingOffers = offerRows.filter((offer) => offer.status === "pending");
+  const offerRowsByMembership = new Map<string, typeof offerRows>();
+  for (const offer of offerRows) {
+    const key = `${offer.project_id}:${offer.organization_member_id}`;
+    offerRowsByMembership.set(key, [...(offerRowsByMembership.get(key) ?? []), offer]);
+  }
+  const acceptedProjectMembers = projectMembers.filter((membership) => {
+    const pairOffers = offerRowsByMembership.get(`${membership.project_id}:${membership.organization_member_id}`) ?? [];
+    return pairOffers.length === 0 || pairOffers.some((offer) => offer.status === "accepted");
+  });
+  return buildPartnerPortalData(client, members, projectMembers, waitingOffers, acceptedProjectMembers);
+}
+
 async function buildPartnerPortalData(
   client: SupabaseClient,
   members: MemberRow[],

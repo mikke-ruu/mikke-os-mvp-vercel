@@ -169,6 +169,35 @@ export async function loadOperationsClientPortalPreview(
   return buildClientPortalData(client, members, clientMemberships);
 }
 
+// O-3(2026-08-01)「〜として表示」: 本部staffが、対象のクライアント担当者に
+// 実際どう見えているかを本物のポータル画面のまま確認するための読み込み。
+// loadOperationsClientPortalPreviewがprojectId固定なのに対し、こちらは対象者が
+// 実際に持っている全プロジェクトを解決するので、本人がログインしたときと同じ姿になる。
+// RLSは変更していない(staffは元々組織の全データを読める)。書き込みは
+// TeamWorksViewAsContextで画面側が止める。
+export async function loadOperationsClientPortalAs(
+  client: SupabaseClient,
+  organizationMemberId: string
+): Promise<OperationsClientPortalData> {
+  const memberResult = await client
+    .from("team_works_organization_members")
+    .select("id,display_name")
+    .eq("id", organizationMemberId)
+    .maybeSingle();
+  if (memberResult.error) throw memberResult.error;
+  if (!memberResult.data) return emptyClientPortalData(null);
+  const members = [memberResult.data as { id: string; display_name: string }];
+
+  const membershipResult = await client
+    .from("team_works_project_members")
+    .select("project_id,organization_member_id")
+    .eq("project_role", "client")
+    .eq("organization_member_id", organizationMemberId);
+  if (membershipResult.error) throw membershipResult.error;
+  const clientMemberships = (membershipResult.data ?? []) as { project_id: string; organization_member_id: string }[];
+  return buildClientPortalData(client, members, clientMemberships);
+}
+
 async function buildClientPortalData(
   client: SupabaseClient,
   members: { id: string; display_name: string }[],
