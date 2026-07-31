@@ -143,6 +143,9 @@ export function TeamWorksOperationsDashboard() {
     }
     return map;
   }, new Map<string, string[]>())].map(([date, names]) => ({ date, names }));
+  // 運営型プロジェクト全てでshifts=falseの時だけ希望シフトを隠す。1つでもON/未設定
+  // (feature_settingsがnull=全ON)があれば従来どおり表示する(§L-2)。
+  const shiftsEnabled = data.projects.length === 0 || data.projects.some((project) => project.featureSettings.shifts);
 
   return (
     <div className="space-y-6">
@@ -227,7 +230,7 @@ export function TeamWorksOperationsDashboard() {
               events={data.monthEvents}
               holidayDates={data.monthHolidayDates}
               projects={data.projects}
-              shiftAvailability={shiftAvailability}
+              shiftAvailability={shiftsEnabled ? shiftAvailability : []}
               onSelectDay={setSelectedDayKey}
               operationSettings={data.operationSettings}
             />
@@ -238,11 +241,13 @@ export function TeamWorksOperationsDashboard() {
             </div>
           </div>
 
-          <TeamWorksShiftAdminPanel
-            targetMonth={monthDate}
-            submissions={shiftSubmissions}
-            onRefresh={() => load(monthDate)}
-          />
+          {shiftsEnabled ? (
+            <TeamWorksShiftAdminPanel
+              targetMonth={monthDate}
+              submissions={shiftSubmissions}
+              onRefresh={() => load(monthDate)}
+            />
+          ) : null}
 
           <MikkeSection title="Today" tone="editorial">
             <p className="mb-2 -mt-2 text-xs font-semibold text-[var(--mikke-muted)]">本日のスケジュール（本部）</p>

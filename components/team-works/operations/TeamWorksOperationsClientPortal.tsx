@@ -25,11 +25,15 @@ import {
 type ProjectTab = "calendar" | "roster" | "messages";
 type MutationNotice = { tone: "success" | "error"; text: string };
 
-const projectTabs: { id: ProjectTab; label: string }[] = [
-  { id: "calendar", label: "カレンダー" },
-  { id: "roster", label: "名簿" },
-  { id: "messages", label: "メッセージ" }
-];
+// 機能とポータルの設定(Phase L)に連動: lessons=falseでカレンダータブ、
+// roster=falseで名簿タブを非表示にする。メッセージは常時表示。
+function projectTabsFor(project: OperationsClientPortalData["projects"][number]): { id: ProjectTab; label: string }[] {
+  return [
+    project.featureSettings.lessons ? { id: "calendar" as const, label: "カレンダー" } : null,
+    project.featureSettings.roster ? { id: "roster" as const, label: "名簿" } : null,
+    { id: "messages" as const, label: "メッセージ" }
+  ].filter((tab): tab is { id: ProjectTab; label: string } => tab !== null);
+}
 
 function todayKey(): string {
   const date = new Date();
@@ -296,12 +300,18 @@ function ProjectView({
   mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice>;
 }) {
   const project = data.projects.find((item) => item.id === projectId);
+  const tabs = project ? projectTabsFor(project) : [];
+  useEffect(() => {
+    if (project && tabs.length && !tabs.some((tab) => tab.id === projectTab)) {
+      onProjectTabChange(tabs[0].id);
+    }
+  }, [project, tabs, projectTab, onProjectTabChange]);
   if (!project) return <MikkeEmptyState title="このプロジェクトは表示できません" />;
 
   return (
     <div className="space-y-5">
       <nav aria-label="校内のページ" className="flex gap-1 overflow-x-auto rounded-xl bg-[var(--mikke-surface-soft)] p-1">
-        {projectTabs.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -312,8 +322,10 @@ function ProjectView({
           </button>
         ))}
       </nav>
-      {projectTab === "calendar" ? <ProjectCalendarTab data={data} project={project} selectedDate={selectedDate} onSelectDate={onSelectDate} mutate={mutate} /> : null}
-      {projectTab === "roster" ? <ProjectRosterTab data={data} project={project} mutate={mutate} /> : null}
+      {projectTab === "calendar" && project.featureSettings.lessons ? (
+        <ProjectCalendarTab data={data} project={project} selectedDate={selectedDate} onSelectDate={onSelectDate} mutate={mutate} />
+      ) : null}
+      {projectTab === "roster" && project.featureSettings.roster ? <ProjectRosterTab data={data} project={project} mutate={mutate} /> : null}
       {projectTab === "messages" ? <ProjectMessagesTab data={data} project={project} mutate={mutate} /> : null}
     </div>
   );
@@ -357,6 +369,7 @@ function ProjectCalendarTab({
                 groups={groups}
                 mutate={mutate}
                 initiallyOpen={index === 0}
+                attendanceEnabled={project.featureSettings.attendance}
               />
             ))}
           </div>
@@ -371,13 +384,15 @@ function SessionRosterPanel({
   participants,
   groups,
   mutate,
-  initiallyOpen
+  initiallyOpen,
+  attendanceEnabled
 }: {
   session: OperationsClientSession;
   participants: OperationsClientPortalData["participants"];
   groups: OperationsClientPortalData["groups"];
   mutate: (action: () => Promise<void>, message: string) => Promise<MutationNotice>;
   initiallyOpen: boolean;
+  attendanceEnabled: boolean;
 }) {
   const [open, setOpen] = useState(initiallyOpen);
   useEffect(() => setOpen(initiallyOpen), [initiallyOpen, session.id]);
@@ -400,7 +415,7 @@ function SessionRosterPanel({
               {session.zoomUrl ? <a href={session.zoomUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white"><ExternalLink size={13} />Zoomを開く</a> : null}
             </div>
           ) : null}
-          <RosterEditor session={session} participants={participants} groups={groups} mutate={mutate} />
+          {attendanceEnabled ? <RosterEditor session={session} participants={participants} groups={groups} mutate={mutate} /> : null}
         </div>
       ) : null}
     </article>

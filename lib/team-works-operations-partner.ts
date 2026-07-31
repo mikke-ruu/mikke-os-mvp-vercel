@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
+import {
+  resolveOperationsFeatureSettings,
+  type TeamWorksOperationsFeatureSettings
+} from "@/lib/team-works-feature-settings";
 
 export type OperationsPartnerManual = {
   no: number;
@@ -57,7 +61,7 @@ export type OperationsPartnerSession = {
 export type OperationsPartnerPortalData = {
   memberName: string | null;
   projectCount: number;
-  projects: { id: string; title: string; manuals: OperationsPartnerManual[] }[];
+  projects: { id: string; title: string; manuals: OperationsPartnerManual[]; featureSettings: TeamWorksOperationsFeatureSettings }[];
   offers: { projectId: string; projectTitle: string; organizationMemberId: string; requestedAt: string }[];
   today: OperationsPartnerSession[];
   upcoming: OperationsPartnerSession[];
@@ -65,7 +69,13 @@ export type OperationsPartnerPortalData = {
 
 type MemberRow = { id: string; display_name: string };
 type ProjectMemberRow = { project_id: string; organization_member_id: string };
-type ProjectRow = { id: string; title: string; style: string; status: string };
+type ProjectRow = {
+  id: string;
+  title: string;
+  style: string;
+  status: string;
+  feature_settings?: Partial<TeamWorksOperationsFeatureSettings> | null;
+};
 type SessionRow = {
   id: string;
   project_id: string;
@@ -200,20 +210,34 @@ export async function loadOperationsPartnerPortal(
     return { memberName: members[0]?.display_name ?? null, projectCount: 0, projects: [], offers: [], today: [], upcoming: [] };
   }
 
-  const projectResult = await client
+  let projectResult = await client
     .from("team_works_projects")
-    .select("id,title,style,status")
+    .select("id,title,style,status,feature_settings")
     .in("id", projectIds)
     .eq("style", "operations")
     .eq("status", "active");
+  if (projectResult.error && isMissingSupabaseField(projectResult.error, ["feature_settings"])) {
+    projectResult = await client
+      .from("team_works_projects")
+      .select("id,title,style,status")
+      .in("id", projectIds)
+      .eq("style", "operations")
+      .eq("status", "active") as typeof projectResult;
+  }
   if (projectResult.error) throw projectResult.error;
   const projects = (projectResult.data ?? []) as ProjectRow[];
   const projectTitleById = new Map(projects.map((project) => [project.id, project.title]));
   const acceptedProjectIds = new Set(acceptedProjectMembers.map((membership) => membership.project_id));
   const portalProjects = projects
     .filter((project) => acceptedProjectIds.has(project.id))
-    .map((project) => ({ id: project.id, title: project.title, manuals: [] as OperationsPartnerManual[] }));
+    .map((project) => ({
+      id: project.id,
+      title: project.title,
+      manuals: [] as OperationsPartnerManual[],
+      featureSettings: resolveOperationsFeatureSettings(project.feature_settings ?? null)
+    }));
   const operationsProjectIds = portalProjects.map((project) => project.id);
+  const lessonsProjectIds = portalProjects.filter((project) => project.featureSettings.lessons).map((project) => project.id);
   const offers = waitingOffers.flatMap((offer) => {
     const projectTitle = projectTitleById.get(offer.project_id);
     return projectTitle ? [{ projectId: offer.project_id, projectTitle, organizationMemberId: offer.organization_member_id, requestedAt: offer.requested_at }] : [];
@@ -252,15 +276,29 @@ export async function loadOperationsPartnerPortal(
   });
   const projectsWithManuals = portalProjects.map((project) => ({
     ...project,
-    manuals: manuals.filter((manual) => manual.project_id === project.id).map(mapManual)
+    // manuals=falseのプロジェクトはスタッフのマニュアル閲覧も非表示にする(§L-2)。
+    manuals: project.featureSettings.manuals ? manuals.filter((manual) => manual.project_id === project.id).map(mapManual) : []
   }));
+
+  // lessons=falseのプロジェクトは「レッスン画面・Zoom」自体を出さないため、
+  // セッション取得の対象から除外する(本部のスケジュール管理には影響しない)。
+  if (lessonsProjectIds.length === 0) {
+    return {
+      memberName: members[0]?.display_name ?? null,
+      projectCount: operationsProjectIds.length,
+      projects: projectsWithManuals,
+      offers,
+      today: [],
+      upcoming: []
+    };
+  }
 
   const today = dateKey(new Date());
   const through = dateKey(addDays(new Date(), 30));
   let sessionResult = await client
     .from("team_works_op_sessions")
     .select("id,project_id,session_date,start_time,duration_min,status,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,partner_standby_at,partner_ended_at")
-    .in("project_id", operationsProjectIds)
+    .in("project_id", lessonsProjectIds)
     .in("partner_member_id", memberIds)
     .gte("session_date", today)
     .lte("session_date", through)
@@ -271,7 +309,7 @@ export async function loadOperationsPartnerPortal(
     sessionResult = await client
       .from("team_works_op_sessions")
       .select("id,project_id,session_date,start_time,duration_min,status")
-      .in("project_id", operationsProjectIds)
+      .in("project_id", lessonsProjectIds)
       .in("partner_member_id", memberIds)
       .gte("session_date", today)
       .lte("session_date", through)

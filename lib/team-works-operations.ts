@@ -1,12 +1,17 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StatChipTone } from "@/components/mikkeos/StatChip";
 import { isJapanDayOffKey } from "@/lib/japanese-calendar";
+import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 import {
   DEFAULT_OPERATION_SETTINGS,
   isClosedDayKey,
   loadOrganizationOperationSettingsMap,
   type TeamWorksOperationSettings
 } from "@/lib/team-works-operation-settings";
+import {
+  resolveOperationsFeatureSettings,
+  type TeamWorksOperationsFeatureSettings
+} from "@/lib/team-works-feature-settings";
 
 /**
  * Team Works R2: 運営型プロジェクトのダッシュボード/スケジュール用データアクセス＋
@@ -24,6 +29,7 @@ export type OperationsProjectSummary = {
   tone: StatChipTone;
   bg: string;
   fg: string;
+  featureSettings: TeamWorksOperationsFeatureSettings;
 };
 
 export type OperationsCalendarEvent = {
@@ -231,22 +237,39 @@ export async function fetchArchivedTeamWorksProjects(client: SupabaseClient): Pr
 
 async function fetchOperationsProjectRows(client: SupabaseClient, organizationIds: string[]) {
   if (organizationIds.length === 0) return [];
-  const { data, error } = await client
+  let result = await client
     .from("team_works_projects")
-    .select("id,organization_id,title")
+    .select("id,organization_id,title,feature_settings")
     .in("organization_id", organizationIds)
     .eq("style", "operations")
     .is("archived_at", null)
     .order("title", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as { id: string; organization_id: string; title: string }[];
+  if (result.error && isMissingSupabaseField(result.error, ["feature_settings"])) {
+    result = await client
+      .from("team_works_projects")
+      .select("id,organization_id,title")
+      .in("organization_id", organizationIds)
+      .eq("style", "operations")
+      .is("archived_at", null)
+      .order("title", { ascending: true }) as typeof result;
+  }
+  if (result.error) throw result.error;
+  return (result.data ?? []) as {
+    id: string;
+    organization_id: string;
+    title: string;
+    feature_settings?: Partial<TeamWorksOperationsFeatureSettings> | null;
+  }[];
 }
 
-function toProjectSummaries(rows: { id: string; organization_id: string; title: string }[]): OperationsProjectSummary[] {
+function toProjectSummaries(
+  rows: { id: string; organization_id: string; title: string; feature_settings?: Partial<TeamWorksOperationsFeatureSettings> | null }[]
+): OperationsProjectSummary[] {
   return rows.map((row, index) => ({
     id: row.id,
     organizationId: row.organization_id,
     title: row.title,
+    featureSettings: resolveOperationsFeatureSettings(row.feature_settings ?? null),
     ...projectColorCycle[index % projectColorCycle.length]
   }));
 }

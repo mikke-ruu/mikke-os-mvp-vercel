@@ -126,6 +126,9 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
   const labels = useTeamWorksLabels();
   const sessions = useMemo(() => [...data.today, ...data.upcoming], [data.today, data.upcoming]);
   const projects = data.projects;
+  // 担当プロジェクトが1件もshifts=trueで無ければ「希望シフトを提出」自体を隠す。
+  // プロジェクトがまだ無い(新規パートナー等)場合は従来どおり表示する。
+  const shiftsEnabled = projects.length === 0 || projects.some((project) => project.featureSettings.shifts);
   const [activeView, setActiveView] = useState("home");
   const [projectTab, setProjectTab] = useState<"calendar" | "schedule" | "manuals">("calendar");
   const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
@@ -133,10 +136,14 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
   const [responseNotice, setResponseNotice] = useState<SaveNotice>(null);
 
   useEffect(() => {
+    if (activeView === "shifts" && !shiftsEnabled) {
+      setActiveView("home");
+      return;
+    }
     if (!["home", "shifts"].includes(activeView) && !projects.some((project) => project.id === activeView)) {
       setActiveView("home");
     }
-  }, [activeView, projects]);
+  }, [activeView, projects, shiftsEnabled]);
 
   async function respond(projectId: string, organizationMemberId: string, accept: boolean) {
     setResponding(projectId);
@@ -176,12 +183,13 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
         ))}
       </nav>
 
-      {activeView === "shifts" ? (
+      {activeView === "shifts" && shiftsEnabled ? (
         <TeamWorksPartnerShiftPanel />
       ) : activeView === "home" ? (
         <PartnerHome
           data={data}
           sessions={sessions}
+          shiftsEnabled={shiftsEnabled}
           selectedDate={selectedDate}
           onSelectDate={setSelectedDate}
           onOpenProject={(projectId, tab) => { setActiveView(projectId); setProjectTab(tab); }}
@@ -212,6 +220,7 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
 function PartnerHome({
   data,
   sessions,
+  shiftsEnabled,
   selectedDate,
   onSelectDate,
   onOpenProject,
@@ -219,6 +228,7 @@ function PartnerHome({
 }: {
   data: OperationsPartnerPortalData;
   sessions: OperationsPartnerSession[];
+  shiftsEnabled: boolean;
   selectedDate: string;
   onSelectDate: (date: string) => void;
   onOpenProject: (projectId: string, tab: "calendar" | "schedule" | "manuals") => void;
@@ -239,13 +249,15 @@ function PartnerHome({
         {data.today.length ? <div className="space-y-2">{data.today.map((session) => <PartnerScheduleRow key={session.id} session={session} />)}</div> : <MikkeEmptyState title="本日の担当はありません" />}
       </MikkeSection>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PartnerHomeAction
-          icon={<CalendarCheck2 size={18} />}
-          title="希望シフトを提出"
-          detail="稼働できる日を本部へ共有"
-          onClick={onOpenShifts}
-          tone="yellow"
-        />
+        {shiftsEnabled ? (
+          <PartnerHomeAction
+            icon={<CalendarCheck2 size={18} />}
+            title="希望シフトを提出"
+            detail="稼働できる日を本部へ共有"
+            onClick={onOpenShifts}
+            tone="yellow"
+          />
+        ) : null}
         <PartnerHomeAction
           icon={<CalendarDays size={18} />}
           title="次回レッスン"
@@ -289,7 +301,9 @@ function PartnerProject({
       <nav className="flex gap-1 rounded-xl bg-[var(--mikke-surface-soft)] p-1" aria-label={`${title}内のページ`}>
         <button type="button" onClick={() => onTabChange("calendar")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "calendar" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><CalendarDays size={14} />カレンダー</button>
         <button type="button" onClick={() => onTabChange("schedule")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "schedule" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><List size={14} />スケジュール</button>
-        <button type="button" onClick={() => onTabChange("manuals")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "manuals" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><BookOpen size={14} />マニュアル</button>
+        {project.featureSettings.manuals ? (
+          <button type="button" onClick={() => onTabChange("manuals")} className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold ${tab === "manuals" ? "bg-white text-[var(--mikke-primary)] shadow-sm" : "text-[var(--mikke-muted)]"}`}><BookOpen size={14} />マニュアル</button>
+        ) : null}
       </nav>
       {tab === "calendar" ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,0.8fr)]">
@@ -305,9 +319,9 @@ function PartnerProject({
           <p className="-mt-2 mb-4 text-xs font-semibold text-[var(--mikke-muted)]">「レッスン画面」を押すと、Zoomの横に置ける専用窓で開きます。</p>
           <div className="space-y-2">{projectSessions.map((session) => <PartnerScheduleRow key={session.id} session={session} />)}</div>
         </MikkeSection>
-      ) : (
+      ) : project.featureSettings.manuals ? (
         <PartnerManualLibrary manuals={project.manuals} />
-      )}
+      ) : null}
     </div>
   );
 }

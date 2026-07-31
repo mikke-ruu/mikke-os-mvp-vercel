@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
+import {
+  resolveOperationsFeatureSettings,
+  type TeamWorksOperationsFeatureSettings
+} from "@/lib/team-works-feature-settings";
 
 export type OperationsClientParticipant = {
   id: string;
@@ -64,7 +68,14 @@ export type OperationsClientHoliday = {
 export type OperationsClientPortalData = {
   memberName: string | null;
   projectCount: number;
-  projects: { id: string; title: string; clientMemberId: string; organizationId: string; organizationName: string }[];
+  projects: {
+    id: string;
+    title: string;
+    clientMemberId: string;
+    organizationId: string;
+    organizationName: string;
+    featureSettings: TeamWorksOperationsFeatureSettings;
+  }[];
   groups: OperationsClientGroup[];
   participants: OperationsClientParticipant[];
   sessions: OperationsClientSession[];
@@ -123,14 +134,28 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
   const projectIds = [...new Set(clientMemberships.map((row) => row.project_id))];
   if (projectIds.length === 0) return emptyClientPortalData(members[0]?.display_name ?? null);
 
-  const projectResult = await client
+  let projectResult = await client
     .from("team_works_projects")
-    .select("id,title,organization_id,client_partner_contact_visible")
+    .select("id,title,organization_id,client_partner_contact_visible,feature_settings")
     .in("id", projectIds)
     .eq("style", "operations")
     .eq("status", "active");
+  if (projectResult.error && isMissingSupabaseField(projectResult.error, ["feature_settings"])) {
+    projectResult = await client
+      .from("team_works_projects")
+      .select("id,title,organization_id,client_partner_contact_visible")
+      .in("id", projectIds)
+      .eq("style", "operations")
+      .eq("status", "active") as typeof projectResult;
+  }
   if (projectResult.error) throw projectResult.error;
-  const projectRows = (projectResult.data ?? []) as { id: string; title: string; organization_id: string; client_partner_contact_visible: boolean }[];
+  const projectRows = (projectResult.data ?? []) as {
+    id: string;
+    title: string;
+    organization_id: string;
+    client_partner_contact_visible: boolean;
+    feature_settings?: Partial<TeamWorksOperationsFeatureSettings> | null;
+  }[];
   const operationsProjectIds = projectRows.map((project) => project.id);
   if (operationsProjectIds.length === 0) return emptyClientPortalData(members[0]?.display_name ?? null);
 
@@ -148,7 +173,8 @@ export async function loadOperationsClientPortal(client: SupabaseClient): Promis
           title: project.title,
           clientMemberId,
           organizationId: project.organization_id,
-          organizationName: organizationNameById.get(project.organization_id) ?? "組織"
+          organizationName: organizationNameById.get(project.organization_id) ?? "組織",
+          featureSettings: resolveOperationsFeatureSettings(project.feature_settings ?? null)
         }]
       : [];
   });
