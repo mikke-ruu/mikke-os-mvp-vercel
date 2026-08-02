@@ -110,6 +110,17 @@ export const mikkeApps: MikkeAppDefinition[] = [
     storyOutputs: ["団体ホームページ", "サービス紹介", "活動一覧"],
     deskOutputs: ["公開ページ別の反応", "申込導線", "後続フェーズでの成果確認"],
     accent: "slate"
+  },
+  {
+    key: "library",
+    name: "Library",
+    shortName: "Library",
+    role: "文章、メモ、URL、AI相談文、提出物の構成を整理する個人用の編集書庫。",
+    status: "prototype",
+    activityExamples: ["提出物の原案を作る", "AI文と整え文を比べる", "PageやAcademy用の説明文を準備する", "JSONバックアップを書き出す"],
+    storyOutputs: [],
+    deskOutputs: [],
+    accent: "blue"
   }
 ];
 

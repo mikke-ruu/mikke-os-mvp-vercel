@@ -10,7 +10,8 @@ export const appSlugs: Record<AppKey, string> = {
   community: "community",
   team_works: "team-works",
   fund: "fund",
-  page: "page"
+  page: "page",
+  library: "library"
 };
 
 export function getAppPath(appKey: AppKey) {

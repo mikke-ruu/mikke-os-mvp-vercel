@@ -8,7 +8,8 @@ export type AppKey =
   | "community"
   | "team_works"
   | "fund"
-  | "page";
+  | "page"
+  | "library";
 
 export type AmountType = "income" | "expense" | "none";
 export type Visibility = "public" | "private";
