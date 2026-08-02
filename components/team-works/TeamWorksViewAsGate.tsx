@@ -21,7 +21,7 @@ export function TeamWorksViewAsGate({
   children
 }: {
   role: TeamWorksViewAs["role"];
-  children: (args: { viewAsMemberId?: string; sampleProjectId?: string }) => ReactNode;
+  children: ReactNode;
 }) {
   const searchParams = useSearchParams();
   const asMemberId = searchParams.get("as") ?? undefined;
@@ -78,13 +78,8 @@ export function TeamWorksViewAsGate({
     return <p className="p-6 text-sm font-semibold text-[var(--mikke-muted)]">読み込み中…</p>;
   }
 
-  return (
-    <TeamWorksViewAsProvider value={viewAs}>
-      {children(
-        isSample
-          ? { sampleProjectId }
-          : { viewAsMemberId: viewAs?.organizationMemberId }
-      )}
-    </TeamWorksViewAsProvider>
-  );
+  // children は関数ではなく素の要素で受ける。page.tsx がサーバーコンポーネントの
+  // ため、関数を子として渡すと "Functions are not valid as a child of Client
+  // Components" になる。表示モードは context 経由で各ポータルが読む。
+  return <TeamWorksViewAsProvider value={viewAs}>{children}</TeamWorksViewAsProvider>;
 }

@@ -9,9 +9,7 @@ export default function TeamWorksClientPortalPage() {
       {/* useSearchParams を使うためSuspense必須(Next.jsのCSR bailout) */}
       <Suspense fallback={null}>
         <TeamWorksViewAsGate role="client">
-          {({ viewAsMemberId, sampleProjectId }) => (
-            <TeamWorksOperationsClientPortal viewAsMemberId={viewAsMemberId} sampleProjectId={sampleProjectId} />
-          )}
+          <TeamWorksOperationsClientPortal />
         </TeamWorksViewAsGate>
       </Suspense>
     </AuthGate>

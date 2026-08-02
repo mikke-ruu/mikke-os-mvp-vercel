@@ -8,7 +8,7 @@ import { ClientMonthCalendar } from "@/components/team-works/operations/ClientMo
 import { TeamWorksClientProjectsShell } from "@/components/team-works/client-projects/TeamWorksClientProjectsShell";
 import { TeamWorksClientSelfProfile } from "@/components/team-works/operations/TeamWorksDirectorySelfProfile";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
-import { TeamWorksViewAsBanner, useIsViewAs } from "@/components/team-works/TeamWorksViewAsContext";
+import { TeamWorksViewAsBanner, useIsViewAs, useViewAs } from "@/components/team-works/TeamWorksViewAsContext";
 import type { TeamWorksLabels } from "@/lib/team-works-labels";
 import { buildSampleClientPortalData, loadSampleProjectShell } from "@/lib/team-works-portal-sample-data";
 import { supabase } from "@/lib/supabase/client";
@@ -52,11 +52,11 @@ function todayKey(): string {
 // 読み込みはloadOperationsClientPortalAsに切り替わり、書き込みはmutate/approveの
 // 入口で全て止まる(どのボタンを押しても実行されない)。通常のログイン表示では
 // undefinedのまま=既存の挙動。
-export function TeamWorksOperationsClientPortal({
-  viewAsMemberId,
-  sampleProjectId
-}: { viewAsMemberId?: string; sampleProjectId?: string } = {}) {
+export function TeamWorksOperationsClientPortal() {
   const labels = useTeamWorksLabels();
+  const viewAs = useViewAs();
+  const sampleProjectId = viewAs?.sampleProjectId;
+  const viewAsMemberId = viewAs && !viewAs.sampleProjectId ? viewAs.organizationMemberId : undefined;
   const [data, setData] = useState<OperationsClientPortalData | null>(null);
   const [pending, setPending] = useState<OperationsClientPendingProject[]>([]);
   const [activeView, setActiveView] = useState<string>("home");
