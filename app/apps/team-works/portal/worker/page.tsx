@@ -1,3 +1,5 @@
+"use client";
+
 import { Suspense } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import { TeamWorksViewAsGate } from "@/components/team-works/TeamWorksViewAsGate";

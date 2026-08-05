@@ -59,6 +59,12 @@ type MikkeAppShellProps = {
   navItems?: MikkeShellNavItem[];
   /** モバイル下部メニュー（アイコンのみ5枠想定）。navItems指定時のみ意味を持つ。 */
   bottomNavItems?: MikkeShellBottomNavItem[];
+  sidebarFooterAction?: {
+    label: string;
+    helper?: string;
+    icon: LucideIcon;
+    onClick: () => void;
+  };
   children: React.ReactNode;
 };
 
@@ -88,6 +94,7 @@ export function MikkeAppShell({
   footerLabel,
   navItems,
   bottomNavItems,
+  sidebarFooterAction,
   children
 }: MikkeAppShellProps) {
   const pathname = usePathname() ?? "";
@@ -116,6 +123,7 @@ export function MikkeAppShell({
         )
       : null;
   const appTiles = [...(ownedApps ?? []), ...(otherApps ?? [])];
+  const SidebarFooterIcon = sidebarFooterAction?.icon;
 
   let lastSection: string | undefined;
 
@@ -145,6 +153,28 @@ export function MikkeAppShell({
               suggestedApps={suggestedApps}
               onClose={closeMenu}
             />
+            {sidebarFooterAction ? (
+              <button
+                type="button"
+                onClick={() => {
+                  closeMenu();
+                  sidebarFooterAction.onClick();
+                }}
+                className="mt-5 flex w-full items-center gap-3 border-t border-[var(--mikke-line-soft)] px-1 pt-4 text-left text-sm font-bold text-[var(--mikke-muted)]"
+              >
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--mikke-surface-soft)] text-[var(--mikke-text-soft)]">
+                  {SidebarFooterIcon ? <SidebarFooterIcon size={16} strokeWidth={1.8} /> : null}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate">{sidebarFooterAction.label}</span>
+                  {sidebarFooterAction.helper ? (
+                    <span className="mt-0.5 block truncate text-[11px] font-semibold text-[var(--mikke-muted-light)]">
+                      {sidebarFooterAction.helper}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            ) : null}
           </aside>
         </div>
       ) : null}
@@ -197,6 +227,24 @@ export function MikkeAppShell({
                 <MikkeAppsTileGrid apps={appTiles} />
               </div>
             ) : null}
+
+            {sidebarFooterAction ? (
+              <button
+                type="button"
+                onClick={sidebarFooterAction.onClick}
+                className="mt-auto flex w-full items-center gap-2.5 border-t border-[var(--mikke-line)] px-2.5 pt-4 text-left text-[12.5px] font-semibold text-[var(--mikke-muted)]"
+              >
+                {SidebarFooterIcon ? <SidebarFooterIcon size={17} strokeWidth={1.8} /> : null}
+                <span className="min-w-0">
+                  <span className="block truncate">{sidebarFooterAction.label}</span>
+                  {sidebarFooterAction.helper ? (
+                    <span className="mt-0.5 block truncate text-[10.5px] font-semibold text-[var(--mikke-muted-light)]">
+                      {sidebarFooterAction.helper}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            ) : null}
           </aside>
         ) : null}
 
@@ -217,9 +265,10 @@ export function MikkeAppShell({
             >
               {bottomNavItems.map((item) => {
                 const Icon = item.icon;
+                const itemKey = `${item.label}:${item.href}`;
                 if (item.primary) {
                   return (
-                    <Link key={item.href} href={item.href} aria-label={item.label} className="grid place-items-center py-2.5">
+                    <Link key={itemKey} href={item.href} aria-label={item.label} className="grid place-items-center py-2.5">
                       <span className="grid h-[34px] w-[34px] place-items-center rounded-xl" style={{ background: toneStyle.background }}>
                         <Icon size={18} color={toneStyle.foreground} strokeWidth={1.8} />
                       </span>
@@ -229,7 +278,7 @@ export function MikkeAppShell({
                 const isActive = item.href === activeBottomHref;
                 return (
                   <Link
-                    key={item.href}
+                    key={itemKey}
                     href={item.href}
                     aria-label={item.label}
                     className="grid place-items-center py-3"

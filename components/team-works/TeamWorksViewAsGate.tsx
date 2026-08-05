@@ -7,6 +7,10 @@ import { supabase } from "@/lib/supabase/client";
 import { TeamWorksViewAsProvider, type TeamWorksViewAs } from "@/components/team-works/TeamWorksViewAsContext";
 import { SAMPLE_MEMBER_ID } from "@/lib/team-works-portal-sample-data";
 
+type TeamWorksViewAsGateChildren =
+  | ReactNode
+  | ((value: { viewAsMemberId?: string; sampleProjectId?: string }) => ReactNode);
+
 // O-3 / Phase P: ポータルのルートで URL パラメータを読み取り、表示モードを決める。
 //
 //   ?as=<organization_member_id>        … その実在メンバーとして表示
@@ -21,7 +25,7 @@ export function TeamWorksViewAsGate({
   children
 }: {
   role: TeamWorksViewAs["role"];
-  children: ReactNode;
+  children: TeamWorksViewAsGateChildren;
 }) {
   const searchParams = useSearchParams();
   const asMemberId = searchParams.get("as") ?? undefined;
@@ -81,5 +85,9 @@ export function TeamWorksViewAsGate({
   // children は関数ではなく素の要素で受ける。page.tsx がサーバーコンポーネントの
   // ため、関数を子として渡すと "Functions are not valid as a child of Client
   // Components" になる。表示モードは context 経由で各ポータルが読む。
-  return <TeamWorksViewAsProvider value={viewAs}>{children}</TeamWorksViewAsProvider>;
+  const renderedChildren = typeof children === "function"
+    ? children({ viewAsMemberId: viewAs?.sampleProjectId ? undefined : viewAs?.organizationMemberId, sampleProjectId: viewAs?.sampleProjectId })
+    : children;
+
+  return <TeamWorksViewAsProvider value={viewAs}>{renderedChildren}</TeamWorksViewAsProvider>;
 }
