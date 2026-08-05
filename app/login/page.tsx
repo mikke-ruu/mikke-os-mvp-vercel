@@ -4,8 +4,20 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
-// TODO(将来): ?from=クエリ等でアプリ別の見出し出し分けを検討する。
-// 現在は共有ルートのためアプリ中立の文言に固定している。
+function safeNextPath(value: string | null) {
+  if (!value) return "/os";
+  return value.startsWith("/") && !value.startsWith("//") ? value : "/os";
+}
+
+function getNextPath() {
+  return safeNextPath(new URLSearchParams(window.location.search).get("next"));
+}
+
+function getGuestReturnPath() {
+  const nextPath = getNextPath();
+  return nextPath === "/os" ? "/marketnote" : nextPath;
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -25,16 +37,30 @@ export default function LoginPage() {
       return;
     }
 
-    const next = new URLSearchParams(window.location.search).get("next");
-    router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/os");
+    router.replace(getNextPath());
   }
 
   async function handleSignUp() {
     setLoading(true);
     setMessage("");
-    const { error } = await supabase.auth.signUp({ email, password });
+    const nextPath = getNextPath();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}${nextPath}`
+      }
+    });
     setLoading(false);
-    setMessage(error ? error.message : "登録しました。確認メールが届いた場合は、メール内のリンクを開いてください。");
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    if (data.session) {
+      router.replace(nextPath);
+      return;
+    }
+    setMessage("登録しました。確認メールが届いた場合は、メール内のリンクを開いてください。");
   }
 
   return (
@@ -42,7 +68,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-6 shadow-sm">
         <h1 className="text-3xl font-bold text-[var(--mikke-text)]">ログイン</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
-          ログインすると、活動の記録がStoryとDESKにつながります。
+          MarketNoteの記録をクラウドに保存したり、別の端末でも続きを見るための入口です。ログインなしで使う場合は、MarketNoteへ戻ってそのまま始められます。
         </p>
 
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
@@ -88,6 +114,14 @@ export default function LoginPage() {
             新規登録
           </button>
         </form>
+
+        <button
+          type="button"
+          onClick={() => router.push(getGuestReturnPath())}
+          className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-muted)]"
+        >
+          ログインせずMarketNoteへ戻る
+        </button>
 
         <p className="mt-6 text-center text-xs font-semibold text-[var(--mikke-muted-light)]">by mikke</p>
       </div>
