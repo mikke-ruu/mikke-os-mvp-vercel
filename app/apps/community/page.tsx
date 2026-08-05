@@ -1,6 +1,5 @@
-import { AppMiniPage } from "@/components/mikkeos/AppMiniPage";
+import { redirect } from "next/navigation";
 
 export default function CommunityMiniPage() {
-  return <AppMiniPage appKey="community" />;
+  redirect("/community");
 }
-
