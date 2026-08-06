@@ -36,7 +36,7 @@ export type StoryProfileView = {
 };
 
 export const storyProfileStorageKey = "mikkeos.story.profile.v3";
-export const storyPublicOrigin = (process.env.NEXT_PUBLIC_APP_ORIGIN ?? "https://app.mikke-os.com").replace(/\/$/, "");
+export const storyPublicOrigin = (process.env.NEXT_PUBLIC_STORY_PUBLIC_ORIGIN ?? "https://mikke-os.com").replace(/\/$/, "");
 
 export const storySnsDefaults: StoryProfileLink[] = [
   { key: "line", label: "LINE", url: "" },
@@ -85,7 +85,7 @@ const reservedStoryHandles = new Set([
 const reservedStoryPrefixes = ["admin-", "api-", "mikke-", "mikkeos-", "mikkeruu-", "official-", "system-"];
 
 export function normalizeStoryHandle(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  return value.trim().replace(/^@/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
 }
 
 export function isReservedStoryHandle(handle: string) {
@@ -95,11 +95,11 @@ export function isReservedStoryHandle(handle: string) {
 
 export function getStoryProfileValidationError(profile: StoryProfileView, forPublish: boolean) {
   if (!forPublish && !profile.handle) return "";
-  if (!forPublish && !/^[a-z0-9][a-z0-9_-]{2,39}$/.test(profile.handle)) return "URL名は3〜40文字の英小文字・数字・ハイフン・アンダースコアで入力してください。";
-  if (!forPublish && isReservedStoryHandle(profile.handle)) return "このURL名は公式またはシステム用です。別のURL名を選んでください。";
+  if (!forPublish && !/^[a-z0-9_][a-z0-9_-]{2,29}$/.test(profile.handle)) return "mikke IDは3〜30文字の英小文字・数字・ハイフン・アンダースコアで入力してください。";
+  if (!forPublish && isReservedStoryHandle(profile.handle)) return "このmikke IDは公式またはシステム用です。別のIDを選んでください。";
   if (!profile.displayName.trim()) return "表示名を入力してください。";
-  if (!/^[a-z0-9][a-z0-9_-]{2,39}$/.test(profile.handle)) return "URL名は3〜40文字の英小文字・数字・ハイフン・アンダースコアで入力してください。";
-  if (isReservedStoryHandle(profile.handle)) return "このURL名は公式またはシステム用です。別のURL名を選んでください。";
+  if (!/^[a-z0-9_][a-z0-9_-]{2,29}$/.test(profile.handle)) return "mikke IDは3〜30文字の英小文字・数字・ハイフン・アンダースコアで入力してください。";
+  if (isReservedStoryHandle(profile.handle)) return "このmikke IDは公式またはシステム用です。別のIDを選んでください。";
   if (!profile.role.trim() && !profile.bio.trim()) return "肩書きまたは自己紹介のどちらかを入力してください。";
   const invalidLink = [profile.websiteUrl, profile.shopUrl, ...profile.sns.map((item) => item.url)].find((url) => url.trim() && !getSafeStoryLinkUrl(url));
   if (invalidLink) return "SNSとリンクは https:// または http:// から始まるURLを入力してください。";
@@ -107,7 +107,11 @@ export function getStoryProfileValidationError(profile: StoryProfileView, forPub
 }
 
 export function getStoryPublicUrl(handle: string) {
-  return `${storyPublicOrigin}/story/${normalizeStoryHandle(handle)}`;
+  return `${storyPublicOrigin}/story/@${normalizeStoryHandle(handle)}`;
+}
+
+export function getStoryAppPath(handle: string) {
+  return `/story/@${normalizeStoryHandle(handle)}`;
 }
 
 export function getSafeStoryLinkUrl(value: string) {

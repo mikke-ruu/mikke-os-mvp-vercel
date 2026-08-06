@@ -82,7 +82,8 @@ export async function saveMyStoryProfile(client: DbClient, story: StoryProfileVi
 
 export function getStorySaveErrorMessage(error: unknown) {
   const value = error as { code?: string; message?: string };
-  if (value?.code === "23505" || value?.message?.includes("story_profiles_handle_lower_key")) return "このURL名はすでに使われています。別のURL名を選んでください。";
-  if (value?.message?.includes("story_profiles_reserved_handle")) return "このURL名は公式またはシステム用です。別のURL名を選んでください。";
+  if (value?.code === "23505" || value?.message?.includes("handle_unique") || value?.message?.includes("story_profiles_handle_lower_key")) return "このmikke IDはすでに使われています。別のIDを選んでください。";
+  if (value?.message?.includes("Reserved mikke ID") || value?.message?.includes("story_profiles_reserved_handle")) return "このmikke IDは公式またはシステム用です。別のIDを選んでください。";
+  if (value?.message?.includes("Invalid mikke ID")) return "mikke IDの文字数または文字の種類を確認してください。";
   return "STORYをサーバーへ保存できませんでした。通信状態を確認して、もう一度お試しください。";
 }
