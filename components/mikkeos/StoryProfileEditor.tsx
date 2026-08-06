@@ -11,7 +11,7 @@ import { useAuth } from "@/components/AuthGate";
 import { getMyStoryProfile, getStorySaveErrorMessage, saveMyStoryProfile } from "@/lib/mikkeos/story-profile-db";
 import { uploadStoryImage } from "@/lib/mikkeos/story-profile-media";
 import {
-  defaultStoryProfile, getStoryProfileValidationError, getStoryPublicUrl, loadStoryProfileDraft,
+  defaultStoryProfile, getStoryAppPath, getStoryProfileValidationError, getStoryPublicUrl, loadStoryProfileDraft,
   normalizeStoryHandle, saveStoryProfileDraft, storySnsDefaults, storyThemes,
   type StoryProfileLink, type StoryProfileView, type StoryThemeKey
 } from "@/lib/mikkeos/story-profile-store";
@@ -21,7 +21,7 @@ const introSeenKey = "mikkeos.story.intro.seen.v2";
 
 export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
   const [form, setForm] = useState<StoryProfileView>(defaultStoryProfile);
   const [loading, setLoading] = useState(true);
   const [introStep, setIntroStep] = useState<number | null | undefined>(mode === "start" ? undefined : null);
@@ -30,6 +30,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [idEditing, setIdEditing] = useState(false);
 
   useEffect(() => {
     if (mode === "start") setIntroStep(window.localStorage.getItem(introSeenKey) === "1" ? null : 0);
@@ -37,7 +38,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
 
   useEffect(() => {
     let cancelled = false;
-    setForm(loadStoryProfileDraft());
+    setForm({ ...loadStoryProfileDraft(), handle: profile.handle });
     getMyStoryProfile(supabase).then((remote) => {
       if (!cancelled && remote) {
         setForm(remote);
@@ -48,7 +49,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
       if (!cancelled) setMessage("端末内の下書きを表示しています。");
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [user.id]);
+  }, [profile.handle, user.id]);
 
   const update = <K extends keyof StoryProfileView>(key: K, value: StoryProfileView[K]) => {
     setMessage("");
@@ -85,7 +86,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   const persist = async (publish: boolean) => {
     if (!publish && (!form.displayName.trim() || !form.handle)) {
       saveStoryProfileDraft({ ...form, isPublished: false });
-      setIsError(false); setMessage("この端末に下書きを保存しました。名前とURL名を決めるとサーバーにも保存できます。");
+      setIsError(false); setMessage("この端末に下書きを保存しました。表示名を入力するとサーバーにも保存できます。");
       return;
     }
     const next = { ...form, isPublished: publish };
@@ -94,7 +95,9 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
     try {
       const saved = await saveMyStoryProfile(supabase, next);
       setForm(saved); saveStoryProfileDraft(saved); setIsError(false);
-      if (publish) { router.push(`/story/${saved.handle}`); return; }
+      await refreshProfile();
+      setIdEditing(false);
+      if (publish) { router.push(getStoryAppPath(saved.handle)); return; }
       setMessage("下書きを保存しました。まだ公開されていません。");
     } catch (error) {
       setIsError(true); setMessage(`${getStorySaveErrorMessage(error)} 端末内には下書きを残しています。`);
@@ -115,7 +118,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
         <div className="mx-auto flex max-w-[430px] items-center justify-between">
           <Link href="/story" aria-label="STORYへ戻る" className="grid h-10 w-10 place-items-center rounded-full hover:bg-black/5"><ArrowLeft size={20} /></Link>
           <div className="text-center"><p className="text-xs font-extrabold tracking-[0.22em] text-[var(--story-accent)]">EDIT STORY</p><p className="mt-1 text-[10px] font-bold text-black/45">{form.isPublished ? "公開中・見たまま編集" : "未公開・下書き"}</p></div>
-          {form.handle && form.isPublished ? <Link href={`/story/${form.handle}`} aria-label="公開画面を見る" className="grid h-10 w-10 place-items-center rounded-full hover:bg-black/5"><Eye size={19} /></Link> : <span className="h-10 w-10" />}
+          {form.handle && form.isPublished ? <Link href={getStoryAppPath(form.handle)} aria-label="公開画面を見る" className="grid h-10 w-10 place-items-center rounded-full hover:bg-black/5"><Eye size={19} /></Link> : <span className="h-10 w-10" />}
         </div>
       </header>
 
@@ -170,8 +173,19 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
           <div className="flex gap-3">{(Object.keys(storyThemes) as StoryThemeKey[]).map((key) => <button key={key} type="button" aria-label={storyThemes[key].label} onClick={() => update("themeKey", key)} className={`grid h-11 w-11 place-items-center rounded-full border-2 ${form.themeKey === key ? "border-black" : "border-transparent"}`}><span className="h-8 w-8 rounded-full" style={{ backgroundColor: storyThemes[key].accent }} /></button>)}</div>
         </EditorSection>
 
-        <EditorSection eyebrow="PUBLIC URL" title="あなたのSTORY URL" note="英小文字・数字・ハイフンで3文字以上。">
-          <label className="flex min-w-0 overflow-hidden rounded-2xl border border-black/10"><span className="hidden bg-black/[0.03] px-3 py-3 text-[11px] font-bold text-black/45 min-[390px]:block">app.mikke-os.com/story/</span><input aria-label="URL名" value={form.handle} onChange={(event) => update("handle", normalizeStoryHandle(event.target.value))} placeholder="your-name" className="min-w-0 flex-1 px-3 py-3 text-sm font-bold outline-none" /></label>
+        <EditorSection eyebrow="MIKKE ID" title="あなたのmikke ID" note="すべてのmikkeアプリで共通の、人に教えるためのIDです。ログインには使いません。">
+          {idEditing ? (
+            <div>
+              <label className="flex min-w-0 overflow-hidden rounded-2xl border border-black/10"><span className="bg-black/[0.03] px-3 py-3 text-sm font-extrabold text-black/45">@</span><input aria-label="mikke ID" value={form.handle} onChange={(event) => update("handle", normalizeStoryHandle(event.target.value))} className="min-w-0 flex-1 px-3 py-3 text-sm font-bold outline-none" /></label>
+              <p className="mt-2 text-xs font-bold leading-5 text-amber-700">変更すると、前のURLは使えなくなります。</p>
+              <button type="button" onClick={() => { update("handle", profile.handle); setIdEditing(false); }} className="mt-2 text-xs font-bold text-black/45 underline underline-offset-4">変更をやめる</button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--story-soft)] px-4 py-4">
+              <div className="min-w-0"><p className="truncate text-lg font-extrabold text-[var(--story-ink)]">@{form.handle}</p><p className="mt-1 truncate text-[11px] text-black/45">mikke-os.com/story/@{form.handle}</p></div>
+              <button type="button" onClick={() => setIdEditing(true)} className="shrink-0 rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-bold">IDを変更する</button>
+            </div>
+          )}
         </EditorSection>
 
         <footer className="border-t border-black/5 py-5 text-center text-[11px] font-semibold text-black/30">STORY <span className="font-normal">by mikke</span></footer>
