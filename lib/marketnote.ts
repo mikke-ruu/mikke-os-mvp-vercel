@@ -1,4 +1,27 @@
 import { createActivityLog } from "@/lib/activity-log";
+import {
+  addGuestCheckItem,
+  addGuestFinancialRecord,
+  clearGuestMarketNoteStore,
+  createGuestMarketEvent,
+  deleteGuestFinancialRecord,
+  getGuestMarketEvent,
+  getGuestMarketEventBundle,
+  getGuestMarketNoteStats,
+  getGuestReflection,
+  isMarketNoteGuestProfile,
+  listGuestCheckItems,
+  listGuestFinancialRecords,
+  listGuestMarketEvents,
+  listGuestReflections,
+  readGuestMarketNoteStore,
+  saveGuestReflection,
+  toggleGuestCheckItem,
+  updateGuestFinancialRecord,
+  updateGuestMarketEventDetails,
+  updateGuestMarketEventStatus,
+  upsertGuestEventPaymentRecord
+} from "@/lib/marketnote-guest";
 import { supabase } from "@/lib/supabase/client";
 import type {
   ActivityLog,
@@ -9,13 +32,199 @@ import type {
   Profile
 } from "@/types/database";
 
+export type MarketNoteImportResult = {
+  events: number;
+  checks: number;
+  finances: number;
+  reflections: number;
+};
+
 // DBのstatus列は create経路で planned/preparing のみ許容のため、
 // 「申込済み」は private_note の「入力ステータス:」行が正となる（DB変更は別フェーズ）。
 export function hasAppliedEntryStatus(privateNote: string | null | undefined) {
   return Boolean(privateNote && privateNote.includes("入力ステータス: 申込済み"));
 }
 
+export function getGuestMarketNoteImportStats() {
+  return getGuestMarketNoteStats();
+}
+
+export async function importGuestMarketNoteRecords(profile: Profile): Promise<MarketNoteImportResult> {
+  if (isMarketNoteGuestProfile(profile)) {
+    throw new Error("クラウドへ保存するにはログインが必要です。端末内の記録はこのブラウザに残っています。");
+  }
+
+  const store = readGuestMarketNoteStore();
+  if (store.events.length === 0) {
+    return { events: 0, checks: 0, finances: 0, reflections: 0 };
+  }
+
+  const eventIdMap = new Map<string, string>();
+
+  for (const event of store.events) {
+    const guestImportMarker = `guest_import_id: ${event.id}`;
+    const privateNote = [event.private_note, guestImportMarker].filter(Boolean).join("\n") || null;
+    const { data: existing, error: existingError } = await supabase
+      .from("market_events")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .eq("private_note", privateNote)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+    if (existing?.id) {
+      eventIdMap.set(event.id, existing.id);
+      continue;
+    }
+
+    const { data, error } = await supabase
+      .from("market_events")
+      .insert({
+        user_id: profile.user_id,
+        profile_id: profile.id,
+        title: event.title,
+        event_date: event.event_date,
+        venue_name: event.venue_name,
+        area: event.area,
+        genre: event.genre,
+        status: event.status,
+        visibility: "private",
+        display_on_story: false,
+        public_note: event.public_note,
+        private_note: privateNote
+      })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+    eventIdMap.set(event.id, (data as MarketEvent).id);
+  }
+
+  let importedChecks = 0;
+  for (const item of store.checks) {
+    const marketEventId = eventIdMap.get(item.market_event_id);
+    if (!marketEventId) continue;
+    const inserted = await ensureImportedGuestCheckItem(profile, marketEventId, item);
+    if (inserted) importedChecks += 1;
+  }
+
+  let importedFinances = 0;
+  for (const record of store.finances) {
+    const marketEventId = record.market_event_id ? eventIdMap.get(record.market_event_id) ?? null : null;
+    if (record.market_event_id && !marketEventId) continue;
+    const inserted = await ensureImportedGuestFinancialRecord(profile, marketEventId, record);
+    if (inserted) importedFinances += 1;
+  }
+
+  let importedReflections = 0;
+  for (const reflection of store.reflections) {
+    const marketEventId = eventIdMap.get(reflection.market_event_id);
+    if (!marketEventId) continue;
+    const inserted = await ensureImportedGuestReflection(profile, marketEventId, reflection);
+    if (inserted) importedReflections += 1;
+  }
+
+  clearGuestMarketNoteStore();
+
+  return {
+    events: eventIdMap.size,
+    checks: importedChecks,
+    finances: importedFinances,
+    reflections: importedReflections
+  };
+}
+
+async function ensureImportedGuestCheckItem(profile: Profile, marketEventId: string, item: MarketCheckItem) {
+  const { data: existing, error: existingError } = await supabase
+    .from("market_check_items")
+    .select("id,due_date,is_done")
+    .eq("profile_id", profile.id)
+    .eq("market_event_id", marketEventId)
+    .eq("title", item.title)
+    .eq("sort_order", item.sort_order);
+
+  if (existingError) throw existingError;
+  if ((existing ?? []).some((row) => row.due_date === item.due_date && row.is_done === item.is_done)) return false;
+
+  const { error } = await supabase.from("market_check_items").insert({
+    user_id: profile.user_id,
+    profile_id: profile.id,
+    market_event_id: marketEventId,
+    title: item.title,
+    is_done: item.is_done,
+    due_date: item.due_date,
+    sort_order: item.sort_order
+  });
+
+  if (error) throw error;
+  return true;
+}
+
+async function ensureImportedGuestFinancialRecord(profile: Profile, marketEventId: string | null, record: MarketFinancialRecord) {
+  let query = supabase
+    .from("market_financial_records")
+    .select("id,category,memo,payment_status")
+    .eq("profile_id", profile.id)
+    .eq("record_type", record.record_type)
+    .eq("title", record.title)
+    .eq("amount", record.amount)
+    .eq("occurred_at", record.occurred_at);
+
+  query = marketEventId ? query.eq("market_event_id", marketEventId) : query.is("market_event_id", null);
+
+  const { data: existing, error: existingError } = await query;
+  if (existingError) throw existingError;
+  if ((existing ?? []).some((row) =>
+    row.category === record.category &&
+    row.memo === record.memo &&
+    row.payment_status === record.payment_status
+  )) return false;
+
+  const { error } = await supabase.from("market_financial_records").insert({
+    user_id: profile.user_id,
+    profile_id: profile.id,
+    market_event_id: marketEventId,
+    record_type: record.record_type,
+    title: record.title,
+    amount: record.amount,
+    occurred_at: record.occurred_at,
+    category: record.category,
+    payment_status: record.payment_status,
+    memo: record.memo
+  });
+
+  if (error) throw error;
+  return true;
+}
+
+async function ensureImportedGuestReflection(profile: Profile, marketEventId: string, reflection: MarketReflection) {
+  const { data: existing, error: existingError } = await supabase
+    .from("market_reflections")
+    .select("id")
+    .eq("profile_id", profile.id)
+    .eq("market_event_id", marketEventId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+  if (existing?.id) return false;
+
+  const { error } = await supabase.from("market_reflections").insert({
+    user_id: profile.user_id,
+    profile_id: profile.id,
+    market_event_id: marketEventId,
+    public_summary: reflection.public_summary,
+    private_note: reflection.private_note,
+    good_points: reflection.good_points,
+    next_actions: reflection.next_actions
+  });
+
+  if (error) throw error;
+  return true;
+}
+
 export async function listMarketEvents(profileId: string) {
+  if (isMarketNoteGuestProfile(profileId)) return listGuestMarketEvents();
+
   const { data, error } = await supabase
     .from("market_events")
     .select("*")
@@ -27,6 +236,8 @@ export async function listMarketEvents(profileId: string) {
 }
 
 export async function getMarketEvent(profileId: string, id: string) {
+  if (isMarketNoteGuestProfile(profileId)) return getGuestMarketEvent(id);
+
   const { data, error } = await supabase
     .from("market_events")
     .select("*")
@@ -39,6 +250,8 @@ export async function getMarketEvent(profileId: string, id: string) {
 }
 
 export async function getMarketEventBundle(profileId: string, id: string) {
+  if (isMarketNoteGuestProfile(profileId)) return getGuestMarketEventBundle(id);
+
   const [event, checks, finances, reflection] = await Promise.all([
     getMarketEvent(profileId, id),
     listCheckItems(profileId, id),
@@ -62,6 +275,8 @@ export async function createMarketEvent(
     status?: "planned" | "preparing";
   }
 ) {
+  if (isMarketNoteGuestProfile(profile)) return createGuestMarketEvent(input);
+
   const { data, error } = await supabase
     .from("market_events")
     .insert({
@@ -73,8 +288,8 @@ export async function createMarketEvent(
       area: input.area || null,
       genre: input.genre || null,
       status: input.status ?? "planned",
-      visibility: "public",
-      display_on_story: true,
+      visibility: "private",
+      display_on_story: false,
       public_note: input.publicNote || null,
       private_note: input.privateNote || null
     })
@@ -92,10 +307,10 @@ export async function createMarketEvent(
     title: `${event.title}を出店予定に追加しました`,
     description: [event.venue_name, event.area, event.genre].filter(Boolean).join(" / ") || null,
     occurredAt: event.event_date,
-    visibility: "public",
-    displayOnStory: true,
-    displayInTimeline: true,
-    countsTowardSummary: true
+    visibility: "private",
+    displayOnStory: false,
+    displayInTimeline: false,
+    countsTowardSummary: false
   });
 
   return event;
@@ -114,6 +329,8 @@ export async function updateMarketEventDetails(
     privateNote: string;
   }
 ) {
+  if (isMarketNoteGuestProfile(profile)) return updateGuestMarketEventDetails(eventId, input);
+
   const { data, error } = await supabase
     .from("market_events")
     .update({
@@ -135,6 +352,8 @@ export async function updateMarketEventDetails(
 }
 
 export async function listCheckItems(profileId: string, marketEventId: string) {
+  if (isMarketNoteGuestProfile(profileId)) return listGuestCheckItems(marketEventId);
+
   const { data, error } = await supabase
     .from("market_check_items")
     .select("*")
@@ -147,6 +366,8 @@ export async function listCheckItems(profileId: string, marketEventId: string) {
 }
 
 export async function addCheckItem(profile: Profile, marketEventId: string, title: string, dueDate?: string | null) {
+  if (isMarketNoteGuestProfile(profile)) return addGuestCheckItem(marketEventId, title, dueDate);
+
   const existing = await listCheckItems(profile.id, marketEventId);
   const { data, error } = await supabase
     .from("market_check_items")
@@ -166,6 +387,11 @@ export async function addCheckItem(profile: Profile, marketEventId: string, titl
 }
 
 export async function toggleCheckItem(profile: Profile, item: MarketCheckItem, nextValue: boolean) {
+  if (isMarketNoteGuestProfile(profile)) {
+    toggleGuestCheckItem(item.id, nextValue);
+    return;
+  }
+
   const { error } = await supabase
     .from("market_check_items")
     .update({ is_done: nextValue })
@@ -187,6 +413,8 @@ export async function toggleCheckItem(profile: Profile, item: MarketCheckItem, n
 }
 
 export async function listFinancialRecords(profileId: string, marketEventId?: string) {
+  if (isMarketNoteGuestProfile(profileId)) return listGuestFinancialRecords(marketEventId);
+
   let query = supabase
     .from("market_financial_records")
     .select("*")
@@ -213,6 +441,8 @@ export async function addFinancialRecord(
     paymentStatus?: "unpaid" | "paid" | "not_required";
   }
 ) {
+  if (isMarketNoteGuestProfile(profile)) return addGuestFinancialRecord(input);
+
   const { data, error } = await supabase
     .from("market_financial_records")
     .insert({
@@ -264,6 +494,8 @@ export async function updateFinancialRecord(
     paymentStatus?: "unpaid" | "paid" | "not_required";
   }
 ) {
+  if (isMarketNoteGuestProfile(profile)) return updateGuestFinancialRecord(recordId, input);
+
   const { data, error } = await supabase
     .from("market_financial_records")
     .update({
@@ -285,6 +517,11 @@ export async function updateFinancialRecord(
 }
 
 export async function deleteFinancialRecord(profile: Profile, recordId: string) {
+  if (isMarketNoteGuestProfile(profile)) {
+    deleteGuestFinancialRecord(recordId);
+    return;
+  }
+
   const { error } = await supabase
     .from("market_financial_records")
     .delete()
@@ -304,6 +541,8 @@ export async function saveEventPaymentRecord(
     paymentStatus: "unpaid" | "paid" | "not_required";
   }
 ) {
+  if (isMarketNoteGuestProfile(profile)) return upsertGuestEventPaymentRecord(input);
+
   const existing = (await listFinancialRecords(profile.id, input.marketEventId))
     .find((row) => row.record_type === "expense" && (row.title.includes("出店") || row.title.includes("蜃ｺ蠎") || row.category === "出店料"));
 
@@ -341,6 +580,8 @@ export async function saveEventPaymentRecord(
 }
 
 export async function getReflection(profileId: string, marketEventId: string) {
+  if (isMarketNoteGuestProfile(profileId)) return getGuestReflection(marketEventId);
+
   const { data, error } = await supabase
     .from("market_reflections")
     .select("*")
@@ -353,6 +594,8 @@ export async function getReflection(profileId: string, marketEventId: string) {
 }
 
 export async function listReflections(profileId: string) {
+  if (isMarketNoteGuestProfile(profileId)) return listGuestReflections();
+
   const { data, error } = await supabase
     .from("market_reflections")
     .select("*")
@@ -372,6 +615,8 @@ export async function saveReflection(
     nextActions: string;
   }
 ) {
+  if (isMarketNoteGuestProfile(profile)) return saveGuestReflection(input);
+
   const { data, error } = await supabase
     .from("market_reflections")
     .upsert(
@@ -399,16 +644,18 @@ export async function saveReflection(
     sourceRecordId: reflection.id,
     title: "出店の振り返りを記録しました",
     description: reflection.public_summary,
-    visibility: reflection.public_summary ? "public" : "private",
-    displayOnStory: Boolean(reflection.public_summary),
-    displayInTimeline: Boolean(reflection.public_summary),
-    countsTowardSummary: Boolean(reflection.public_summary)
+    visibility: "private",
+    displayOnStory: false,
+    displayInTimeline: false,
+    countsTowardSummary: false
   });
 
   return reflection;
 }
 
 export async function completeMarketEvent(profile: Profile, event: MarketEvent) {
+  if (isMarketNoteGuestProfile(profile)) return updateGuestMarketEventStatus(event.id, "completed");
+
   const { data, error } = await supabase
     .from("market_events")
     .update({ status: "completed" })
@@ -428,11 +675,11 @@ export async function completeMarketEvent(profile: Profile, event: MarketEvent) 
     title: `${event.title}に出店しました`,
     description: [event.venue_name, event.area, event.genre].filter(Boolean).join(" / ") || null,
     occurredAt: event.event_date,
-    visibility: "public",
-    displayOnStory: true,
-    displayInTimeline: true,
+    visibility: "private",
+    displayOnStory: false,
+    displayInTimeline: false,
     displayAsAchievement: true,
-    countsTowardSummary: true
+    countsTowardSummary: false
   });
 
   return updated;
@@ -443,6 +690,8 @@ export async function updateMarketEventStatus(
   event: MarketEvent,
   status: MarketEvent["status"]
 ) {
+  if (isMarketNoteGuestProfile(profile)) return updateGuestMarketEventStatus(event.id, status);
+
   const { data, error } = await supabase
     .from("market_events")
     .update({ status })
@@ -456,6 +705,8 @@ export async function updateMarketEventStatus(
 }
 
 export async function listActivityLogs(profileId: string, storyOnly = false) {
+  if (isMarketNoteGuestProfile(profileId)) return [];
+
   let query = supabase
     .from("activity_logs")
     .select("*")

@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, Suspense, useContext, useEffect, useMemo, useState } from "react";
 import { ensureProfile } from "@/lib/profile";
+import { MARKETNOTE_GUEST_USER_ID, marketNoteGuestProfile } from "@/lib/marketnote-guest";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile } from "@/types/database";
 import { LoadingScreen } from "./LoadingScreen";
@@ -11,10 +12,21 @@ import { LoadingScreen } from "./LoadingScreen";
 type AuthContextValue = {
   user: User;
   profile: Profile;
+  isGuest: boolean;
   refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const authSessionTimeoutMs = 5000;
+
+function withAuthTimeout<T>(promise: Promise<T>) {
+  return Promise.race([
+    promise,
+    new Promise<T>((_resolve, reject) => {
+      window.setTimeout(() => reject(new Error("Auth session check timed out.")), authSessionTimeoutMs);
+    })
+  ]);
+}
 
 export function useAuth() {
   const value = useContext(AuthContext);
@@ -25,15 +37,24 @@ export function useAuth() {
 // useSearchParams() requires a Suspense boundary during build-time
 // prerendering, or every page that renders AuthGate fails the production
 // build. AuthGate itself provides that boundary so no caller has to.
-export function AuthGate({ children }: { children: React.ReactNode }) {
+export function AuthGate({ children, allowGuest = false }: { children: React.ReactNode; allowGuest?: boolean }) {
   return (
     <Suspense fallback={<LoadingScreen />}>
-      <AuthGateInner>{children}</AuthGateInner>
+      <AuthGateInner allowGuest={allowGuest}>{children}</AuthGateInner>
     </Suspense>
   );
 }
 
-function AuthGateInner({ children }: { children: React.ReactNode }) {
+const marketNoteGuestUser = {
+  id: MARKETNOTE_GUEST_USER_ID,
+  aud: "authenticated",
+  role: "authenticated",
+  app_metadata: {},
+  user_metadata: {},
+  created_at: marketNoteGuestProfile.created_at
+} as User;
+
+function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; allowGuest: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -56,11 +77,17 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    withAuthTimeout(supabase.auth.getSession()).then(async ({ data }) => {
       if (!mounted) return;
       const nextUser = data.session?.user ?? null;
       setUser(nextUser);
       if (!nextUser) {
+        if (allowGuest) {
+          setUser(marketNoteGuestUser);
+          setProfile(marketNoteGuestProfile);
+          setLoading(false);
+          return;
+        }
         setLoading(false);
         if (pathname !== "/login") router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
         return;
@@ -70,12 +97,27 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
       } finally {
         if (mounted) setLoading(false);
       }
+    }).catch(() => {
+      if (!mounted) return;
+      if (allowGuest) {
+        setUser(marketNoteGuestUser);
+        setProfile(marketNoteGuestProfile);
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+      if (pathname !== "/login") router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       const nextUser = session?.user ?? null;
       setUser(nextUser);
       if (!nextUser) {
+        if (allowGuest) {
+          setUser(marketNoteGuestUser);
+          setProfile(marketNoteGuestProfile);
+          return;
+        }
         setProfile(null);
         router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
       }
@@ -85,11 +127,11 @@ function AuthGateInner({ children }: { children: React.ReactNode }) {
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [nextPath, pathname, router]);
+  }, [allowGuest, nextPath, pathname, router]);
 
   const value = useMemo(() => {
     if (!user || !profile) return null;
-    return { user, profile, refreshProfile };
+    return { user, profile, isGuest: profile.id === marketNoteGuestProfile.id, refreshProfile };
   }, [user, profile]);
 
   if (loading || !value) return <LoadingScreen />;

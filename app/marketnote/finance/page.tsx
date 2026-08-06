@@ -12,7 +12,7 @@ import {
   Plus,
   ReceiptText
 } from "lucide-react";
-import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { defaultFinanceCategorySettings, getFinanceCategoryNames, loadFinanceCategorySettings } from "@/lib/finance-categories";
 import { formatMonthDay, formatYen } from "@/lib/format";
@@ -46,7 +46,7 @@ type EventFinanceRow = {
 };
 
 function MarketFinanceContent() {
-  const { profile } = useAuth();
+  const { profile, isGuest } = useAuth();
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [records, setRecords] = useState<MarketFinancialRecord[]>([]);
   const [categorySettings, setCategorySettings] = useState(defaultFinanceCategorySettings);
@@ -190,8 +190,10 @@ function MarketFinanceContent() {
   }
 
   return (
-    <MikkeAppShell appName="MarketNote" title="MarketNote" subtitle="Events and finance">
+    <MarketNoteShell title="MarketNote" subtitle="Events and finance" isGuest={isGuest}>
       <div className="-mx-1 pb-2">
+        {isGuest ? <GuestNotice /> : null}
+
         <header className="mb-4 pt-2">
           <div className="grid grid-cols-[40px_1fr_40px] items-center">
             <span className="h-10 w-10" aria-hidden="true" />
@@ -298,7 +300,15 @@ function MarketFinanceContent() {
           )}
         </section>
       </div>
-    </MikkeAppShell>
+    </MarketNoteShell>
+  );
+}
+
+function GuestNotice() {
+  return (
+    <div className="mb-4 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
+      会計もこのブラウザに保存されます。同じアイコン・同じブラウザから続きが見られます。クラウド保存とDESK連携は、ログイン後の検証が済んでから開放します。
+    </div>
   );
 }
 
@@ -523,7 +533,7 @@ function isSameMonth(date: Date, month: Date) {
 
 export default function MarketFinancePage() {
   return (
-    <AuthGate>
+    <AuthGate allowGuest>
       <MarketFinanceContent />
     </AuthGate>
   );

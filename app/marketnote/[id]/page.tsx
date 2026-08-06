@@ -20,7 +20,7 @@ import {
   WalletCards,
   X
 } from "lucide-react";
-import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { AuthGate, useAuth } from "@/components/AuthGate";
@@ -67,7 +67,7 @@ const defaultPaymentMethodNames = getPaymentMethodNames(defaultPaymentMethodSett
 function MarketDetailContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, isGuest } = useAuth();
   const [event, setEvent] = useState<MarketEvent | null>(null);
   const [checks, setChecks] = useState<MarketCheckItem[]>([]);
   const [finances, setFinances] = useState<MarketFinancialRecord[]>([]);
@@ -210,14 +210,14 @@ function MarketDetailContent() {
 
   if (!event) {
     return (
-      <MikkeAppShell appName="MarketNote" title="出店詳細" subtitle="MarketNote">
+      <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest}>
         <MikkeEmptyState title="読み込み中です" />
-      </MikkeAppShell>
+      </MarketNoteShell>
     );
   }
 
   return (
-    <MikkeAppShell appName="MarketNote" title="出店詳細" subtitle="MarketNote">
+    <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest}>
       <form onSubmit={submit} className="pb-5">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button type="button" onClick={() => router.back()} className="grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-text)]" aria-label="戻る">
@@ -226,6 +226,8 @@ function MarketDetailContent() {
           <h1 className="text-center text-xl font-semibold tracking-normal text-[var(--mikke-text)]">出店詳細</h1>
           <span />
         </header>
+
+        {isGuest ? <GuestNotice /> : null}
 
         <SummaryCard
           event={event}
@@ -354,7 +356,15 @@ function MarketDetailContent() {
           </div>
         </div>
       </form>
-    </MikkeAppShell>
+    </MarketNoteShell>
+  );
+}
+
+function GuestNotice() {
+  return (
+    <div className="mb-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
+      この記録はこのブラウザに保存されています。同じアイコン・同じブラウザから続きが見られます。STORY掲載や他アプリ連携は、まだ自動では行いません。
+    </div>
   );
 }
 
@@ -745,7 +755,7 @@ function getPaymentMethodOptions(options: string[], selected: string) {
 
 export default function MarketDetailPage() {
   return (
-    <AuthGate>
+    <AuthGate allowGuest>
       <MarketDetailContent />
     </AuthGate>
   );

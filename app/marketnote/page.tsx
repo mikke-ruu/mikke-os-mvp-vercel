@@ -1,15 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, Clock3, Edit3, MapPin, Plus } from "lucide-react";
 import { HomeCalendar } from "@/components/marketnote/HomeCalendar";
-import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { formatDate } from "@/lib/format";
-import { hasAppliedEntryStatus, listCheckItems, listFinancialRecords, listMarketEvents, listReflections } from "@/lib/marketnote";
+import {
+  getGuestMarketNoteImportStats,
+  hasAppliedEntryStatus,
+  importGuestMarketNoteRecords,
+  listCheckItems,
+  listFinancialRecords,
+  listMarketEvents,
+  listReflections
+} from "@/lib/marketnote";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
 type HomeTab = "calendar" | "list";
@@ -19,41 +27,48 @@ type EventSummary = {
   event: MarketEvent;
   checks: MarketCheckItem[];
 };
+type GuestImportStats = ReturnType<typeof getGuestMarketNoteImportStats>;
 
 function MarketNoteContent() {
-  const { profile } = useAuth();
+  const { profile, isGuest } = useAuth();
   const [homeTab, setHomeTab] = useState<HomeTab>("calendar");
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [checksByEvent, setChecksByEvent] = useState<Record<string, MarketCheckItem[]>>({});
   const [financesByEvent, setFinancesByEvent] = useState<Record<string, MarketFinancialRecord[]>>({});
   const [reflectionsByEvent, setReflectionsByEvent] = useState<Record<string, MarketReflection | undefined>>({});
   const [activeTab, setActiveTab] = useState<ListTab>("confirmed");
+  const [guestStats, setGuestStats] = useState<GuestImportStats | null>(null);
+
+  const loadMarketNoteData = useCallback(async () => {
+    const [nextEvents, allFinances, allReflections] = await Promise.all([
+      listMarketEvents(profile.id),
+      listFinancialRecords(profile.id),
+      listReflections(profile.id)
+    ]);
+    const checkPairs = await Promise.all(
+      nextEvents.map(async (event) => [event.id, await listCheckItems(profile.id, event.id)] as const)
+    );
+
+    setEvents(nextEvents);
+    setChecksByEvent(Object.fromEntries(checkPairs));
+    setFinancesByEvent(groupByEventId(allFinances));
+    setReflectionsByEvent(Object.fromEntries(allReflections.map((reflection) => [reflection.market_event_id, reflection])));
+    setGuestStats(getGuestMarketNoteImportStats());
+  }, [profile.id]);
 
   useEffect(() => {
     let active = true;
 
     async function load() {
-      const [nextEvents, allFinances, allReflections] = await Promise.all([
-        listMarketEvents(profile.id),
-        listFinancialRecords(profile.id),
-        listReflections(profile.id)
-      ]);
-      const checkPairs = await Promise.all(
-        nextEvents.map(async (event) => [event.id, await listCheckItems(profile.id, event.id)] as const)
-      );
-
       if (!active) return;
-      setEvents(nextEvents);
-      setChecksByEvent(Object.fromEntries(checkPairs));
-      setFinancesByEvent(groupByEventId(allFinances));
-      setReflectionsByEvent(Object.fromEntries(allReflections.map((reflection) => [reflection.market_event_id, reflection])));
+      await loadMarketNoteData();
     }
 
     load();
     return () => {
       active = false;
     };
-  }, [profile.id]);
+  }, [loadMarketNoteData]);
 
   const summaries = useMemo<EventSummary[]>(() => {
     return events.map((event) => ({
@@ -70,15 +85,12 @@ function MarketNoteContent() {
   }, [activeTab, summaries]);
 
   return (
-    <MikkeAppShell appName="MarketNote" title="MarketNote" subtitle="Events and finance">
+    <MarketNoteShell isGuest={isGuest}>
       <div className="-mx-1 pb-2">
-        <header className="mb-5 pt-2">
-          <div className="grid grid-cols-[40px_1fr_40px] items-center">
-            <span className="h-10 w-10" aria-hidden="true" />
-            <h1 className="text-center text-3xl font-semibold tracking-normal text-[var(--mikke-text)]">MarketNote</h1>
-            <span className="h-10 w-10" aria-hidden="true" />
-          </div>
-        </header>
+        {isGuest ? <GuestNotice /> : null}
+        {!isGuest && guestStats && guestStats.events > 0 ? (
+          <CloudImportNotice stats={guestStats} profile={profile} onImported={loadMarketNoteData} />
+        ) : null}
 
         <div className="mb-4 flex items-center justify-between gap-2 px-1">
           <div className="inline-flex rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-1">
@@ -131,7 +143,69 @@ function MarketNoteContent() {
           </div>
         )}
       </div>
-    </MikkeAppShell>
+    </MarketNoteShell>
+  );
+}
+
+function GuestNotice() {
+  return (
+    <div className="mb-4 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
+      ログインなしですぐ使えます。記録はこのブラウザに保存され、同じアイコン・同じブラウザから続きが見られます。
+      <Link href="/login?next=/marketnote" className="ml-2 text-[var(--mikke-accent)]">
+        ログインしてクラウド保存
+      </Link>
+    </div>
+  );
+}
+
+function CloudImportNotice({
+  stats,
+  profile,
+  onImported
+}: {
+  stats: GuestImportStats;
+  profile: Parameters<typeof importGuestMarketNoteRecords>[0];
+  onImported: () => Promise<void>;
+}) {
+  const [importing, setImporting] = useState(false);
+  const [message, setMessage] = useState("");
+
+  async function importRecords() {
+    setImporting(true);
+    setMessage("");
+
+    try {
+      const result = await importGuestMarketNoteRecords(profile);
+      await onImported();
+      setMessage(`${result.events}件の出店予定をクラウドへ保存しました。これからはログインした状態で続きが見られます。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "クラウド保存に失敗しました。端末内の記録は残っているので、時間をおいてもう一度お試しください。");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p>
+          このブラウザに保存されたMarketNote記録があります。
+          <span className="ml-1 text-[var(--mikke-accent)]">出店予定 {stats.events}件</span>
+          <span className="mt-1 block text-[var(--mikke-muted)]">
+            クラウド保存が完了するまで、端末内のゲスト記録は残ります。
+          </span>
+        </p>
+        <button
+          type="button"
+          onClick={importRecords}
+          disabled={importing}
+          className="rounded-full bg-[var(--mikke-accent)] px-4 py-2 text-xs font-extrabold text-[var(--mikke-surface)] disabled:opacity-50"
+        >
+          {importing ? "保存中..." : "クラウドへ保存する"}
+        </button>
+      </div>
+      {message ? <p className="mt-2 text-[var(--mikke-muted)]">{message}</p> : null}
+    </div>
   );
 }
 
@@ -252,7 +326,7 @@ function paymentLabel(payment: PaymentState) {
 
 export default function MarketNotePage() {
   return (
-    <AuthGate>
+    <AuthGate allowGuest>
       <MarketNoteContent />
     </AuthGate>
   );

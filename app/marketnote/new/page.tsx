@@ -16,7 +16,7 @@ import {
   WalletCards,
   X
 } from "lucide-react";
-import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { getActiveCheckItems, loadCheckTemplate, resolveDueDate } from "@/lib/check-templates";
 import { addCheckItem, addFinancialRecord, createMarketEvent, toggleCheckItem } from "@/lib/marketnote";
@@ -43,7 +43,7 @@ const defaultPaymentMethodNames = getPaymentMethodNames(defaultPaymentMethodSett
 
 function NewMarketEventContent() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, isGuest } = useAuth();
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -182,7 +182,7 @@ function NewMarketEventContent() {
   }
 
   return (
-    <MikkeAppShell appName="MarketNote" title="出店予定を追加" subtitle="MarketNote">
+    <MarketNoteShell title="出店予定を追加" subtitle="MarketNote" isGuest={isGuest}>
       <form onSubmit={submit} className="pb-5">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button
@@ -200,6 +200,8 @@ function NewMarketEventContent() {
         </header>
 
         <div className="space-y-3">
+          {isGuest ? <GuestNotice /> : null}
+
           <FormCard title="基本情報" icon={<ClipboardList size={16} strokeWidth={1.8} />}>
             <div className="grid grid-cols-[1fr_0.86fr] gap-3">
               <Field label="イベント名" required compact>
@@ -381,7 +383,15 @@ function NewMarketEventContent() {
           </div>
         </div>
       </form>
-    </MikkeAppShell>
+    </MarketNoteShell>
+  );
+}
+
+function GuestNotice() {
+  return (
+    <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
+      保存すると、このブラウザに出店予定が残ります。同じアイコン・同じブラウザから続きが見られ、あとでログインするとクラウド保存へ進めます。
+    </div>
   );
 }
 
@@ -588,7 +598,7 @@ function getPaymentMethodOptions(options: string[], selected: string) {
 
 export default function NewMarketEventPage() {
   return (
-    <AuthGate>
+    <AuthGate allowGuest>
       <NewMarketEventContent />
     </AuthGate>
   );
