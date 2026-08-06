@@ -4,6 +4,16 @@ export type StoryProfileLink = {
   url: string;
 };
 
+export type StoryPortfolioItem = {
+  id: string;
+  source: "upload" | "item_studio";
+  storagePath: string;
+  imageUrl: string;
+  caption: string;
+};
+
+export type StoryThemeKey = "indigo" | "rose" | "sage" | "sun" | "ink";
+
 export type StoryProfileView = {
   displayName: string;
   handle: string;
@@ -11,6 +21,11 @@ export type StoryProfileView = {
   area: string;
   bio: string;
   avatarUrl: string;
+  avatarStoragePath: string;
+  bannerUrl: string;
+  bannerStoragePath: string;
+  portfolio: StoryPortfolioItem[];
+  themeKey: StoryThemeKey;
   tags: string[];
   status: string;
   websiteUrl: string;
@@ -20,8 +35,24 @@ export type StoryProfileView = {
   isPublished: boolean;
 };
 
-export const storyProfileStorageKey = "mikkeos.story.profile.v2";
+export const storyProfileStorageKey = "mikkeos.story.profile.v3";
 export const storyPublicOrigin = (process.env.NEXT_PUBLIC_APP_ORIGIN ?? "https://app.mikke-os.com").replace(/\/$/, "");
+
+export const storySnsDefaults: StoryProfileLink[] = [
+  { key: "line", label: "LINE", url: "" },
+  { key: "instagram", label: "Instagram", url: "" },
+  { key: "x", label: "X", url: "" },
+  { key: "facebook", label: "Facebook", url: "" },
+  { key: "tiktok", label: "TikTok", url: "" }
+];
+
+export const storyThemes: Record<StoryThemeKey, { label: string; accent: string; soft: string; ink: string }> = {
+  indigo: { label: "Indigo", accent: "#4656c7", soft: "#eef0ff", ink: "#171a2d" },
+  rose: { label: "Rose", accent: "#bb536d", soft: "#fff0f3", ink: "#2d1920" },
+  sage: { label: "Sage", accent: "#467464", soft: "#edf7f2", ink: "#152821" },
+  sun: { label: "Sun", accent: "#a86710", soft: "#fff5df", ink: "#2b2215" },
+  ink: { label: "Ink", accent: "#24252a", soft: "#f0f0f1", ink: "#111216" }
+};
 
 export const defaultStoryProfile: StoryProfileView = {
   displayName: "",
@@ -30,11 +61,16 @@ export const defaultStoryProfile: StoryProfileView = {
   area: "",
   bio: "",
   avatarUrl: "",
+  avatarStoragePath: "",
+  bannerUrl: "",
+  bannerStoragePath: "",
+  portfolio: [],
+  themeKey: "indigo",
   tags: [],
   status: "",
   websiteUrl: "",
   shopUrl: "",
-  sns: [{ key: "instagram", label: "Instagram", url: "" }],
+  sns: storySnsDefaults,
   pickupText: "",
   isPublished: false
 };
@@ -49,12 +85,7 @@ const reservedStoryHandles = new Set([
 const reservedStoryPrefixes = ["admin-", "api-", "mikke-", "mikkeos-", "mikkeruu-", "official-", "system-"];
 
 export function normalizeStoryHandle(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 40);
+  return value.toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 }
 
 export function isReservedStoryHandle(handle: string) {
@@ -65,11 +96,13 @@ export function isReservedStoryHandle(handle: string) {
 export function getStoryProfileValidationError(profile: StoryProfileView, forPublish: boolean) {
   if (!forPublish && !profile.handle) return "";
   if (!forPublish && !/^[a-z0-9][a-z0-9_-]{2,39}$/.test(profile.handle)) return "URL名は3〜40文字の英小文字・数字・ハイフン・アンダースコアで入力してください。";
-  if (!forPublish && isReservedStoryHandle(profile.handle)) return "このURL名は公式またはシステム用に予約されています。別のURL名を選んでください。";
+  if (!forPublish && isReservedStoryHandle(profile.handle)) return "このURL名は公式またはシステム用です。別のURL名を選んでください。";
   if (!profile.displayName.trim()) return "表示名を入力してください。";
   if (!/^[a-z0-9][a-z0-9_-]{2,39}$/.test(profile.handle)) return "URL名は3〜40文字の英小文字・数字・ハイフン・アンダースコアで入力してください。";
-  if (isReservedStoryHandle(profile.handle)) return "このURL名は公式またはシステム用に予約されています。別のURL名を選んでください。";
+  if (isReservedStoryHandle(profile.handle)) return "このURL名は公式またはシステム用です。別のURL名を選んでください。";
   if (!profile.role.trim() && !profile.bio.trim()) return "肩書きまたは自己紹介のどちらかを入力してください。";
+  const invalidLink = [profile.websiteUrl, profile.shopUrl, ...profile.sns.map((item) => item.url)].find((url) => url.trim() && !getSafeStoryLinkUrl(url));
+  if (invalidLink) return "SNSとリンクは https:// または http:// から始まるURLを入力してください。";
   return "";
 }
 
@@ -77,18 +110,34 @@ export function getStoryPublicUrl(handle: string) {
   return `${storyPublicOrigin}/story/${normalizeStoryHandle(handle)}`;
 }
 
+export function getSafeStoryLinkUrl(value: string) {
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function mergeSnsLinks(value: unknown): StoryProfileLink[] {
+  const parsed = Array.isArray(value) ? value as StoryProfileLink[] : [];
+  const fixed = storySnsDefaults.map((item) => parsed.find((candidate) => candidate.key === item.key) ?? item);
+  return [...fixed, ...parsed.filter((item) => !storySnsDefaults.some((fixedItem) => fixedItem.key === item.key))];
+}
+
 export function loadStoryProfileDraft(): StoryProfileView {
   if (typeof window === "undefined") return defaultStoryProfile;
-  const stored = window.localStorage.getItem(storyProfileStorageKey);
+  const stored = window.localStorage.getItem(storyProfileStorageKey) ?? window.localStorage.getItem("mikkeos.story.profile.v2");
   if (!stored) return defaultStoryProfile;
-
   try {
     const parsed = JSON.parse(stored) as Partial<StoryProfileView>;
     return {
       ...defaultStoryProfile,
       ...parsed,
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
-      sns: Array.isArray(parsed.sns) ? parsed.sns : defaultStoryProfile.sns
+      sns: mergeSnsLinks(parsed.sns),
+      portfolio: Array.isArray(parsed.portfolio) ? parsed.portfolio.slice(0, 5) : [],
+      themeKey: parsed.themeKey && parsed.themeKey in storyThemes ? parsed.themeKey : "indigo"
     };
   } catch {
     return defaultStoryProfile;
