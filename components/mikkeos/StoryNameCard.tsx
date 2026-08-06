@@ -54,7 +54,7 @@ export function StoryNameCard({ story, isOwner = false }: { story: StoryProfileV
           </div>
         </section>
 
-        {story.portfolio.length ? <section className="border-t border-black/5 px-5 py-6"><SectionTitle eyebrow="PORTFOLIO" title="作品・活動" /><div className="mt-4 grid grid-cols-3 gap-2">{story.portfolio.map((item, index) => <figure key={item.id} className={`overflow-hidden rounded-2xl bg-black/5 ${index === 0 ? "col-span-2 row-span-2 aspect-square" : "aspect-square"}`}><img src={item.imageUrl} alt={item.caption || `作品 ${index + 1}`} className="h-full w-full object-cover" /></figure>)}</div></section> : null}
+        {story.portfolio.length ? <section aria-label="写真" className="border-t border-black/5 px-5 py-6"><div className="grid grid-cols-3 gap-2">{story.portfolio.map((item, index) => <figure key={item.id} className={`overflow-hidden rounded-2xl bg-black/5 ${index === 0 ? "col-span-2 row-span-2 aspect-square" : "aspect-square"}`}><img src={item.imageUrl} alt={item.caption || `写真 ${index + 1}`} className="h-full w-full object-cover" /></figure>)}</div></section> : null}
 
         {story.pickupText ? <section className="border-t border-black/5 px-5 py-6"><SectionTitle eyebrow="PICK UP" title="いま伝えたいこと" /><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-black/65">{story.pickupText}</p></section> : null}
 
