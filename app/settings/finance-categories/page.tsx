@@ -306,7 +306,7 @@ function CategoryRow({
 
 export default function FinanceCategoriesPage() {
   return (
-    <AuthGate>
+    <AuthGate allowGuest>
       <FinanceCategoriesContent />
     </AuthGate>
   );

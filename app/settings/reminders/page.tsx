@@ -273,7 +273,7 @@ function ConnectionItem({ icon, title, text }: { icon: React.ReactNode; title: s
 
 export default function RemindersPage() {
   return (
-    <AuthGate>
+    <AuthGate allowGuest>
       <RemindersContent />
     </AuthGate>
   );
