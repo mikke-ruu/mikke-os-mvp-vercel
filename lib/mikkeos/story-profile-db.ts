@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Profile } from "@/types/database";
 import type { StoryProfileLink, StoryProfileView } from "./story-profile-store";
 
 type DbClient = SupabaseClient<any, "public", any>;
@@ -56,24 +55,21 @@ function mapStoryProfileRow(row: StoryProfileRow): StoryProfileView {
   };
 }
 
-function storyProfilePayload(profile: Profile, story: StoryProfileView) {
+function storyProfilePayload(story: StoryProfileView) {
   return {
-    owner_user_id: profile.user_id,
-    owner_profile_id: profile.id,
-    handle: story.handle,
-    display_name: story.displayName.trim(),
-    role_label: story.role.trim(),
-    bio: story.bio.trim(),
-    area: story.area.trim(),
-    avatar_url: story.avatarUrl.trim() || null,
-    website_url: story.websiteUrl.trim() || null,
-    shop_url: story.shopUrl.trim() || null,
-    sns_links: story.sns.filter((item) => item.label.trim() && item.url.trim()),
-    tags: story.tags,
-    status_label: story.status.trim(),
-    pickup_text: story.pickupText.trim(),
-    publication_status: story.isPublished ? "published" : "draft",
-    published_at: story.isPublished ? new Date().toISOString() : null
+    p_handle: story.handle,
+    p_display_name: story.displayName.trim(),
+    p_role_label: story.role.trim(),
+    p_bio: story.bio.trim(),
+    p_area: story.area.trim(),
+    p_avatar_url: story.avatarUrl.trim() || null,
+    p_website_url: story.websiteUrl.trim() || null,
+    p_shop_url: story.shopUrl.trim() || null,
+    p_sns_links: story.sns.filter((item) => item.label.trim() && item.url.trim()),
+    p_tags: story.tags,
+    p_status_label: story.status.trim(),
+    p_pickup_text: story.pickupText.trim(),
+    p_publication_status: story.isPublished ? "published" : "draft"
   };
 }
 
@@ -93,13 +89,15 @@ export async function getPublishedStoryProfile(client: DbClient, handle: string)
   return data ? mapStoryProfileRow(data as unknown as StoryProfileRow) : null;
 }
 
-export async function saveMyStoryProfile(client: DbClient, profile: Profile, story: StoryProfileView) {
+export async function saveMyStoryProfile(client: DbClient, story: StoryProfileView) {
   const { data, error } = await withStoryProfileTimeout(
-    client.from("story_profiles").upsert(storyProfilePayload(profile, story), { onConflict: "owner_profile_id" }).select(storyProfileColumns).single(),
+    client.rpc("story_profile_save_mine", storyProfilePayload(story)),
     "Saving STORY profile"
   );
   if (error) throw error;
-  return mapStoryProfileRow(data as unknown as StoryProfileRow);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("Saving STORY profile returned no profile.");
+  return mapStoryProfileRow(row as StoryProfileRow);
 }
 
 export function getStorySaveErrorMessage(error: unknown) {
