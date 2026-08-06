@@ -2,6 +2,7 @@ export type CommunityRole = "owner" | "moderator" | "member";
 export type CommunityMembershipStatus = "active" | "suspended" | "left";
 export type CommunityRoomKind = "announcement" | "normal" | "question" | "event";
 export type CommunityRoomAccessType = "free" | "entitlement" | "staff";
+export type CommunityRoomColor = "blue" | "orange" | "yellow" | "pink" | "green";
 export type CommunityPostKind = "announcement" | "normal" | "question";
 export type CommunityEventStatus = "open" | "closed" | "cancelled";
 export type CommunityResourceKind = "web" | "pdf" | "video" | "other";
@@ -72,6 +73,7 @@ export type CommunityRoom = {
   description: string | null;
   kind: CommunityRoomKind;
   accessType: CommunityRoomAccessType;
+  themeColor: CommunityRoomColor;
   requiredEntitlementKeys: string[];
   isLocked: boolean;
   sortOrder: number;
@@ -105,6 +107,7 @@ export type CommunityComment = {
   body: string;
   isHidden: boolean;
   createdAt: string;
+  updatedAt: string;
   profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
 };
 

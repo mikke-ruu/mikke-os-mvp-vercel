@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import {
+  ArrowLeft,
   BookOpen,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  CircleChevronRight,
   DoorOpen,
   Home,
   KeyRound,
@@ -14,9 +18,12 @@ import {
   LogOut,
   MessageCircle,
   MessagesSquare,
+  Pencil,
   Plus,
+  Send,
   Settings,
   ShieldCheck,
+  Trash2,
   UserRound,
   Users
 } from "lucide-react";
@@ -33,11 +40,14 @@ import {
   createCommunityResource,
   createEntitlementDefinition,
   createCommunityPost,
+  deleteCommunityComment,
+  deleteCommunityPost,
   grantMemberEntitlement,
   joinCommunity,
   loadCommunityDashboard,
   loadCommunityPublicEntry,
   revokeMemberEntitlement,
+  reorderCommunityRooms,
   restoreCommunityRoom,
   saveCommunitySettings,
   saveCommunityProfile,
@@ -45,6 +55,7 @@ import {
   updateCommunityEvent,
   updateCommunityEventStatus,
   updateCommunityMembership,
+  updateCommunityComment,
   updateCommunityPost,
   updateCommunityPostVisibility,
   updateCommunityResource,
@@ -52,10 +63,10 @@ import {
   updateCommunityRoom,
   updateCommunityRoomAccess
 } from "@/lib/community/client";
-import type { CommunityDashboard, CommunityEvent, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomKind } from "@/lib/community/types";
+import type { CommunityDashboard, CommunityEvent, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 
-type CommunityView = "home" | "join" | "rooms" | "room" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
+type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
 
 type SessionUser = {
   id: string;
@@ -102,7 +113,7 @@ function isOwnerLike(data: CommunityDashboard | null, userId?: string) {
   return data?.community.ownerUserId === userId || data?.membership?.role === "owner" || data?.membership?.role === "moderator";
 }
 
-export function CommunityApp({ view, roomId, communitySlug }: { view: CommunityView; roomId?: string; communitySlug: string }) {
+export function CommunityApp({ view, roomId, postId, communitySlug }: { view: CommunityView; roomId?: string; postId?: string; communitySlug: string }) {
   const router = useRouter();
   const base = `/community/c/${encodeURIComponent(communitySlug)}`;
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -208,6 +219,7 @@ export function CommunityApp({ view, roomId, communitySlug }: { view: CommunityV
       {view === "home" ? <HomeView base={base} data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "rooms" ? <RoomsView base={base} data={data} /> : null}
       {view === "room" ? <RoomView data={data} userId={user.id} roomId={roomId} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
+      {view === "post" ? <PostThreadView base={base} data={data} userId={user.id} roomId={roomId} postId={postId} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "events" ? <EventsView events={data.events} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "library" ? <LibraryView data={data} /> : null}
       {view === "profile" ? <ProfileView data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
@@ -340,13 +352,13 @@ function HomeView({ base, data, userId, onReload, onMessage, onError }: ViewMuta
             </Link>
           </div>
           <div className="mt-4 space-y-3">
-            {pinned.length > 0 ? pinned.map((post) => <PostCard key={post.id} post={post} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />) : <MikkeEmptyState title="固定のお知らせはまだありません" helper="新アプリリリースや説明会情報をここに固定できます。" />}
+            {pinned.length > 0 ? pinned.map((post) => <ThreadListItem key={post.id} post={post} href={`${base}/rooms/${post.roomId}/posts/${post.id}`} />) : <MikkeEmptyState title="固定のお知らせはまだありません" helper="新アプリリリースや説明会情報をここに固定できます。" />}
           </div>
         </section>
         <section className="border-t border-[var(--mikke-line)] pt-5">
           <h2 className="text-lg font-bold tracking-normal">新着投稿</h2>
           <div className="mt-4 space-y-3">
-            {recent.length > 0 ? recent.map((post) => <PostCard key={post.id} post={post} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />) : <MikkeEmptyState title="投稿はまだありません" helper="Roomから最初の投稿を作成できます。" />}
+            {recent.length > 0 ? recent.map((post) => <ThreadListItem key={post.id} post={post} href={`${base}/rooms/${post.roomId}/posts/${post.id}`} />) : <MikkeEmptyState title="投稿はまだありません" helper="Roomから最初の投稿を作成できます。" />}
           </div>
         </section>
       </div>
@@ -368,23 +380,32 @@ function HomeView({ base, data, userId, onReload, onMessage, onError }: ViewMuta
   );
 }
 
+function roomColorBorderClass(color: CommunityRoomColor) {
+  return {
+    blue: "border-[var(--mikke-blue)]",
+    orange: "border-[var(--mikke-orange)]",
+    yellow: "border-[var(--mikke-yellow)]",
+    pink: "border-[var(--mikke-pink)]",
+    green: "border-[var(--mikke-green)]"
+  }[color];
+}
+
 function RoomsView({ base, data }: { base: string; data: CommunityDashboard }) {
-  const visibleRooms = data.rooms.filter((room) => !room.isArchived);
+  const visibleRooms = data.rooms.filter((room) => !room.isArchived && !room.isLocked);
   return (
     <section className="border-t border-[var(--mikke-line)] pt-5">
       <h2 className="text-2xl font-bold tracking-normal">ROOMS</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {visibleRooms.map((room) => (
-          <Link key={room.id} href={room.isLocked ? `${base}/rooms` : `${base}/rooms/${room.id}`} aria-disabled={room.isLocked} className={`rounded-lg border border-[var(--mikke-line)] bg-white p-5 ${room.isLocked ? "cursor-not-allowed opacity-70" : ""}`}>
-            <div className="flex items-center justify-between gap-2">
-              <MikkeStatusBadge tone={room.kind === "announcement" ? "primary" : "muted"}>{room.kind}</MikkeStatusBadge>
-              <RoomAccessBadge room={room} />
-            </div>
-            <h3 className="mt-3 text-lg font-bold tracking-normal">{room.title}</h3>
+          <Link key={room.id} href={`${base}/rooms/${room.id}`} className={`flex items-center gap-4 border-l-4 bg-white px-5 py-4 transition-colors hover:bg-[var(--mikke-surface-soft)] ${roomColorBorderClass(room.themeColor)}`}>
+            <span className="min-w-0 flex-1">
+            <h3 className="text-lg font-bold tracking-normal">{room.title}</h3>
             {room.description ? <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{room.description}</p> : null}
-            {room.isLocked ? <p className="mt-3 flex items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]"><Lock size={14} /> このRoomは利用権限が必要です</p> : null}
+            </span>
+            <CircleChevronRight aria-hidden="true" className="shrink-0 text-[var(--mikke-primary)]" size={24} />
           </Link>
         ))}
+        {visibleRooms.length === 0 ? <MikkeEmptyState title="参加できるRoomはまだありません" helper="運営者が公開したRoomがここに表示されます。" /> : null}
       </div>
     </section>
   );
@@ -399,25 +420,42 @@ type ViewMutationProps = {
 };
 
 function RoomView({ data, userId, roomId, onReload, onMessage, onError }: ViewMutationProps & { roomId?: string }) {
-  const visibleRooms = data.rooms.filter((candidate) => !candidate.isArchived);
+  const base = `/community/c/${encodeURIComponent(data.community.slug)}`;
+  const visibleRooms = data.rooms.filter((candidate) => !candidate.isArchived && !candidate.isLocked);
   const room = visibleRooms.find((candidate) => candidate.id === roomId) ?? visibleRooms[0];
   const posts = room ? data.posts.filter((post) => post.roomId === room.id && !post.isHidden) : [];
   if (!room) return <MikkeEmptyState title="Roomがまだありません" helper="運営画面から最初のRoomを作成してください。" />;
-  if (room.isLocked) return <MikkeEmptyState title="このRoomは限定公開です" helper="利用権限が付与されると閲覧できます。運営者へお問い合わせください。" />;
   return (
-    <section className="grid gap-5 lg:grid-cols-[1fr_360px]">
-      <div>
-        <div className="border-t border-[var(--mikke-line)] pt-5">
-          <MikkeStatusBadge tone="primary">{room.kind}</MikkeStatusBadge>
-          <h2 className="mt-3 text-2xl font-bold tracking-normal">{room.title}</h2>
-          {room.description ? <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{room.description}</p> : null}
-        </div>
-        <div className="mt-5 space-y-3">
-          {posts.length > 0 ? posts.map((post) => <PostCard key={post.id} post={post} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />) : <MikkeEmptyState title="このRoomの投稿はまだありません" helper="最初の話題を投稿できます。" />}
-        </div>
+    <section>
+      <Link href={`${base}/rooms`} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> Room一覧へ戻る</Link>
+      <div className={`mt-4 border-t-4 pt-5 ${roomColorBorderClass(room.themeColor)}`}>
+        <h2 className="text-2xl font-bold tracking-normal">{room.title}</h2>
+        {room.description ? <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{room.description}</p> : null}
       </div>
-      {room.memberCanPost ? <PostComposer data={data} userId={userId} defaultRoomId={room.id} onReload={onReload} onMessage={onMessage} onError={onError} /> : null}
+      {room.memberCanPost ? <div className="mt-5"><PostComposer data={data} userId={userId} defaultRoomId={room.id} onReload={onReload} onMessage={onMessage} onError={onError} /></div> : null}
+      <div className="mt-5 divide-y divide-[var(--mikke-line-soft)] border-y border-[var(--mikke-line)] bg-white">
+        {posts.length > 0 ? posts.map((post) => <ThreadListItem key={post.id} post={post} href={`${base}/rooms/${room.id}/posts/${post.id}`} />) : <div className="py-4"><MikkeEmptyState title="このRoomの投稿はまだありません" helper={room.memberCanPost ? "最初の話題を投稿できます。" : "運営者からのお知らせをお待ちください。"} /></div>}
+      </div>
     </section>
+  );
+}
+
+function ThreadListItem({ post, href }: { post: CommunityPost; href: string }) {
+  const commentCount = (post.comments ?? []).filter((comment) => !comment.isHidden).length;
+  return (
+    <Link href={href} className="flex gap-3 px-2 py-4 transition-colors hover:bg-[var(--mikke-surface-soft)] sm:px-4">
+      <MemberAvatar name={post.profile?.displayName} avatarUrl={post.profile?.avatarUrl} />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-bold text-[var(--mikke-text)]">{post.profile?.displayName ?? "member"}</span>
+          <span className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(post.createdAt)}</span>
+          {post.isPinned ? <span className="text-xs font-bold text-[var(--mikke-primary)]">固定</span> : null}
+        </span>
+        <span className="mt-1 block font-bold text-[var(--mikke-text)]">{post.title}</span>
+        <span className="mt-1 block truncate text-sm text-[var(--mikke-muted)]">{post.body}</span>
+        <span className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]"><MessageCircle size={14} /> {commentCount}件のコメント</span>
+      </span>
+    </Link>
   );
 }
 
@@ -447,24 +485,44 @@ function PostComposer({ data, userId, defaultRoomId, onReload, onMessage, onErro
   }
 
   return (
-    <form onSubmit={submit} className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
-      <h3 className="text-base font-bold tracking-normal">投稿する</h3>
-      <select value={roomId} onChange={(event) => setRoomId(event.target.value)} className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm">
-        {data.rooms.filter((room) => !room.isArchived && room.memberCanPost && !room.isLocked).map((room) => <option key={room.id} value={room.id}>{room.title}</option>)}
-      </select>
-      <input value={title} onChange={(event) => setTitle(event.target.value)} required placeholder="タイトル" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" />
-      <textarea value={body} onChange={(event) => setBody(event.target.value)} required rows={5} placeholder="本文" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-6 outline-none focus:border-[var(--mikke-accent)]" />
-      <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="URL（任意）" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" />
-      <button disabled={saving} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">
-        <Plus size={16} /> {saving ? "投稿中..." : "投稿"}
-      </button>
-    </form>
+    <details className="group border border-[var(--mikke-line)] bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 font-bold text-[var(--mikke-primary)]"><span className="inline-flex items-center gap-2"><Plus size={17} /> 新しく投稿する</span><ChevronDown className="group-open:rotate-180" size={18} /></summary>
+      <form onSubmit={submit} className="border-t border-[var(--mikke-line-soft)] p-4">
+        {!defaultRoomId ? <select value={roomId} onChange={(event) => setRoomId(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm">{data.rooms.filter((room) => !room.isArchived && room.memberCanPost && !room.isLocked).map((room) => <option key={room.id} value={room.id}>{room.title}</option>)}</select> : null}
+        <input value={title} onChange={(event) => setTitle(event.target.value)} required placeholder="投稿のタイトル" className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" />
+        <textarea value={body} onChange={(event) => setBody(event.target.value)} required rows={3} placeholder="話したいことを書いてください" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-6 outline-none focus:border-[var(--mikke-accent)]" />
+        <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="参考URL（任意）" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" />
+        <button disabled={saving} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"><Send size={16} /> {saving ? "投稿中..." : "投稿する"}</button>
+      </form>
+    </details>
   );
 }
 
-function PostCard({ post, userId, onReload, onMessage, onError }: { post: CommunityPost; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+function PostThreadView({ base, data, userId, roomId, postId, onReload, onMessage, onError }: ViewMutationProps & { base: string; roomId?: string; postId?: string }) {
+  const room = data.rooms.find((candidate) => candidate.id === roomId && !candidate.isArchived && !candidate.isLocked);
+  const post = data.posts.find((candidate) => candidate.id === postId && candidate.roomId === room?.id && !candidate.isHidden);
+  if (!room || !post) return <MikkeEmptyState title="投稿を開けません" helper="削除されたか、現在の参加権限では閲覧できません。" />;
+  return (
+    <section className="max-w-4xl">
+      <Link href={`${base}/rooms/${room.id}`} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> {room.title}へ戻る</Link>
+      <div className="mt-4"><PostCard post={post} userId={userId} canComment={room.memberCanComment} onReload={onReload} onMessage={onMessage} onError={onError} /></div>
+    </section>
+  );
+}
+
+function MemberAvatar({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
+  if (avatarUrl) return <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-[var(--mikke-line-soft)] object-cover" />;
+  return <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--mikke-pink)] text-sm font-bold text-[var(--mikke-primary)]">{(name ?? "M").trim().slice(0, 1).toUpperCase()}</span>;
+}
+
+function PostCard({ post, userId, canComment, onReload, onMessage, onError }: { post: CommunityPost; userId: string; canComment: boolean; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(post.title);
+  const [body, setBody] = useState(post.body);
+  const [url, setUrl] = useState(post.url ?? "");
+  const ownPost = post.authorUserId === userId;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -481,30 +539,64 @@ function PostCard({ post, userId, onReload, onMessage, onError }: { post: Commun
     }
   }
 
+  async function savePost(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await updateCommunityPost(supabase, post.id, { title, body, url, isPinned: post.isPinned });
+      setEditing(false);
+      onMessage("投稿を更新しました。");
+      await onReload();
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "投稿を更新できませんでした。"));
+    } finally { setSaving(false); }
+  }
+
+  async function removePost() {
+    if (!window.confirm("この投稿を削除しますか？コメントも画面から非表示になります。")) return;
+    setSaving(true);
+    try {
+      await deleteCommunityPost(supabase, post.id, userId);
+      onMessage("投稿を削除しました。");
+      await onReload();
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "投稿を削除できませんでした。"));
+    } finally { setSaving(false); }
+  }
+
   return (
-    <article className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
-      <div className="flex flex-wrap items-center gap-2">
-        {post.isPinned ? <MikkeStatusBadge tone="primary">固定</MikkeStatusBadge> : null}
-        <span className="text-xs font-bold text-[var(--mikke-muted-light)]">{post.room?.title ?? "Room"} ・ {formatDateTime(post.createdAt)}</span>
+    <article className="border-t-4 border-[var(--mikke-blue)] bg-white px-4 py-5 sm:px-6">
+      <div className="flex items-start gap-3">
+        <MemberAvatar name={post.profile?.displayName} avatarUrl={post.profile?.avatarUrl} />
+        <div className="min-w-0 flex-1">
+          <p className="font-bold">{post.profile?.displayName ?? "member"}</p>
+          <p className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(post.createdAt)}{post.updatedAt !== post.createdAt ? "・編集済み" : ""}</p>
+        </div>
+        {ownPost ? <div className="flex gap-1"><button type="button" onClick={() => setEditing((value) => !value)} className="p-2 text-[var(--mikke-primary)]" aria-label="投稿を編集"><Pencil size={16} /></button><button type="button" disabled={saving} onClick={removePost} className="p-2 text-[var(--mikke-danger)] disabled:opacity-50" aria-label="投稿を削除"><Trash2 size={16} /></button></div> : null}
       </div>
-      <h3 className="mt-3 text-lg font-bold tracking-normal">{post.title}</h3>
-      <p className="mt-2 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{post.body}</p>
-      {post.url ? <a href={post.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-bold text-[var(--mikke-primary)]">リンクを開く</a> : null}
+      {editing ? <form onSubmit={savePost} className="mt-4 border-l-4 border-[var(--mikke-pink)] pl-4"><input required value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-bold" /><textarea required rows={5} value={body} onChange={(event) => setBody(event.target.value)} className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-7" /><input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="参考URL（任意）" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-3 flex gap-2"><button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white">保存</button><button type="button" onClick={() => setEditing(false)} className="rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold">キャンセル</button></div></form> : <><h3 className="mt-4 text-xl font-bold tracking-normal">{post.title}</h3><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{post.body}</p>{post.url ? <a href={post.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-bold text-[var(--mikke-primary)]">参考リンクを開く</a> : null}</>}
       <div className="mt-4 border-t border-[var(--mikke-line-soft)] pt-3">
-        {(post.comments ?? []).slice(0, 3).map((item) => (
-          <p key={item.id} className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
-            <span className="font-bold text-[var(--mikke-text)]">{item.profile?.displayName ?? "member"}</span> {item.body}
-          </p>
-        ))}
-        <form onSubmit={submit} className="mt-3 flex flex-wrap gap-2">
+        <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--mikke-primary)]">Comments</p>
+        <div className="mt-2 space-y-1">{(post.comments ?? []).filter((item) => !item.isHidden).map((item) => <CommentRow key={item.id} comment={item} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div>
+        {canComment ? <form onSubmit={submit} className="mt-4 flex items-end gap-2">
           <input value={comment} onChange={(event) => setComment(event.target.value)} required placeholder="コメント" className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" />
           <button disabled={saving} className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--mikke-primary)] text-white disabled:opacity-60" aria-label="コメント">
-            <MessageCircle size={16} />
+            <Send size={16} />
           </button>
-        </form>
+        </form> : null}
       </div>
     </article>
   );
+}
+
+function CommentRow({ comment, userId, onReload, onMessage, onError }: { comment: NonNullable<CommunityPost["comments"]>[number]; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [body, setBody] = useState(comment.body);
+  const [saving, setSaving] = useState(false);
+  const ownComment = comment.authorUserId === userId;
+  async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); try { await updateCommunityComment(supabase, comment.id, userId, body); setEditing(false); onMessage("コメントを更新しました。"); await onReload(); } catch (error) { onError(communityErrorMessage(error, "コメントを更新できませんでした。")); } finally { setSaving(false); } }
+  async function remove() { if (!window.confirm("このコメントを削除しますか？")) return; setSaving(true); try { await deleteCommunityComment(supabase, comment.id, userId); onMessage("コメントを削除しました。"); await onReload(); } catch (error) { onError(communityErrorMessage(error, "コメントを削除できませんでした。")); } finally { setSaving(false); } }
+  return <div className="flex gap-3 border-l-4 border-[var(--mikke-pink)] bg-[var(--mikke-surface-soft)] px-3 py-3"><MemberAvatar name={comment.profile?.displayName} avatarUrl={comment.profile?.avatarUrl} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold">{comment.profile?.displayName ?? "member"}</span><span className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(comment.createdAt)}{comment.updatedAt !== comment.createdAt ? "・編集済み" : ""}</span></div>{editing ? <form onSubmit={save} className="mt-2"><textarea required rows={2} value={body} onChange={(event) => setBody(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-2 flex gap-2"><button disabled={saving} className="text-xs font-bold text-[var(--mikke-primary)]">保存</button><button type="button" onClick={() => setEditing(false)} className="text-xs font-bold text-[var(--mikke-muted)]">キャンセル</button></div></form> : <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{comment.body}</p>}</div>{ownComment && !editing ? <div className="flex"><button type="button" onClick={() => setEditing(true)} className="p-1.5 text-[var(--mikke-primary)]" aria-label="コメントを編集"><Pencil size={14} /></button><button type="button" disabled={saving} onClick={remove} className="p-1.5 text-[var(--mikke-danger)]" aria-label="コメントを削除"><Trash2 size={14} /></button></div> : null}</div>;
 }
 
 function EventsView({ events, userId, onReload, onMessage, onError }: { events: CommunityEvent[]; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
@@ -1029,16 +1121,34 @@ function OwnerRoomsView({ data, ownerLike, onReload, onMessage, onError }: ViewM
   const [description, setDescription] = useState("");
   const [kind, setKind] = useState<CommunityRoomKind>("normal");
   const [accessType, setAccessType] = useState<CommunityRoomAccessType>("free");
+  const [themeColor, setThemeColor] = useState<CommunityRoomColor>("yellow");
   const [entitlementKey, setEntitlementKey] = useState(data.entitlementDefinitions[0]?.key ?? "");
   const [saving, setSaving] = useState(false);
   const activeRooms = data.rooms.filter((room) => !room.isArchived);
   const archivedRooms = data.rooms.filter((room) => room.isArchived);
 
+  async function moveRoom(index: number, direction: -1 | 1) {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= activeRooms.length) return;
+    const roomIds = activeRooms.map((room) => room.id);
+    [roomIds[index], roomIds[targetIndex]] = [roomIds[targetIndex], roomIds[index]];
+    setSaving(true);
+    try {
+      await reorderCommunityRooms(supabase, data.community.id, roomIds);
+      onMessage("Roomの順番を更新しました。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "Roomの順番を更新できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function createRoom(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     try {
-      await createCommunityRoom(supabase, data.community.id, { title, description, kind, accessType, entitlementKey });
+      await createCommunityRoom(supabase, data.community.id, { title, description, kind, accessType, themeColor, entitlementKey });
       setTitle("");
       setDescription("");
       onMessage("Roomを作成しました。");
@@ -1055,7 +1165,7 @@ function OwnerRoomsView({ data, ownerLike, onReload, onMessage, onError }: ViewM
     <section className="border-t border-[var(--mikke-line)] pt-5">
       <h2 className="text-2xl font-bold tracking-normal">ROOM ACCESS</h2>
       <div className="mt-5 space-y-3">
-        {activeRooms.map((room) => <RoomAccessEditor key={room.id} room={room} data={data} onReload={onReload} onMessage={onMessage} onError={onError} />)}
+        {activeRooms.map((room, index) => <RoomAccessEditor key={room.id} room={room} data={data} onMoveUp={index > 0 ? () => moveRoom(index, -1) : undefined} onMoveDown={index < activeRooms.length - 1 ? () => moveRoom(index, 1) : undefined} onReload={onReload} onMessage={onMessage} onError={onError} />)}
       </div>
       {archivedRooms.length > 0 ? (
         <section className="mt-6 border-t border-[var(--mikke-line-soft)] pt-5">
@@ -1069,8 +1179,9 @@ function OwnerRoomsView({ data, ownerLike, onReload, onMessage, onError }: ViewM
         <h3 className="font-bold">Roomを追加</h3>
         <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Room名" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="説明" rows={3} className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <select value={kind} onChange={(event) => setKind(event.target.value as CommunityRoomKind)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="normal">交流</option><option value="announcement">お知らせ</option><option value="question">質問</option><option value="event">イベント</option></select>
+          <RoomColorSelect value={themeColor} onChange={setThemeColor} />
           <AccessTypeSelect value={accessType} onChange={setAccessType} />
           {accessType === "entitlement" ? <EntitlementSelect data={data} value={entitlementKey} onChange={setEntitlementKey} /> : <span />}
         </div>
@@ -1080,12 +1191,12 @@ function OwnerRoomsView({ data, ownerLike, onReload, onMessage, onError }: ViewM
   );
 }
 
-function RoomAccessEditor({ room, data, onReload, onMessage, onError }: { room: CommunityRoom; data: CommunityDashboard; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+function RoomAccessEditor({ room, data, onMoveUp, onMoveDown, onReload, onMessage, onError }: { room: CommunityRoom; data: CommunityDashboard; onMoveUp?: () => void; onMoveDown?: () => void; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(room.title);
   const [description, setDescription] = useState(room.description ?? "");
   const [kind, setKind] = useState(room.kind);
-  const [sortOrder, setSortOrder] = useState(String(room.sortOrder));
+  const [themeColor, setThemeColor] = useState(room.themeColor);
   const [memberCanPost, setMemberCanPost] = useState(room.memberCanPost);
   const [memberCanComment, setMemberCanComment] = useState(room.memberCanComment);
   const [accessType, setAccessType] = useState(room.accessType);
@@ -1100,7 +1211,8 @@ function RoomAccessEditor({ room, data, onReload, onMessage, onError }: { room: 
         title,
         description,
         kind,
-        sortOrder: Number.parseInt(sortOrder, 10) || 100,
+        themeColor,
+        sortOrder: room.sortOrder,
         memberCanPost,
         memberCanComment
       });
@@ -1152,7 +1264,7 @@ function RoomAccessEditor({ room, data, onReload, onMessage, onError }: { room: 
   }
   return (
     <div className={`rounded-lg border border-[var(--mikke-line)] bg-white p-4 ${room.isArchived ? "opacity-80" : ""}`}>
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-bold">{room.title}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">{room.description}</p></div><div className="flex flex-wrap gap-2"><RoomAccessBadge room={room} />{room.isArchived ? <MikkeStatusBadge tone="muted">公開停止</MikkeStatusBadge> : null}</div></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-start gap-2">{!room.isArchived ? <div className="flex flex-col"><button type="button" disabled={saving || !onMoveUp} onClick={onMoveUp} className="p-1 text-[var(--mikke-primary)] disabled:opacity-20" aria-label={`${room.title}を上へ`}><ChevronUp size={17} /></button><button type="button" disabled={saving || !onMoveDown} onClick={onMoveDown} className="p-1 text-[var(--mikke-primary)] disabled:opacity-20" aria-label={`${room.title}を下へ`}><ChevronDown size={17} /></button></div> : null}<div><p className="font-bold">{room.title}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">{room.description}</p></div></div><div className="flex flex-wrap gap-2"><RoomAccessBadge room={room} />{room.isArchived ? <MikkeStatusBadge tone="muted">公開停止</MikkeStatusBadge> : null}</div></div>
       <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-[1fr_1fr_auto_auto_auto]">
         <AccessTypeSelect value={accessType} onChange={setAccessType} />
         {accessType === "entitlement" ? <EntitlementSelect data={data} value={entitlementKey} onChange={setEntitlementKey} /> : <span />}
@@ -1161,10 +1273,10 @@ function RoomAccessEditor({ room, data, onReload, onMessage, onError }: { room: 
         <button type="button" disabled={saving} onClick={room.isArchived ? restore : archive} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm font-bold text-[var(--mikke-danger)] disabled:opacity-60">{room.isArchived ? "再公開" : "公開停止"}</button>
       </div>
       {editing ? (
-        <form onSubmit={saveDetails} className="mt-3 grid gap-3 border-t border-[var(--mikke-line-soft)] pt-3 md:grid-cols-[1fr_140px_120px]">
+        <form onSubmit={saveDetails} className="mt-3 grid gap-3 border-t border-[var(--mikke-line-soft)] pt-3 md:grid-cols-[1fr_160px_160px]">
           <input required value={title} onChange={(event) => setTitle(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" />
           <select value={kind} onChange={(event) => setKind(event.target.value as CommunityRoomKind)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><option value="normal">交流</option><option value="announcement">お知らせ</option><option value="question">質問</option><option value="event">イベント</option></select>
-          <input type="number" value={sortOrder} onChange={(event) => setSortOrder(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" />
+          <RoomColorSelect value={themeColor} onChange={setThemeColor} />
           <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-6 md:col-span-3" />
           <label className="flex items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]"><input type="checkbox" checked={memberCanPost} onChange={(event) => setMemberCanPost(event.target.checked)} />参加者が投稿できる</label>
           <label className="flex items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]"><input type="checkbox" checked={memberCanComment} onChange={(event) => setMemberCanComment(event.target.checked)} />参加者がコメントできる</label>
@@ -1475,4 +1587,8 @@ export function LegacyCommunityAuthRedirect() {
   }, [router]);
 
   return <main className="grid min-h-screen place-items-center bg-white px-5 text-sm font-semibold text-[var(--mikke-muted)]">入口へ移動しています...</main>;
+}
+
+function RoomColorSelect({ value, onChange }: { value: CommunityRoomColor; onChange: (value: CommunityRoomColor) => void }) {
+  return <label className="flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3"><span className={`h-3 w-3 shrink-0 rounded-full border-2 ${roomColorBorderClass(value)}`} /><select aria-label="Roomカラー" value={value} onChange={(event) => onChange(event.target.value as CommunityRoomColor)} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none"><option value="blue">ブルー</option><option value="orange">オレンジ</option><option value="yellow">イエロー</option><option value="pink">ピンク</option><option value="green">グリーン</option></select></label>;
 }

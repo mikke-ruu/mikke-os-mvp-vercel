@@ -17,6 +17,7 @@ import type {
   CommunityRole,
   CommunityRoom,
   CommunityRoomAccessType,
+  CommunityRoomColor,
   CommunityRoomKind
 } from "./types";
 import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
@@ -90,6 +91,7 @@ function mapRoom(row: any, requiredEntitlementKeys: string[], isLocked: boolean)
     description: row.description ?? null,
     kind: row.kind,
     accessType: row.access_type ?? "free",
+    themeColor: row.theme_color ?? "yellow",
     requiredEntitlementKeys,
     isLocked,
     sortOrder: row.sort_order ?? 0,
@@ -107,6 +109,7 @@ function mapComment(row: any): CommunityComment {
     body: row.body,
     isHidden: Boolean(row.is_hidden),
     createdAt: row.created_at,
+    updatedAt: row.updated_at,
     profile: null
   };
 }
@@ -400,13 +403,14 @@ export async function saveCommunityProfile(client: DbClient, communityId: string
   if (error) throw error;
 }
 
-export async function createCommunityRoom(client: DbClient, communityId: string, input: { title: string; description: string; kind: CommunityRoomKind; accessType: CommunityRoomAccessType; entitlementKey?: string }) {
+export async function createCommunityRoom(client: DbClient, communityId: string, input: { title: string; description: string; kind: CommunityRoomKind; accessType: CommunityRoomAccessType; themeColor: CommunityRoomColor; entitlementKey?: string }) {
   const { data, error } = await client.from("community_rooms").insert({
     community_id: communityId,
     title: input.title.trim(),
     description: input.description.trim() || null,
     kind: input.kind,
     access_type: input.accessType,
+    theme_color: input.themeColor,
     member_can_post: input.kind !== "announcement",
     member_can_comment: true,
     sort_order: 100
@@ -429,11 +433,12 @@ export async function updateCommunityRoomAccess(client: DbClient, roomId: string
   }
 }
 
-export async function updateCommunityRoom(client: DbClient, roomId: string, communityId: string, input: { title: string; description: string; kind: CommunityRoomKind; sortOrder: number; memberCanPost: boolean; memberCanComment: boolean }) {
+export async function updateCommunityRoom(client: DbClient, roomId: string, communityId: string, input: { title: string; description: string; kind: CommunityRoomKind; themeColor: CommunityRoomColor; sortOrder: number; memberCanPost: boolean; memberCanComment: boolean }) {
   const { error } = await client.from("community_rooms").update({
     title: input.title.trim(),
     description: input.description.trim() || null,
     kind: input.kind,
+    theme_color: input.themeColor,
     sort_order: input.sortOrder,
     member_can_post: input.memberCanPost,
     member_can_comment: input.memberCanComment
@@ -524,9 +529,32 @@ export async function updateCommunityPost(client: DbClient, postId: string, inpu
   if (error) throw error;
 }
 
+export async function deleteCommunityPost(client: DbClient, postId: string, authorUserId: string) {
+  const { error } = await client.from("community_posts").update({ deleted_at: new Date().toISOString(), deleted_by_user_id: authorUserId }).eq("id", postId).eq("author_user_id", authorUserId);
+  if (error) throw error;
+}
+
 export async function createCommunityComment(client: DbClient, postId: string, authorUserId: string, body: string) {
   const { error } = await client.from("community_comments").insert({ post_id: postId, author_user_id: authorUserId, body: body.trim() });
   if (error) throw error;
+}
+
+export async function updateCommunityComment(client: DbClient, commentId: string, authorUserId: string, body: string) {
+  const { error } = await client.from("community_comments").update({ body: body.trim() }).eq("id", commentId).eq("author_user_id", authorUserId);
+  if (error) throw error;
+}
+
+export async function deleteCommunityComment(client: DbClient, commentId: string, authorUserId: string) {
+  const { error } = await client.from("community_comments").update({ deleted_at: new Date().toISOString(), deleted_by_user_id: authorUserId }).eq("id", commentId).eq("author_user_id", authorUserId);
+  if (error) throw error;
+}
+
+export async function reorderCommunityRooms(client: DbClient, communityId: string, roomIds: string[]) {
+  const results = await Promise.all(roomIds.map((roomId, index) => (
+    client.from("community_rooms").update({ sort_order: (index + 1) * 10 }).eq("id", roomId).eq("community_id", communityId)
+  )));
+  const failed = results.find((result) => result.error);
+  if (failed?.error) throw failed.error;
 }
 
 export async function createCommunityEvent(client: DbClient, communityId: string, input: { title: string; description: string; startsAt: string; endsAt?: string; locationLabel?: string; externalUrl?: string }) {
