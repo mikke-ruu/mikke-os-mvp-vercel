@@ -208,6 +208,26 @@ export async function listMyCommunities(client: DbClient, userId: string): Promi
   return (data ?? []).map(mapCommunity);
 }
 
+export async function listMyManagedCommunities(client: DbClient, userId: string): Promise<Community[]> {
+  const { data: memberships, error: membershipsError } = await client
+    .from("community_memberships")
+    .select("community_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("role", ["owner", "moderator"]);
+  if (membershipsError) throw membershipsError;
+  const ids = Array.from(new Set((memberships ?? []).map((item: any) => item.community_id)));
+  if (ids.length === 0) return [];
+  const { data, error } = await client
+    .from("community_communities")
+    .select("*")
+    .in("id", ids)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(mapCommunity);
+}
+
 export async function createCommunity(client: DbClient, userId: string, input: { name: string; slug: string; description: string; displayName: string }): Promise<Community> {
   if (!userId) throw new Error("ログインが必要です。");
   assertMikkeNameIsNotReserved({ slug: input.slug, displayName: input.name, label: "Community名またはURL用ID" });

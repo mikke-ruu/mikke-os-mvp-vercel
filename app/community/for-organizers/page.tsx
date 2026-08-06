@@ -1,5 +1,5 @@
-import { CommunityOrganizerEntryPage } from "@/components/community/CommunityHub";
+import { CommunityOrganizerAuthPage } from "@/components/community/CommunityApp";
 
 export default function CommunityForOrganizersPage() {
-  return <CommunityOrganizerEntryPage />;
+  return <CommunityOrganizerAuthPage />;
 }

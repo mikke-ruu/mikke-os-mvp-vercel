@@ -169,6 +169,18 @@ When the user review starts, ask the user to verify these in order.
 - Post, event, and resource drag ordering.
 - Full app-wide build across unrelated dirty worktree areas.
 
+## 2026-08-06 participant / organizer entry split
+
+- Organizer entry and authentication: `/community/for-organizers`
+- Organizer hub after login: `/community/manage`
+- Generic returning participant login: `/community/participant-login`
+- Tenant-specific participant login/signup: `/community/c/{slug}/login`
+- Tenant public entry: `/community/c/{slug}`
+- Legacy `/community/login?next=...` remains redirect-only for existing links.
+- A tenant URL exposes only public Community name/description/join mode. Room, post, event, library, member, and owner data still require authentication and applicable membership/role.
+- Participant navigation does not render `OWNER`; it is shown only for owner/moderator users.
+- The shell title uses the tenant Community name. A separate logo field and logo uploader are deferred to the next UI/settings slice.
+
 ## Stop conditions
 
 Stop and ask the user before:
