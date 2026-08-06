@@ -59,6 +59,10 @@ type MikkeAppShellProps = {
   navItems?: MikkeShellNavItem[];
   /** モバイル下部メニュー（アイコンのみ5枠想定）。navItems指定時のみ意味を持つ。 */
   bottomNavItems?: MikkeShellBottomNavItem[];
+  /** 中央の主要操作だけ別の固定色にする。未指定時はthemeと同じ。 */
+  primaryActionTone?: StatChipTone;
+  /** 初見でも意味が分かるよう、モバイル下部メニューに短いラベルを表示する。 */
+  showBottomNavLabels?: boolean;
   sidebarFooterAction?: {
     label: string;
     helper?: string;
@@ -94,6 +98,8 @@ export function MikkeAppShell({
   footerLabel,
   navItems,
   bottomNavItems,
+  primaryActionTone,
+  showBottomNavLabels = false,
   sidebarFooterAction,
   children
 }: MikkeAppShellProps) {
@@ -114,6 +120,7 @@ export function MikkeAppShell({
 
   const hasSidebar = Boolean(navItems && navItems.length > 0);
   const toneStyle = tileToneStyles[theme];
+  const primaryToneStyle = tileToneStyles[primaryActionTone ?? theme];
   const activeNavHref = navItems && navItems.length > 0 ? findActiveHref(pathname, navItems.map((item) => item.href)) : null;
   const activeBottomHref =
     bottomNavItems && bottomNavItems.length > 0
@@ -260,7 +267,7 @@ export function MikkeAppShell({
           {bottomNavItems && bottomNavItems.length > 0 ? (
             <nav
               aria-label={`${appName} メニュー（モバイル）`}
-              className="sticky bottom-0 z-10 grid border-t border-[var(--mikke-line)] bg-white/95 backdrop-blur min-[900px]:hidden"
+              className="sticky bottom-0 z-10 grid border-t border-[var(--mikke-line)] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur min-[900px]:hidden"
               style={{ gridTemplateColumns: `repeat(${bottomNavItems.length}, minmax(0, 1fr))` }}
             >
               {bottomNavItems.map((item) => {
@@ -268,10 +275,11 @@ export function MikkeAppShell({
                 const itemKey = `${item.label}:${item.href}`;
                 if (item.primary) {
                   return (
-                    <Link key={itemKey} href={item.href} aria-label={item.label} className="grid place-items-center py-2.5">
-                      <span className="grid h-[34px] w-[34px] place-items-center rounded-xl" style={{ background: toneStyle.background }}>
-                        <Icon size={18} color={toneStyle.foreground} strokeWidth={1.8} />
+                    <Link key={itemKey} href={item.href} aria-label={item.label} className="flex min-h-[58px] flex-col items-center justify-center gap-1 py-2">
+                      <span className="grid h-9 w-9 place-items-center rounded-xl" style={{ background: primaryToneStyle.background }}>
+                        <Icon size={19} color={primaryToneStyle.foreground} strokeWidth={1.9} />
                       </span>
+                      {showBottomNavLabels ? <span className="text-[10px] font-bold text-[var(--mikke-muted)]">{item.label}</span> : null}
                     </Link>
                   );
                 }
@@ -281,10 +289,11 @@ export function MikkeAppShell({
                     key={itemKey}
                     href={item.href}
                     aria-label={item.label}
-                    className="grid place-items-center py-3"
+                    className="flex min-h-[58px] flex-col items-center justify-center gap-1 py-2"
                     style={{ color: isActive ? toneStyle.background : "var(--mikke-muted-light)" }}
                   >
                     <Icon size={21} strokeWidth={1.8} />
+                    {showBottomNavLabels ? <span className="text-[10px] font-bold">{item.label}</span> : null}
                   </Link>
                 );
               })}

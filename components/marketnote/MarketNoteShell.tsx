@@ -93,7 +93,9 @@ export function MarketNoteShell({
       title={title}
       subtitle={subtitle}
       currentApp={{ label: "MarketNote", href: "/marketnote", icon: Store }}
-      theme="orange"
+      theme="blue"
+      primaryActionTone="orange"
+      showBottomNavLabels
       menuEditItems={isGuest ? guestMarketNoteEditItems : marketNoteEditItems}
       ownedApps={ownedMarketNoteApps}
       otherApps={isGuest ? [] : loggedInRelatedApps}

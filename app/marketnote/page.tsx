@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Clock3, Edit3, MapPin, Plus } from "lucide-react";
+import { Clock3, Edit3, MapPin, Plus } from "lucide-react";
 import { HomeCalendar } from "@/components/marketnote/HomeCalendar";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
-import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { formatDate } from "@/lib/format";
 import {
@@ -101,7 +100,7 @@ function MarketNoteContent() {
               一覧
             </SegmentButton>
           </div>
-          <Link href="/marketnote/new" className="inline-flex items-center gap-1 rounded-full border border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent)]">
+          <Link href="/marketnote/new" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-[var(--mikke-orange)] px-3.5 text-xs font-bold text-white">
             <Plus size={15} strokeWidth={1.8} />
             追加
           </Link>
@@ -151,7 +150,7 @@ function GuestNotice() {
   return (
     <div className="mb-4 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
       ログインなしですぐ使えます。記録はこのブラウザに保存され、同じアイコン・同じブラウザから続きが見られます。
-      <Link href="/login?next=/marketnote" className="ml-2 text-[var(--mikke-accent)]">
+      <Link href="/login?next=/marketnote" className="ml-2 text-[var(--mikke-blue)] underline underline-offset-2">
         ログインしてクラウド保存
       </Link>
     </div>
@@ -190,7 +189,7 @@ function CloudImportNotice({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p>
           このブラウザに保存されたMarketNote記録があります。
-          <span className="ml-1 text-[var(--mikke-accent)]">出店予定 {stats.events}件</span>
+          <span className="ml-1 text-[var(--mikke-blue)]">出店予定 {stats.events}件</span>
           <span className="mt-1 block text-[var(--mikke-muted)]">
             クラウド保存が完了するまで、端末内のゲスト記録は残ります。
           </span>
@@ -199,7 +198,7 @@ function CloudImportNotice({
           type="button"
           onClick={importRecords}
           disabled={importing}
-          className="rounded-full bg-[var(--mikke-accent)] px-4 py-2 text-xs font-extrabold text-[var(--mikke-surface)] disabled:opacity-50"
+          className="min-h-11 rounded-xl bg-[var(--mikke-orange)] px-4 text-xs font-extrabold text-white disabled:opacity-50"
         >
           {importing ? "保存中..." : "クラウドへ保存する"}
         </button>
@@ -224,8 +223,8 @@ function SegmentButton({ active, onClick, children }: { active: boolean; onClick
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-        active ? "bg-[var(--mikke-accent)] text-white" : "text-[var(--mikke-text-soft)]"
+      className={`min-h-10 rounded-full px-3.5 text-xs font-bold transition ${
+        active ? "bg-[var(--mikke-blue)] text-white" : "text-[var(--mikke-text-soft)]"
       }`}
     >
       {children}
@@ -238,10 +237,10 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
     <button
       type="button"
       onClick={onClick}
-      className={`relative pb-3 pt-1 transition ${active ? "text-[var(--mikke-accent)]" : "text-[var(--mikke-text)]"}`}
+      className={`relative min-h-11 pb-3 pt-1 transition ${active ? "text-[var(--mikke-blue)]" : "text-[var(--mikke-text)]"}`}
     >
       {children}
-      {active ? <span className="absolute inset-x-0 bottom-[-1px] mx-auto h-0.5 w-full rounded-full bg-[var(--mikke-accent)]" /> : null}
+      {active ? <span className="absolute inset-x-0 bottom-[-1px] mx-auto h-0.5 w-full rounded-full bg-[var(--mikke-blue)]" /> : null}
     </button>
   );
 }
@@ -255,7 +254,7 @@ function EventListCard({ summary }: { summary: EventSummary }) {
   return (
     <Link
       href={`/marketnote/${event.id}`}
-      className="block rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-[0_5px_16px_rgba(45,33,22,0.045)] transition hover:border-[var(--mikke-primary-border)]"
+      className="block rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 transition hover:border-[var(--mikke-blue)]"
     >
       <div className="flex items-start justify-between gap-3">
         <StatusChip status={event.status} applied={hasAppliedEntryStatus(event.private_note)} />
@@ -284,7 +283,7 @@ function EventListCard({ summary }: { summary: EventSummary }) {
       </div>
 
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--mikke-line-soft)]">
-        <div className="h-full rounded-full bg-[var(--mikke-accent)]" style={{ width: `${progress}%` }} />
+        <div className="h-full rounded-full bg-[var(--mikke-yellow)]" style={{ width: `${progress}%` }} />
       </div>
     </Link>
   );
@@ -292,17 +291,29 @@ function EventListCard({ summary }: { summary: EventSummary }) {
 
 function StatusChip({ status, applied = false }: { status: MarketEvent["status"]; applied?: boolean }) {
   const showApplied = applied && status === "planned";
+  const toneClass = showApplied
+    ? "bg-[var(--mikke-yellow)] text-[var(--mikke-text)]"
+    : status === "preparing"
+      ? "bg-[var(--mikke-orange)] text-white"
+      : status === "completed"
+        ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]"
+        : status === "planned"
+          ? "bg-[var(--mikke-blue)] text-white"
+          : "border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]";
   return (
-    <MikkeStatusBadge tone={showApplied || status === "preparing" ? "primary" : "muted"} className="rounded-full py-1">
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>
       {showApplied ? "申込済み" : statusLabel(status)}
-      <ChevronDown size={14} strokeWidth={1.7} />
-    </MikkeStatusBadge>
+    </span>
   );
 }
 
 function PaymentChip({ payment }: { payment: PaymentState }) {
-  const tone = payment === "paid" ? "success" : payment === "unpaid" ? "primary" : "muted";
-  return <MikkeStatusBadge tone={tone} className="rounded-full px-2 py-0.5 text-[10px] leading-none">{paymentLabel(payment)}</MikkeStatusBadge>;
+  const toneClass = payment === "paid"
+    ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]"
+    : payment === "unpaid"
+      ? "bg-[var(--mikke-orange)] text-white"
+      : "border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]";
+  return <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold leading-none ${toneClass}`}>{paymentLabel(payment)}</span>;
 }
 
 function getPaymentState(checks: MarketCheckItem[]): PaymentState {

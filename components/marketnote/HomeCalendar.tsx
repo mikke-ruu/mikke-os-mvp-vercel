@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronLeft, ChevronRight, Edit3, MapPin } from "lucide-react";
-import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { formatMonthDayWeekday, formatYen, toDateKey } from "@/lib/format";
 import { hasAppliedEntryStatus } from "@/lib/marketnote";
@@ -28,6 +27,8 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent, reflectio
   });
   const [selectedDate, setSelectedDate] = useState<string>(todayKey);
   const [expandedReflection, setExpandedReflection] = useState<string | null>(null);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, MarketEvent[]> = {};
@@ -66,44 +67,81 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent, reflectio
 
   const selectedEvents = eventsByDate[selectedDate] ?? [];
 
+  function moveMonth(delta: number) {
+    const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + delta, 1);
+    const selectedDay = Number(selectedDate.slice(8, 10)) || 1;
+    const lastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    setVisibleMonth(nextMonth);
+    setSelectedDate(toDateKey(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(selectedDay, lastDay))));
+  }
+
+  function selectDate(date: Date) {
+    setSelectedDate(toDateKey(date));
+    if (date.getMonth() !== visibleMonth.getMonth() || date.getFullYear() !== visibleMonth.getFullYear()) {
+      setVisibleMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+    }
+  }
+
+  function goToToday() {
+    const now = new Date();
+    setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+    setSelectedDate(todayKey);
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between px-1">
         <button
           type="button"
-          onClick={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
+          onClick={() => moveMonth(-1)}
           aria-label="前の月"
-          className="grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-muted)] hover:bg-[var(--mikke-surface-soft)]"
+          className="grid h-11 w-11 place-items-center rounded-full text-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)]"
         >
-          <ChevronLeft size={18} />
+          <ChevronLeft size={20} />
         </button>
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold tracking-normal text-[var(--mikke-text)]">
+          <h2 className="text-lg font-bold tracking-normal text-[var(--mikke-blue)]">
             {visibleMonth.getFullYear()}年{visibleMonth.getMonth() + 1}月
           </h2>
           <button
             type="button"
-            onClick={() => {
-              const now = new Date();
-              setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-              setSelectedDate(todayKey);
-            }}
-            className="rounded-full border border-[var(--mikke-line)] px-2 py-1 text-[11px] font-bold text-[var(--mikke-muted)]"
+            onClick={goToToday}
+            className="min-h-9 rounded-full border border-[var(--mikke-blue)] px-2.5 text-[11px] font-bold text-[var(--mikke-blue)]"
           >
             今日
           </button>
         </div>
         <button
           type="button"
-          onClick={() => setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
+          onClick={() => moveMonth(1)}
           aria-label="次の月"
-          className="grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-muted)] hover:bg-[var(--mikke-surface-soft)]"
+          className="grid h-11 w-11 place-items-center rounded-full text-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)]"
         >
-          <ChevronRight size={18} />
+          <ChevronRight size={20} />
         </button>
       </div>
 
-      <div className="mt-3 grid grid-cols-7 gap-1 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-2">
+      <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-[var(--mikke-blue)]" style={{ fontFamily: "var(--mikke-font-display)" }}>
+        CALENDAR
+      </p>
+
+      <div
+        className="mt-2 grid touch-pan-y grid-cols-7 gap-1 rounded-xl border border-[var(--mikke-line)] bg-white p-2"
+        onTouchStart={(event) => {
+          touchStartX.current = event.touches[0]?.clientX ?? null;
+          touchStartY.current = event.touches[0]?.clientY ?? null;
+        }}
+        onTouchEnd={(event) => {
+          if (touchStartX.current === null || touchStartY.current === null) return;
+          const endTouch = event.changedTouches[0];
+          if (!endTouch) return;
+          const deltaX = endTouch.clientX - touchStartX.current;
+          const deltaY = endTouch.clientY - touchStartY.current;
+          touchStartX.current = null;
+          touchStartY.current = null;
+          if (Math.abs(deltaX) >= 54 && Math.abs(deltaX) > Math.abs(deltaY)) moveMonth(deltaX > 0 ? -1 : 1);
+        }}
+      >
         {weekdayLabels.map((label) => (
           <div key={label} className="py-1 text-center text-[11px] font-bold text-[var(--mikke-muted-light)]">
             {label}
@@ -114,32 +152,59 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent, reflectio
           const inMonth = date.getMonth() === visibleMonth.getMonth();
           const dayEvents = eventsByDate[key] ?? [];
           const selected = key === selectedDate;
+          const today = key === todayKey;
 
           return (
             <button
               key={key}
               type="button"
-              onClick={() => setSelectedDate(key)}
-              className={`flex h-16 flex-col items-start rounded-xl border p-1 text-left sm:h-20 ${
+              onClick={() => selectDate(date)}
+              aria-label={calendarDayLabel(date, dayEvents)}
+              className={`flex h-14 min-w-0 flex-col items-center rounded-lg border p-1 text-center sm:h-16 ${
                 selected
-                  ? "border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)]"
+                  ? "border-[var(--mikke-blue)] bg-white"
                   : "border-transparent hover:bg-[var(--mikke-surface-soft)]"
               } ${inMonth ? "" : "opacity-40"}`}
             >
               <span
-                className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
-                  selected ? "bg-[var(--mikke-accent)] text-white" : "text-[var(--mikke-text)]"
+                className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${
+                  selected
+                    ? "bg-[var(--mikke-blue)] text-white"
+                    : today
+                      ? "border border-[var(--mikke-blue)] text-[var(--mikke-blue)]"
+                      : "text-[var(--mikke-text)]"
                 }`}
               >
                 {date.getDate()}
               </span>
-              <CalendarCellBody events={dayEvents} checksByEvent={checksByEvent} financesByEvent={financesByEvent} />
+              <CalendarCellBody events={dayEvents} />
             </button>
           );
         })}
       </div>
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-[var(--mikke-muted)]" aria-label="予定の色分け">
+        <CalendarLegend color="var(--mikke-blue)" label="予定" />
+        <CalendarLegend color="var(--mikke-orange)" label="出店確定" />
+        <CalendarLegend color="var(--mikke-green)" label="完了" />
+      </div>
+
+      <div className="mt-5">
+        <div className="mb-3 flex items-center justify-between gap-3 border-b border-[var(--mikke-line)] pb-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--mikke-blue)]" style={{ fontFamily: "var(--mikke-font-display)" }}>
+              SELECTED DAY
+            </p>
+            <h3 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{formatSelectedDate(selectedDate)}</h3>
+          </div>
+          <Link
+            href={`/marketnote/new?startDate=${selectedDate}`}
+            className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-[var(--mikke-orange)] px-3.5 text-xs font-bold text-white"
+          >
+            この日に追加
+          </Link>
+        </div>
+        <div className="space-y-3">
         {selectedEvents.length > 0 ? (
           selectedEvents.map((event) =>
             event.status === "completed" ? (
@@ -156,25 +221,24 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent, reflectio
             )
           )
         ) : (
-          <MikkeEmptyState title="この日の予定はまだありません" helper="出店予定を追加すると、この日にカードが表示されます。" />
+          <div className="py-5 text-center">
+            <p className="text-sm font-bold text-[var(--mikke-text)]">この日の予定はありません</p>
+            <p className="mt-1 text-xs text-[var(--mikke-muted)]">上の「この日に追加」からすぐ登録できます。</p>
+          </div>
         )}
-        <Link
-          href={`/marketnote/new?startDate=${selectedDate}`}
-          className="block text-center text-xs font-bold text-[var(--mikke-accent)]"
-        >
-          + この日に別の予定を追加
-        </Link>
+        </div>
       </div>
 
       {dueTasks.length > 0 || upcomingEvents.length > 0 || unrecordedFinishedEvents.length > 0 ? (
         <div className="mt-6 space-y-4">
           {dueTasks.length > 0 ? (
-            <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4">
-              <h3 className="text-sm font-bold text-[var(--mikke-text)]">やること（期限順）</h3>
+            <section className="border-t border-[var(--mikke-line)] pt-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--mikke-blue)]" style={{ fontFamily: "var(--mikke-font-display)" }}>TODO</p>
+              <h3 className="mt-1 text-sm font-bold text-[var(--mikke-text)]">やること（期限順）</h3>
               <ul className="mt-2 space-y-1.5">
                 {dueTasks.map(({ event, item, effectiveDue }) => (
                   <li key={item.id} className="flex items-center gap-2 text-xs font-semibold text-[var(--mikke-text-soft)]">
-                    <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-[var(--mikke-line)]" />
+                    <span className={`h-3 w-3 shrink-0 rounded-full ${effectiveDue <= todayKey ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-yellow)]"}`} />
                     <span className="min-w-0 flex-1 truncate">{item.title}</span>
                     <span className="shrink-0 text-[var(--mikke-muted)]">{formatMonthDayWeekday(effectiveDue)}</span>
                     <span className="sr-only">（{event.title}）</span>
@@ -185,8 +249,9 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent, reflectio
           ) : null}
 
           {upcomingEvents.length > 0 ? (
-            <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4">
-              <h3 className="text-sm font-bold text-[var(--mikke-text)]">次回イベント</h3>
+            <section className="border-t border-[var(--mikke-line)] pt-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--mikke-blue)]" style={{ fontFamily: "var(--mikke-font-display)" }}>NEXT EVENTS</p>
+              <h3 className="mt-1 text-sm font-bold text-[var(--mikke-text)]">次回イベント</h3>
               <ul className="mt-2 space-y-2">
                 {upcomingEvents.slice(0, 3).map((event) => {
                   const checks = checksByEvent[event.id] ?? [];
@@ -221,63 +286,18 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent, reflectio
 }
 
 function CalendarCellBody({
-  events,
-  checksByEvent,
-  financesByEvent
+  events
 }: {
   events: MarketEvent[];
-  checksByEvent: Record<string, MarketCheckItem[]>;
-  financesByEvent: Record<string, MarketFinancialRecord[]>;
 }) {
   if (events.length === 0) return null;
 
-  const primary = events[0];
-  const extraCount = events.length - 1;
-
   return (
-    <div className="mt-0.5 min-w-0 flex-1 text-[9px] font-bold leading-tight sm:text-[10px]">
-      {extraCount > 0 ? <span className="text-[var(--mikke-muted-light)]">+{extraCount}</span> : null}
-      {primary.status === "completed" ? (
-        <FinishedCellSummary event={primary} finances={financesByEvent[primary.id] ?? []} />
-      ) : (
-        <PendingCellSummary event={primary} checks={checksByEvent[primary.id] ?? []} />
-      )}
-    </div>
-  );
-}
-
-function PendingCellSummary({ event, checks }: { event: MarketEvent; checks: MarketCheckItem[] }) {
-  const done = checks.filter((check) => check.is_done).length;
-  const payment = getPaymentState(checks);
-  const applied = hasAppliedEntryStatus(event.private_note) && event.status === "planned";
-  const toneClass = applied || event.status === "preparing" ? "text-[var(--mikke-accent-strong)]" : "text-[var(--mikke-muted)]";
-
-  return (
-    <div className={`space-y-0.5 ${toneClass}`}>
-      <p className="truncate">{event.title}</p>
-      <p className="truncate text-[var(--mikke-muted-light)]">
-        {payment === "not_required" ? "" : payment === "paid" ? "済" : "未"}
-        {checks.length > 0 ? ` ${done}/${checks.length}` : ""}
-      </p>
-    </div>
-  );
-}
-
-function FinishedCellSummary({ event, finances }: { event: MarketEvent; finances: MarketFinancialRecord[] }) {
-  if (finances.length === 0) {
-    return (
-      <div className="space-y-0.5 text-[var(--mikke-muted-light)]">
-        <p className="truncate">終了</p>
-        <p className="truncate">未記録</p>
-      </div>
-    );
-  }
-
-  const profit = sumProfit(finances);
-  return (
-    <div className="space-y-0.5 text-[var(--mikke-success)]">
-      <p className="truncate text-[var(--mikke-muted-light)]">利益</p>
-      <p className="truncate">{formatYen(profit)}</p>
+    <div className="mt-1 flex min-w-0 items-center justify-center gap-0.5" aria-hidden="true">
+      {events.slice(0, 3).map((event) => (
+        <span key={event.id} className={`h-1.5 w-1.5 shrink-0 rounded-full ${calendarEventDotClass(event)}`} />
+      ))}
+      {events.length > 3 ? <span className="ml-0.5 text-[8px] font-bold text-[var(--mikke-muted)]">+{events.length - 3}</span> : null}
     </div>
   );
 }
@@ -291,13 +311,10 @@ function UpcomingEventCard({ event, checks }: { event: MarketEvent; checks: Mark
   return (
     <Link
       href={`/marketnote/${event.id}`}
-      className="block rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm"
+      className="block rounded-xl border border-[var(--mikke-line)] bg-white p-4 transition hover:border-[var(--mikke-blue)]"
     >
       <div className="flex items-center justify-between gap-2">
-        <MikkeStatusBadge tone={applied || event.status === "preparing" ? "primary" : "muted"} className="rounded-full py-1">
-          {applied ? "申込済み" : statusLabel(event.status)}
-          <ChevronDown size={13} />
-        </MikkeStatusBadge>
+        <CalendarStatusPill event={event} applied={applied} />
         <Edit3 size={16} className="shrink-0 text-[var(--mikke-muted)]" />
       </div>
       <h4 className="mt-2 truncate text-base font-bold text-[var(--mikke-text)]">{event.title}</h4>
@@ -313,7 +330,7 @@ function UpcomingEventCard({ event, checks }: { event: MarketEvent; checks: Mark
         <span className="font-semibold text-[var(--mikke-text-soft)]">タスク {done}/{checks.length}</span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--mikke-line-soft)]">
-        <div className="h-full rounded-full bg-[var(--mikke-accent)]" style={{ width: `${progress}%` }} />
+        <div className="h-full rounded-full bg-[var(--mikke-yellow)]" style={{ width: `${progress}%` }} />
       </div>
     </Link>
   );
@@ -338,7 +355,7 @@ function FinishedEventCard({
   const reflectionText = reflection?.good_points?.trim() || "";
 
   return (
-    <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
+    <div className="rounded-xl border border-[var(--mikke-line)] bg-white p-4">
       <div className="flex items-center gap-2">
         <MikkeStatusBadge tone="success" className="rounded-full px-2 py-0.5 text-[10px]">終了</MikkeStatusBadge>
         <p className="text-xs font-semibold text-[var(--mikke-muted)]">{formatMonthDayWeekday(event.event_date)}</p>
@@ -378,12 +395,58 @@ function FinishedEventCard({
 
       <Link
         href={`/marketnote/${event.id}`}
-        className="mt-3 inline-flex items-center text-xs font-bold text-[var(--mikke-accent)]"
+        className="mt-3 inline-flex min-h-10 items-center text-xs font-bold text-[var(--mikke-blue)]"
       >
         詳細を見る
       </Link>
     </div>
   );
+}
+
+function CalendarLegend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+      {label}
+    </span>
+  );
+}
+
+function CalendarStatusPill({ event, applied }: { event: MarketEvent; applied: boolean }) {
+  const toneClass = applied
+    ? "bg-[var(--mikke-yellow)] text-[var(--mikke-text)]"
+    : event.status === "preparing"
+      ? "bg-[var(--mikke-orange)] text-white"
+      : event.status === "completed"
+        ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]"
+        : event.status === "planned"
+          ? "bg-[var(--mikke-blue)] text-white"
+          : "border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]";
+
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>
+      {applied ? "申込済み" : statusLabel(event.status)}
+    </span>
+  );
+}
+
+function calendarEventDotClass(event: MarketEvent) {
+  if (event.status === "completed") return "bg-[var(--mikke-green)]";
+  if (event.status === "preparing") return "bg-[var(--mikke-orange)]";
+  if (hasAppliedEntryStatus(event.private_note) && event.status === "planned") return "bg-[var(--mikke-yellow)]";
+  if (event.status === "planned") return "bg-[var(--mikke-blue)]";
+  return "bg-[var(--mikke-line)]";
+}
+
+function calendarDayLabel(date: Date, events: MarketEvent[]) {
+  const dateLabel = date.toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" });
+  if (events.length === 0) return `${dateLabel}、予定なし`;
+  return `${dateLabel}、${events.map((event) => `${event.title}（${statusLabel(event.status)}）`).join("、")}`;
+}
+
+function formatSelectedDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" });
 }
 
 function buildMonthMatrix(monthStart: Date) {
@@ -413,10 +476,6 @@ function buildMonthMatrix(monthStart: Date) {
 
 function sumByType(finances: MarketFinancialRecord[], type: "revenue" | "expense") {
   return finances.filter((record) => record.record_type === type).reduce((total, record) => total + Number(record.amount), 0);
-}
-
-function sumProfit(finances: MarketFinancialRecord[]) {
-  return sumByType(finances, "revenue") - sumByType(finances, "expense");
 }
 
 function getPaymentState(checks: MarketCheckItem[]): PaymentState {

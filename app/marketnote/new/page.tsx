@@ -202,8 +202,8 @@ function NewMarketEventContent() {
         <div className="space-y-3">
           {isGuest ? <GuestNotice /> : null}
 
-          <FormCard title="基本情報" icon={<ClipboardList size={16} strokeWidth={1.8} />}>
-            <div className="grid grid-cols-[1fr_0.86fr] gap-3">
+          <FormCard title="基本情報" tone="blue" icon={<ClipboardList size={16} strokeWidth={1.8} />}>
+            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-[1fr_0.86fr]">
               <Field label="イベント名" required compact>
                 <TextInput value={title} onChange={setTitle} placeholder="例）ハンドメイドフェス 2025" required />
               </Field>
@@ -237,8 +237,8 @@ function NewMarketEventContent() {
             </div>
 
             {multiDay ? (
-              <div className="grid grid-cols-[1fr_0.86fr] gap-3">
-                <span />
+              <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-[1fr_0.86fr]">
+                <span className="hidden min-[360px]:block" />
                 <Field label="終了日" required compact>
                   <TextInput value={endDate} onChange={setEndDate} type="date" required icon={<CalendarDays size={15} />} />
                 </Field>
@@ -254,25 +254,25 @@ function NewMarketEventContent() {
                   return next;
                 });
               }}
-              className="inline-flex items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]"
+              className="inline-flex min-h-10 items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]"
             >
-              <span className={`grid h-4 w-4 place-items-center rounded border ${multiDay ? "border-[var(--mikke-accent)] bg-[var(--mikke-accent)] text-[var(--mikke-surface)]" : "border-[var(--mikke-line)] bg-[var(--mikke-surface)] text-transparent"}`}>
+              <span className={`grid h-4 w-4 place-items-center rounded border ${multiDay ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white text-transparent"}`}>
                 <Check size={11} strokeWidth={2} />
               </span>
               複数日イベント
             </button>
           </FormCard>
 
-          <FormCard title="ステータス" icon={<Check size={16} strokeWidth={1.8} />}>
+          <FormCard title="ステータス" tone="orange" icon={<Check size={16} strokeWidth={1.8} />}>
             <Segmented
               options={statusOptions}
               value={status}
               onChange={setStatus}
-              getTone={(value) => value === "preparing" ? "orange" : value === "applied" ? "green" : "gray"}
+              getTone={(value) => value === "preparing" ? "orange" : value === "applied" ? "yellow" : "blue"}
             />
           </FormCard>
 
-          <AccordionCard title="日時（任意）" icon={<Clock3 size={16} />} open={timeOpen} onToggle={() => setTimeOpen((value) => !value)}>
+          <AccordionCard title="日時（任意）" tone="yellow" icon={<Clock3 size={16} />} open={timeOpen} onToggle={() => setTimeOpen((value) => !value)}>
             <div className="grid grid-cols-2 gap-3">
               <Field label="開始時間" compact>
                 <TextInput value={startTime} onChange={setStartTime} type="time" />
@@ -289,7 +289,7 @@ function NewMarketEventContent() {
             </div>
           </AccordionCard>
 
-          <AccordionCard title="会場情報（任意）" icon={<MapPin size={16} />} open={venueOpen} onToggle={() => setVenueOpen((value) => !value)}>
+          <AccordionCard title="会場情報（任意）" tone="blue" icon={<MapPin size={16} />} open={venueOpen} onToggle={() => setVenueOpen((value) => !value)}>
             <div className="space-y-2.5">
               <Field label="会場名" compact>
                 <TextInput value={venueName} onChange={setVenueName} placeholder="例）東京ビッグサイト 西1・2ホール" />
@@ -300,11 +300,13 @@ function NewMarketEventContent() {
             </div>
           </AccordionCard>
 
-          <FormCard title="支払い情報" icon={<WalletCards size={16} />}>
-            <div className="grid grid-cols-[1fr_1fr_0.95fr] gap-2">
+          <FormCard title="支払い情報" tone="orange" icon={<WalletCards size={16} />}>
+            <div className="grid grid-cols-2 gap-2 min-[360px]:grid-cols-[1fr_1fr_0.95fr]">
               <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentStatus === "paid" ? "green" : paymentStatus === "unpaid" ? "orange" : "gray"} />
               <SelectBox value={paymentMethod} onChange={setPaymentMethod} options={getPaymentMethodOptions(paymentMethodOptions, paymentMethod)} tone="gray" />
-              <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
+              <div className="col-span-2 min-[360px]:col-span-1">
+                <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
+              </div>
             </div>
             <div
               className="mt-2.5 flex w-full select-none items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted-light)]"
@@ -315,17 +317,17 @@ function NewMarketEventContent() {
             </div>
           </FormCard>
 
-          <FormCard title="メモ" icon={<FileText size={16} />}>
+          <FormCard title="メモ" tone="pink" icon={<FileText size={16} />}>
             <textarea
               value={memo}
               onChange={(event) => setMemo(event.target.value)}
               rows={4}
               placeholder="電源使用予定、搬入時間、主催者からの連絡など"
-              className="w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm leading-6 text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-accent)]"
+              className="w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm leading-6 text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)]"
             />
           </FormCard>
 
-          <AccordionCard title="チェック項目（任意）" icon={<ClipboardList size={16} />} open={checksOpen} onToggle={() => setChecksOpen((value) => !value)}>
+          <AccordionCard title="チェック項目（任意）" tone="yellow" icon={<ClipboardList size={16} />} open={checksOpen} onToggle={() => setChecksOpen((value) => !value)}>
             <div className="flex flex-wrap gap-2">
               {templateChecks.map((item) => {
                 const active = selectedChecks.includes(item);
@@ -336,7 +338,7 @@ function NewMarketEventContent() {
                     onClick={() => toggleCheck(item)}
                     className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-bold ${
                       active
-                        ? "border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]"
+                        ? "border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)] text-[var(--mikke-text)]"
                         : "border-[var(--mikke-line)] bg-[var(--mikke-surface)] text-[var(--mikke-muted)]"
                     }`}
                   >
@@ -363,20 +365,20 @@ function NewMarketEventContent() {
             </div>
           </AccordionCard>
 
-          {error ? <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-accent-strong)]">{error}</p> : null}
+          {error ? <p className="rounded-xl bg-[var(--mikke-pink)] px-4 py-3 text-sm font-bold text-[var(--mikke-text)]">{error}</p> : null}
 
           <div className="space-y-2.5 pt-0.5">
             <p className="text-center text-xs font-bold text-[var(--mikke-muted-light)]">イベント名と開催日だけでも保存できます</p>
             <button
               type="submit"
               disabled={!canSave}
-              className="w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-3.5 text-base font-extrabold text-[var(--mikke-surface)] shadow-[0_8px_18px_rgba(255,90,31,0.16)] disabled:opacity-50"
+              className="w-full rounded-xl bg-[var(--mikke-orange)] px-4 py-3.5 text-base font-extrabold text-white disabled:opacity-50"
             >
               {saving ? "保存中..." : "出店予定を保存"}
             </button>
             <Link
               href="/marketnote"
-              className="block w-full rounded-xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-4 py-3 text-center text-sm font-extrabold text-[var(--mikke-accent)]"
+              className="block w-full rounded-xl border border-[var(--mikke-blue)] bg-white px-4 py-3 text-center text-sm font-extrabold text-[var(--mikke-blue)]"
             >
               閉じる
             </Link>
@@ -395,10 +397,12 @@ function GuestNotice() {
   );
 }
 
-function FormCard({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+type SectionTone = "blue" | "orange" | "green" | "yellow" | "pink";
+
+function FormCard({ title, icon, tone = "blue", children }: { title: string; icon?: React.ReactNode; tone?: SectionTone; children: React.ReactNode }) {
   return (
-    <section className="rounded-[18px] border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-3.5 shadow-[0_4px_14px_rgba(45,33,22,0.035)]">
-      <SectionHeading title={title} icon={icon} />
+    <section className="rounded-xl border border-[var(--mikke-line)] bg-white p-3.5">
+      <SectionHeading title={title} icon={icon} tone={tone} />
       <div className="mt-3 space-y-2.5">{children}</div>
     </section>
   );
@@ -407,20 +411,22 @@ function FormCard({ title, icon, children }: { title: string; icon?: React.React
 function AccordionCard({
   title,
   icon,
+  tone = "blue",
   open,
   onToggle,
   children
 }: {
   title: string;
   icon?: React.ReactNode;
+  tone?: SectionTone;
   open: boolean;
   onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-[18px] border border-[var(--mikke-line)] bg-[var(--mikke-surface)] shadow-[0_4px_14px_rgba(45,33,22,0.035)]">
-      <button type="button" onClick={onToggle} className="flex w-full items-center justify-between gap-3 p-3.5 text-left">
-        <SectionHeading title={title} icon={icon} />
+    <section className="rounded-xl border border-[var(--mikke-line)] bg-white">
+      <button type="button" onClick={onToggle} className="flex min-h-12 w-full items-center justify-between gap-3 p-3.5 text-left">
+        <SectionHeading title={title} icon={icon} tone={tone} />
         <ChevronDown size={17} className={`shrink-0 text-[var(--mikke-muted)] transition ${open ? "rotate-180" : ""}`} />
       </button>
       {open ? <div className="border-t border-[var(--mikke-line-soft)] px-3.5 pb-3.5 pt-3">{children}</div> : null}
@@ -428,11 +434,25 @@ function AccordionCard({
   );
 }
 
-function SectionHeading({ title, icon }: { title: string; icon?: React.ReactNode }) {
+function SectionHeading({ title, icon, tone = "blue" }: { title: string; icon?: React.ReactNode; tone?: SectionTone }) {
+  const toneClass = {
+    blue: "text-[var(--mikke-blue)]",
+    orange: "text-[var(--mikke-orange)]",
+    green: "bg-[var(--mikke-green)] text-[var(--mikke-text)]",
+    yellow: "bg-[var(--mikke-yellow)] text-[var(--mikke-text)]",
+    pink: "bg-[var(--mikke-pink)] text-[var(--mikke-text)]"
+  }[tone];
+  const dotClass = {
+    blue: "bg-[var(--mikke-blue)]",
+    orange: "bg-[var(--mikke-orange)]",
+    green: "bg-[var(--mikke-green)]",
+    yellow: "bg-[var(--mikke-yellow)]",
+    pink: "bg-[var(--mikke-pink)]"
+  }[tone];
   return (
     <div className="flex items-center gap-2">
-      <span className="grid h-6 w-6 place-items-center rounded-full text-[var(--mikke-accent)]">
-        {icon ?? <span className="h-2 w-2 rounded-full bg-[var(--mikke-accent)]" />}
+      <span className={`grid h-6 w-6 place-items-center rounded-full ${toneClass}`}>
+        {icon ?? <span className={`h-2 w-2 rounded-full ${dotClass}`} />}
       </span>
       <h2 className="text-sm font-extrabold text-[var(--mikke-text)]">{title}</h2>
     </div>
@@ -483,7 +503,7 @@ function TextInput({
         type={type}
         required={required}
         placeholder={placeholder}
-        className="h-10 w-full rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 pr-9 text-sm font-semibold text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-accent)]"
+        className="h-10 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 pr-9 text-sm font-semibold text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)]"
       />
       {icon ? <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--mikke-muted)]">{icon}</span> : null}
     </div>
@@ -499,7 +519,7 @@ function Segmented<T extends string>({
   options: Array<{ label: string; value: T }>;
   value: T;
   onChange: (value: T) => void;
-  getTone: (value: T) => "orange" | "green" | "gray";
+  getTone: (value: T) => "blue" | "orange" | "green" | "yellow" | "gray";
 }) {
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -507,17 +527,21 @@ function Segmented<T extends string>({
         const active = option.value === value;
         const tone = getTone(option.value);
         const activeClass = tone === "green"
-          ? "border-[var(--mikke-success)] bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]"
+          ? "border-[var(--mikke-green)] bg-[var(--mikke-green)] text-[var(--mikke-text)]"
           : tone === "orange"
-            ? "border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]"
-            : "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-text-soft)]";
+            ? "border-[var(--mikke-orange)] bg-[var(--mikke-orange)] text-white"
+            : tone === "yellow"
+              ? "border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)] text-[var(--mikke-text)]"
+              : tone === "blue"
+                ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white"
+                : "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-text-soft)]";
 
         return (
           <button
             key={option.value}
             type="button"
             onClick={() => onChange(option.value)}
-            className={`h-9 rounded-full border px-2 text-xs font-extrabold transition ${
+            className={`min-h-10 whitespace-nowrap rounded-full border px-1 text-[11px] font-extrabold transition min-[360px]:px-2 min-[360px]:text-xs ${
               active ? activeClass : "border-[var(--mikke-line)] bg-[var(--mikke-surface)] text-[var(--mikke-muted)]"
             }`}
           >
@@ -541,9 +565,9 @@ function SelectBox({
   tone: "orange" | "green" | "gray";
 }) {
   const toneClass = tone === "green"
-    ? "border-[var(--mikke-success)] bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]"
+    ? "border-[var(--mikke-green)] bg-[var(--mikke-green)] text-[var(--mikke-text)]"
     : tone === "orange"
-      ? "border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]"
+      ? "border-[var(--mikke-orange)] bg-[var(--mikke-orange)] text-white"
       : "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]";
 
   return (
@@ -551,7 +575,7 @@ function SelectBox({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`h-9 w-full appearance-none rounded-xl border px-3 pr-7 text-xs font-extrabold outline-none ${toneClass}`}
+        className={`h-10 w-full appearance-none rounded-xl border px-3 pr-7 text-xs font-extrabold outline-none ${toneClass}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>

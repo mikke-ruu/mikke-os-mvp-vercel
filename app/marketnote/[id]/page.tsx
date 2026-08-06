@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
-import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { formatDate, formatMonthDay, formatYen } from "@/lib/format";
 import {
@@ -605,17 +604,29 @@ function MoneyInput({ value, onChange }: { value: string; onChange: (value: stri
 
 function StatusChip({ status, applied = false, withChevron = false }: { status: MarketEvent["status"]; applied?: boolean; withChevron?: boolean }) {
   const showApplied = applied && status === "planned";
-  const tone = status === "completed" ? "success" : showApplied || status === "preparing" ? "primary" : "muted";
+  const toneClass = showApplied
+    ? "bg-[var(--mikke-yellow)] text-[var(--mikke-text)]"
+    : status === "preparing"
+      ? "bg-[var(--mikke-orange)] text-white"
+      : status === "completed"
+        ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]"
+        : status === "planned"
+          ? "bg-[var(--mikke-blue)] text-white"
+          : "border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]";
   return (
-    <MikkeStatusBadge tone={tone} className="rounded-full py-1">
+    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>
       {showApplied ? "申込済み" : statusLabel(status)}{withChevron ? <ChevronDown size={13} /> : null}
-    </MikkeStatusBadge>
+    </span>
   );
 }
 
 function PaymentChip({ status }: { status: PaymentStatus }) {
-  const tone = status === "paid" ? "success" : status === "unpaid" ? "primary" : "muted";
-  return <MikkeStatusBadge tone={tone} className="rounded-full px-2 py-0.5">{paymentLabel(status)}</MikkeStatusBadge>;
+  const toneClass = status === "paid"
+    ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]"
+    : status === "unpaid"
+      ? "bg-[var(--mikke-orange)] text-white"
+      : "border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]";
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClass}`}>{paymentLabel(status)}</span>;
 }
 
 function parseEventMeta(event: MarketEvent): EventMeta {
@@ -737,14 +748,14 @@ function paymentTone(status: PaymentStatus) {
 }
 
 function statusChipClass(status: MarketEvent["status"]) {
-  if (status === "preparing") return "bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]";
-  if (status === "completed") return "bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]";
+  if (status === "preparing") return "bg-[var(--mikke-orange)] text-white";
+  if (status === "completed") return "bg-[var(--mikke-green)] text-[var(--mikke-text)]";
   return "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]";
 }
 
 function paymentChipClass(status: PaymentStatus) {
-  if (status === "paid") return "bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]";
-  if (status === "unpaid") return "bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]";
+  if (status === "paid") return "bg-[var(--mikke-green)] text-[var(--mikke-text)]";
+  if (status === "unpaid") return "bg-[var(--mikke-orange)] text-white";
   return "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]";
 }
 
