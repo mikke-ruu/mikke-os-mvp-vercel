@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   BookOpen,
   CalendarDays,
@@ -36,6 +36,7 @@ import {
   grantMemberEntitlement,
   joinCommunity,
   loadCommunityDashboard,
+  loadCommunityPublicEntry,
   revokeMemberEntitlement,
   restoreCommunityRoom,
   saveCommunitySettings,
@@ -51,7 +52,7 @@ import {
   updateCommunityRoom,
   updateCommunityRoomAccess
 } from "@/lib/community/client";
-import type { CommunityDashboard, CommunityEvent, CommunityPost, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomKind } from "@/lib/community/types";
+import type { CommunityDashboard, CommunityEvent, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomKind } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 
 type CommunityView = "home" | "join" | "rooms" | "room" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
@@ -106,6 +107,7 @@ export function CommunityApp({ view, roomId, communitySlug }: { view: CommunityV
   const base = `/community/c/${encodeURIComponent(communitySlug)}`;
   const [user, setUser] = useState<SessionUser | null>(null);
   const [data, setData] = useState<CommunityDashboard | null>(null);
+  const [publicEntry, setPublicEntry] = useState<CommunityPublicEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -127,8 +129,13 @@ export function CommunityApp({ view, roomId, communitySlug }: { view: CommunityV
       const nextUser = sessionData.session?.user ? { id: sessionData.session.user.id, email: sessionData.session.user.email } : null;
       setUser(nextUser);
       if (!nextUser) {
-        setLoading(false);
-        router.replace(`/community/login?next=${encodeURIComponent(window.location.pathname)}`);
+        try {
+          setPublicEntry(await loadCommunityPublicEntry(supabase, communitySlug));
+        } catch (nextError) {
+          setError(communityErrorMessage(nextError, "このCommunityの参加案内を読み込めませんでした。"));
+        } finally {
+          if (mounted) setLoading(false);
+        }
         return;
       }
       try {
@@ -169,6 +176,10 @@ export function CommunityApp({ view, roomId, communitySlug }: { view: CommunityV
     );
   }
 
+  if (!user && publicEntry) {
+    return <PublicCommunityEntry community={publicEntry} base={base} />;
+  }
+
   if (error && !data) {
     return (
       <CommunityShell base={base} onSignOut={signOut}>
@@ -206,6 +217,35 @@ export function CommunityApp({ view, roomId, communitySlug }: { view: CommunityV
       {view === "owner-members" ? <OwnerMembersView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-content" ? <OwnerContentView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
     </CommunityShell>
+  );
+}
+
+function PublicCommunityEntry({ community, base }: { community: CommunityPublicEntry; base: string }) {
+  const next = `${base}/join`;
+  const loginHref = `/community/login?next=${encodeURIComponent(next)}`;
+  const signupHref = `${loginHref}&mode=signup`;
+  const joinLabel = community.joinMode === "open_free"
+    ? "無料で参加できます"
+    : community.joinMode === "invite_only"
+      ? "招待を受けた方が参加できます"
+      : "参加条件を確認してお進みください";
+
+  return (
+    <main className="min-h-screen bg-white px-5 py-10 text-[var(--mikke-text)]">
+      <div className="mx-auto max-w-3xl">
+        <p className="text-xs font-bold uppercase text-[var(--mikke-primary)]">Community by mikke</p>
+        <section className="mt-5 rounded-lg border border-[var(--mikke-line)] bg-white p-6 md:p-8">
+          <p className="text-sm font-bold text-[var(--mikke-accent-strong)]">{joinLabel}</p>
+          <h1 className="mt-3 text-3xl font-bold tracking-normal text-[var(--mikke-primary)] md:text-4xl">{community.name}に参加</h1>
+          <p className="mt-4 text-sm leading-7 text-[var(--mikke-muted)]">{community.description ?? "このCommunityから届くお知らせや交流、イベント、資料を確認できます。"}</p>
+          <div className="mt-7 grid gap-3 sm:grid-cols-2">
+            <Link href={signupHref} className="rounded-lg bg-[var(--mikke-accent)] px-5 py-3 text-center text-sm font-bold text-white">新規登録して参加</Link>
+            <Link href={loginHref} className="rounded-lg border border-[var(--mikke-line)] px-5 py-3 text-center text-sm font-bold text-[var(--mikke-primary)]">ログインして参加</Link>
+          </div>
+        </section>
+        <div className="mt-5"><InAppBrowserNotice /></div>
+      </div>
+    </main>
   );
 }
 
@@ -1300,12 +1340,22 @@ export function CommunityAuthPage() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [next, setNext] = useState("/community");
+  const [community, setCommunity] = useState<CommunityPublicEntry | null>(null);
 
-  const next = useMemo(() => {
-    if (typeof window === "undefined") return "/community";
-    const raw = new URLSearchParams(window.location.search).get("next");
-    return raw?.startsWith("/") && !raw.startsWith("//") ? raw : "/community";
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get("next");
+    const safeNext = raw?.startsWith("/") && !raw.startsWith("//") ? raw : "/community";
+    setNext(safeNext);
+    if (params.get("mode") === "signup") setMode("signup");
+    const match = safeNext.match(/^\/community\/c\/([^/]+)/);
+    if (match) {
+      loadCommunityPublicEntry(supabase, decodeURIComponent(match[1])).then(setCommunity).catch(() => setCommunity(null));
+    }
   }, []);
+  const isOperatorFlow = next === "/community/create";
+  const heading = community ? `${community.name}に参加` : "Communityを作る・運営する";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1314,14 +1364,14 @@ export function CommunityAuthPage() {
     const result =
       mode === "login"
         ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/community/join` } });
+        : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}${next}` } });
     setLoading(false);
     if (result.error) {
       setMessage(result.error.message);
       return;
     }
     if (mode === "signup" && !result.data.session) {
-      setMessage("確認メールを送りました。メール内のリンクからCOMMUNITYに戻ってください。");
+      setMessage("確認メールを送りました。メール内のリンクからCommunityに戻ってください。");
       return;
     }
     router.replace(next);
@@ -1332,16 +1382,19 @@ export function CommunityAuthPage() {
       <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-[1fr_420px] md:items-center">
         <section>
           <p className="text-xs font-bold uppercase text-[var(--mikke-primary)]">COMMUNITY</p>
-          <h1 className="mt-3 text-4xl font-bold tracking-normal text-[var(--mikke-primary)]">mikke COMMUNITY</h1>
+          <h1 className="mt-3 text-4xl font-bold tracking-normal text-[var(--mikke-primary)]">{heading}</h1>
           <p className="mt-4 max-w-xl text-sm leading-7 text-[var(--mikke-muted)]">
-            無料エリアと限定エリアを持つCommunityを、単独で利用・運営できます。mikke IDでログインし、参加中のCommunityへ進みます。
+            {community?.description ?? "参加者とのお知らせ・交流・イベント・資料共有を、ひとつの場所にまとめられます。"}
           </p>
+          <p className="mt-5 text-xs font-bold text-[var(--mikke-muted-light)]">Community by mikke</p>
         </section>
         <form onSubmit={submit} className="rounded-lg border border-[var(--mikke-line)] bg-white p-6">
           <InAppBrowserNotice />
-          <div className="grid grid-cols-2 gap-2 rounded-lg border border-[var(--mikke-line)] p-1">
+          <p className="text-sm font-bold text-[var(--mikke-primary)]">{community ? `${community.name} 参加者向け` : isOperatorFlow ? "Community作成・運営者向け" : "Community運営者向け"}</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{community ? "参加に使うメールアドレスでログインまたは登録してください。" : "運営に使うメールアドレスでログインまたは登録してください。"}</p>
+          <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-[var(--mikke-line)] p-1">
             <button type="button" onClick={() => setMode("login")} className={`rounded-md px-3 py-2 text-sm font-bold ${mode === "login" ? "bg-[var(--mikke-yellow)] text-[var(--mikke-primary)]" : "text-[var(--mikke-muted)]"}`}>ログイン</button>
-            <button type="button" onClick={() => setMode("signup")} className={`rounded-md px-3 py-2 text-sm font-bold ${mode === "signup" ? "bg-[var(--mikke-yellow)] text-[var(--mikke-primary)]" : "text-[var(--mikke-muted)]"}`}>無料登録</button>
+            <button type="button" onClick={() => setMode("signup")} className={`rounded-md px-3 py-2 text-sm font-bold ${mode === "signup" ? "bg-[var(--mikke-yellow)] text-[var(--mikke-primary)]" : "text-[var(--mikke-muted)]"}`}>新規登録</button>
           </div>
           <label className="mt-5 block">
             <span className="text-sm font-bold">メールアドレス</span>
@@ -1353,9 +1406,8 @@ export function CommunityAuthPage() {
           </label>
           {message ? <p className="mt-4 rounded-lg bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-accent-strong)]">{message}</p> : null}
           <button disabled={loading} className="mt-5 w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-            {loading ? "確認中..." : mode === "login" ? "ログイン" : "無料で登録"}
+            {loading ? "確認中..." : mode === "login" ? (community ? `${community.name}へ進む` : "運営画面へ進む") : (community ? "登録して参加へ進む" : "運営者アカウントを登録")}
           </button>
-          <p className="mt-5 text-center text-xs font-semibold text-[var(--mikke-muted-light)]">Community by mikke</p>
         </form>
       </div>
     </main>

@@ -18,7 +18,7 @@ function HubFrame({ children }: { children: React.ReactNode }) {
       <div className="mx-auto max-w-5xl">
         <header className="border-b border-[var(--mikke-line)] pb-5">
           <p className="text-xs font-bold uppercase text-[var(--mikke-primary)]">COMMUNITY</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-normal text-[var(--mikke-primary)]">mikke COMMUNITY</h1>
+          <h1 className="mt-2 text-3xl font-bold tracking-normal text-[var(--mikke-primary)]">Community by mikke</h1>
           <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">無料エリアと限定エリアを持つCommunityを、単独で作成・運営できます。</p>
         </header>
         {children}
@@ -40,7 +40,7 @@ export function CommunityHubPage() {
       const sessionUser = data.session?.user ? { id: data.session.user.id, email: data.session.user.email } : null;
       if (!mounted) return;
       if (!sessionUser) {
-        router.replace("/community/login?next=/community");
+        router.replace("/community/for-organizers");
         return;
       }
       setUser(sessionUser);
@@ -57,7 +57,7 @@ export function CommunityHubPage() {
 
   async function signOut() {
     await supabase.auth.signOut();
-    router.replace("/community/login");
+    router.replace("/community/for-organizers");
   }
 
   return (
@@ -86,6 +86,22 @@ export function CommunityHubPage() {
           <p className="mt-2 text-sm text-[var(--mikke-muted)]">自分のCommunityを作るか、運営者から受け取った参加URLを開いてください。</p>
         </section>
       ) : null}
+    </HubFrame>
+  );
+}
+
+export function CommunityOrganizerEntryPage() {
+  return (
+    <HubFrame>
+      <section className="mt-6 max-w-3xl rounded-lg border border-[var(--mikke-line)] bg-white p-6 md:p-8">
+        <p className="text-sm font-bold text-[var(--mikke-accent-strong)]">運営者向け</p>
+        <h2 className="mt-3 text-3xl font-bold tracking-normal text-[var(--mikke-primary)]">Communityを作る・運営する</h2>
+        <p className="mt-4 text-sm leading-7 text-[var(--mikke-muted)]">Communityの作成、参加者への案内、Roomや投稿の管理を行います。参加者には、作成したCommunityごとの専用URLまたはQRコードをご案内ください。</p>
+        <div className="mt-7 flex flex-wrap gap-3">
+          <Link href="/community/login?next=/community/create&mode=signup" className="rounded-lg bg-[var(--mikke-accent)] px-5 py-3 text-sm font-bold text-white">新しくCommunityを作る</Link>
+          <Link href="/community/login?next=/community" className="rounded-lg border border-[var(--mikke-line)] px-5 py-3 text-sm font-bold text-[var(--mikke-primary)]">ログインして運営する</Link>
+        </div>
+      </section>
     </HubFrame>
   );
 }

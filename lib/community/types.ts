@@ -18,6 +18,8 @@ export type Community = {
   ownerUserId: string | null;
 };
 
+export type CommunityPublicEntry = Pick<Community, "slug" | "name" | "description" | "joinMode" | "status">;
+
 export type CommunityMembership = {
   id: string;
   communityId: string;

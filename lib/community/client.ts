@@ -11,6 +11,7 @@ import type {
   CommunityMembershipStatus,
   CommunityPost,
   CommunityPostKind,
+  CommunityPublicEntry,
   CommunityResource,
   CommunityResourceKind,
   CommunityRole,
@@ -169,6 +170,23 @@ export function communityErrorMessage(error: unknown, fallback: string) {
     return "COMMUNITYのデータベース更新が必要です。最新migrationの適用後にもう一度お試しください。";
   }
   return message || fallback;
+}
+
+export async function loadCommunityPublicEntry(client: DbClient, communitySlug: string): Promise<CommunityPublicEntry> {
+  const { data, error } = await client
+    .from("community_communities")
+    .select("slug,name,description,join_mode,status")
+    .eq("slug", communitySlug)
+    .eq("status", "active")
+    .single();
+  if (error) throw error;
+  return {
+    slug: data.slug,
+    name: data.name,
+    description: data.description ?? null,
+    joinMode: data.join_mode,
+    status: data.status
+  };
 }
 
 export async function listMyCommunities(client: DbClient, userId: string): Promise<Community[]> {

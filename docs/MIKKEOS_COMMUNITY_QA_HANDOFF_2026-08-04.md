@@ -26,14 +26,17 @@ User review starts when all items in "Codex gate before user review" pass.
 
 ## Latest Codex check result
 
-Checked on 2026-08-04.
+Checked on 2026-08-06.
 
-- Route smoke: passed for all routes listed below.
-- COMMUNITY-scoped TypeScript: passed.
+- Participant entry is tenant-specific at `/community/c/{communitySlug}`.
+- Organizer entry is separated at `/community/for-organizers`.
+- App-side Community guidance routes to the organizer entry.
+- COMMUNITY TypeScript (`npm.cmd run lint`): passed.
 - COMMUNITY diff whitespace check: passed.
-- Temporary `tsconfig.community.json`: removed after the check.
-- Production Supabase migration history: confirmed through `community_staff_archived_room_read`.
-- User-side production actions: not performed.
+- Webpack production compile: passed; the command timed out during the separate TypeScript phase already covered above.
+- Production Supabase migration history: confirmed through `official_academy_initial_owner`.
+- Anonymous REST check: public entry columns returned `200`; `owner_user_id` was denied.
+- Official Academy Community: `active`, `open_free`, owner configured, 6 free rooms, 1 entitlement room, 1 staff room.
 
 ## Codex gate before user review
 
@@ -44,6 +47,7 @@ Run and confirm `200` for these routes:
 - `/community`
 - `/community/create`
 - `/community/login`
+- `/community/for-organizers`
 - `/community/c/official-academy-community`
 - `/community/c/official-academy-community/join`
 - `/community/c/official-academy-community/rooms`
@@ -73,6 +77,9 @@ Run and confirm `200` for these routes:
   - `community_creation_flow`
   - `community_staff_hidden_post_read`
   - `community_staff_archived_room_read`
+  - `community_public_participant_entry`
+  - `community_public_participant_entry_acl`
+  - `official_academy_initial_owner`
 - Staff can read hidden posts for moderation.
 - Staff can read archived rooms for restore.
 - Non-staff room catalog remains limited to non-archived rooms.

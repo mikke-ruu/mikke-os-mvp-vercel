@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function CommunityMiniPage() {
-  redirect("/community");
+  redirect("/community/for-organizers");
 }
