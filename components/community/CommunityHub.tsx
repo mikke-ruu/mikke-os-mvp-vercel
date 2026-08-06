@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, LogOut, Plus, Users } from "lucide-react";
-import { communityErrorMessage, createCommunity, listMyCommunities } from "@/lib/community/client";
+import { communityErrorMessage, createCommunity, listMyCommunities, listMyManagedCommunities } from "@/lib/community/client";
 import { communityBasePath } from "@/lib/community/routes";
 import type { Community } from "@/lib/community/types";
 import { assertMikkeNameIsNotReserved, isMikkeReservedDisplayName, isMikkeReservedSlug } from "@/lib/mikkeos/reserved-names";
@@ -12,22 +12,23 @@ import { supabase } from "@/lib/supabase/client";
 
 type HubUser = { id: string; email?: string };
 
-function HubFrame({ children }: { children: React.ReactNode }) {
+function HubFrame({ children, organizer = true }: { children: React.ReactNode; organizer?: boolean }) {
   return (
     <main className="min-h-screen bg-white px-5 py-8 text-[var(--mikke-text)]">
       <div className="mx-auto max-w-5xl">
         <header className="border-b border-[var(--mikke-line)] pb-5">
           <p className="text-xs font-bold uppercase text-[var(--mikke-primary)]">COMMUNITY</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-normal text-[var(--mikke-primary)]">mikke COMMUNITY</h1>
-          <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">無料エリアと限定エリアを持つCommunityを、単独で作成・運営できます。</p>
+          <h1 className="mt-2 text-3xl font-bold tracking-normal text-[var(--mikke-primary)]">COMMUNITY</h1>
+          <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{organizer ? "無料エリアと限定エリアを持つCommunityを、単独で作成・運営できます。" : "参加中のCommunityから、お知らせ・Room・イベントを確認できます。"}</p>
         </header>
         {children}
+        <p className="mt-10 border-t border-[var(--mikke-line)] pt-5 text-center text-xs font-bold text-[var(--mikke-muted-light)]">Community by mikke</p>
       </div>
     </main>
   );
 }
 
-export function CommunityHubPage() {
+export function CommunityHubPage({ organizer = false }: { organizer?: boolean }) {
   const router = useRouter();
   const [user, setUser] = useState<HubUser | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
@@ -40,12 +41,12 @@ export function CommunityHubPage() {
       const sessionUser = data.session?.user ? { id: data.session.user.id, email: data.session.user.email } : null;
       if (!mounted) return;
       if (!sessionUser) {
-        router.replace("/community/login?next=/community");
+        router.replace(organizer ? "/community/for-organizers" : "/community/participant-login");
         return;
       }
       setUser(sessionUser);
       try {
-        setCommunities(await listMyCommunities(supabase, sessionUser.id));
+        setCommunities(await (organizer ? listMyManagedCommunities(supabase, sessionUser.id) : listMyCommunities(supabase, sessionUser.id)));
       } catch (nextError) {
         setError(communityErrorMessage(nextError, "Community一覧を読み込めませんでした。"));
       } finally {
@@ -53,19 +54,19 @@ export function CommunityHubPage() {
       }
     });
     return () => { mounted = false; };
-  }, [router]);
+  }, [organizer, router]);
 
   async function signOut() {
     await supabase.auth.signOut();
-    router.replace("/community/login");
+    router.replace(organizer ? "/community/for-organizers" : "/community/participant-login");
   }
 
   return (
-    <HubFrame>
+    <HubFrame organizer={organizer}>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <div><p className="text-xs font-bold text-[var(--mikke-muted-light)]">MY COMMUNITIES</p><h2 className="mt-1 text-xl font-bold">参加中・運営中</h2></div>
+        <div><p className="text-xs font-bold text-[var(--mikke-muted-light)]">MY COMMUNITIES</p><h2 className="mt-1 text-xl font-bold">{organizer ? "運営中のCommunity" : "参加中のCommunity"}</h2></div>
         <div className="flex gap-2">
-          <Link href="/community/create" className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16} />Communityを作る</Link>
+          {organizer ? <Link href="/community/create" className="inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white"><Plus size={16} />Communityを作る</Link> : null}
           <button type="button" onClick={signOut} className="grid h-10 w-10 place-items-center rounded-lg border border-[var(--mikke-line)] text-[var(--mikke-muted)]" aria-label="ログアウト"><LogOut size={17} /></button>
         </div>
       </div>
@@ -83,7 +84,7 @@ export function CommunityHubPage() {
       {!loading && user && communities.length === 0 ? (
         <section className="mt-6 rounded-lg border border-dashed border-[var(--mikke-line)] p-6 text-center">
           <h3 className="font-bold">まだCommunityに参加していません</h3>
-          <p className="mt-2 text-sm text-[var(--mikke-muted)]">自分のCommunityを作るか、運営者から受け取った参加URLを開いてください。</p>
+          <p className="mt-2 text-sm text-[var(--mikke-muted)]">{organizer ? "新しいCommunityを作成してください。" : "運営者から受け取った参加URLを開いてください。"}</p>
         </section>
       ) : null}
     </HubFrame>
@@ -114,7 +115,7 @@ export function CommunityCreatePage() {
     supabase.auth.getSession().then(({ data }) => {
       const sessionUser = data.session?.user ? { id: data.session.user.id, email: data.session.user.email } : null;
       if (!sessionUser) {
-        router.replace("/community/login?next=/community/create");
+        router.replace("/community/for-organizers?mode=signup");
         return;
       }
       setUser(sessionUser);

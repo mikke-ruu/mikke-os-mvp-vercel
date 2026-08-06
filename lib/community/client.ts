@@ -11,6 +11,7 @@ import type {
   CommunityMembershipStatus,
   CommunityPost,
   CommunityPostKind,
+  CommunityPublicEntry,
   CommunityResource,
   CommunityResourceKind,
   CommunityRole,
@@ -171,12 +172,49 @@ export function communityErrorMessage(error: unknown, fallback: string) {
   return message || fallback;
 }
 
+export async function loadCommunityPublicEntry(client: DbClient, communitySlug: string): Promise<CommunityPublicEntry> {
+  const { data, error } = await client
+    .from("community_communities")
+    .select("slug,name,description,join_mode,status")
+    .eq("slug", communitySlug)
+    .eq("status", "active")
+    .single();
+  if (error) throw error;
+  return {
+    slug: data.slug,
+    name: data.name,
+    description: data.description ?? null,
+    joinMode: data.join_mode,
+    status: data.status
+  };
+}
+
 export async function listMyCommunities(client: DbClient, userId: string): Promise<Community[]> {
   const { data: memberships, error: membershipsError } = await client
     .from("community_memberships")
     .select("community_id")
     .eq("user_id", userId)
     .eq("status", "active");
+  if (membershipsError) throw membershipsError;
+  const ids = Array.from(new Set((memberships ?? []).map((item: any) => item.community_id)));
+  if (ids.length === 0) return [];
+  const { data, error } = await client
+    .from("community_communities")
+    .select("*")
+    .in("id", ids)
+    .eq("status", "active")
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map(mapCommunity);
+}
+
+export async function listMyManagedCommunities(client: DbClient, userId: string): Promise<Community[]> {
+  const { data: memberships, error: membershipsError } = await client
+    .from("community_memberships")
+    .select("community_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("role", ["owner", "moderator"]);
   if (membershipsError) throw membershipsError;
   const ids = Array.from(new Set((memberships ?? []).map((item: any) => item.community_id)));
   if (ids.length === 0) return [];
