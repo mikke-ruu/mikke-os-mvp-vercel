@@ -176,6 +176,7 @@ When the user review starts, ask the user to verify these in order.
 - Generic returning participant login: `/community/participant-login`
 - Tenant-specific participant login/signup: `/community/c/{slug}/login`
 - Tenant public entry: `/community/c/{slug}`
+- Legacy tenant `/community/c/{slug}/join` redirects to the tenant public entry, so previously issued QR codes remain valid.
 - Legacy `/community/login?next=...` remains redirect-only for existing links.
 - A tenant URL exposes only public Community name/description/join mode. Room, post, event, library, member, and owner data still require authentication and applicable membership/role.
 - Participant navigation does not render `OWNER`; it is shown only for owner/moderator users.
