@@ -56,7 +56,7 @@ export async function listMyStoryCollection(client: DbClient): Promise<StoryColl
     handle: row.handle ?? "",
     displayName: row.display_name ?? "",
     role: row.role_label ?? "",
-    avatarUrl: row.available && row.avatar_storage_path ? await getStorySignedUrl(client, row.avatar_storage_path) : "",
+    avatarUrl: row.available && row.avatar_storage_path ? await getStorySignedUrl(client, row.avatar_storage_path, { width: 160, height: 160, resize: "cover", quality: 80 }) : "",
     themeKey: row.theme_key ?? "blue"
   })));
 }

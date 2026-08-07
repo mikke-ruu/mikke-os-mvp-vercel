@@ -3,7 +3,7 @@
 import { ExternalLink, Instagram, MapPin, MessageCircle, Music2, Pencil } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { getSafeStoryLinkUrl, storySnsDefaults, storyThemes, type StoryProfileView } from "@/lib/mikkeos/story-profile-store";
+import { getSafeStoryLinkUrl, getStoryAppPath, storySnsDefaults, storyThemes, type StoryProfileView } from "@/lib/mikkeos/story-profile-store";
 
 export function StoryNameCard({
   story,
@@ -44,17 +44,17 @@ export function StoryNameCard({
             <p className="text-xs font-semibold tracking-[0.2em] text-[var(--story-accent)]">STORY</p>
             {isOwner ? <p className="mt-1 text-[10px] font-medium text-black/40">{story.isPublished ? "公開中" : "未公開・下書き"}</p> : null}
           </div>
-          {isOwner ? <Link href="/story/edit" className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-3 py-2 text-xs font-medium"><Pencil size={14} />編集</Link> : null}
+          {isOwner ? <div className="flex items-center gap-2"><Link href={getStoryAppPath(story.handle)} aria-label="公開ページを見る" className="grid h-9 w-9 place-items-center rounded-full border border-black/10"><ExternalLink size={14} /></Link><Link href="/story/edit" className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-3 py-2 text-xs font-medium"><Pencil size={14} />編集</Link></div> : null}
         </header>
 
         <section className="relative">
           <div className="h-36 overflow-hidden" style={{ background: story.bannerUrl ? undefined : theme.accent }}>
-            {story.bannerUrl ? <img src={story.bannerUrl} alt="プロフィールバナー" className="h-full w-full object-cover" /> : null}
+            {story.bannerUrl ? <img src={story.bannerUrl} alt="プロフィールバナー" decoding="async" className="h-full w-full object-cover" /> : null}
           </div>
           <div className="relative px-5 pb-6">
             <div className="absolute -top-12 left-5 h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-[var(--story-soft)]">
               <div className="grid h-full w-full place-items-center text-xl font-semibold text-[var(--story-ink)]">{initials}</div>
-              {story.avatarUrl ? <img src={story.avatarUrl} alt={`${displayName}さんのプロフィール写真`} className="absolute inset-0 h-full w-full object-cover" /> : null}
+              {story.avatarUrl ? <img src={story.avatarUrl} alt={`${displayName}さんのプロフィール写真`} decoding="async" className="absolute inset-0 h-full w-full object-cover" /> : null}
             </div>
             <div className="pt-16">
               <h1 className="text-[26px] font-semibold leading-tight">{displayName}</h1>
@@ -71,7 +71,7 @@ export function StoryNameCard({
             <div className={story.portfolio.length === 6 ? "grid aspect-[2/1] grid-cols-4 grid-rows-2 gap-2" : "grid grid-cols-3 gap-2"}>
               {story.portfolio.map((item, index) => (
                 <figure key={item.id} className={`overflow-hidden rounded-xl bg-black/5 ${photoItemClass(story.portfolio.length, index)}`}>
-                  <img src={item.imageUrl} alt={item.caption || `写真 ${index + 1}`} className="h-full w-full object-cover" />
+                  <img src={item.imageUrl} alt={item.caption || `写真 ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 </figure>
               ))}
             </div>

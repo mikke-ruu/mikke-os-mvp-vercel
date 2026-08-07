@@ -9,15 +9,22 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { StoryNameCard } from "@/components/mikkeos/StoryNameCard";
 import { getMyStoryProfile, getStorySaveErrorMessage, saveMyStoryProfile } from "@/lib/mikkeos/story-profile-db";
-import { uploadStoryImage } from "@/lib/mikkeos/story-profile-media";
+import { removeStoryImages, uploadStoryImage, type StoryImageCrop } from "@/lib/mikkeos/story-profile-media";
 import {
-  defaultStoryProfile, getStoryAppPath, getStoryProfileValidationError, getStoryPublicUrl, loadStoryProfileDraft,
+  defaultStoryProfile, getStoryProfileValidationError, getStoryPublicUrl, loadStoryProfileDraft,
   normalizeStoryHandle, saveStoryProfileDraft, storySnsDefaults, storyThemes,
   type StoryProfileLink, type StoryProfileView, type StoryThemeKey
 } from "@/lib/mikkeos/story-profile-store";
 import { supabase } from "@/lib/supabase/client";
 
 const introSeenKey = "mikkeos.story.intro.seen.v2";
+
+type CropDraft = {
+  file: File;
+  kind: "avatar" | "banner";
+  objectUrl: string;
+  crop: StoryImageCrop;
+};
 
 export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   const router = useRouter();
@@ -33,6 +40,8 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [idEditing, setIdEditing] = useState(false);
   const [viewMode, setViewMode] = useState<"edit" | "preview">("edit");
+  const [cropDraft, setCropDraft] = useState<CropDraft | null>(null);
+  const [persistedMediaPaths, setPersistedMediaPaths] = useState<string[]>([]);
 
   useEffect(() => {
     if (mode === "start") setIntroStep(window.localStorage.getItem(introSeenKey) === "1" ? null : 0);
@@ -44,6 +53,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
     getMyStoryProfile(supabase).then((remote) => {
       if (!cancelled && remote) {
         setForm(remote);
+        setPersistedMediaPaths(storyMediaPaths(remote));
         saveStoryProfileDraft(remote);
         setIntroStep(null);
       }
@@ -58,24 +68,48 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const upload = async (file: File | undefined, kind: "avatar" | "banner" | "portfolio") => {
+  const upload = async (file: File | undefined, kind: "avatar" | "banner" | "portfolio", crop?: StoryImageCrop) => {
     if (!file) return;
     if (kind === "portfolio" && form.portfolio.length >= 6) return;
     setUploading(kind);
-    setMessage("");
+    setIsError(false);
+    setMessage("写真を見やすい大きさに調整しています…");
     try {
-      const result = await uploadStoryImage(supabase, user.id, file, kind);
+      const result = await uploadStoryImage(supabase, user.id, file, kind, crop);
       setForm((current) => {
         if (kind === "avatar") return { ...current, avatarUrl: result.imageUrl, avatarStoragePath: result.storagePath };
         if (kind === "banner") return { ...current, bannerUrl: result.imageUrl, bannerStoragePath: result.storagePath };
         return { ...current, portfolio: [...current.portfolio, { id: crypto.randomUUID(), source: "upload" as const, storagePath: result.storagePath, imageUrl: result.imageUrl, caption: "" }].slice(0, 6) };
       });
+      setMessage("写真を追加しました。保存すると公開内容に反映されます。");
     } catch (error) {
       setIsError(true);
       setMessage(error instanceof Error ? error.message : "画像をアップロードできませんでした。");
     } finally {
       setUploading("");
     }
+  };
+
+  const requestImage = (file: File | undefined, kind: "avatar" | "banner" | "portfolio") => {
+    if (!file) return;
+    if (kind === "portfolio") {
+      void upload(file, kind);
+      return;
+    }
+    setCropDraft({ file, kind, objectUrl: URL.createObjectURL(file), crop: { x: 50, y: 50 } });
+  };
+
+  const closeCrop = () => {
+    if (cropDraft) URL.revokeObjectURL(cropDraft.objectUrl);
+    setCropDraft(null);
+  };
+
+  const confirmCrop = () => {
+    if (!cropDraft) return;
+    const next = cropDraft;
+    URL.revokeObjectURL(next.objectUrl);
+    setCropDraft(null);
+    void upload(next.file, next.kind, next.crop);
   };
 
   const requestSave = (publish: boolean) => {
@@ -91,16 +125,20 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
       setIsError(false); setMessage("この端末に下書きを保存しました。表示名を入力するとサーバーにも保存できます。");
       return;
     }
-    const next = { ...form, isPublished: publish };
+    const next = { ...form, isPublished: publish || form.isPublished };
     setConfirmOpen(false); setSaving(publish ? "publish" : "draft"); setMessage("");
-    saveStoryProfileDraft({ ...next, isPublished: false });
+    saveStoryProfileDraft(next);
     try {
       const saved = await saveMyStoryProfile(supabase, next);
       setForm(saved); saveStoryProfileDraft(saved); setIsError(false);
+      const savedPaths = storyMediaPaths(saved);
+      const removedPaths = persistedMediaPaths.filter((path) => !savedPaths.includes(path));
+      if (removedPaths.length) void removeStoryImages(supabase, removedPaths).catch(() => undefined);
+      setPersistedMediaPaths(savedPaths);
       await refreshProfile();
       setIdEditing(false);
-      if (publish) { router.push(safeStoryNextPath(searchParams.get("next")) ?? getStoryAppPath(saved.handle)); return; }
-      setMessage("下書きを保存しました。まだ公開されていません。");
+      if (publish) { router.push(safeStoryNextPath(searchParams.get("next")) ?? "/story"); return; }
+      setMessage(saved.isPublished ? "変更を保存しました。公開ページにも反映されています。" : "下書きを保存しました。まだ公開されていません。");
     } catch (error) {
       setIsError(true); setMessage(`${getStorySaveErrorMessage(error)} 端末内には下書きを残しています。`);
     } finally { setSaving(null); }
@@ -127,13 +165,13 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
         <section className="relative">
           <div className="relative h-36 overflow-hidden bg-[var(--story-soft)]">
             {form.bannerUrl ? <img src={form.bannerUrl} alt="バナー" className="h-full w-full object-cover" /> : <div className="absolute inset-0 grid place-items-center text-center text-xs font-bold text-black/35"><span><ImagePlus className="mx-auto mb-2" size={24} />バナーを追加</span></div>}
-            <FileButton label="バナー画像を選ぶ" className="absolute bottom-3 right-3 rounded-full" busy={uploading === "banner"} onFile={(file) => void upload(file, "banner")}><Camera size={14} /> バナー</FileButton>
+            <FileButton label="バナー画像を選ぶ" className="absolute bottom-3 right-3 rounded-full" busy={uploading === "banner"} onFile={(file) => requestImage(file, "banner")}><Camera size={14} /> バナー</FileButton>
           </div>
           <div className="relative px-5 pb-6">
             <div className="absolute -top-12 left-5 h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-[var(--story-soft)] shadow-sm">
               <div className="grid h-full w-full place-items-center text-xl font-semibold text-[var(--story-ink)]">{initials}</div>
               {form.avatarUrl ? <img src={form.avatarUrl} alt="プロフィール写真" className="absolute inset-0 h-full w-full object-cover" /> : null}
-              <FileButton label="プロフィール写真を選ぶ" className="absolute inset-x-0 bottom-0 rounded-none border-0 bg-black/60 py-1 text-[10px] text-white" busy={uploading === "avatar"} onFile={(file) => void upload(file, "avatar")}><Camera size={11} /> 写真</FileButton>
+              <FileButton label="プロフィール写真を選ぶ" className="absolute inset-x-0 bottom-0 rounded-none border-0 bg-black/60 py-1 text-[10px] text-white" busy={uploading === "avatar"} onFile={(file) => requestImage(file, "avatar")}><Camera size={11} /> 写真</FileButton>
             </div>
             <div className="pt-16">
               <InlineInput label="表示名" value={form.displayName} placeholder="名前" onChange={(value) => update("displayName", value)} className="text-2xl font-semibold" />
@@ -145,10 +183,10 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
           </div>
         </section>
 
-        <EditorSection eyebrow="PHOTOS" title="写真（任意）" note="最大6枚。公開画面に写真用の見出しは表示しません。">
+        <EditorSection eyebrow="PHOTOS" title="写真（任意）" note="最大6枚。スマホの大きな写真も自動で軽くして保存します。">
           <div className={form.portfolio.length === 6 ? "grid aspect-[2/1] grid-cols-4 grid-rows-2 gap-2" : "grid grid-cols-3 gap-2"}>
             {form.portfolio.map((item, index) => <div key={item.id} className={`group relative overflow-hidden rounded-xl bg-black/5 ${editorPhotoItemClass(form.portfolio.length, index)}`}><img src={item.imageUrl} alt={item.caption || `写真 ${index + 1}`} className="h-full w-full object-cover" /><button type="button" aria-label="写真を削除" onClick={() => update("portfolio", form.portfolio.filter((candidate) => candidate.id !== item.id))} className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white"><Trash2 size={13} /></button></div>)}
-            {form.portfolio.length < 6 ? <FileButton label="写真を追加" className="flex aspect-square min-h-24 flex-col items-center justify-center rounded-xl border border-dashed border-black/20 bg-black/[0.02] text-xs font-medium text-black/45 shadow-none" busy={uploading === "portfolio"} onFile={(file) => void upload(file, "portfolio")}><Plus size={21} /><span className="mt-1">写真を追加</span></FileButton> : null}
+            {form.portfolio.length < 6 ? <FileButton label="写真を追加" className="flex aspect-square min-h-24 flex-col items-center justify-center rounded-xl border border-dashed border-black/20 bg-black/[0.02] text-xs font-medium text-black/45 shadow-none" busy={uploading === "portfolio"} onFile={(file) => requestImage(file, "portfolio")}><Plus size={21} /><span className="mt-1">写真を追加</span></FileButton> : null}
           </div>
         </EditorSection>
 
@@ -190,11 +228,18 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
         <footer className="border-t border-black/5 py-5 text-center text-[11px] font-normal text-black/30">STORY by mikke</footer>
       </article>}
 
-      <div className="sticky bottom-[58px] z-20 mt-4 border-t border-black/10 bg-white/95 px-3 py-3 backdrop-blur min-[900px]:bottom-0"><div className="mx-auto flex max-w-[430px] gap-2"><button type="button" disabled={saving !== null || !!uploading} onClick={() => requestSave(false)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-black/10 px-3 py-3 text-sm font-medium disabled:opacity-50"><Save size={16} />{saving === "draft" ? "保存中" : "下書き保存"}</button><button type="button" disabled={saving !== null || !!uploading} onClick={() => requestSave(true)} className="flex-1 rounded-2xl bg-[var(--story-accent)] px-3 py-3 text-sm font-medium text-white disabled:opacity-50">{saving === "publish" ? "公開中" : "公開する"}</button></div></div>
+      <div className="sticky bottom-[58px] z-20 mt-4 border-t border-black/10 bg-white/95 px-3 py-3 backdrop-blur min-[900px]:bottom-0"><div className="mx-auto flex max-w-[430px] gap-2"><button type="button" disabled={saving !== null || !!uploading} onClick={() => requestSave(false)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-black/10 px-3 py-3 text-sm font-medium disabled:opacity-50"><Save size={16} />{saving === "draft" ? "保存中" : form.isPublished ? "変更を保存" : "下書き保存"}</button><button type="button" disabled={saving !== null || !!uploading} onClick={() => form.isPublished ? void persist(true) : requestSave(true)} className="flex-1 rounded-2xl bg-[var(--story-accent)] px-3 py-3 text-sm font-medium text-white disabled:opacity-50">{saving === "publish" ? "保存中" : form.isPublished ? "保存して確認" : "公開する"}</button></div></div>
+
+      {cropDraft ? <StoryCropDialog draft={cropDraft} onChange={(crop) => setCropDraft((current) => current ? { ...current, crop } : current)} onCancel={closeCrop} onConfirm={confirmCrop} /> : null}
 
       {confirmOpen ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center"><div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-[24px] bg-white p-5"><div className="flex items-start justify-between"><div><p className="text-[10px] font-extrabold tracking-[0.18em] text-[var(--story-accent)]">PUBLIC STORY</p><h2 className="mt-2 text-xl font-extrabold">この内容を公開しますか？</h2></div><button type="button" aria-label="閉じる" onClick={() => setConfirmOpen(false)}><X size={20} /></button></div><p className="mt-3 text-sm leading-6 text-black/55">URLを知っている人は、ログインせずに写真・自己紹介・リンクを見ることができます。</p><p className="mt-3 break-all rounded-xl bg-black/[0.03] p-3 text-xs font-bold">{getStoryPublicUrl(form.handle)}</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setConfirmOpen(false)} className="rounded-xl border border-black/10 py-3 text-sm font-bold">戻る</button><button type="button" onClick={() => void persist(true)} className="rounded-xl bg-[var(--story-accent)] py-3 text-sm font-bold text-white">公開する</button></div></div></div> : null}
     </div>
   );
+}
+
+function StoryCropDialog({ draft, onChange, onCancel, onConfirm }: { draft: CropDraft; onChange: (crop: StoryImageCrop) => void; onCancel: () => void; onConfirm: () => void }) {
+  const isAvatar = draft.kind === "avatar";
+  return <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/55 p-3 sm:items-center"><div role="dialog" aria-modal="true" aria-label="写真の位置を調整" className="w-full max-w-md rounded-[24px] bg-white p-5 shadow-2xl"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-medium tracking-[0.18em] text-[var(--story-accent)]">PHOTO POSITION</p><h2 className="mt-1 text-lg font-semibold">写真の位置を調整</h2><p className="mt-1 text-xs leading-5 text-black/50">見せたい部分が枠の中に入るように調整してください。</p></div><button type="button" aria-label="閉じる" onClick={onCancel} className="grid h-9 w-9 place-items-center rounded-full border border-black/10"><X size={17} /></button></div><div className={`mx-auto mt-5 overflow-hidden bg-black/5 ${isAvatar ? "h-64 w-64 rounded-full" : "aspect-[3/1] w-full rounded-2xl"}`}><img src={draft.objectUrl} alt="切り抜き位置の確認" className="h-full w-full object-cover" style={{ objectPosition: `${draft.crop.x}% ${draft.crop.y}%` }} /></div><label className="mt-5 block text-xs font-medium">左右の位置<input type="range" min="0" max="100" value={draft.crop.x} onChange={(event) => onChange({ ...draft.crop, x: Number(event.target.value) })} className="mt-2 w-full accent-[var(--story-accent)]" /></label><label className="mt-4 block text-xs font-medium">上下の位置<input type="range" min="0" max="100" value={draft.crop.y} onChange={(event) => onChange({ ...draft.crop, y: Number(event.target.value) })} className="mt-2 w-full accent-[var(--story-accent)]" /></label><div className="mt-6 grid grid-cols-2 gap-2"><button type="button" onClick={onCancel} className="rounded-2xl border border-black/10 py-3 text-sm font-medium">選び直す</button><button type="button" onClick={onConfirm} className="rounded-2xl bg-[var(--story-accent)] py-3 text-sm font-medium text-white">この位置で使う</button></div></div></div>;
 }
 
 function StoryIntro({ step, onStep, onBegin }: { step: number; onStep: (value: number) => void; onBegin: () => void }) {
@@ -242,4 +287,8 @@ function safeStoryNextPath(value: string | null) {
 function updateSns(form: StoryProfileView, update: <K extends keyof StoryProfileView>(key: K, value: StoryProfileView[K]) => void, item: StoryProfileLink) {
   const exists = form.sns.some((candidate) => candidate.key === item.key);
   update("sns", exists ? form.sns.map((candidate) => candidate.key === item.key ? item : candidate) : [...form.sns, item]);
+}
+
+function storyMediaPaths(story: StoryProfileView) {
+  return [story.avatarStoragePath, story.bannerStoragePath, ...story.portfolio.map((item) => item.storagePath)].filter(Boolean);
 }
