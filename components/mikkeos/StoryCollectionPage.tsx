@@ -58,7 +58,7 @@ export function StoryCollectionPage() {
                 {item.available ? <><p className="truncate text-sm font-medium">{item.displayName}</p>{item.role ? <p className="mt-1 truncate text-xs font-normal text-[var(--mikke-muted)]">{item.role}</p> : null}<p className="mt-1 truncate text-[11px] text-[var(--mikke-muted-light)]">@{item.handle}</p></> : <><p className="text-sm font-medium">現在は公開されていません</p><p className="mt-1 text-xs font-normal text-[var(--mikke-muted)]">古いプロフィール情報は表示しません。</p></>}
               </div>
               <div className="flex shrink-0 items-center gap-1">
-                {item.available ? <Link href={getStoryAppPath(item.handle)} aria-label={`${item.displayName}のSTORYを見る`} className="grid h-9 w-9 place-items-center rounded-full border border-[var(--mikke-line)]"><ExternalLink size={15} /></Link> : null}
+                {item.available ? <Link href={`${getStoryAppPath(item.handle)}?from=collection`} aria-label={`${item.displayName}のSTORYを見る`} className="grid h-9 w-9 place-items-center rounded-full border border-[var(--mikke-line)]"><ExternalLink size={15} /></Link> : null}
                 <button type="button" aria-label="コレクションから外す" onClick={() => void remove(item.collectionId)} className="grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-muted)]"><Trash2 size={15} /></button>
               </div>
             </article>;
