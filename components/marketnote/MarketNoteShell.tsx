@@ -21,21 +21,21 @@ const marketNoteNavItems: MikkeShellNavItem[] = [
   { label: "カレンダー", href: "/marketnote", icon: CalendarDays, section: "MarketNote" },
   { label: "出店予定を追加", href: "/marketnote/new", icon: Plus, section: "MarketNote" },
   { label: "会計", href: "/marketnote/finance", icon: ReceiptText, section: "MarketNote" },
-  { label: "設定", href: "/settings", icon: Settings, section: "Settings" }
+  { label: "設定", href: "/marketnote/settings", icon: Settings, section: "Settings" }
 ];
 
 const marketNoteBottomNavItems: MikkeShellBottomNavItem[] = [
   { label: "予定", href: "/marketnote", icon: CalendarDays },
   { label: "追加", href: "/marketnote/new", icon: Plus, primary: true },
   { label: "会計", href: "/marketnote/finance", icon: ReceiptText },
-  { label: "設定", href: "/settings", icon: Settings }
+  { label: "設定", href: "/marketnote/settings", icon: Settings }
 ];
 
 const marketNoteEditItems: MikkeOwnerMenuItem[] = [
   { title: "カレンダー", href: "/marketnote", icon: CalendarDays },
   { title: "出店予定を追加", href: "/marketnote/new", icon: Plus },
   { title: "会計", href: "/marketnote/finance", icon: ReceiptText },
-  { title: "MarketNote設定", href: "/settings", icon: Settings }
+  { title: "MarketNote設定", href: "/marketnote/settings", icon: Settings }
 ];
 
 const guestSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
@@ -67,12 +67,14 @@ export function MarketNoteShell({
   subtitle = "Events and finance",
   isGuest = false,
   addHref = "/marketnote/new",
+  hideBottomNav = false,
   children
 }: {
   title?: string;
   subtitle?: string;
   isGuest?: boolean;
   addHref?: string;
+  hideBottomNav?: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -103,7 +105,7 @@ export function MarketNoteShell({
       isGuest={isGuest}
       onSignOut={isGuest ? undefined : () => void signOut()}
       navItems={marketNoteNavItems}
-      bottomNavItems={contextualBottomNavItems}
+      bottomNavItems={hideBottomNav ? undefined : contextualBottomNavItems}
       footerLabel="MarketNote by mikke"
     >
       <InAppBrowserNotice />

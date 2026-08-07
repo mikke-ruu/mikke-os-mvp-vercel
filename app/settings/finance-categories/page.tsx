@@ -133,7 +133,7 @@ function FinanceCategoriesContent() {
     <AppShell title="収支項目" hideHeader hideBottomNav>
       <div className="pb-5">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
-          <Link href="/settings" className="grid h-9 w-9 place-items-center rounded-full text-[#1f1b18]" aria-label="戻る">
+          <Link href="/marketnote/settings" className="grid h-9 w-9 place-items-center rounded-full text-[#1f1b18]" aria-label="戻る">
             <ArrowLeft size={22} strokeWidth={1.7} />
           </Link>
           <h1 className="text-center text-xl font-semibold tracking-normal text-[#1f1b18]">収支項目</h1>
