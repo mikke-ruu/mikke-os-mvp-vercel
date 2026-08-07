@@ -252,9 +252,6 @@ export function MikkeAccountMenu({
               {copied ? "コピー済み" : "コピー"}
             </button>
           </div>
-          <Link href="/settings" className="mt-2 inline-flex text-xs font-bold text-[var(--mikke-primary)]">
-            IDを変更する →
-          </Link>
         </div>
       ) : null}
 
