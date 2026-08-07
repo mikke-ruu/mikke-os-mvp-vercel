@@ -1,7 +1,9 @@
 export type CommunityRole = "owner" | "moderator" | "member";
 export type CommunityMembershipStatus = "active" | "suspended" | "left";
 export type CommunityRoomKind = "announcement" | "normal" | "question" | "event";
+export type CommunityConversationMode = "thread" | "chat";
 export type CommunityRoomAccessType = "free" | "entitlement" | "staff";
+export type CommunityRoomColor = "blue" | "orange" | "yellow" | "pink" | "green";
 export type CommunityPostKind = "announcement" | "normal" | "question";
 export type CommunityEventStatus = "open" | "closed" | "cancelled";
 export type CommunityResourceKind = "web" | "pdf" | "video" | "other";
@@ -16,9 +18,11 @@ export type Community = {
   joinMode: "open_free" | "invite_only" | "paid";
   status: "active" | "archived";
   ownerUserId: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
 };
 
-export type CommunityPublicEntry = Pick<Community, "slug" | "name" | "description" | "joinMode" | "status">;
+export type CommunityPublicEntry = Pick<Community, "slug" | "name" | "description" | "joinMode" | "status" | "logoUrl" | "bannerUrl">;
 
 export type CommunityMembership = {
   id: string;
@@ -71,13 +75,16 @@ export type CommunityRoom = {
   title: string;
   description: string | null;
   kind: CommunityRoomKind;
+  conversationMode: CommunityConversationMode;
   accessType: CommunityRoomAccessType;
+  themeColor: CommunityRoomColor;
   requiredEntitlementKeys: string[];
   isLocked: boolean;
   sortOrder: number;
   isArchived: boolean;
   memberCanPost: boolean;
   memberCanComment: boolean;
+  unreadCount: number;
 };
 
 export type CommunityPost = {
@@ -89,6 +96,7 @@ export type CommunityPost = {
   body: string;
   kind: CommunityPostKind;
   url: string | null;
+  imageUrl: string | null;
   isPinned: boolean;
   isHidden: boolean;
   createdAt: string;
@@ -96,6 +104,31 @@ export type CommunityPost = {
   room?: Pick<CommunityRoom, "id" | "title" | "kind"> | null;
   profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
   comments?: CommunityComment[];
+  attachments?: CommunityPostAttachment[];
+};
+
+export type CommunityPostAttachment = {
+  id: string;
+  communityId: string;
+  postId: string;
+  uploaderUserId: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  createdAt: string;
+};
+
+export type CommunityStamp = {
+  id: string;
+  communityId: string;
+  name: string;
+  imageUrl: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CommunityComment = {
@@ -105,7 +138,34 @@ export type CommunityComment = {
   body: string;
   isHidden: boolean;
   createdAt: string;
+  updatedAt: string;
+  stampId: string | null;
+  stamp?: CommunityStamp | null;
   profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
+};
+
+export type CommunityChatMessage = {
+  id: string;
+  communityId: string;
+  roomId: string;
+  authorUserId: string;
+  replyToMessageId: string | null;
+  stampId: string | null;
+  body: string;
+  isHidden: boolean;
+  editedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
+  replyTo?: CommunityChatMessage | null;
+  stamp?: CommunityStamp | null;
+  reactions: CommunityChatReactionGroup[];
+};
+
+export type CommunityChatReactionGroup = {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
 };
 
 export type CommunityEvent = {
@@ -138,6 +198,7 @@ export type CommunityDashboard = {
   community: Community;
   membership: CommunityMembership | null;
   profile: CommunityMemberProfile | null;
+  profiles: CommunityMemberProfile[];
   entitlements: CommunityMemberEntitlement[];
   entitlementDefinitions: CommunityEntitlementDefinition[];
   ownerMembers: CommunityOwnerMember[];
@@ -145,4 +206,5 @@ export type CommunityDashboard = {
   posts: CommunityPost[];
   events: CommunityEvent[];
   resources: CommunityResource[];
+  stamps: CommunityStamp[];
 };
