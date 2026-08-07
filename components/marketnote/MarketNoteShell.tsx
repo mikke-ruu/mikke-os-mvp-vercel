@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
-  BookOpenText,
   CalendarDays,
   FileText,
   ListChecks,
   Plus,
   ReceiptText,
   Settings,
-  Store,
-  WalletCards
+  Store
 } from "lucide-react";
+import { useAuth } from "@/components/AuthGate";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import type { MikkeOwnerMenuItem, MikkeOwnerMenuSuggestedApp } from "@/components/mikkeos/MikkeOwnerMenu";
+import { releasedApps } from "@/lib/mikkeos/released-apps";
+import { supabase } from "@/lib/supabase/client";
 
 const marketNoteNavItems: MikkeShellNavItem[] = [
   { label: "カレンダー", href: "/marketnote", icon: CalendarDays, section: "MarketNote" },
@@ -36,22 +38,12 @@ const marketNoteEditItems: MikkeOwnerMenuItem[] = [
   { title: "MarketNote設定", href: "/settings", icon: Settings }
 ];
 
-const ownedMarketNoteApps: MikkeOwnerMenuItem[] = [
-  { title: "MarketNote", href: "/marketnote", icon: WalletCards, tone: "orange" }
-];
-
-const loggedInRelatedApps: MikkeOwnerMenuItem[] = [
-  { title: "Story", href: "/story", icon: BookOpenText, tone: "blue" }
-];
-
 const guestSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
-  { name: "Story", helper: "ログイン後にプロフィール機能を使えます", href: "/login?next=/story" },
-  { name: "DESK", helper: "会計連携は検証後に開放します" }
+  { name: "Story", helper: "ログイン後にプロフィール機能を使えます", href: "/login?next=/story" }
 ];
 
 const loggedInSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
-  { name: "Story", helper: "MarketNoteの実績掲載は、本人が選んだあとに開通します", href: "/story" },
-  { name: "DESK", helper: "MarketNote会計との連携は検証後に開放します" }
+  { name: "Story", helper: "MarketNoteの実績掲載は、本人が選んだあとに開通します", href: "/story" }
 ];
 
 const installGuideUrl = "https://mikke-os.com/install.html";
@@ -83,9 +75,16 @@ export function MarketNoteShell({
   addHref?: string;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
+  const { profile } = useAuth();
   const contextualBottomNavItems = marketNoteBottomNavItems.map((item) => (
     item.primary ? { ...item, href: addHref } : item
   ));
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    router.replace("/login?next=/marketnote");
+  }
 
   return (
     <MikkeAppShell
@@ -97,9 +96,12 @@ export function MarketNoteShell({
       primaryActionTone="orange"
       showBottomNavLabels
       menuEditItems={marketNoteEditItems}
-      ownedApps={ownedMarketNoteApps}
-      otherApps={isGuest ? [] : loggedInRelatedApps}
+      ownedApps={releasedApps}
+      otherApps={[]}
       suggestedApps={isGuest ? guestSuggestedApps : loggedInSuggestedApps}
+      mikkeId={isGuest ? undefined : profile.handle}
+      isGuest={isGuest}
+      onSignOut={isGuest ? undefined : () => void signOut()}
       navItems={marketNoteNavItems}
       bottomNavItems={contextualBottomNavItems}
       footerLabel="MarketNote by mikke"

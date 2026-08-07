@@ -16,7 +16,6 @@ import {
   KeyRound,
   Library,
   Lock,
-  LogOut,
   MessageCircle,
   MessagesSquare,
   Pencil,
@@ -82,6 +81,8 @@ import {
 import type { CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEvent, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
+import { releasedApps } from "@/lib/mikkeos/released-apps";
+import { ensureProfile } from "@/lib/profile";
 
 type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
 
@@ -138,6 +139,7 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
   const [user, setUser] = useState<SessionUser | null>(null);
   const [data, setData] = useState<CommunityDashboard | null>(null);
   const [publicEntry, setPublicEntry] = useState<CommunityPublicEntry | null>(null);
+  const [mikkeId, setMikkeId] = useState<string>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -156,9 +158,10 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
     let mounted = true;
     supabase.auth.getSession().then(async ({ data: sessionData }) => {
       if (!mounted) return;
-      const nextUser = sessionData.session?.user ? { id: sessionData.session.user.id, email: sessionData.session.user.email } : null;
+      const sessionUser = sessionData.session?.user ?? null;
+      const nextUser = sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null;
       setUser(nextUser);
-      if (!nextUser) {
+      if (!sessionUser || !nextUser) {
         try {
           setPublicEntry(await loadCommunityPublicEntry(supabase, communitySlug));
         } catch (nextError) {
@@ -168,6 +171,13 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
         }
         return;
       }
+      void ensureProfile(sessionUser)
+        .then((profile) => {
+          if (mounted) setMikkeId(profile.handle);
+        })
+        .catch(() => {
+          if (mounted) setMikkeId(undefined);
+        });
       try {
         await reload(nextUser);
       } finally {
@@ -212,7 +222,7 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
 
   if (error && !data) {
     return (
-      <CommunityShell base={base} onSignOut={signOut} showOwner={false}>
+      <CommunityShell base={base} mikkeId={mikkeId} onSignOut={signOut} showOwner={false}>
         <MikkeEmptyState title="COMMUNITYの準備が必要です" helper={error} />
       </CommunityShell>
     );
@@ -225,14 +235,14 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
 
   if (!active || view === "join") {
     return (
-      <CommunityShell base={base} community={data} onSignOut={signOut} showOwner={false}>
+      <CommunityShell base={base} community={data} mikkeId={mikkeId} onSignOut={signOut} showOwner={false}>
         <JoinPanel community={data} defaultName={data.profile?.displayName ?? user.email?.split("@")[0] ?? ""} error={error} onJoin={handleJoin} />
       </CommunityShell>
     );
   }
 
   return (
-    <CommunityShell base={base} community={data} onSignOut={signOut} showOwner={ownerLike}>
+    <CommunityShell base={base} community={data} mikkeId={mikkeId} onSignOut={signOut} showOwner={ownerLike}>
       {message ? <Notice>{message}</Notice> : null}
       {error ? <Notice>{error}</Notice> : null}
       {view === "home" ? <HomeView base={base} data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
@@ -282,7 +292,7 @@ function PublicCommunityEntry({ community, base }: { community: CommunityPublicE
   );
 }
 
-function CommunityShell({ children, base, community, onSignOut, showOwner }: { children: React.ReactNode; base: string; community?: CommunityDashboard | null; onSignOut: () => void; showOwner: boolean }) {
+function CommunityShell({ children, base, community, mikkeId, onSignOut, showOwner }: { children: React.ReactNode; base: string; community?: CommunityDashboard | null; mikkeId?: string; onSignOut: () => void; showOwner: boolean }) {
   const { navItems, bottomNavItems } = buildNavigation(base, showOwner);
   return (
     <MikkeAppShell
@@ -293,11 +303,12 @@ function CommunityShell({ children, base, community, onSignOut, showOwner }: { c
       theme="yellow"
       navItems={navItems}
       bottomNavItems={bottomNavItems}
-      ownedApps={[]}
+      ownedApps={releasedApps}
       otherApps={[]}
       suggestedApps={[]}
+      mikkeId={mikkeId}
+      onSignOut={onSignOut}
       footerLabel="Community by mikke"
-      sidebarFooterAction={{ label: "ログアウト", helper: "COMMUNITYから退出", icon: LogOut, onClick: onSignOut }}
     >
       {community?.community.bannerUrl || community?.community.logoUrl ? (
         <div className="mb-6 overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-white">

@@ -1,17 +1,18 @@
 "use client";
 
 import {
-  BriefcaseBusiness,
-  BookOpenText,
   ChevronDown,
+  Copy,
   Grid3X3,
   Link as LinkIcon,
+  LogOut,
   PlusCircle,
   Settings,
   X
 } from "lucide-react";
 import Link from "next/link";
 import { useState, type ComponentType, type ReactNode } from "react";
+import { releasedApps } from "@/lib/mikkeos/released-apps";
 import type { StatChipTone } from "./StatChip";
 
 type OwnerMenuIcon = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
@@ -41,6 +42,9 @@ export type MikkeOwnerMenuProps = {
   ownedApps?: MikkeOwnerMenuItem[];
   otherApps?: MikkeOwnerMenuItem[];
   suggestedApps?: MikkeOwnerMenuSuggestedApp[];
+  mikkeId?: string;
+  isGuest?: boolean;
+  onSignOut?: () => void;
   /** ヘッダー行に close ボタンと並べる追加アクション（STORYの「編集」ボタン等）。 */
   headerAction?: ReactNode;
   onClose?: () => void;
@@ -48,15 +52,9 @@ export type MikkeOwnerMenuProps = {
 
 const defaultEditItems: MikkeOwnerMenuItem[] = [{ title: "表示設定", href: "/settings", icon: Settings }];
 
-const defaultOwnedApps: MikkeOwnerMenuItem[] = [
-  { title: "Manager", href: "/manager", icon: BriefcaseBusiness },
-  { title: "Story", href: "/story", icon: BookOpenText },
-  { title: "DESK", href: "/desk", icon: Grid3X3 },
-  { title: "Apps", href: "/apps", icon: Grid3X3 }
-];
+const defaultOwnedApps = releasedApps;
 
 const defaultSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
-  { name: "Order", helper: "依頼受付をつなげますか", href: "/apps/order" },
   { name: "Community", helper: "Communityを作成・運営しますか", href: "/community/for-organizers" }
 ];
 
@@ -74,7 +72,8 @@ export const tileToneStyles: Record<StatChipTone, { background: string; foregrou
 };
 
 const registeredAppTileTones: Partial<Record<string, StatChipTone>> = {
-  MarketNote: "blue",
+  MarketNote: "orange",
+  Story: "blue",
   Community: "yellow",
   "Team Works": "green",
   Library: "blue"
@@ -127,6 +126,9 @@ export function MikkeOwnerMenu({
   ownedApps = defaultOwnedApps,
   otherApps = [],
   suggestedApps = defaultSuggestedApps,
+  mikkeId,
+  isGuest = false,
+  onSignOut,
   headerAction,
   onClose
 }: MikkeOwnerMenuProps) {
@@ -190,7 +192,83 @@ export function MikkeOwnerMenu({
       ) : null}
 
       {suggestedApps.length > 0 ? <ConnectAppsSection apps={suggestedApps} /> : null}
+
+      <MikkeAccountMenu mikkeId={mikkeId} isGuest={isGuest} onSignOut={onSignOut} />
     </section>
+  );
+}
+
+export function MikkeAccountMenu({
+  mikkeId,
+  isGuest = false,
+  onSignOut
+}: Pick<MikkeOwnerMenuProps, "mikkeId" | "isGuest" | "onSignOut">) {
+  const [copied, setCopied] = useState(false);
+  const normalizedId = mikkeId?.replace(/^@/, "");
+
+  async function copyMikkeId() {
+    if (!normalizedId) return;
+    try {
+      await navigator.clipboard.writeText(`@${normalizedId}`);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  if (isGuest) {
+    return (
+      <div className="border-t border-[var(--mikke-line-soft)] pt-4">
+        <p className="text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
+          ログインすると、別の端末でも<br />続きが見られます。
+        </p>
+        <Link
+          href="/login?next=/marketnote"
+          className="mt-3 flex min-h-10 w-full items-center justify-center rounded-lg bg-[var(--mikke-orange)] px-3 text-sm font-bold text-white"
+        >
+          ログイン・無料登録
+        </Link>
+      </div>
+    );
+  }
+
+  if (!normalizedId && !onSignOut) return null;
+
+  return (
+    <div className="border-t border-[var(--mikke-line-soft)] pt-4">
+      {normalizedId ? (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mikke-muted-light)]">mikke ID</p>
+          <div className="mt-2 flex min-w-0 items-center gap-2">
+            <p className="min-w-0 flex-1 truncate text-sm font-bold text-[var(--mikke-text)]">@{normalizedId}</p>
+            <button
+              type="button"
+              onClick={() => void copyMikkeId()}
+              className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-lg border border-[var(--mikke-line)] px-2 text-xs font-bold text-[var(--mikke-muted)]"
+              aria-label="mikke IDをコピー"
+            >
+              <Copy size={13} strokeWidth={1.8} />
+              {copied ? "コピー済み" : "コピー"}
+            </button>
+          </div>
+          <Link href="/settings" className="mt-2 inline-flex text-xs font-bold text-[var(--mikke-primary)]">
+            IDを変更する →
+          </Link>
+        </div>
+      ) : null}
+
+      {onSignOut ? (
+        <button
+          type="button"
+          onClick={onSignOut}
+          className={`${normalizedId ? "mt-4 border-t" : ""} flex w-full items-center gap-2 border-[var(--mikke-line-soft)] pt-4 text-left text-sm font-bold text-[var(--mikke-muted)]`}
+        >
+          <LogOut size={17} strokeWidth={1.8} />
+          ログアウト
+        </button>
+      ) : null}
+    </div>
   );
 }
 

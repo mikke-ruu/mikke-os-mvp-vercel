@@ -7,6 +7,7 @@ import type { LucideIcon } from "lucide-react";
 import { AppHeader } from "./AppHeader";
 import {
   MikkeAppsTileGrid,
+  MikkeAccountMenu,
   MikkeOwnerMenu,
   tileToneStyles,
   type MikkeOwnerMenuItem,
@@ -51,6 +52,9 @@ type MikkeAppShellProps = {
   ownedApps?: MikkeOwnerMenuItem[];
   otherApps?: MikkeOwnerMenuItem[];
   suggestedApps?: MikkeOwnerMenuSuggestedApp[];
+  mikkeId?: string;
+  isGuest?: boolean;
+  onSignOut?: () => void;
   footerLabel?: string;
   /**
    * 渡された時だけPC(≥900px)常時左サイドメニュー＋モバイルドロワーのナビ一覧を表示する。
@@ -95,6 +99,9 @@ export function MikkeAppShell({
   ownedApps,
   otherApps,
   suggestedApps,
+  mikkeId,
+  isGuest = false,
+  onSignOut,
   footerLabel,
   navItems,
   bottomNavItems,
@@ -158,6 +165,9 @@ export function MikkeAppShell({
               ownedApps={ownedApps}
               otherApps={otherApps}
               suggestedApps={suggestedApps}
+              mikkeId={mikkeId}
+              isGuest={isGuest}
+              onSignOut={onSignOut}
               onClose={closeMenu}
             />
             {sidebarFooterAction ? (
@@ -232,6 +242,12 @@ export function MikkeAppShell({
               <div className="mt-3.5 border-t border-[var(--mikke-line)] pt-4">
                 <p className="mb-2 px-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mikke-muted-light)]">APPS</p>
                 <MikkeAppsTileGrid apps={appTiles} />
+              </div>
+            ) : null}
+
+            {isGuest || mikkeId || onSignOut ? (
+              <div className="mt-auto pt-5">
+                <MikkeAccountMenu mikkeId={mikkeId} isGuest={isGuest} onSignOut={onSignOut} />
               </div>
             ) : null}
 

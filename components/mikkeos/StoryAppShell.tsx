@@ -1,8 +1,11 @@
 "use client";
 
-import { BookOpenText, CalendarDays, ContactRound, Grid3X3, Library, Pencil, QrCode, Users } from "lucide-react";
+import { BookOpenText, ContactRound, Pencil, QrCode } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthGate";
+import { releasedApps } from "@/lib/mikkeos/released-apps";
+import { supabase } from "@/lib/supabase/client";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "./MikkeAppShell";
-import type { MikkeOwnerMenuItem } from "./MikkeOwnerMenu";
 
 const storyNavItems: MikkeShellNavItem[] = [
   { label: "マイSTORY", href: "/story", icon: BookOpenText, section: "STORY" },
@@ -18,18 +21,15 @@ const storyBottomNavItems: MikkeShellBottomNavItem[] = [
   { label: "共有", href: "/story/share", icon: QrCode }
 ];
 
-const ownedApps: MikkeOwnerMenuItem[] = [
-  { title: "STORY", href: "/story", icon: BookOpenText, tone: "blue" }
-];
-
-const otherApps: MikkeOwnerMenuItem[] = [
-  { title: "MarketNote", href: "/marketnote", icon: CalendarDays, tone: "orange" },
-  { title: "Community", href: "/community", icon: Users, tone: "green" },
-  { title: "Library", href: "/apps/library", icon: Library, tone: "yellow" },
-  { title: "Apps", href: "/apps", icon: Grid3X3, tone: "pink" }
-];
-
 export function StoryAppShell({ children, title = "STORY", subtitle }: { children: React.ReactNode; title?: string; subtitle?: string }) {
+  const router = useRouter();
+  const { profile } = useAuth();
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    router.replace("/login?next=/story");
+  }
+
   return (
     <MikkeAppShell
       appName="STORY"
@@ -37,9 +37,11 @@ export function StoryAppShell({ children, title = "STORY", subtitle }: { childre
       subtitle={subtitle}
       theme="blue"
       menuEditItems={storyNavItems.map((item) => ({ title: item.label, href: item.href, icon: item.icon }))}
-      ownedApps={ownedApps}
-      otherApps={otherApps}
+      ownedApps={releasedApps}
+      otherApps={[]}
       suggestedApps={[]}
+      mikkeId={profile.handle}
+      onSignOut={() => void signOut()}
       navItems={storyNavItems}
       bottomNavItems={storyBottomNavItems}
       showBottomNavLabels
