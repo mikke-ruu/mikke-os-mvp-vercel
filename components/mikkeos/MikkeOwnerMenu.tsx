@@ -73,29 +73,39 @@ export const tileToneStyles: Record<StatChipTone, { background: string; foregrou
   pink: { background: "var(--mikke-pink, #f9d3d2)", foreground: "#1b1b1f" }
 };
 
-export const tileToneCycle: StatChipTone[] = ["blue", "orange", "green", "yellow", "pink"];
+const registeredAppTileTones: Partial<Record<string, StatChipTone>> = {
+  MarketNote: "blue",
+  Community: "yellow",
+  "Team Works": "green",
+  Library: "blue"
+};
+
+const unregisteredTileStyle = {
+  background: "var(--mikke-surface-soft, #f7f7f8)",
+  foreground: "var(--mikke-text, #1b1b1f)"
+};
 
 /**
- * APPSタイルグリッド（1行4つ・カラフル5色サイクル）。MikkeOwnerMenu（ドロワー）と
- * MikkeAppShellのPC常時サイドバー下部で共通利用する（重複実装を避ける＝brief指示）。
+ * APPSタイルグリッド。モバイルドロワーは4列、PC常時サイドバーは2列。
+ * アプリ色は登録済みテーマまたは明示されたtoneを使い、並び順では変えない。
  */
 export function MikkeAppsTileGrid({ apps }: { apps: MikkeOwnerMenuItem[] }) {
   if (apps.length === 0) return null;
   return (
-    <div className="grid grid-cols-4 gap-2">
-      {apps.map((app, index) => {
+    <div className="grid grid-cols-4 gap-2 min-[900px]:grid-cols-2">
+      {apps.map((app) => {
         const Icon = app.icon ?? Grid3X3;
-        const tone = app.tone ?? tileToneCycle[index % tileToneCycle.length];
-        const style = tileToneStyles[tone];
+        const tone = registeredAppTileTones[app.title] ?? app.tone;
+        const style = tone ? tileToneStyles[tone] : unregisteredTileStyle;
         return (
           <Link
             key={`${app.title}-${app.href}`}
             href={app.href}
-            className="flex flex-col items-center gap-1.5 rounded-xl p-2.5 text-center"
+            className="flex h-[74px] min-w-0 flex-col items-center justify-center gap-1.5 rounded-xl p-2.5 text-center"
             style={{ background: style.background }}
           >
             <Icon size={20} color={style.foreground} strokeWidth={1.8} />
-            <span className="w-full truncate text-[11px] font-bold" style={{ color: style.foreground }}>
+            <span className="line-clamp-2 min-h-7 w-full overflow-hidden text-[10px] font-bold leading-3.5" style={{ color: style.foreground }}>
               {app.title}
             </span>
           </Link>
