@@ -67,6 +67,7 @@ function NewMarketEventContent() {
   const [templateChecks, setTemplateChecks] = useState<string[]>([]);
   const [templateDueRules, setTemplateDueRules] = useState<Record<string, string>>({});
   const [selectedChecks, setSelectedChecks] = useState<string[]>([]);
+  const [customChecks, setCustomChecks] = useState<string[]>([]);
   const [customCheck, setCustomCheck] = useState("");
   const [timeOpen, setTimeOpen] = useState(false);
   const [venueOpen, setVenueOpen] = useState(false);
@@ -197,7 +198,7 @@ function NewMarketEventContent() {
   }
 
   return (
-    <MarketNoteShell title="出店予定を追加" subtitle="MarketNote" isGuest={isGuest}>
+    <MarketNoteShell title="出店予定を追加" subtitle="MarketNote" isGuest={isGuest} hideBottomNav>
       <form onSubmit={submit} className="pb-5">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button
@@ -360,7 +361,7 @@ function NewMarketEventContent() {
 
           <AccordionCard title="チェック項目（任意）" tone="yellow" icon={<ClipboardList size={16} />} open={checksOpen} onToggle={() => setChecksOpen((value) => !value)}>
             <div className="flex flex-wrap gap-2">
-              {templateChecks.map((item) => {
+              {Array.from(new Set([...templateChecks, ...customChecks])).map((item) => {
                 const active = selectedChecks.includes(item);
                 return (
                   <button
@@ -384,8 +385,10 @@ function NewMarketEventContent() {
               <button
                 type="button"
                 onClick={() => {
-                  if (!customCheck.trim()) return;
-                  setSelectedChecks((current) => Array.from(new Set([...current, customCheck.trim()])));
+                  const item = customCheck.trim();
+                  if (!item) return;
+                  setCustomChecks((current) => Array.from(new Set([...current, item])));
+                  setSelectedChecks((current) => Array.from(new Set([...current, item])));
                   setCustomCheck("");
                 }}
                 className="grid h-10 w-10 place-items-center rounded-xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] text-[var(--mikke-accent)]"
