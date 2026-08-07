@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import { StoryNameCard } from "@/components/mikkeos/StoryNameCard";
+import { StoryAppShell } from "@/components/mikkeos/StoryAppShell";
 import { getMyStoryProfile } from "@/lib/mikkeos/story-profile-db";
 import { defaultStoryProfile, loadStoryProfileDraft, type StoryProfileView } from "@/lib/mikkeos/story-profile-store";
 import { supabase } from "@/lib/supabase/client";
 
 export default function StoryPage() {
-  return <AuthGate><StoryOwnerPage /></AuthGate>;
+  return <AuthGate><StoryAppShell title="マイSTORY" subtitle="あなたの公開名刺"><StoryOwnerPage /></StoryAppShell></AuthGate>;
 }
 
 function StoryOwnerPage() {
