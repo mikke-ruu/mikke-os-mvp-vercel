@@ -12,7 +12,7 @@ export type StoryPortfolioItem = {
   caption: string;
 };
 
-export type StoryThemeKey = "indigo" | "rose" | "sage" | "sun" | "ink";
+export type StoryThemeKey = "blue" | "orange" | "green" | "yellow" | "pink";
 
 export type StoryProfileView = {
   displayName: string;
@@ -28,7 +28,9 @@ export type StoryProfileView = {
   themeKey: StoryThemeKey;
   tags: string[];
   status: string;
+  websiteLabel: string;
   websiteUrl: string;
+  shopLabel: string;
   shopUrl: string;
   sns: StoryProfileLink[];
   pickupText: string;
@@ -47,11 +49,11 @@ export const storySnsDefaults: StoryProfileLink[] = [
 ];
 
 export const storyThemes: Record<StoryThemeKey, { label: string; accent: string; soft: string; ink: string }> = {
-  indigo: { label: "Indigo", accent: "#4656c7", soft: "#eef0ff", ink: "#171a2d" },
-  rose: { label: "Rose", accent: "#bb536d", soft: "#fff0f3", ink: "#2d1920" },
-  sage: { label: "Sage", accent: "#467464", soft: "#edf7f2", ink: "#152821" },
-  sun: { label: "Sun", accent: "#a86710", soft: "#fff5df", ink: "#2b2215" },
-  ink: { label: "Ink", accent: "#24252a", soft: "#f0f0f1", ink: "#111216" }
+  blue: { label: "ブルー", accent: "#3f4eb5", soft: "#f5f7ff", ink: "#1b1b1f" },
+  orange: { label: "オレンジ", accent: "#f75a3b", soft: "#fff7ed", ink: "#1b1b1f" },
+  green: { label: "グリーン", accent: "#8bc7ad", soft: "#eff8f4", ink: "#1b1b1f" },
+  yellow: { label: "イエロー", accent: "#ffd370", soft: "#fff9e8", ink: "#1b1b1f" },
+  pink: { label: "ピンク", accent: "#f9d3d2", soft: "#fff4f4", ink: "#1b1b1f" }
 };
 
 export const defaultStoryProfile: StoryProfileView = {
@@ -65,10 +67,12 @@ export const defaultStoryProfile: StoryProfileView = {
   bannerUrl: "",
   bannerStoragePath: "",
   portfolio: [],
-  themeKey: "indigo",
+  themeKey: "blue",
   tags: [],
   status: "",
+  websiteLabel: "Webサイト",
   websiteUrl: "",
+  shopLabel: "ショップ",
   shopUrl: "",
   sns: storySnsDefaults,
   pickupText: "",
@@ -140,8 +144,10 @@ export function loadStoryProfileDraft(): StoryProfileView {
       ...parsed,
       tags: Array.isArray(parsed.tags) ? parsed.tags : [],
       sns: mergeSnsLinks(parsed.sns),
-      portfolio: Array.isArray(parsed.portfolio) ? parsed.portfolio.slice(0, 5) : [],
-      themeKey: parsed.themeKey && parsed.themeKey in storyThemes ? parsed.themeKey : "indigo"
+      portfolio: Array.isArray(parsed.portfolio) ? parsed.portfolio.slice(0, 6) : [],
+      themeKey: parsed.themeKey && parsed.themeKey in storyThemes ? parsed.themeKey : "blue",
+      websiteLabel: parsed.websiteLabel?.trim() || "Webサイト",
+      shopLabel: parsed.shopLabel?.trim() || "ショップ"
     };
   } catch {
     return defaultStoryProfile;

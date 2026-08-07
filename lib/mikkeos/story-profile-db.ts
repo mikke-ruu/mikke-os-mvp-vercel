@@ -9,7 +9,8 @@ type StoryProfileRow = {
   handle: string; display_name: string; role_label: string; bio: string; area: string;
   avatar_url: string | null; avatar_storage_path: string | null;
   banner_storage_path: string | null; portfolio_items: StoredPortfolioItem[]; theme_key: StoryThemeKey;
-  website_url: string | null; shop_url: string | null; sns_links: StoryProfileLink[]; tags: string[];
+  website_label: string; website_url: string | null; shop_label: string; shop_url: string | null;
+  sns_links: StoryProfileLink[]; tags: string[];
   status_label: string; pickup_text: string; publication_status: "draft" | "published";
   published_at: string | null; created_at: string; updated_at: string;
 };
@@ -17,7 +18,7 @@ type StoryProfileRow = {
 const storyProfileDbTimeoutMs = 7000;
 const storyProfileColumns = [
   "handle", "display_name", "role_label", "bio", "area", "avatar_url", "avatar_storage_path",
-  "banner_storage_path", "portfolio_items", "theme_key", "website_url", "shop_url", "sns_links",
+  "banner_storage_path", "portfolio_items", "theme_key", "website_label", "website_url", "shop_label", "shop_url", "sns_links",
   "tags", "status_label", "pickup_text", "publication_status", "published_at", "created_at", "updated_at"
 ].join(",");
 
@@ -33,11 +34,12 @@ function mapStoryProfileRow(row: StoryProfileRow): StoryProfileView {
     displayName: row.display_name, handle: row.handle, role: row.role_label, area: row.area, bio: row.bio,
     avatarUrl: row.avatar_url ?? "", avatarStoragePath: row.avatar_storage_path ?? "",
     bannerUrl: "", bannerStoragePath: row.banner_storage_path ?? "",
-    portfolio: (row.portfolio_items ?? []).slice(0, 5).map((item): StoryPortfolioItem => ({
+    portfolio: (row.portfolio_items ?? []).slice(0, 6).map((item): StoryPortfolioItem => ({
       id: item.id, source: item.source, storagePath: item.storage_path, imageUrl: "", caption: item.caption ?? ""
     })),
-    themeKey: row.theme_key ?? "indigo", tags: row.tags ?? [], status: row.status_label,
-    websiteUrl: row.website_url ?? "", shopUrl: row.shop_url ?? "", sns: row.sns_links ?? [],
+    themeKey: row.theme_key ?? "blue", tags: row.tags ?? [], status: row.status_label,
+    websiteLabel: row.website_label?.trim() || "Webサイト", websiteUrl: row.website_url ?? "",
+    shopLabel: row.shop_label?.trim() || "ショップ", shopUrl: row.shop_url ?? "", sns: row.sns_links ?? [],
     pickupText: row.pickup_text, isPublished: row.publication_status === "published"
   };
 }
@@ -47,9 +49,10 @@ function storyProfilePayload(story: StoryProfileView) {
     p_handle: story.handle, p_display_name: story.displayName.trim(), p_role_label: story.role.trim(),
     p_bio: story.bio.trim(), p_area: story.area.trim(), p_avatar_url: null,
     p_avatar_storage_path: story.avatarStoragePath || null, p_banner_storage_path: story.bannerStoragePath || null,
-    p_portfolio_items: story.portfolio.slice(0, 5).map((item) => ({ id: item.id, source: item.source, storage_path: item.storagePath, caption: item.caption.trim() })),
-    p_theme_key: story.themeKey, p_website_url: story.websiteUrl.trim() || null,
-    p_shop_url: story.shopUrl.trim() || null,
+    p_portfolio_items: story.portfolio.slice(0, 6).map((item) => ({ id: item.id, source: item.source, storage_path: item.storagePath, caption: item.caption.trim() })),
+    p_theme_key: story.themeKey,
+    p_website_label: story.websiteLabel.trim() || "Webサイト", p_website_url: story.websiteUrl.trim() || null,
+    p_shop_label: story.shopLabel.trim() || "ショップ", p_shop_url: story.shopUrl.trim() || null,
     p_sns_links: story.sns.filter((item) => item.label.trim() && item.url.trim()), p_tags: story.tags.slice(0, 8),
     p_status_label: story.status.trim(), p_pickup_text: story.pickupText.trim(),
     p_publication_status: story.isPublished ? "published" : "draft"
