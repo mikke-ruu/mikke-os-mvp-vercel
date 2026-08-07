@@ -17,9 +17,11 @@ export type Community = {
   joinMode: "open_free" | "invite_only" | "paid";
   status: "active" | "archived";
   ownerUserId: string | null;
+  logoUrl: string | null;
+  bannerUrl: string | null;
 };
 
-export type CommunityPublicEntry = Pick<Community, "slug" | "name" | "description" | "joinMode" | "status">;
+export type CommunityPublicEntry = Pick<Community, "slug" | "name" | "description" | "joinMode" | "status" | "logoUrl" | "bannerUrl">;
 
 export type CommunityMembership = {
   id: string;
@@ -91,6 +93,7 @@ export type CommunityPost = {
   body: string;
   kind: CommunityPostKind;
   url: string | null;
+  imageUrl: string | null;
   isPinned: boolean;
   isHidden: boolean;
   createdAt: string;
@@ -98,6 +101,31 @@ export type CommunityPost = {
   room?: Pick<CommunityRoom, "id" | "title" | "kind"> | null;
   profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
   comments?: CommunityComment[];
+  attachments?: CommunityPostAttachment[];
+};
+
+export type CommunityPostAttachment = {
+  id: string;
+  communityId: string;
+  postId: string;
+  uploaderUserId: string;
+  storagePath: string;
+  fileName: string;
+  mimeType: string;
+  byteSize: number;
+  createdAt: string;
+};
+
+export type CommunityStamp = {
+  id: string;
+  communityId: string;
+  name: string;
+  imageUrl: string;
+  sortOrder: number;
+  isActive: boolean;
+  createdByUserId: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CommunityComment = {
@@ -108,6 +136,8 @@ export type CommunityComment = {
   isHidden: boolean;
   createdAt: string;
   updatedAt: string;
+  stampId: string | null;
+  stamp?: CommunityStamp | null;
   profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
 };
 
@@ -148,4 +178,5 @@ export type CommunityDashboard = {
   posts: CommunityPost[];
   events: CommunityEvent[];
   resources: CommunityResource[];
+  stamps: CommunityStamp[];
 };

@@ -10,6 +10,7 @@ import type {
   CommunityMembership,
   CommunityMembershipStatus,
   CommunityPost,
+  CommunityPostAttachment,
   CommunityPostKind,
   CommunityPublicEntry,
   CommunityResource,
@@ -18,7 +19,8 @@ import type {
   CommunityRoom,
   CommunityRoomAccessType,
   CommunityRoomColor,
-  CommunityRoomKind
+  CommunityRoomKind,
+  CommunityStamp
 } from "./types";
 import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
 
@@ -32,7 +34,9 @@ function mapCommunity(row: any): Community {
     description: row.description ?? null,
     joinMode: row.join_mode,
     status: row.status,
-    ownerUserId: row.owner_user_id ?? null
+    ownerUserId: row.owner_user_id ?? null,
+    logoUrl: row.logo_url ?? null,
+    bannerUrl: row.banner_url ?? null
   };
 }
 
@@ -110,6 +114,8 @@ function mapComment(row: any): CommunityComment {
     isHidden: Boolean(row.is_hidden),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    stampId: row.stamp_id ?? null,
+    stamp: null,
     profile: null
   };
 }
@@ -124,6 +130,7 @@ function mapPost(row: any): CommunityPost {
     body: row.body,
     kind: row.kind,
     url: row.url ?? null,
+    imageUrl: row.image_url ?? null,
     isPinned: Boolean(row.is_pinned),
     isHidden: Boolean(row.is_hidden),
     createdAt: row.created_at,
@@ -132,7 +139,36 @@ function mapPost(row: any): CommunityPost {
       ? { id: row.community_rooms.id, title: row.community_rooms.title, kind: row.community_rooms.kind }
       : null,
     profile: null,
-    comments: []
+    comments: [],
+    attachments: []
+  };
+}
+
+function mapAttachment(row: any): CommunityPostAttachment {
+  return {
+    id: row.id,
+    communityId: row.community_id,
+    postId: row.post_id,
+    uploaderUserId: row.uploader_user_id,
+    storagePath: row.storage_path,
+    fileName: row.file_name,
+    mimeType: row.mime_type,
+    byteSize: Number(row.byte_size),
+    createdAt: row.created_at
+  };
+}
+
+function mapStamp(row: any): CommunityStamp {
+  return {
+    id: row.id,
+    communityId: row.community_id,
+    name: row.name,
+    imageUrl: row.image_url,
+    sortOrder: row.sort_order ?? 100,
+    isActive: Boolean(row.is_active),
+    createdByUserId: row.created_by_user_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
@@ -178,7 +214,7 @@ export function communityErrorMessage(error: unknown, fallback: string) {
 export async function loadCommunityPublicEntry(client: DbClient, communitySlug: string): Promise<CommunityPublicEntry> {
   const { data, error } = await client
     .from("community_communities")
-    .select("slug,name,description,join_mode,status")
+    .select("slug,name,description,join_mode,status,logo_url,banner_url")
     .eq("slug", communitySlug)
     .eq("status", "active")
     .single();
@@ -188,7 +224,9 @@ export async function loadCommunityPublicEntry(client: DbClient, communitySlug: 
     name: data.name,
     description: data.description ?? null,
     joinMode: data.join_mode,
-    status: data.status
+    status: data.status,
+    logoUrl: data.logo_url ?? null,
+    bannerUrl: data.banner_url ?? null
   };
 }
 
@@ -261,16 +299,17 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
   if (communityError) throw communityError;
 
   const community = mapCommunity(communityRow);
-  const [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult] = await Promise.all([
+  const [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult] = await Promise.all([
     client.from("community_memberships").select("*").eq("community_id", community.id).eq("user_id", userId).maybeSingle(),
     client.from("community_memberships").select("*").eq("community_id", community.id).order("joined_at", { ascending: true }),
     client.from("community_member_profiles").select("*").eq("community_id", community.id),
     client.from("community_room_entitlement_rules").select("room_id,entitlement_key").eq("community_id", community.id),
     client.from("community_entitlement_definitions").select("*").eq("community_id", community.id).eq("status", "active").order("name", { ascending: true }),
-    client.from("community_member_entitlements").select("*").eq("community_id", community.id).order("created_at", { ascending: false })
+    client.from("community_member_entitlements").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
+    client.from("community_stamps").select("*").eq("community_id", community.id).order("sort_order", { ascending: true }).order("created_at", { ascending: true })
   ]);
 
-  const firstError = [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult]
+  const firstError = [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult]
     .find((result) => result.error)?.error;
   if (firstError) throw firstError;
 
@@ -307,22 +346,35 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
 
   const posts = (postsResult.data ?? []).map(mapPost);
   const postIds = posts.map((post) => post.id);
-  const commentsResult = postIds.length > 0
-    ? await client.from("community_comments").select("*").in("post_id", postIds).eq("is_hidden", false).order("created_at", { ascending: true })
-    : { data: [], error: null };
+  const [commentsResult, attachmentsResult] = postIds.length > 0
+    ? await Promise.all([
+        client.from("community_comments").select("*").in("post_id", postIds).eq("is_hidden", false).order("created_at", { ascending: true }),
+        client.from("community_post_attachments").select("*").in("post_id", postIds).order("created_at", { ascending: true })
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }];
   if (commentsResult.error) throw commentsResult.error;
+  if (attachmentsResult.error) throw attachmentsResult.error;
 
   const profiles = (profilesResult.data ?? []).map(mapProfile);
   const profilesByUser = new Map(profiles.map((profile) => [profile.userId, profile]));
+  const stamps = (stampsResult.data ?? []).map(mapStamp);
+  const stampsById = new Map(stamps.map((stamp) => [stamp.id, stamp]));
   const comments = (commentsResult.data ?? []).map(mapComment);
+  const attachments = (attachmentsResult.data ?? []).map(mapAttachment);
   const commentsByPost = new Map<string, CommunityComment[]>();
+  const attachmentsByPost = new Map<string, CommunityPostAttachment[]>();
   for (const comment of comments) {
     comment.profile = profilesByUser.get(comment.authorUserId) ?? null;
+    comment.stamp = comment.stampId ? stampsById.get(comment.stampId) ?? null : null;
     commentsByPost.set(comment.postId, [...(commentsByPost.get(comment.postId) ?? []), comment]);
+  }
+  for (const attachment of attachments) {
+    attachmentsByPost.set(attachment.postId, [...(attachmentsByPost.get(attachment.postId) ?? []), attachment]);
   }
   for (const post of posts) {
     post.profile = profilesByUser.get(post.authorUserId) ?? null;
     post.comments = commentsByPost.get(post.id) ?? [];
+    post.attachments = attachmentsByPost.get(post.id) ?? [];
   }
 
   const allMemberships = (membershipsResult.data ?? []).map(mapMembership);
@@ -344,7 +396,8 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     rooms,
     posts,
     events: (eventsResult.data ?? []).map(mapEvent),
-    resources: (resourcesResult.data ?? []).map(mapResource)
+    resources: (resourcesResult.data ?? []).map(mapResource),
+    stamps
   };
 }
 
@@ -386,18 +439,20 @@ export async function claimCommunityOwnership(client: DbClient, communityId: str
   if (error) throw error;
 }
 
-export async function saveCommunitySettings(client: DbClient, communityId: string, input: { name: string; description: string; joinMode: Community["joinMode"] }) {
+export async function saveCommunitySettings(client: DbClient, communityId: string, input: { name: string; description: string; joinMode: Community["joinMode"]; logoUrl?: string | null; bannerUrl?: string | null }) {
   const { error } = await client.from("community_communities").update({
     name: input.name.trim(),
     description: input.description.trim() || null,
-    join_mode: input.joinMode
+    join_mode: input.joinMode,
+    ...(input.logoUrl !== undefined ? { logo_url: input.logoUrl } : {}),
+    ...(input.bannerUrl !== undefined ? { banner_url: input.bannerUrl } : {})
   }).eq("id", communityId);
   if (error) throw error;
 }
 
-export async function saveCommunityProfile(client: DbClient, communityId: string, userId: string, displayName: string, bio: string) {
+export async function saveCommunityProfile(client: DbClient, communityId: string, userId: string, displayName: string, bio: string, avatarUrl?: string | null) {
   const { error } = await client.from("community_member_profiles").upsert(
-    { community_id: communityId, user_id: userId, display_name: displayName.trim() || "COMMUNITY participant", bio: bio.trim() || null },
+    { community_id: communityId, user_id: userId, display_name: displayName.trim() || "COMMUNITY participant", bio: bio.trim() || null, ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}) },
     { onConflict: "community_id,user_id" }
   );
   if (error) throw error;
@@ -496,8 +551,8 @@ export async function updateCommunityMembership(client: DbClient, membershipId: 
   if (error) throw error;
 }
 
-export async function createCommunityPost(client: DbClient, input: { communityId: string; roomId: string; authorUserId: string; title: string; body: string; kind: CommunityPostKind; url?: string; isPinned?: boolean }) {
-  const { error } = await client.from("community_posts").insert({
+export async function createCommunityPost(client: DbClient, input: { communityId: string; roomId: string; authorUserId: string; title: string; body: string; kind: CommunityPostKind; url?: string; imageUrl?: string; isPinned?: boolean }) {
+  const { data, error } = await client.from("community_posts").insert({
     community_id: input.communityId,
     room_id: input.roomId,
     author_user_id: input.authorUserId,
@@ -505,9 +560,11 @@ export async function createCommunityPost(client: DbClient, input: { communityId
     body: input.body.trim(),
     kind: input.kind,
     url: input.url?.trim() || null,
+    image_url: input.imageUrl?.trim() || null,
     is_pinned: Boolean(input.isPinned)
-  });
+  }).select("id").single();
   if (error) throw error;
+  return data.id as string;
 }
 
 export async function updateCommunityPostVisibility(client: DbClient, postId: string, input: { isHidden?: boolean; isPinned?: boolean }) {
@@ -534,8 +591,8 @@ export async function deleteCommunityPost(client: DbClient, postId: string, auth
   if (error) throw error;
 }
 
-export async function createCommunityComment(client: DbClient, postId: string, authorUserId: string, body: string) {
-  const { error } = await client.from("community_comments").insert({ post_id: postId, author_user_id: authorUserId, body: body.trim() });
+export async function createCommunityComment(client: DbClient, postId: string, authorUserId: string, body: string, stampId?: string) {
+  const { error } = await client.from("community_comments").insert({ post_id: postId, author_user_id: authorUserId, body: body.trim() || "スタンプ", stamp_id: stampId ?? null });
   if (error) throw error;
 }
 
@@ -546,6 +603,96 @@ export async function updateCommunityComment(client: DbClient, commentId: string
 
 export async function deleteCommunityComment(client: DbClient, commentId: string, authorUserId: string) {
   const { error } = await client.from("community_comments").update({ deleted_at: new Date().toISOString(), deleted_by_user_id: authorUserId }).eq("id", commentId).eq("author_user_id", authorUserId);
+  if (error) throw error;
+}
+
+export const COMMUNITY_FILE_BUCKET = "community-files";
+export const COMMUNITY_FILE_MAX_BYTES = 10 * 1024 * 1024;
+
+const communityFileMimeTypes = new Set([
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain",
+  "text/csv",
+  "application/zip",
+  "image/jpeg",
+  "image/png",
+  "image/webp"
+]);
+
+const communityFileMimeByExtension: Record<string, string> = {
+  pdf: "application/pdf",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ppt: "application/vnd.ms-powerpoint",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  txt: "text/plain",
+  csv: "text/csv",
+  zip: "application/zip",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp"
+};
+
+export async function uploadCommunityPostAttachment(client: DbClient, input: { communityId: string; postId: string; userId: string; file: File }): Promise<CommunityPostAttachment> {
+  if (input.file.size <= 0 || input.file.size > COMMUNITY_FILE_MAX_BYTES) throw new Error("添付ファイルは10MB以下にしてください。");
+  const rawExtension = input.file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+  const extension = rawExtension.slice(0, 10) || "file";
+  const mimeType = communityFileMimeTypes.has(input.file.type) ? input.file.type : communityFileMimeByExtension[extension];
+  if (!mimeType) throw new Error("このファイル形式は添付できません。PDF、Office、テキスト、ZIP、画像を選んでください。");
+  const storagePath = `${input.communityId}/${input.postId}/${input.userId}/${crypto.randomUUID()}.${extension}`;
+  const { data, error } = await client.from("community_post_attachments").insert({
+    community_id: input.communityId,
+    post_id: input.postId,
+    uploader_user_id: input.userId,
+    storage_path: storagePath,
+    file_name: input.file.name.slice(0, 255),
+    mime_type: mimeType,
+    byte_size: input.file.size
+  }).select("*").single();
+  if (error) throw error;
+
+  const { error: uploadError } = await client.storage.from(COMMUNITY_FILE_BUCKET).upload(storagePath, input.file, {
+    cacheControl: "3600",
+    contentType: mimeType,
+    upsert: false
+  });
+  if (uploadError) {
+    await client.from("community_post_attachments").delete().eq("id", data.id);
+    throw uploadError;
+  }
+  return mapAttachment(data);
+}
+
+export async function createCommunityAttachmentDownloadUrl(client: DbClient, storagePath: string) {
+  const { data, error } = await client.storage.from(COMMUNITY_FILE_BUCKET).createSignedUrl(storagePath, 60 * 10);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function createCommunityStamp(client: DbClient, input: { communityId: string; userId: string; name: string; imageUrl: string }) {
+  const { data, error } = await client.from("community_stamps").insert({
+    community_id: input.communityId,
+    created_by_user_id: input.userId,
+    name: input.name.trim(),
+    image_url: input.imageUrl,
+    sort_order: 100,
+    is_active: true
+  }).select("id").single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+export async function setCommunityStampActive(client: DbClient, stampId: string, isActive: boolean) {
+  const { error } = await client.from("community_stamps").update({ is_active: isActive }).eq("id", stampId);
   if (error) throw error;
 }
 

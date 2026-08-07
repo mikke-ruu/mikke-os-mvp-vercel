@@ -11,6 +11,7 @@ import {
   ChevronUp,
   CircleChevronRight,
   DoorOpen,
+  FileDown,
   Home,
   KeyRound,
   Library,
@@ -19,10 +20,12 @@ import {
   MessageCircle,
   MessagesSquare,
   Pencil,
+  Paperclip,
   Plus,
   Send,
   Settings,
   ShieldCheck,
+  Sticker,
   Trash2,
   UserRound,
   Users
@@ -37,9 +40,11 @@ import {
   createCommunityEvent,
   createCommunityRoom,
   createCommunityComment,
+  createCommunityAttachmentDownloadUrl,
   createCommunityResource,
   createEntitlementDefinition,
   createCommunityPost,
+  createCommunityStamp,
   deleteCommunityComment,
   deleteCommunityPost,
   grantMemberEntitlement,
@@ -51,6 +56,7 @@ import {
   restoreCommunityRoom,
   saveCommunitySettings,
   saveCommunityProfile,
+  setCommunityStampActive,
   setEventAttendance,
   updateCommunityEvent,
   updateCommunityEventStatus,
@@ -61,12 +67,14 @@ import {
   updateCommunityResource,
   updateCommunityResourceVisibility,
   updateCommunityRoom,
-  updateCommunityRoomAccess
+  updateCommunityRoomAccess,
+  uploadCommunityPostAttachment
 } from "@/lib/community/client";
 import type { CommunityDashboard, CommunityEvent, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
+import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
 
-type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
+type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
 
 type SessionUser = {
   id: string;
@@ -85,7 +93,7 @@ function buildNavigation(base: string, showOwner: boolean) {
   const bottomNavItems: MikkeShellBottomNavItem[] = [
     { label: "HOME", href: base, icon: Home },
     { label: "ROOMS", href: `${base}/rooms`, icon: MessagesSquare },
-    { label: "POST", href: `${base}/rooms?compose=1`, icon: Plus, primary: true },
+    { label: "POST", href: `${base}/post`, icon: Plus, primary: true },
     { label: "EVENTS", href: `${base}/events`, icon: CalendarDays },
     { label: "PROFILE", href: `${base}/profile`, icon: UserRound }
   ];
@@ -220,6 +228,7 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
       {view === "rooms" ? <RoomsView base={base} data={data} /> : null}
       {view === "room" ? <RoomView data={data} userId={user.id} roomId={roomId} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "post" ? <PostThreadView base={base} data={data} userId={user.id} roomId={roomId} postId={postId} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
+      {view === "compose" ? <ComposeView base={base} data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "events" ? <EventsView events={data.events} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "library" ? <LibraryView data={data} /> : null}
       {view === "profile" ? <ProfileView data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
@@ -246,6 +255,8 @@ function PublicCommunityEntry({ community, base }: { community: CommunityPublicE
       <div className="mx-auto max-w-3xl">
         <p className="text-xs font-bold uppercase text-[var(--mikke-primary)]">Community by mikke</p>
         <section className="mt-5 rounded-lg border border-[var(--mikke-line)] bg-white p-6 md:p-8">
+          {community.bannerUrl ? <img src={community.bannerUrl} alt="" className="mb-6 h-36 w-full rounded-xl object-cover sm:h-48" /> : null}
+          {community.logoUrl ? <img src={community.logoUrl} alt="" className="mb-4 h-16 w-16 rounded-xl border border-[var(--mikke-line-soft)] object-cover" /> : null}
           <p className="text-sm font-bold text-[var(--mikke-accent-strong)]">{joinLabel}</p>
           <h1 className="mt-3 text-3xl font-bold tracking-normal text-[var(--mikke-primary)] md:text-4xl">{community.name}に参加</h1>
           <p className="mt-4 text-sm leading-7 text-[var(--mikke-muted)]">{community.description ?? "このCommunityから届くお知らせや交流、イベント、資料を確認できます。"}</p>
@@ -277,6 +288,12 @@ function CommunityShell({ children, base, community, onSignOut, showOwner }: { c
       footerLabel="Community by mikke"
       sidebarFooterAction={{ label: "ログアウト", helper: "COMMUNITYから退出", icon: LogOut, onClick: onSignOut }}
     >
+      {community?.community.bannerUrl || community?.community.logoUrl ? (
+        <div className="mb-6 overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-white">
+          {community.community.bannerUrl ? <img src={community.community.bannerUrl} alt="" className="h-32 w-full object-cover sm:h-44" /> : null}
+          {community.community.logoUrl ? <div className="flex items-center gap-3 px-4 py-3"><img src={community.community.logoUrl} alt="" className="h-12 w-12 rounded-xl border border-[var(--mikke-line-soft)] bg-white object-cover" /><p className="font-bold text-[var(--mikke-primary)]">{community.community.name}</p></div> : null}
+        </div>
+      ) : null}
       {children}
     </MikkeAppShell>
   );
@@ -390,6 +407,16 @@ function roomColorBorderClass(color: CommunityRoomColor) {
   }[color];
 }
 
+function roomColorValue(color: CommunityRoomColor) {
+  return {
+    blue: "var(--mikke-blue)",
+    orange: "var(--mikke-orange)",
+    yellow: "var(--mikke-yellow)",
+    pink: "var(--mikke-pink)",
+    green: "var(--mikke-green)"
+  }[color];
+}
+
 function RoomsView({ base, data }: { base: string; data: CommunityDashboard }) {
   const visibleRooms = data.rooms.filter((room) => !room.isArchived && !room.isLocked);
   return (
@@ -397,7 +424,7 @@ function RoomsView({ base, data }: { base: string; data: CommunityDashboard }) {
       <h2 className="text-2xl font-bold tracking-normal">ROOMS</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {visibleRooms.map((room) => (
-          <Link key={room.id} href={`${base}/rooms/${room.id}`} className={`flex items-center gap-4 border-l-4 bg-white px-5 py-4 transition-colors hover:bg-[var(--mikke-surface-soft)] ${roomColorBorderClass(room.themeColor)}`}>
+          <Link key={room.id} href={`${base}/rooms/${room.id}`} style={{ background: `color-mix(in srgb, ${roomColorValue(room.themeColor)} 24%, white)` }} className={`flex items-center gap-4 border-l-[6px] px-5 py-4 transition-opacity hover:opacity-80 ${roomColorBorderClass(room.themeColor)}`}>
             <span className="min-w-0 flex-1">
             <h3 className="text-lg font-bold tracking-normal">{room.title}</h3>
             {room.description ? <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{room.description}</p> : null}
@@ -455,15 +482,19 @@ function ThreadListItem({ post, href }: { post: CommunityPost; href: string }) {
         <span className="mt-1 block truncate text-sm text-[var(--mikke-muted)]">{post.body}</span>
         <span className="mt-2 inline-flex items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]"><MessageCircle size={14} /> {commentCount}件のコメント</span>
       </span>
+      {post.imageUrl ? <img src={post.imageUrl} alt="" className="h-16 w-16 shrink-0 rounded-lg border border-[var(--mikke-line-soft)] object-cover" /> : null}
     </Link>
   );
 }
 
 function PostComposer({ data, userId, defaultRoomId, onReload, onMessage, onError }: ViewMutationProps & { defaultRoomId?: string }) {
-  const [roomId, setRoomId] = useState(defaultRoomId ?? data.rooms.find((room) => !room.isArchived)?.id ?? "");
+  const writableRooms = data.rooms.filter((room) => !room.isArchived && room.memberCanPost && !room.isLocked);
+  const [roomId, setRoomId] = useState(defaultRoomId ?? writableRooms[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [url, setUrl] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -471,11 +502,23 @@ function PostComposer({ data, userId, defaultRoomId, onReload, onMessage, onErro
     if (!roomId) return;
     setSaving(true);
     try {
-      await createCommunityPost(supabase, { communityId: data.community.id, roomId, authorUserId: userId, title, body, kind: "normal", url });
+      const image = imageFile ? await uploadMikkeMediaImage({ userId, file: imageFile, sourceApp: "community-post" }) : null;
+      const createdPostId = await createCommunityPost(supabase, { communityId: data.community.id, roomId, authorUserId: userId, title, body, kind: "normal", url, imageUrl: image?.publicUrl });
+      if (image) await syncMikkeMediaUsages({ appKey: "community", entityType: "post", entityId: createdPostId, assetIds: [image.id] });
+      let attachmentWarning = "";
+      if (attachmentFile) {
+        try {
+          await uploadCommunityPostAttachment(supabase, { communityId: data.community.id, postId: createdPostId, userId, file: attachmentFile });
+        } catch (attachmentError) {
+          attachmentWarning = communityErrorMessage(attachmentError, "投稿は作成しましたが、ファイルを添付できませんでした。");
+        }
+      }
       setTitle("");
       setBody("");
       setUrl("");
-      onMessage("投稿しました。");
+      setImageFile(null);
+      setAttachmentFile(null);
+      onMessage(attachmentWarning || "投稿しました。");
       await onReload();
     } catch (nextError) {
       onError(communityErrorMessage(nextError, "投稿に失敗しました。"));
@@ -488,13 +531,27 @@ function PostComposer({ data, userId, defaultRoomId, onReload, onMessage, onErro
     <details className="group border border-[var(--mikke-line)] bg-white">
       <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 font-bold text-[var(--mikke-primary)]"><span className="inline-flex items-center gap-2"><Plus size={17} /> 新しく投稿する</span><ChevronDown className="group-open:rotate-180" size={18} /></summary>
       <form onSubmit={submit} className="border-t border-[var(--mikke-line-soft)] p-4">
-        {!defaultRoomId ? <select value={roomId} onChange={(event) => setRoomId(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm">{data.rooms.filter((room) => !room.isArchived && room.memberCanPost && !room.isLocked).map((room) => <option key={room.id} value={room.id}>{room.title}</option>)}</select> : null}
+        {!defaultRoomId ? <select value={roomId} onChange={(event) => setRoomId(event.target.value)} className="mb-3 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm">{writableRooms.map((room) => <option key={room.id} value={room.id}>{room.title}</option>)}</select> : null}
         <input value={title} onChange={(event) => setTitle(event.target.value)} required placeholder="投稿のタイトル" className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" />
         <textarea value={body} onChange={(event) => setBody(event.target.value)} required rows={3} placeholder="話したいことを書いてください" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-6 outline-none focus:border-[var(--mikke-accent)]" />
+        <ImageFilePicker label="写真を追加（任意）" file={imageFile} onChange={setImageFile} />
+        <GenericFilePicker label="ファイルを添付（任意・10MBまで）" file={attachmentFile} onChange={setAttachmentFile} />
         <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="参考URL（任意）" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" />
         <button disabled={saving} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"><Send size={16} /> {saving ? "投稿中..." : "投稿する"}</button>
       </form>
     </details>
+  );
+}
+
+function ComposeView({ base, data, userId, onReload, onMessage, onError }: ViewMutationProps & { base: string }) {
+  const canPost = data.rooms.some((room) => !room.isArchived && !room.isLocked && room.memberCanPost);
+  return (
+    <section className="mx-auto max-w-2xl">
+      <Link href={`${base}/rooms`} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> Room一覧へ戻る</Link>
+      <h2 className="mt-5 text-2xl font-bold tracking-normal">新しい投稿</h2>
+      <p className="mt-2 text-sm text-[var(--mikke-muted)]">投稿先のRoomを選んで、写真やメッセージを共有できます。</p>
+      <div className="mt-5">{canPost ? <PostComposer data={data} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} /> : <MikkeEmptyState title="投稿できるRoomがありません" helper="運営者が投稿可能なRoomを公開すると、ここから投稿できます。" />}</div>
+    </section>
   );
 }
 
@@ -505,7 +562,7 @@ function PostThreadView({ base, data, userId, roomId, postId, onReload, onMessag
   return (
     <section className="max-w-4xl">
       <Link href={`${base}/rooms/${room.id}`} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> {room.title}へ戻る</Link>
-      <div className="mt-4"><PostCard post={post} userId={userId} canComment={room.memberCanComment} onReload={onReload} onMessage={onMessage} onError={onError} /></div>
+      <div className="mt-4"><PostCard post={post} stamps={data.stamps.filter((stamp) => stamp.isActive)} userId={userId} canComment={room.memberCanComment} onReload={onReload} onMessage={onMessage} onError={onError} /></div>
     </section>
   );
 }
@@ -515,7 +572,7 @@ function MemberAvatar({ name, avatarUrl }: { name?: string; avatarUrl?: string |
   return <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--mikke-pink)] text-sm font-bold text-[var(--mikke-primary)]">{(name ?? "M").trim().slice(0, 1).toUpperCase()}</span>;
 }
 
-function PostCard({ post, userId, canComment, onReload, onMessage, onError }: { post: CommunityPost; userId: string; canComment: boolean; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+function PostCard({ post, stamps, userId, canComment, onReload, onMessage, onError }: { post: CommunityPost; stamps: CommunityDashboard["stamps"]; userId: string; canComment: boolean; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -534,6 +591,19 @@ function PostCard({ post, userId, canComment, onReload, onMessage, onError }: { 
       await onReload();
     } catch (nextError) {
       onError(communityErrorMessage(nextError, "コメントに失敗しました。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function sendStamp(stampId: string) {
+    setSaving(true);
+    try {
+      await createCommunityComment(supabase, post.id, userId, "", stampId);
+      onMessage("スタンプを送りました。");
+      await onReload();
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "スタンプを送れませんでした。"));
     } finally {
       setSaving(false);
     }
@@ -574,16 +644,11 @@ function PostCard({ post, userId, canComment, onReload, onMessage, onError }: { 
         </div>
         {ownPost ? <div className="flex gap-1"><button type="button" onClick={() => setEditing((value) => !value)} className="p-2 text-[var(--mikke-primary)]" aria-label="投稿を編集"><Pencil size={16} /></button><button type="button" disabled={saving} onClick={removePost} className="p-2 text-[var(--mikke-danger)] disabled:opacity-50" aria-label="投稿を削除"><Trash2 size={16} /></button></div> : null}
       </div>
-      {editing ? <form onSubmit={savePost} className="mt-4 border-l-4 border-[var(--mikke-pink)] pl-4"><input required value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-bold" /><textarea required rows={5} value={body} onChange={(event) => setBody(event.target.value)} className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-7" /><input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="参考URL（任意）" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-3 flex gap-2"><button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white">保存</button><button type="button" onClick={() => setEditing(false)} className="rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold">キャンセル</button></div></form> : <><h3 className="mt-4 text-xl font-bold tracking-normal">{post.title}</h3><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{post.body}</p>{post.url ? <a href={post.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-bold text-[var(--mikke-primary)]">参考リンクを開く</a> : null}</>}
+      {editing ? <form onSubmit={savePost} className="mt-4 border-l-4 border-[var(--mikke-pink)] pl-4"><input required value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-bold" /><textarea required rows={5} value={body} onChange={(event) => setBody(event.target.value)} className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-7" /><input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="参考URL（任意）" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-3 flex gap-2"><button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white">保存</button><button type="button" onClick={() => setEditing(false)} className="rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold">キャンセル</button></div></form> : <><h3 className="mt-4 text-xl font-bold tracking-normal">{post.title}</h3>{post.imageUrl ? <img src={post.imageUrl} alt="投稿画像" className="mt-4 max-h-[520px] w-full rounded-xl border border-[var(--mikke-line-soft)] object-contain" /> : null}<p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{post.body}</p>{post.url ? <a href={post.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-bold text-[var(--mikke-primary)]">参考リンクを開く</a> : null}{(post.attachments ?? []).length > 0 ? <div className="mt-4 flex flex-wrap gap-2">{(post.attachments ?? []).map((attachment) => <AttachmentButton key={attachment.id} attachment={attachment} onError={onError} />)}</div> : null}</>}
       <div className="mt-4 border-t border-[var(--mikke-line-soft)] pt-3">
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--mikke-primary)]">Comments</p>
         <div className="mt-2 space-y-1">{(post.comments ?? []).filter((item) => !item.isHidden).map((item) => <CommentRow key={item.id} comment={item} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div>
-        {canComment ? <form onSubmit={submit} className="mt-4 flex items-end gap-2">
-          <input value={comment} onChange={(event) => setComment(event.target.value)} required placeholder="コメント" className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" />
-          <button disabled={saving} className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--mikke-primary)] text-white disabled:opacity-60" aria-label="コメント">
-            <Send size={16} />
-          </button>
-        </form> : null}
+        {canComment ? <><form onSubmit={submit} className="mt-4 flex items-end gap-2"><input value={comment} onChange={(event) => setComment(event.target.value)} required placeholder="コメント" className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" /><button disabled={saving} className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--mikke-primary)] text-white disabled:opacity-60" aria-label="コメント"><Send size={16} /></button></form>{stamps.length > 0 ? <div className="mt-3 flex gap-2 overflow-x-auto pb-2">{stamps.map((stamp) => <button key={stamp.id} type="button" disabled={saving} onClick={() => sendStamp(stamp.id)} title={stamp.name} className="shrink-0 rounded-xl border border-[var(--mikke-line)] bg-white p-2 transition hover:border-[var(--mikke-primary)] disabled:opacity-50"><img src={stamp.imageUrl} alt={stamp.name} className="h-12 w-12 object-contain" /></button>)}</div> : null}</> : null}
       </div>
     </article>
   );
@@ -596,7 +661,7 @@ function CommentRow({ comment, userId, onReload, onMessage, onError }: { comment
   const ownComment = comment.authorUserId === userId;
   async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); try { await updateCommunityComment(supabase, comment.id, userId, body); setEditing(false); onMessage("コメントを更新しました。"); await onReload(); } catch (error) { onError(communityErrorMessage(error, "コメントを更新できませんでした。")); } finally { setSaving(false); } }
   async function remove() { if (!window.confirm("このコメントを削除しますか？")) return; setSaving(true); try { await deleteCommunityComment(supabase, comment.id, userId); onMessage("コメントを削除しました。"); await onReload(); } catch (error) { onError(communityErrorMessage(error, "コメントを削除できませんでした。")); } finally { setSaving(false); } }
-  return <div className="flex gap-3 border-l-4 border-[var(--mikke-pink)] bg-[var(--mikke-surface-soft)] px-3 py-3"><MemberAvatar name={comment.profile?.displayName} avatarUrl={comment.profile?.avatarUrl} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold">{comment.profile?.displayName ?? "member"}</span><span className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(comment.createdAt)}{comment.updatedAt !== comment.createdAt ? "・編集済み" : ""}</span></div>{editing ? <form onSubmit={save} className="mt-2"><textarea required rows={2} value={body} onChange={(event) => setBody(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-2 flex gap-2"><button disabled={saving} className="text-xs font-bold text-[var(--mikke-primary)]">保存</button><button type="button" onClick={() => setEditing(false)} className="text-xs font-bold text-[var(--mikke-muted)]">キャンセル</button></div></form> : <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{comment.body}</p>}</div>{ownComment && !editing ? <div className="flex"><button type="button" onClick={() => setEditing(true)} className="p-1.5 text-[var(--mikke-primary)]" aria-label="コメントを編集"><Pencil size={14} /></button><button type="button" disabled={saving} onClick={remove} className="p-1.5 text-[var(--mikke-danger)]" aria-label="コメントを削除"><Trash2 size={14} /></button></div> : null}</div>;
+  return <div className="flex gap-3 border-l-4 border-[var(--mikke-pink)] bg-[var(--mikke-surface-soft)] px-3 py-3"><MemberAvatar name={comment.profile?.displayName} avatarUrl={comment.profile?.avatarUrl} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold">{comment.profile?.displayName ?? "member"}</span><span className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(comment.createdAt)}{comment.updatedAt !== comment.createdAt ? "・編集済み" : ""}</span></div>{comment.stamp ? <img src={comment.stamp.imageUrl} alt={comment.stamp.name} className="mt-2 h-24 w-24 object-contain" /> : editing ? <form onSubmit={save} className="mt-2"><textarea required rows={2} value={body} onChange={(event) => setBody(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-2 flex gap-2"><button disabled={saving} className="text-xs font-bold text-[var(--mikke-primary)]">保存</button><button type="button" onClick={() => setEditing(false)} className="text-xs font-bold text-[var(--mikke-muted)]">キャンセル</button></div></form> : <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{comment.body}</p>}</div>{ownComment && !editing ? <div className="flex">{!comment.stamp ? <button type="button" onClick={() => setEditing(true)} className="p-1.5 text-[var(--mikke-primary)]" aria-label="コメントを編集"><Pencil size={14} /></button> : null}<button type="button" disabled={saving} onClick={remove} className="p-1.5 text-[var(--mikke-danger)]" aria-label="コメントを削除"><Trash2 size={14} /></button></div> : null}</div>;
 }
 
 function EventsView({ events, userId, onReload, onMessage, onError }: { events: CommunityEvent[]; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
@@ -660,13 +725,17 @@ function LibraryView({ data }: { data: CommunityDashboard }) {
 function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutationProps) {
   const [displayName, setDisplayName] = useState(data.profile?.displayName ?? "");
   const [bio, setBio] = useState(data.profile?.bio ?? "");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     try {
-      await saveCommunityProfile(supabase, data.community.id, userId, displayName, bio);
+      const avatar = avatarFile ? await uploadMikkeMediaImage({ userId, file: avatarFile, sourceApp: "community-profile" }) : null;
+      await saveCommunityProfile(supabase, data.community.id, userId, displayName, bio, avatar?.publicUrl);
+      if (avatar) await syncMikkeMediaUsages({ appKey: "community", entityType: "member-profile", entityId: `${data.community.id}:${userId}`, assetIds: [avatar.id] });
+      setAvatarFile(null);
       onMessage("プロフィールを保存しました。");
       await onReload();
     } catch (nextError) {
@@ -679,6 +748,7 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
   return (
     <form onSubmit={submit} className="max-w-2xl border-t border-[var(--mikke-line)] pt-5">
       <h2 className="text-2xl font-bold tracking-normal">PROFILE</h2>
+      <div className="mt-4 flex items-center gap-4"><MemberAvatar name={displayName} avatarUrl={data.profile?.avatarUrl} /><div className="min-w-0 flex-1"><ImageFilePicker label="プロフィール画像を選ぶ" file={avatarFile} onChange={setAvatarFile} compact /></div></div>
       <label className="mt-4 block">
         <span className="text-sm font-bold">表示名</span>
         <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3 outline-none focus:border-[var(--mikke-accent)]" />
@@ -741,6 +811,9 @@ function OwnerContentView({ data, userId, ownerLike, onReload, onMessage, onErro
       <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
         <OwnerPostManager data={data} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />
         <OwnerEventManager data={data} onReload={onReload} onMessage={onMessage} onError={onError} />
+        <div className="xl:col-span-2">
+          <OwnerStampManager data={data} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />
+        </div>
         <div className="xl:col-span-2">
           <OwnerResourceManager data={data} onReload={onReload} onMessage={onMessage} onError={onError} />
         </div>
@@ -1067,6 +1140,8 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
   const [name, setName] = useState(data.community.name);
   const [description, setDescription] = useState(data.community.description ?? "");
   const [joinMode, setJoinMode] = useState(data.community.joinMode);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function claim() {
@@ -1086,7 +1161,15 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
     event.preventDefault();
     setSaving(true);
     try {
-      await saveCommunitySettings(supabase, data.community.id, { name, description, joinMode });
+      const [logo, banner] = await Promise.all([
+        logoFile ? uploadMikkeMediaImage({ userId, file: logoFile, sourceApp: "community-logo" }) : null,
+        bannerFile ? uploadMikkeMediaImage({ userId, file: bannerFile, sourceApp: "community-banner" }) : null
+      ]);
+      await saveCommunitySettings(supabase, data.community.id, { name, description, joinMode, logoUrl: logo?.publicUrl, bannerUrl: banner?.publicUrl });
+      if (logo) await syncMikkeMediaUsages({ appKey: "community", entityType: "community-logo", entityId: data.community.id, assetIds: [logo.id] });
+      if (banner) await syncMikkeMediaUsages({ appKey: "community", entityType: "community-banner", entityId: data.community.id, assetIds: [banner.id] });
+      setLogoFile(null);
+      setBannerFile(null);
       onMessage("Community設定を保存しました。");
       await onReload();
     } catch (error) {
@@ -1110,6 +1193,7 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
       <h2 className="text-2xl font-bold tracking-normal">COMMUNITY SETTINGS</h2>
       <label className="mt-4 block"><span className="text-sm font-bold">Community名</span><input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3" /></label>
       <label className="mt-4 block"><span className="text-sm font-bold">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3 leading-6" /></label>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2"><ImageFilePicker label="ブランドロゴ" file={logoFile} onChange={setLogoFile} /><ImageFilePicker label="ブランドバナー" file={bannerFile} onChange={setBannerFile} /></div>
       <label className="mt-4 block"><span className="text-sm font-bold">参加方式</span><select value={joinMode} onChange={(event) => setJoinMode(event.target.value as typeof joinMode)} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3"><option value="open_free">無料で自由参加</option><option value="invite_only">招待制</option><option value="paid">有料申込制（決済接続後）</option></select></label>
       <button disabled={saving} className="mt-5 rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{saving ? "保存中..." : "設定を保存"}</button>
     </form>
@@ -1589,6 +1673,99 @@ export function LegacyCommunityAuthRedirect() {
   return <main className="grid min-h-screen place-items-center bg-white px-5 text-sm font-semibold text-[var(--mikke-muted)]">入口へ移動しています...</main>;
 }
 
+function OwnerStampManager({ data, userId, onReload, onMessage, onError }: ViewMutationProps) {
+  const [name, setName] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!imageFile) return;
+    setSaving(true);
+    try {
+      const image = await uploadMikkeMediaImage({ userId, file: imageFile, sourceApp: "community-stamp" });
+      const stampId = await createCommunityStamp(supabase, { communityId: data.community.id, userId, name, imageUrl: image.publicUrl });
+      await syncMikkeMediaUsages({ appKey: "community", entityType: "community-stamp", entityId: stampId, assetIds: [image.id] });
+      setName("");
+      setImageFile(null);
+      onMessage("オリジナルスタンプを登録しました。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "スタンプを登録できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function toggle(stampId: string, isActive: boolean) {
+    try {
+      await setCommunityStampActive(supabase, stampId, isActive);
+      onMessage(isActive ? "スタンプを表示しました。" : "スタンプを非表示にしました。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "スタンプの表示設定を変更できませんでした。"));
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+      <div className="flex items-center gap-2"><Sticker size={19} className="text-[var(--mikke-primary)]" /><h3 className="text-base font-bold tracking-normal">オリジナルスタンプ</h3></div>
+      <p className="mt-2 text-xs leading-6 text-[var(--mikke-muted)]">運営者が登録したスタンプを、参加者がコメント欄から送れます。</p>
+      <form onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] md:items-end">
+        <label><span className="text-xs font-bold">スタンプ名</span><input required maxLength={40} value={name} onChange={(event) => setName(event.target.value)} placeholder="ありがとう" className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /></label>
+        <ImageFilePicker label="スタンプ画像" file={imageFile} onChange={setImageFile} compact />
+        <button disabled={saving || !imageFile} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">{saving ? "登録中..." : "登録"}</button>
+      </form>
+      <div className="mt-5 flex flex-wrap gap-3">
+        {data.stamps.map((stamp) => <article key={stamp.id} className={`w-28 rounded-xl border p-3 text-center ${stamp.isActive ? "border-[var(--mikke-line)]" : "border-dashed border-[var(--mikke-muted-light)] opacity-55"}`}><img src={stamp.imageUrl} alt={stamp.name} className="mx-auto h-16 w-16 object-contain" /><p className="mt-2 truncate text-xs font-bold">{stamp.name}</p><button type="button" onClick={() => toggle(stamp.id, !stamp.isActive)} className="mt-2 text-xs font-bold text-[var(--mikke-primary)]">{stamp.isActive ? "非表示" : "再表示"}</button></article>)}
+        {data.stamps.length === 0 ? <p className="text-sm text-[var(--mikke-muted)]">まだスタンプはありません。</p> : null}
+      </div>
+    </section>
+  );
+}
+
 function RoomColorSelect({ value, onChange }: { value: CommunityRoomColor; onChange: (value: CommunityRoomColor) => void }) {
-  return <label className="flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-white px-3"><span className={`h-3 w-3 shrink-0 rounded-full border-2 ${roomColorBorderClass(value)}`} /><select aria-label="Roomカラー" value={value} onChange={(event) => onChange(event.target.value as CommunityRoomColor)} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none"><option value="blue">ブルー</option><option value="orange">オレンジ</option><option value="yellow">イエロー</option><option value="pink">ピンク</option><option value="green">グリーン</option></select></label>;
+  return <label className="flex items-center gap-3 rounded-lg border border-[var(--mikke-line)] bg-white px-3"><span className="h-5 w-5 shrink-0 rounded-md border border-black/10 shadow-sm" style={{ background: roomColorValue(value) }} /><select aria-label="Roomカラー" value={value} onChange={(event) => onChange(event.target.value as CommunityRoomColor)} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none"><option value="blue">ブルー</option><option value="orange">オレンジ</option><option value="yellow">イエロー</option><option value="pink">ピンク</option><option value="green">グリーン</option></select></label>;
+}
+
+function ImageFilePicker({ label, file, onChange, compact = false }: { label: string; file: File | null; onChange: (file: File | null) => void; compact?: boolean }) {
+  return (
+    <label className={`mt-3 block rounded-lg border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] ${compact ? "px-3 py-2" : "p-3"}`}>
+      <span className="block text-xs font-bold text-[var(--mikke-primary)]">{label}</span>
+      <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => onChange(event.target.files?.[0] ?? null)} className="mt-2 block w-full text-xs text-[var(--mikke-muted)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--mikke-yellow)] file:px-3 file:py-2 file:font-bold file:text-[var(--mikke-primary)]" />
+      {file ? <span className="mt-2 block truncate text-xs text-[var(--mikke-muted)]">選択中：{file.name}</span> : null}
+    </label>
+  );
+}
+
+function GenericFilePicker({ label, file, onChange }: { label: string; file: File | null; onChange: (file: File | null) => void }) {
+  return (
+    <label className="mt-3 block rounded-lg border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+      <span className="flex items-center gap-2 text-xs font-bold text-[var(--mikke-primary)]"><Paperclip size={14} /> {label}</span>
+      <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,image/jpeg,image/png,image/webp" onChange={(event) => onChange(event.target.files?.[0] ?? null)} className="mt-2 block w-full text-xs text-[var(--mikke-muted)] file:mr-3 file:rounded-md file:border-0 file:bg-[var(--mikke-yellow)] file:px-3 file:py-2 file:font-bold file:text-[var(--mikke-primary)]" />
+      {file ? <span className="mt-2 block truncate text-xs text-[var(--mikke-muted)]">選択中：{file.name}</span> : null}
+    </label>
+  );
+}
+
+function AttachmentButton({ attachment, onError }: { attachment: NonNullable<CommunityPost["attachments"]>[number]; onError: (message: string) => void }) {
+  const [loading, setLoading] = useState(false);
+  async function download() {
+    setLoading(true);
+    try {
+      const url = await createCommunityAttachmentDownloadUrl(supabase, attachment.storagePath);
+      window.location.assign(url);
+    } catch (error) {
+      onError(communityErrorMessage(error, "添付ファイルを開けませんでした。"));
+    } finally {
+      setLoading(false);
+    }
+  }
+  return <button type="button" disabled={loading} onClick={download} className="inline-flex max-w-full items-center gap-2 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-left text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50"><FileDown size={16} className="shrink-0" /><span className="truncate">{attachment.fileName}</span><span className="shrink-0 font-normal text-[var(--mikke-muted)]">{formatFileSize(attachment.byteSize)}</span></button>;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
