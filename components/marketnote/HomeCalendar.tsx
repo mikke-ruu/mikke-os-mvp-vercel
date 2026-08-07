@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatMonthDayWeekday, toDateKey } from "@/lib/format";
 import { hasAppliedEntryStatus } from "@/lib/marketnote";
+import { defaultReminderSettings, loadReminderSettings } from "@/lib/reminders";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord } from "@/types/database";
 
 type PaymentState = "paid" | "unpaid" | "not_required";
@@ -23,8 +24,13 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  const [reminderSettings, setReminderSettings] = useState(defaultReminderSettings);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
+
+  useEffect(() => {
+    setReminderSettings(loadReminderSettings());
+  }, []);
 
   const eventsByDate = useMemo(() => {
     const map: Record<string, MarketEvent[]> = {};
@@ -36,21 +42,34 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
   }, [events]);
 
   const weeks = useMemo(() => buildMonthMatrix(visibleMonth), [visibleMonth]);
-  const upcomingEvents = useMemo(
+  const activeEvents = useMemo(
     () => events
       .filter((event) => event.status !== "completed" && event.status !== "cancelled")
       .sort((a, b) => a.event_date.localeCompare(b.event_date)),
     [events]
   );
+  const upcomingEvents = useMemo(
+    () => activeEvents.filter((event) => event.event_date >= todayKey),
+    [activeEvents, todayKey]
+  );
   const dueTasks = useMemo(() => {
+    if (!reminderSettings.enabled || !reminderSettings.targets.checkItemDue) return [];
     const tasks: Array<{ event: MarketEvent; item: MarketCheckItem; effectiveDue: string }> = [];
-    for (const event of upcomingEvents) {
+    for (const event of activeEvents) {
       for (const item of checksByEvent[event.id] ?? []) {
-        if (!item.is_done) tasks.push({ event, item, effectiveDue: item.due_date ?? event.event_date });
+        if (item.is_done) continue;
+        const effectiveDue = item.due_date ?? event.event_date;
+        const daysUntilDue = daysBetween(todayKey, effectiveDue);
+        const shouldShow = daysUntilDue < 0
+          || daysUntilDue === 0 && reminderSettings.timings.sameDay
+          || daysUntilDue === 1 && reminderSettings.timings.oneDayBefore
+          || daysUntilDue === 3 && reminderSettings.timings.threeDaysBefore
+          || daysUntilDue === 7 && reminderSettings.timings.sevenDaysBefore;
+        if (shouldShow) tasks.push({ event, item, effectiveDue });
       }
     }
     return tasks.sort((a, b) => a.effectiveDue.localeCompare(b.effectiveDue)).slice(0, 3);
-  }, [checksByEvent, upcomingEvents]);
+  }, [activeEvents, checksByEvent, reminderSettings, todayKey]);
   const unrecordedFinishedEvents = useMemo(
     () => events
       .filter((event) => event.status === "completed" && (financesByEvent[event.id]?.length ?? 0) === 0)
@@ -145,11 +164,21 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
               <h3 className="mt-1 text-sm font-bold text-[var(--mikke-text)]">やること（期限順）</h3>
               <ul className="mt-2 space-y-1.5">
                 {dueTasks.map(({ event, item, effectiveDue }) => (
-                  <li key={item.id} className="flex items-center gap-2 text-xs font-semibold text-[var(--mikke-text-soft)]">
-                    <span className={`h-3 w-3 shrink-0 rounded-full ${effectiveDue <= todayKey ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-yellow)]"}`} />
-                    <span className="min-w-0 flex-1 truncate">{item.title}</span>
-                    <span className="shrink-0 text-[var(--mikke-muted)]">{formatMonthDayWeekday(effectiveDue)}</span>
-                    <span className="sr-only">（{event.title}）</span>
+                  <li key={item.id}>
+                    <Link
+                      href={`/marketnote/${event.id}`}
+                      className="grid min-h-11 grid-cols-[12px_1fr_auto] items-center gap-2 rounded-lg px-1 text-xs font-semibold text-[var(--mikke-text-soft)] hover:bg-[var(--mikke-surface-soft)]"
+                      aria-label={`${item.title}、${event.title}を開く`}
+                    >
+                      <span className={`h-3 w-3 rounded-full ${effectiveDue <= todayKey ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-yellow)]"}`} />
+                      <span className="min-w-0">
+                        <span className="block truncate">{item.title}</span>
+                        <span className="mt-0.5 block truncate text-[10px] text-[var(--mikke-muted)]">{event.title}</span>
+                      </span>
+                      <span className={`shrink-0 ${effectiveDue < todayKey ? "font-bold text-[var(--mikke-pink)]" : "text-[var(--mikke-muted)]"}`}>
+                        {effectiveDue < todayKey ? "期限切れ " : ""}{formatMonthDayWeekday(effectiveDue)}
+                      </span>
+                    </Link>
                   </li>
                 ))}
               </ul>
@@ -244,6 +273,13 @@ function buildMonthMatrix(monthStart: Date) {
     weeks.push(week);
   }
   return weeks;
+}
+
+function daysBetween(fromDateKey: string, toDateKeyValue: string) {
+  const from = Date.parse(`${fromDateKey}T00:00:00Z`);
+  const to = Date.parse(`${toDateKeyValue}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return 0;
+  return Math.round((to - from) / 86_400_000);
 }
 
 function getPaymentState(checks: MarketCheckItem[]): PaymentState {

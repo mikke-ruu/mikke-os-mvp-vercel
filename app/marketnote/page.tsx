@@ -193,7 +193,7 @@ function CloudImportNotice({
     try {
       const result = await importGuestMarketNoteRecords(profile);
       await onImported();
-      setMessage(`${result.events}件の出店予定をクラウドへ保存しました。これからはログインした状態で続きが見られます。`);
+      setMessage(`${result.events}件の出店予定${result.photos > 0 ? `と写真${result.photos}枚` : ""}をクラウドへ保存しました。これからはログインした状態で続きが見られます。`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "クラウド保存に失敗しました。端末内の記録は残っているので、時間をおいてもう一度お試しください。");
     } finally {
@@ -283,7 +283,7 @@ function EventListCard({ summary }: { summary: EventSummary }) {
       <div className="mt-3 space-y-1.5">
         <p className="flex items-center gap-2 truncate text-sm font-semibold text-[var(--mikke-muted)]">
           <Clock3 size={15} strokeWidth={1.7} className="shrink-0 text-[var(--mikke-muted)]" />
-          <span className="truncate">{formatDate(event.event_date)} 10:00 - 17:00</span>
+          <span className="truncate">{formatEventSchedule(event)}</span>
         </p>
         <p className="flex items-center gap-2 truncate text-sm font-semibold text-[var(--mikke-muted)]">
           <MapPin size={15} strokeWidth={1.7} className="shrink-0 text-[var(--mikke-muted)]" />
@@ -350,6 +350,22 @@ function paymentLabel(payment: PaymentState) {
   if (payment === "paid") return "支払済";
   if (payment === "unpaid") return "未払い";
   return "不要";
+}
+
+function formatEventSchedule(event: MarketEvent) {
+  const note = event.private_note ?? "";
+  const startTime = matchNoteValue(note, "開始時間");
+  const endTime = matchNoteValue(note, "終了時間");
+  const time = startTime && endTime
+    ? `${startTime} - ${endTime}`
+    : startTime || endTime || "時間未設定";
+  return `${formatDate(event.event_date)} ${time}`;
+}
+
+function matchNoteValue(note: string, label: string) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const matched = note.match(new RegExp(`(?:^|\\n)${escaped}:\\s*([^\\n]+)`));
+  return matched?.[1]?.trim() || null;
 }
 
 export default function MarketNotePage() {
