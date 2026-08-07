@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Check, ChevronDown, ClipboardList, EyeOff, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, ChevronDown, ClipboardList, Eye, EyeOff, Plus, RotateCcw, Save } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";
 import {
@@ -23,17 +23,12 @@ function CheckTemplatesContent() {
     setTemplate(loadCheckTemplate());
   }, []);
 
-  const activeItems = useMemo(() => {
+  const orderedItems = useMemo(() => {
     return [...template.items]
-      .filter((item) => item.isActive)
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }, [template.items]);
 
-  const hiddenItems = useMemo(() => {
-    return [...template.items]
-      .filter((item) => !item.isActive)
-      .sort((a, b) => a.sortOrder - b.sortOrder);
-  }, [template.items]);
+  const activeItemCount = orderedItems.filter((item) => item.isActive).length;
 
   function updateItem(id: string, patch: Partial<CheckTemplateItem>) {
     setTemplate((current) => ({
@@ -43,12 +38,31 @@ function CheckTemplatesContent() {
     setMessage("");
   }
 
-  function hideItem(id: string) {
-    updateItem(id, { isActive: false });
+  function toggleVisibility(item: CheckTemplateItem) {
+    updateItem(item.id, item.isActive
+      ? { isActive: false, isInitiallySelected: false }
+      : { isActive: true });
   }
 
-  function restoreItem(id: string) {
-    updateItem(id, { isActive: true });
+  function moveItem(id: string, direction: "up" | "down") {
+    setTemplate((current) => {
+      const ordered = [...current.items].sort((a, b) => a.sortOrder - b.sortOrder);
+      const index = ordered.findIndex((item) => item.id === id);
+      const targetIndex = direction === "up" ? index - 1 : index + 1;
+      if (index < 0 || targetIndex < 0 || targetIndex >= ordered.length) return current;
+
+      const currentItem = ordered[index];
+      const targetItem = ordered[targetIndex];
+      return {
+        ...current,
+        items: current.items.map((item) => {
+          if (item.id === currentItem.id) return { ...item, sortOrder: targetItem.sortOrder };
+          if (item.id === targetItem.id) return { ...item, sortOrder: currentItem.sortOrder };
+          return item;
+        })
+      };
+    });
+    setMessage("");
   }
 
   function addItem() {
@@ -65,7 +79,8 @@ function CheckTemplatesContent() {
           isDefault: false,
           sortOrder: current.items.length + 1,
           dueRule: "event_day",
-          isActive: true
+          isActive: true,
+          isInitiallySelected: false
         }
       ]
     }));
@@ -108,7 +123,7 @@ function CheckTemplatesContent() {
                   onChange={(event) => setTemplate((current) => ({ ...current, name: event.target.value }))}
                   className="mt-2 w-full bg-transparent text-lg font-extrabold tracking-normal text-[#1f1b18] outline-none"
                 />
-                <p className="mt-1 text-xs font-bold text-[#8a817a]">項目 {activeItems.length}件</p>
+                <p className="mt-1 text-xs font-bold text-[#8a817a]">表示中 {activeItemCount}件</p>
               </div>
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#fff6f1] text-[#ff5a1f]">
                 <ClipboardList size={20} strokeWidth={1.8} />
@@ -117,8 +132,21 @@ function CheckTemplatesContent() {
           </div>
 
           <div className="space-y-2.5 p-3.5">
-            {activeItems.map((item) => (
-              <TemplateItemRow key={item.id} item={item} onChange={updateItem} onHide={hideItem} />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[11px] font-bold text-[#8a817a]">
+              <span className="inline-flex items-center gap-1"><Check size={13} className="text-[#16833b]" />最初から選ぶ</span>
+              <span className="inline-flex items-center gap-1"><Eye size={13} />追加画面に表示</span>
+            </div>
+
+            {orderedItems.map((item, index) => (
+              <TemplateItemRow
+                key={item.id}
+                item={item}
+                canMoveUp={index > 0}
+                canMoveDown={index < orderedItems.length - 1}
+                onChange={updateItem}
+                onMove={moveItem}
+                onToggleVisibility={() => toggleVisibility(item)}
+              />
             ))}
 
             <div className="grid grid-cols-[1fr_40px] gap-2 rounded-xl border border-dashed border-[#f3d0be] bg-[#fffdfb] p-2">
@@ -134,20 +162,6 @@ function CheckTemplatesContent() {
             </div>
           </div>
         </section>
-
-        {hiddenItems.length > 0 ? (
-          <section className="mt-3 rounded-2xl border border-[#eee9e4] bg-white p-3.5 shadow-[0_3px_12px_rgba(45,33,22,0.035)]">
-            <h2 className="mb-2 text-sm font-extrabold text-[#1f1b18]">非表示の項目</h2>
-            <div className="space-y-2">
-              {hiddenItems.map((item) => (
-                <button key={item.id} type="button" onClick={() => restoreItem(item.id)} className="flex w-full items-center justify-between rounded-xl bg-[#fbfaf8] px-3 py-2 text-left">
-                  <span className="text-xs font-bold text-[#6f6862]">{item.title}</span>
-                  <span className="text-xs font-extrabold text-[#f46a14]">戻す</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ) : null}
 
         <section className="mt-3 rounded-2xl border border-[#eee9e4] bg-white p-3.5 shadow-[0_3px_12px_rgba(45,33,22,0.035)]">
           <h2 className="text-sm font-extrabold text-[#1f1b18]">今後の接続</h2>
@@ -177,26 +191,44 @@ function CheckTemplatesContent() {
 
 function TemplateItemRow({
   item,
+  canMoveUp,
+  canMoveDown,
   onChange,
-  onHide
+  onMove,
+  onToggleVisibility
 }: {
   item: CheckTemplateItem;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   onChange: (id: string, patch: Partial<CheckTemplateItem>) => void;
-  onHide: (id: string) => void;
+  onMove: (id: string, direction: "up" | "down") => void;
+  onToggleVisibility: () => void;
 }) {
   return (
-    <div className="rounded-xl border border-[#eee9e4] bg-white px-2.5 py-2 shadow-[0_2px_8px_rgba(45,33,22,0.025)]">
-      <div className="grid grid-cols-[22px_1fr_32px] items-center gap-2">
-        <span className="grid h-5 w-5 place-items-center rounded-full border border-[#5fb878] bg-[#eaf8ee] text-[#16833b]">
+    <div className={`rounded-xl border border-[#eee9e4] bg-white px-2.5 py-2 shadow-[0_2px_8px_rgba(45,33,22,0.025)] ${item.isActive ? "" : "opacity-55"}`}>
+      <div className="grid grid-cols-[22px_1fr_28px_28px_32px] items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onChange(item.id, { isInitiallySelected: !item.isInitiallySelected })}
+          disabled={!item.isActive}
+          className={`grid h-5 w-5 place-items-center rounded-full border ${item.isInitiallySelected ? "border-[#5fb878] bg-[#eaf8ee] text-[#16833b]" : "border-[#cfc7c0] bg-white text-transparent"}`}
+          aria-label={item.isInitiallySelected ? "最初から選ばない" : "最初から選ぶ"}
+        >
           <Check size={12} strokeWidth={2} />
-        </span>
+        </button>
         <input
           value={item.title}
           onChange={(event) => onChange(item.id, { title: event.target.value })}
           className="min-w-0 bg-transparent text-sm font-extrabold text-[#1f1b18] outline-none"
         />
-        <button type="button" onClick={() => onHide(item.id)} className="grid h-8 w-8 place-items-center rounded-full text-[#8a817a]" aria-label="非表示">
-          {item.isDefault ? <EyeOff size={16} strokeWidth={1.7} /> : <Trash2 size={16} strokeWidth={1.7} />}
+        <button type="button" onClick={() => onMove(item.id, "up")} disabled={!canMoveUp} className="grid h-7 w-7 place-items-center rounded-full text-[#8a817a] disabled:opacity-25" aria-label="上へ">
+          <ArrowUp size={15} strokeWidth={1.7} />
+        </button>
+        <button type="button" onClick={() => onMove(item.id, "down")} disabled={!canMoveDown} className="grid h-7 w-7 place-items-center rounded-full text-[#8a817a] disabled:opacity-25" aria-label="下へ">
+          <ArrowDown size={15} strokeWidth={1.7} />
+        </button>
+        <button type="button" onClick={onToggleVisibility} className="grid h-8 w-8 place-items-center rounded-full text-[#8a817a]" aria-label={item.isActive ? "候補から非表示" : "候補に表示"}>
+          {item.isActive ? <Eye size={16} strokeWidth={1.7} /> : <EyeOff size={16} strokeWidth={1.7} />}
         </button>
       </div>
       <label className="mt-2 grid grid-cols-[76px_1fr] items-center gap-2 text-xs font-bold text-[#6f6862]">
