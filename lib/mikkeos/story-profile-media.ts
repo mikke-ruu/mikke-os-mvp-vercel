@@ -30,7 +30,7 @@ export async function uploadStoryImage(client: DbClient, userId: string, file: F
   return { storagePath, imageUrl: data.signedUrl };
 }
 
-async function signedUrl(client: DbClient, path: string) {
+export async function getStorySignedUrl(client: DbClient, path: string) {
   if (!path) return "";
   const { data, error } = await client.storage.from(storyBucket).createSignedUrl(path, 60 * 60);
   return error ? "" : data.signedUrl;
@@ -38,9 +38,9 @@ async function signedUrl(client: DbClient, path: string) {
 
 export async function hydrateStoryProfileMedia(client: DbClient, story: StoryProfileView) {
   const [avatarUrl, bannerUrl, portfolioUrls] = await Promise.all([
-    story.avatarStoragePath ? signedUrl(client, story.avatarStoragePath) : Promise.resolve(story.avatarUrl),
-    signedUrl(client, story.bannerStoragePath),
-    Promise.all(story.portfolio.map((item) => signedUrl(client, item.storagePath)))
+    story.avatarStoragePath ? getStorySignedUrl(client, story.avatarStoragePath) : Promise.resolve(story.avatarUrl),
+    getStorySignedUrl(client, story.bannerStoragePath),
+    Promise.all(story.portfolio.map((item) => getStorySignedUrl(client, item.storagePath)))
   ]);
   return {
     ...story,
