@@ -14,7 +14,14 @@ export const metadata: Metadata = {
     title: "mikke",
     statusBarStyle: "default"
   },
-  themeColor: "#f75a3b"
+  themeColor: "#f46a14",
+  icons: {
+    icon: [
+      { url: "/icons/favicon.ico", sizes: "any" },
+      { url: "/icons/favicon.png", type: "image/png", sizes: "32x32" }
+    ],
+    apple: "/icons/apple-touch-icon.png"
+  }
 };
 
 // mikkeOS共通フォント（英数=Poppins／日本語=Noto Sans JP）をアプリ全体で読み込む。
