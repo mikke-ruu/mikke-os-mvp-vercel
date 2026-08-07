@@ -302,7 +302,7 @@ function PaymentMethodRow({
 
 export default function PaymentMethodsPage() {
   return (
-    <AuthGate>
+    <AuthGate allowGuest>
       <PaymentMethodsContent />
     </AuthGate>
   );

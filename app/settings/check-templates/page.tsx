@@ -221,7 +221,7 @@ function TemplateItemRow({
 
 export default function CheckTemplatesPage() {
   return (
-    <AuthGate>
+    <AuthGate allowGuest>
       <CheckTemplatesContent />
     </AuthGate>
   );

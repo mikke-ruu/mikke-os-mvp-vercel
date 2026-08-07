@@ -22,8 +22,6 @@ const marketNoteNavItems: MikkeShellNavItem[] = [
   { label: "設定", href: "/settings", icon: Settings, section: "Settings" }
 ];
 
-const guestMarketNoteNavItems = marketNoteNavItems.filter((item) => item.href !== "/settings");
-
 const marketNoteBottomNavItems: MikkeShellBottomNavItem[] = [
   { label: "予定", href: "/marketnote", icon: CalendarDays },
   { label: "追加", href: "/marketnote/new", icon: Plus, primary: true },
@@ -31,16 +29,12 @@ const marketNoteBottomNavItems: MikkeShellBottomNavItem[] = [
   { label: "設定", href: "/settings", icon: Settings }
 ];
 
-const guestMarketNoteBottomNavItems = marketNoteBottomNavItems.filter((item) => item.href !== "/settings");
-
 const marketNoteEditItems: MikkeOwnerMenuItem[] = [
   { title: "カレンダー", href: "/marketnote", icon: CalendarDays },
   { title: "出店予定を追加", href: "/marketnote/new", icon: Plus },
   { title: "会計", href: "/marketnote/finance", icon: ReceiptText },
   { title: "MarketNote設定", href: "/settings", icon: Settings }
 ];
-
-const guestMarketNoteEditItems = marketNoteEditItems.filter((item) => item.href !== "/settings");
 
 const ownedMarketNoteApps: MikkeOwnerMenuItem[] = [
   { title: "MarketNote", href: "/marketnote", icon: WalletCards, tone: "orange" }
@@ -96,12 +90,12 @@ export function MarketNoteShell({
       theme="blue"
       primaryActionTone="orange"
       showBottomNavLabels
-      menuEditItems={isGuest ? guestMarketNoteEditItems : marketNoteEditItems}
+      menuEditItems={marketNoteEditItems}
       ownedApps={ownedMarketNoteApps}
       otherApps={isGuest ? [] : loggedInRelatedApps}
       suggestedApps={isGuest ? guestSuggestedApps : loggedInSuggestedApps}
-      navItems={isGuest ? guestMarketNoteNavItems : marketNoteNavItems}
-      bottomNavItems={isGuest ? guestMarketNoteBottomNavItems : marketNoteBottomNavItems}
+      navItems={marketNoteNavItems}
+      bottomNavItems={marketNoteBottomNavItems}
       footerLabel="MarketNote by mikke"
     >
       <InAppBrowserNotice />
