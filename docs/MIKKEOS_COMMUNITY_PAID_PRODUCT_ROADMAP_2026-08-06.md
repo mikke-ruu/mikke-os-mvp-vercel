@@ -71,3 +71,13 @@ When tenant templates are introduced, `Create a self-introduction Room` is an op
 ## Release gates
 
 Every phase is verified separately for local UI, responsive layout, TypeScript/lint, production build, applied Supabase migration, RLS with real roles, deployment, and production authenticated flow. Passing one gate is not evidence for another.
+
+## Implementation checkpoints
+
+- Phase 1 conversation foundation: committed as `2e5a093`.
+- Phase 2 tenant identity/media plus custom stamps: committed as `ab7cc9b`; production migrations applied.
+- Phase 3A Realtime CHAT foundation: implemented locally on 2026-08-07. Includes independent Room conversation mode, continuous message timeline, replies, tenant stamps, author edit/soft-delete, staff moderation, and Postgres Changes subscription. Production schema/RLS are applied, including a database guard that prevents thread posts in CHAT Rooms; real-member allow/deny tests and the webpack production build passed. Local user review is pending before commit.
+- Phase 3A Room creation fix: avoid `INSERT ... RETURNING` against the stable Room visibility helper by generating the Room UUID client-side. The exact owner insert/read sequence passed in a rolled-back production RLS test; creation errors now render beside the submit button.
+- Phase 3A chat composer: add an inline emoji picker that inserts common emoji at the current cursor position. Native keyboard and pasted Unicode emoji remain supported independently of tenant custom stamps.
+- Phase 3B reactions and unread state: implemented locally on 2026-08-07. Chat messages support six quick reactions with per-user toggles and aggregated counts. Room cards show a BLUE unread count for new posts, comments, and chat messages from other members; opening a Room updates only the signed-in member's read state. Production RLS, real-member allow/deny tests, advisors, and the webpack production build passed. Local user review is pending before commit.
+- Mentions, notification preferences, and first-visit onboarding remain later Phase 3 checkpoints.

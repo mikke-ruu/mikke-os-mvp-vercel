@@ -1,6 +1,7 @@
 export type CommunityRole = "owner" | "moderator" | "member";
 export type CommunityMembershipStatus = "active" | "suspended" | "left";
 export type CommunityRoomKind = "announcement" | "normal" | "question" | "event";
+export type CommunityConversationMode = "thread" | "chat";
 export type CommunityRoomAccessType = "free" | "entitlement" | "staff";
 export type CommunityRoomColor = "blue" | "orange" | "yellow" | "pink" | "green";
 export type CommunityPostKind = "announcement" | "normal" | "question";
@@ -74,6 +75,7 @@ export type CommunityRoom = {
   title: string;
   description: string | null;
   kind: CommunityRoomKind;
+  conversationMode: CommunityConversationMode;
   accessType: CommunityRoomAccessType;
   themeColor: CommunityRoomColor;
   requiredEntitlementKeys: string[];
@@ -82,6 +84,7 @@ export type CommunityRoom = {
   isArchived: boolean;
   memberCanPost: boolean;
   memberCanComment: boolean;
+  unreadCount: number;
 };
 
 export type CommunityPost = {
@@ -141,6 +144,30 @@ export type CommunityComment = {
   profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
 };
 
+export type CommunityChatMessage = {
+  id: string;
+  communityId: string;
+  roomId: string;
+  authorUserId: string;
+  replyToMessageId: string | null;
+  stampId: string | null;
+  body: string;
+  isHidden: boolean;
+  editedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
+  replyTo?: CommunityChatMessage | null;
+  stamp?: CommunityStamp | null;
+  reactions: CommunityChatReactionGroup[];
+};
+
+export type CommunityChatReactionGroup = {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
+};
+
 export type CommunityEvent = {
   id: string;
   communityId: string;
@@ -171,6 +198,7 @@ export type CommunityDashboard = {
   community: Community;
   membership: CommunityMembership | null;
   profile: CommunityMemberProfile | null;
+  profiles: CommunityMemberProfile[];
   entitlements: CommunityMemberEntitlement[];
   entitlementDefinitions: CommunityEntitlementDefinition[];
   ownerMembers: CommunityOwnerMember[];
