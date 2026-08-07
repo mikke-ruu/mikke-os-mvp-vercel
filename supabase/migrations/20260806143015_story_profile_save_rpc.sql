@@ -1,0 +1,153 @@
+-- Applied to mikke-os-dev as migration version 20260806143015.
+create or replace function public.story_profile_save_mine(
+  p_handle text,
+  p_display_name text,
+  p_role_label text default '',
+  p_bio text default '',
+  p_area text default '',
+  p_avatar_url text default null,
+  p_website_url text default null,
+  p_shop_url text default null,
+  p_sns_links jsonb default '[]'::jsonb,
+  p_tags text[] default '{}'::text[],
+  p_status_label text default '',
+  p_pickup_text text default '',
+  p_publication_status text default 'draft'
+)
+returns table (
+  handle text,
+  display_name text,
+  role_label text,
+  bio text,
+  area text,
+  avatar_url text,
+  avatar_storage_path text,
+  website_url text,
+  shop_url text,
+  sns_links jsonb,
+  tags text[],
+  status_label text,
+  pickup_text text,
+  publication_status text,
+  published_at timestamptz,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  caller_user_id uuid := (select auth.uid());
+  caller_profile_id uuid;
+begin
+  if caller_user_id is null then
+    raise exception 'Authentication required.' using errcode = '42501';
+  end if;
+
+  if p_publication_status not in ('draft', 'published') then
+    raise exception 'Invalid publication status.' using errcode = '22023';
+  end if;
+
+  select p.id
+  into caller_profile_id
+  from public.profiles p
+  where p.user_id = caller_user_id
+  order by p.created_at asc
+  limit 1;
+
+  if caller_profile_id is null then
+    raise exception 'Profile not found for authenticated user.' using errcode = 'P0002';
+  end if;
+
+  insert into public.story_profiles as sp (
+    owner_user_id,
+    owner_profile_id,
+    handle,
+    display_name,
+    role_label,
+    bio,
+    area,
+    avatar_url,
+    website_url,
+    shop_url,
+    sns_links,
+    tags,
+    status_label,
+    pickup_text,
+    publication_status,
+    published_at
+  )
+  values (
+    caller_user_id,
+    caller_profile_id,
+    p_handle,
+    trim(p_display_name),
+    trim(p_role_label),
+    trim(p_bio),
+    trim(p_area),
+    nullif(trim(p_avatar_url), ''),
+    nullif(trim(p_website_url), ''),
+    nullif(trim(p_shop_url), ''),
+    coalesce(p_sns_links, '[]'::jsonb),
+    coalesce(p_tags, '{}'::text[]),
+    trim(p_status_label),
+    trim(p_pickup_text),
+    p_publication_status,
+    case when p_publication_status = 'published' then now() else null end
+  )
+  on conflict (owner_profile_id) do update
+  set
+    handle = excluded.handle,
+    display_name = excluded.display_name,
+    role_label = excluded.role_label,
+    bio = excluded.bio,
+    area = excluded.area,
+    avatar_url = excluded.avatar_url,
+    website_url = excluded.website_url,
+    shop_url = excluded.shop_url,
+    sns_links = excluded.sns_links,
+    tags = excluded.tags,
+    status_label = excluded.status_label,
+    pickup_text = excluded.pickup_text,
+    publication_status = excluded.publication_status,
+    published_at = case
+      when excluded.publication_status = 'published' then coalesce(sp.published_at, now())
+      else null
+    end,
+    updated_at = now()
+  where sp.owner_user_id = caller_user_id;
+
+  return query
+  select
+    sp.handle,
+    sp.display_name,
+    sp.role_label,
+    sp.bio,
+    sp.area,
+    sp.avatar_url,
+    sp.avatar_storage_path,
+    sp.website_url,
+    sp.shop_url,
+    sp.sns_links,
+    sp.tags,
+    sp.status_label,
+    sp.pickup_text,
+    sp.publication_status,
+    sp.published_at,
+    sp.created_at,
+    sp.updated_at
+  from public.story_profiles sp
+  where sp.owner_user_id = caller_user_id
+  limit 1;
+end;
+$$;
+
+revoke all on function public.story_profile_save_mine(
+  text, text, text, text, text, text, text, text, jsonb, text[], text, text, text
+) from public, anon;
+grant execute on function public.story_profile_save_mine(
+  text, text, text, text, text, text, text, text, jsonb, text[], text, text, text
+) to authenticated, service_role;
+
+notify pgrst, 'reload schema';
