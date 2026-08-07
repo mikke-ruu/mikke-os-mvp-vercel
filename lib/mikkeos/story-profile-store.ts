@@ -89,7 +89,13 @@ const reservedStoryHandles = new Set([
 const reservedStoryPrefixes = ["admin-", "api-", "mikke-", "mikkeos-", "mikkeruu-", "official-", "system-"];
 
 export function normalizeStoryHandle(value: string) {
-  return value.trim().replace(/^@/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
+  let decoded = value;
+  try {
+    decoded = decodeURIComponent(value);
+  } catch {
+    // Keep the original value when a malformed URL escape reaches this helper.
+  }
+  return decoded.trim().replace(/^@/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
 }
 
 export function isReservedStoryHandle(handle: string) {
