@@ -5,13 +5,9 @@ import { useRouter } from "next/navigation";
 import {
   BellRing,
   ChevronRight,
-  CircleHelp,
   ClipboardCheck,
-  Database,
   ExternalLink,
-  GraduationCap,
   LogOut,
-  Settings as SettingsIcon,
   Tag,
   UserRound,
   type LucideIcon
@@ -55,24 +51,6 @@ const osItems: SettingsItem[] = [
     description: "公開プロフィール、リンク、表示内容を調整します。",
     href: "/story/edit",
     icon: UserRound
-  },
-  {
-    title: "Activity Log",
-    description: "通常ナビには出さず、必要な時だけ確認します。",
-    href: "/log",
-    icon: Database
-  },
-  {
-    title: "Apps",
-    description: "使っているアプリと、これから繋げられるアプリを確認します。",
-    href: "/apps",
-    icon: SettingsIcon
-  },
-  {
-    title: "認定講座サイト管理",
-    description: "nintei-koza-siteの問い合わせ・紹介コード・成約を管理します。",
-    href: "/nintei-koza-admin",
-    icon: GraduationCap
   }
 ];
 
@@ -121,17 +99,16 @@ function SettingsContent() {
       {!isGuest ? <SettingsSection title="共通設定" items={osItems} /> : null}
       <SettingsSection title="MarketNoteの設定" items={marketNoteItems} />
 
-      <section className="mt-4 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] shadow-sm">
-        <SettingsRow icon={CircleHelp} title="ヘルプ" description="使い方とサポート導線は後続で追加します。" />
-        {!isGuest ? <button type="button" onClick={logout} className="grid w-full grid-cols-[34px_1fr_18px] items-center gap-2 border-t border-[var(--mikke-line-soft)] px-3 py-3 text-left">
+      {!isGuest ? <section className="mt-4 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] shadow-sm">
+        <button type="button" onClick={logout} className="grid w-full grid-cols-[34px_1fr_18px] items-center gap-2 px-3 py-3 text-left">
           <span className="grid h-8 w-8 place-items-center rounded-full text-[var(--mikke-text-soft)]"><LogOut size={18} /></span>
           <span>
             <span className="block text-sm font-bold text-[var(--mikke-text)]">ログアウト</span>
             <span className="mt-0.5 block text-xs font-semibold text-[var(--mikke-muted)]">この端末からログアウトします。</span>
           </span>
           <ChevronRight size={17} className="text-[var(--mikke-muted-light)]" />
-        </button> : null}
-      </section>
+        </button>
+      </section> : null}
     </>
   );
 
