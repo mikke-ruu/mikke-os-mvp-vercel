@@ -23,6 +23,7 @@ import {
   upsertGuestEventPaymentRecord
 } from "@/lib/marketnote-guest";
 import { supabase } from "@/lib/supabase/client";
+import { importGuestMarketNotePhotos } from "@/lib/marketnote-photos";
 import type {
   ActivityLog,
   MarketCheckItem,
@@ -37,6 +38,7 @@ export type MarketNoteImportResult = {
   checks: number;
   finances: number;
   reflections: number;
+  photos: number;
 };
 
 // DBのstatus列は create経路で planned/preparing のみ許容のため、
@@ -56,7 +58,7 @@ export async function importGuestMarketNoteRecords(profile: Profile): Promise<Ma
 
   const store = readGuestMarketNoteStore();
   if (store.events.length === 0) {
-    return { events: 0, checks: 0, finances: 0, reflections: 0 };
+    return { events: 0, checks: 0, finances: 0, reflections: 0, photos: 0 };
   }
 
   const eventIdMap = new Map<string, string>();
@@ -124,13 +126,16 @@ export async function importGuestMarketNoteRecords(profile: Profile): Promise<Ma
     if (inserted) importedReflections += 1;
   }
 
+  const importedPhotos = await importGuestMarketNotePhotos(profile, eventIdMap);
+
   clearGuestMarketNoteStore();
 
   return {
     events: eventIdMap.size,
     checks: importedChecks,
     finances: importedFinances,
-    reflections: importedReflections
+    reflections: importedReflections,
+    photos: importedPhotos
   };
 }
 

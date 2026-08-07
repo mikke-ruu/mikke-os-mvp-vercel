@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -33,6 +33,13 @@ import {
   toggleCheckItem,
   updateMarketEventDetails
 } from "@/lib/marketnote";
+import {
+  addMarketNotePhoto,
+  deleteMarketNotePhoto,
+  listMarketNotePhotos,
+  maxMarketNotePhotos,
+  type MarketNotePhoto
+} from "@/lib/marketnote-photos";
 import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
@@ -70,6 +77,9 @@ function MarketDetailContent() {
   const [checks, setChecks] = useState<MarketCheckItem[]>([]);
   const [finances, setFinances] = useState<MarketFinancialRecord[]>([]);
   const [reflection, setReflection] = useState<MarketReflection | null>(null);
+  const [photos, setPhotos] = useState<MarketNotePhoto[]>([]);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -135,6 +145,20 @@ function MarketDetailContent() {
     load();
   }, [params.id, profile.id]);
 
+  useEffect(() => {
+    let active = true;
+    void listMarketNotePhotos(profile, params.id)
+      .then((nextPhotos) => {
+        if (active) setPhotos(nextPhotos);
+      })
+      .catch(() => {
+        if (active) setMessage("写真を読み込めませんでした。");
+      });
+    return () => {
+      active = false;
+    };
+  }, [params.id, profile]);
+
   const totals = useMemo(() => getTotals(finances), [finances]);
   const done = checks.filter((check) => check.is_done).length;
   const progress = checks.length ? Math.round((done / checks.length) * 100) : 0;
@@ -187,7 +211,7 @@ function MarketDetailContent() {
         publicSummary: goodPoints,
         privateNote: "",
         goodPoints,
-        nextActions: ""
+        nextActions
       });
 
       await load();
@@ -202,6 +226,43 @@ function MarketDetailContent() {
     await addCheckItem(profile, event.id, customCheck.trim());
     setCustomCheck("");
     await load();
+  }
+
+  async function addPhoto(inputEvent: ChangeEvent<HTMLInputElement>) {
+    const file = inputEvent.target.files?.[0];
+    inputEvent.target.value = "";
+    if (!file || !event || photoBusy) return;
+    if (photos.length >= maxMarketNotePhotos) {
+      setMessage(`写真は${maxMarketNotePhotos}枚まで追加できます。`);
+      return;
+    }
+
+    setPhotoBusy(true);
+    setMessage("");
+    try {
+      await addMarketNotePhoto(profile, event.id, file);
+      setPhotos(await listMarketNotePhotos(profile, event.id));
+      setMessage("写真を追加しました。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "写真を追加できませんでした。");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  async function removePhoto(photo: MarketNotePhoto) {
+    if (!event || photoBusy) return;
+    setPhotoBusy(true);
+    setMessage("");
+    try {
+      await deleteMarketNotePhoto(photo);
+      setPhotos(await listMarketNotePhotos(profile, event.id));
+      setMessage("写真を削除しました。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "写真を削除できませんでした。");
+    } finally {
+      setPhotoBusy(false);
+    }
   }
 
   async function addQuickRevenue(amount: number) {
@@ -344,16 +405,46 @@ function MarketDetailContent() {
 
           <FormCard title="振り返り" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
             <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={4} placeholder="今日の反応、気づいたこと、次回やることなど" className="w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm leading-6 outline-none focus:border-[var(--mikke-accent)]" />
+            <label className="mt-3 block text-xs font-bold text-[var(--mikke-text-soft)]">
+              次回やること
+              <textarea
+                value={nextActions}
+                onChange={(inputEvent) => setNextActions(inputEvent.target.value)}
+                rows={3}
+                placeholder="次回に改善すること、準備しておくこと"
+                className="mt-1.5 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm font-medium leading-6 outline-none focus:border-[var(--mikke-accent)]"
+              />
+            </label>
           </FormCard>
 
           <FormCard title="写真" icon={<ImageIcon size={16} strokeWidth={1.8} />}>
-            <div className="grid grid-cols-[72px_1fr] gap-3">
-              <div className="h-16 rounded-xl border border-[var(--mikke-line)] bg-[linear-gradient(135deg,var(--mikke-line),var(--mikke-accent-soft)_55%,var(--mikke-accent))]" />
-              <button type="button" className="flex h-16 items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] text-sm font-extrabold text-[var(--mikke-accent)]">
+            <input ref={photoInputRef} type="file" accept="image/*" className="sr-only" onChange={addPhoto} />
+            <div className="grid grid-cols-3 gap-2">
+              {photos.map((photo) => (
+                <div key={photo.id} className="relative aspect-square overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]">
+                  <img src={photo.imageUrl} alt="振り返り写真" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => void removePhoto(photo)}
+                    disabled={photoBusy}
+                    className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-black/60 text-white disabled:opacity-50"
+                    aria-label="写真を削除"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+              {photos.length < maxMarketNotePhotos ? <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={photoBusy}
+                className="flex aspect-square items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] text-xs font-extrabold text-[var(--mikke-accent)] disabled:opacity-50"
+              >
                 <Camera size={16} />
-                写真を追加
-              </button>
+                {photoBusy ? "処理中" : "追加"}
+              </button> : null}
             </div>
+            <p className="mt-2 text-[11px] font-semibold text-[var(--mikke-muted)]">最大{maxMarketNotePhotos}枚。ログインなしではこの端末に保存されます。</p>
           </FormCard>
 
           {message ? <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-accent-strong)]">{message}</p> : null}
