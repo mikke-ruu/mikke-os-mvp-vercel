@@ -7,6 +7,7 @@ export type CheckTemplateItem = {
   sortOrder: number;
   dueRule: CheckDueRule;
   isActive: boolean;
+  isInitiallySelected?: boolean;
 };
 
 export type CheckTemplate = {
@@ -30,11 +31,11 @@ export const defaultCheckTemplate: CheckTemplate = {
   id: "event-prep",
   name: "出店準備テンプレート",
   items: [
-    { id: "pay-fee", title: "出店料を支払う", isDefault: true, sortOrder: 1, dueRule: "event_day", isActive: true },
-    { id: "check-booth", title: "ブース位置を確認", isDefault: true, sortOrder: 2, dueRule: "previous_day", isActive: true },
-    { id: "prepare-items", title: "持ち物を準備", isDefault: true, sortOrder: 3, dueRule: "previous_day", isActive: true },
-    { id: "check-loadin", title: "搬入時間を確認", isDefault: true, sortOrder: 4, dueRule: "previous_day", isActive: true },
-    { id: "post-notice", title: "告知文を投稿", isDefault: true, sortOrder: 5, dueRule: "three_days_before", isActive: true }
+    { id: "pay-fee", title: "出店料を支払う", isDefault: true, sortOrder: 1, dueRule: "event_day", isActive: true, isInitiallySelected: false },
+    { id: "check-booth", title: "ブース位置を確認", isDefault: true, sortOrder: 2, dueRule: "previous_day", isActive: true, isInitiallySelected: true },
+    { id: "prepare-items", title: "持ち物を準備", isDefault: true, sortOrder: 3, dueRule: "previous_day", isActive: true, isInitiallySelected: true },
+    { id: "check-loadin", title: "搬入時間を確認", isDefault: true, sortOrder: 4, dueRule: "previous_day", isActive: true, isInitiallySelected: true },
+    { id: "post-notice", title: "告知文を投稿", isDefault: true, sortOrder: 5, dueRule: "three_days_before", isActive: true, isInitiallySelected: false }
   ]
 };
 
@@ -51,7 +52,15 @@ export function loadCheckTemplate() {
   try {
     const parsed = JSON.parse(raw) as CheckTemplate;
     if (!parsed?.items?.length) return defaultCheckTemplate;
-    return parsed;
+    return {
+      ...parsed,
+      items: parsed.items.map((item) => ({
+        ...item,
+        isInitiallySelected: typeof item.isInitiallySelected === "boolean"
+          ? item.isInitiallySelected
+          : ["check-booth", "prepare-items", "check-loadin"].includes(item.id)
+      }))
+    };
   } catch {
     return defaultCheckTemplate;
   }
@@ -73,6 +82,10 @@ export function getActiveCheckItems(template: CheckTemplate) {
   return [...template.items]
     .filter((item) => item.isActive && item.title.trim())
     .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export function getInitiallySelectedCheckItems(template: CheckTemplate) {
+  return getActiveCheckItems(template).filter((item) => item.isInitiallySelected);
 }
 
 // custom/none には確定した期日ルールがないため null を返す。

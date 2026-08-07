@@ -14,7 +14,6 @@ import {
   Settings as SettingsIcon,
   Tag,
   UserRound,
-  WalletCards,
   type LucideIcon
 } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
@@ -37,16 +36,10 @@ const marketNoteItems: SettingsItem[] = [
     icon: ClipboardCheck
   },
   {
-    title: "収支カテゴリ",
+    title: "収支項目",
     description: "売上・経費の分類を管理します。",
     href: "/settings/finance-categories",
     icon: Tag
-  },
-  {
-    title: "支払い方法",
-    description: "現金、QR、カード、振込などを管理します。",
-    href: "/settings/payment-methods",
-    icon: WalletCards
   },
   {
     title: "通知 / リマインダー",

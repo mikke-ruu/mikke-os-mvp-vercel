@@ -18,14 +18,21 @@ import {
 } from "lucide-react";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
-import { getActiveCheckItems, loadCheckTemplate, resolveDueDate } from "@/lib/check-templates";
+import { getActiveCheckItems, getInitiallySelectedCheckItems, loadCheckTemplate, resolveDueDate } from "@/lib/check-templates";
+import { toDateKey } from "@/lib/format";
 import { addCheckItem, addFinancialRecord, createMarketEvent, toggleCheckItem } from "@/lib/marketnote";
-import { defaultPaymentMethodSettings, getPaymentMethodNames, loadPaymentMethodSettings } from "@/lib/payment-methods";
+import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import type { MarketEvent } from "@/types/database";
 
 type EntryStatus = "planned" | "applied" | "preparing";
 type PaymentStatus = "unpaid" | "paid" | "not_required";
 type PaymentMethod = string;
+type PaymentEntry = {
+  id: string;
+  status: PaymentStatus;
+  method: PaymentMethod;
+  amount: string;
+};
 
 const statusOptions: Array<{ label: string; value: EntryStatus }> = [
   { label: "検討中", value: "planned" },
@@ -38,8 +45,6 @@ const paymentStatusOptions: Array<{ label: string; value: PaymentStatus }> = [
   { label: "支払済", value: "paid" },
   { label: "不要", value: "not_required" }
 ];
-
-const defaultPaymentMethodNames = getPaymentMethodNames(defaultPaymentMethodSettings);
 
 function NewMarketEventContent() {
   const router = useRouter();
@@ -55,10 +60,9 @@ function NewMarketEventContent() {
   const [packUpTime, setPackUpTime] = useState("");
   const [venueName, setVenueName] = useState("");
   const [address, setAddress] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("unpaid");
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("現金");
-  const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>(defaultPaymentMethodNames);
-  const [paymentAmount, setPaymentAmount] = useState("");
+  const [payments, setPayments] = useState<PaymentEntry[]>([
+    { id: "payment-1", status: "unpaid", method: "現金", amount: "" }
+  ]);
   const [memo, setMemo] = useState("");
   const [templateChecks, setTemplateChecks] = useState<string[]>([]);
   const [templateDueRules, setTemplateDueRules] = useState<Record<string, string>>({});
@@ -71,17 +75,15 @@ function NewMarketEventContent() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const initialStartDate = new URLSearchParams(window.location.search).get("startDate");
-    if (initialStartDate) {
-      setStartDate(initialStartDate);
-      setEndDate(initialStartDate);
-    }
+    const initialStartDate = new URLSearchParams(window.location.search).get("startDate") || toDateKey(new Date());
+    setStartDate(initialStartDate);
+    setEndDate(initialStartDate);
 
-    const activeTemplateItems = getActiveCheckItems(loadCheckTemplate());
+    const template = loadCheckTemplate();
+    const activeTemplateItems = getActiveCheckItems(template);
     setTemplateChecks(activeTemplateItems.map((item) => item.title));
     setTemplateDueRules(Object.fromEntries(activeTemplateItems.map((item) => [item.title, item.dueRule])));
-    setSelectedChecks(activeTemplateItems.map((item) => item.title));
-    setPaymentMethodOptions(getPaymentMethodNames(loadPaymentMethodSettings()));
+    setSelectedChecks(getInitiallySelectedCheckItems(template).map((item) => item.title));
   }, []);
 
   const normalizedEndDate = multiDay ? (endDate || startDate) : startDate;
@@ -97,11 +99,11 @@ function NewMarketEventContent() {
       endTime ? `終了時間: ${endTime}` : "",
       meetTime ? `集合時間: ${meetTime}` : "",
       packUpTime ? `撤収時間: ${packUpTime}` : "",
-      paymentStatus !== "not_required"
-        ? `支払い: ${paymentLabel(paymentStatus)} / ${paymentMethod} / ${paymentAmount || 0}円`
-        : "支払い: 不要"
+      ...payments.map((payment) => payment.status !== "not_required"
+        ? `支払い: ${paymentLabel(payment.status)} / ${payment.method} / ${payment.amount || 0}円`
+        : "支払い: 不要")
     ].filter(Boolean).join("\n");
-  }, [endTime, meetTime, multiDay, normalizedEndDate, packUpTime, paymentAmount, paymentMethod, paymentStatus, startDate, startTime, status]);
+  }, [endTime, meetTime, multiDay, normalizedEndDate, packUpTime, payments, startDate, startTime, status]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -138,26 +140,39 @@ function NewMarketEventContent() {
   }
 
   async function savePayment(created: MarketEvent) {
-    if (paymentStatus === "not_required") return;
+    const requiredPayments = payments.filter((payment) => payment.status !== "not_required");
+    if (requiredPayments.length === 0) return;
 
     const paymentCheck = await addCheckItem(profile, created.id, "支払い済み");
-    if (paymentStatus === "paid") {
+    if (requiredPayments.every((payment) => payment.status === "paid")) {
       await toggleCheckItem(profile, paymentCheck, true);
     }
 
-    const amount = Number(paymentAmount || 0);
-    if (amount > 0) {
-      await addFinancialRecord(profile, {
+    await Promise.all(requiredPayments.map((payment) => {
+      const amount = Number(payment.amount || 0);
+      if (amount <= 0) return Promise.resolve(null);
+      return addFinancialRecord(profile, {
         marketEventId: created.id,
         recordType: "expense",
         title: "出店料",
         amount,
         occurredAt: startDate,
         category: "出店料",
-        memo: paymentMethod,
-        paymentStatus
+        memo: payment.method,
+        paymentStatus: payment.status
       });
-    }
+    }));
+  }
+
+  function updatePayment(id: string, patch: Partial<Omit<PaymentEntry, "id">>) {
+    setPayments((current) => current.map((payment) => payment.id === id ? { ...payment, ...patch } : payment));
+  }
+
+  function addPayment() {
+    setPayments((current) => [
+      ...current,
+      { id: `payment-${Date.now()}`, status: "unpaid", method: fixedPaymentMethodNames[0] ?? "現金", amount: "" }
+    ]);
   }
 
   async function saveChecks(created: MarketEvent) {
@@ -301,20 +316,36 @@ function NewMarketEventContent() {
           </AccordionCard>
 
           <FormCard title="支払い情報" tone="orange" icon={<WalletCards size={16} />}>
-            <div className="grid grid-cols-2 gap-2 min-[360px]:grid-cols-[1fr_1fr_0.95fr]">
-              <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentStatus === "paid" ? "green" : paymentStatus === "unpaid" ? "orange" : "gray"} />
-              <SelectBox value={paymentMethod} onChange={setPaymentMethod} options={getPaymentMethodOptions(paymentMethodOptions, paymentMethod)} tone="gray" />
-              <div className="col-span-2 min-[360px]:col-span-1">
-                <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
-              </div>
+            <p className="text-xs font-bold text-[var(--mikke-muted)]">出店料</p>
+            <div className="space-y-2.5">
+              {payments.map((payment, index) => (
+                <div key={payment.id} className="rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-2.5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[var(--mikke-muted)]">支払い {index + 1}</span>
+                    {payments.length > 1 ? (
+                      <button type="button" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))} className="grid h-7 w-7 place-items-center rounded-full text-[var(--mikke-muted)]" aria-label={`支払い ${index + 1} を削除`}>
+                        <X size={15} />
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 min-[360px]:grid-cols-[1fr_1fr_0.95fr]">
+                    <SelectBox value={payment.status} onChange={(value) => updatePayment(payment.id, { status: value as PaymentStatus })} options={paymentStatusOptions} tone={payment.status === "paid" ? "green" : payment.status === "unpaid" ? "orange" : "gray"} />
+                    <SelectBox value={payment.method} onChange={(value) => updatePayment(payment.id, { method: value })} options={getPaymentMethodOptions(fixedPaymentMethodNames, payment.method)} tone="gray" />
+                    <div className="col-span-2 min-[360px]:col-span-1">
+                      <MoneyInput value={payment.amount} onChange={(value) => updatePayment(payment.id, { amount: value })} />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div
-              className="mt-2.5 flex w-full select-none items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted-light)]"
-              aria-hidden="true"
+            <button
+              type="button"
+              onClick={addPayment}
+              className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-3 py-2 text-xs font-bold text-[var(--mikke-accent)]"
             >
               <Plus size={14} strokeWidth={1.7} />
               支払い追加
-            </div>
+            </button>
           </FormCard>
 
           <FormCard title="メモ" tone="pink" icon={<FileText size={16} />}>
@@ -363,6 +394,9 @@ function NewMarketEventContent() {
                 <Plus size={17} />
               </button>
             </div>
+            <Link href="/settings/check-templates" className="inline-flex min-h-10 items-center text-xs font-extrabold text-[var(--mikke-blue)]">
+              チェック項目設定
+            </Link>
           </AccordionCard>
 
           {error ? <p className="rounded-xl bg-[var(--mikke-pink)] px-4 py-3 text-sm font-bold text-[var(--mikke-text)]">{error}</p> : null}

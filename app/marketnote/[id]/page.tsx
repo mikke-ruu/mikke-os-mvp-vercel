@@ -26,13 +26,14 @@ import { AuthGate, useAuth } from "@/components/AuthGate";
 import { formatDate, formatMonthDay, formatYen } from "@/lib/format";
 import {
   addCheckItem,
+  addFinancialRecord,
   getMarketEventBundle,
   saveEventPaymentRecord,
   saveReflection,
   toggleCheckItem,
   updateMarketEventDetails
 } from "@/lib/marketnote";
-import { defaultPaymentMethodSettings, getPaymentMethodNames, loadPaymentMethodSettings } from "@/lib/payment-methods";
+import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
 type PaymentStatus = "unpaid" | "paid" | "not_required";
@@ -61,8 +62,6 @@ const paymentStatusOptions: Array<{ label: string; value: PaymentStatus }> = [
   { label: "不要", value: "not_required" }
 ];
 
-const defaultPaymentMethodNames = getPaymentMethodNames(defaultPaymentMethodSettings);
-
 function MarketDetailContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -85,7 +84,6 @@ function MarketDetailContent() {
   const [address, setAddress] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("not_required");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("現金");
-  const [paymentMethodOptions, setPaymentMethodOptions] = useState<string[]>(defaultPaymentMethodNames);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [memo, setMemo] = useState("");
   const [customCheck, setCustomCheck] = useState("");
@@ -134,7 +132,6 @@ function MarketDetailContent() {
   }
 
   useEffect(() => {
-    setPaymentMethodOptions(getPaymentMethodNames(loadPaymentMethodSettings()));
     load();
   }, [params.id, profile.id]);
 
@@ -207,6 +204,22 @@ function MarketDetailContent() {
     await load();
   }
 
+  async function addQuickRevenue(amount: number) {
+    if (!event || amount <= 0) return;
+    await addFinancialRecord(profile, {
+      marketEventId: event.id,
+      recordType: "revenue",
+      title: "売上",
+      amount,
+      occurredAt: eventDate,
+      category: "売上",
+      memo: "",
+      paymentStatus: "paid"
+    });
+    await load();
+    setMessage("売上を追加しました");
+  }
+
   if (!event) {
     return (
       <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest}>
@@ -216,7 +229,7 @@ function MarketDetailContent() {
   }
 
   return (
-    <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest}>
+    <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest} addHref={`/marketnote/new?startDate=${eventDate}`}>
       <form onSubmit={submit} className="pb-5">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button type="button" onClick={() => router.back()} className="grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-text)]" aria-label="戻る">
@@ -291,7 +304,7 @@ function MarketDetailContent() {
             <SectionLabel>支払い情報</SectionLabel>
             <div className="grid grid-cols-[1fr_1fr_0.95fr] gap-2">
               <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentTone(paymentStatus)} />
-              <SelectBox value={paymentMethod} onChange={setPaymentMethod} options={getPaymentMethodOptions(paymentMethodOptions, paymentMethod)} tone="gray" />
+              <SelectBox value={paymentMethod} onChange={setPaymentMethod} options={getPaymentMethodOptions(fixedPaymentMethodNames, paymentMethod)} tone="gray" />
               <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
             </div>
             <p className="text-[11px] font-bold leading-5 text-[var(--mikke-muted-light)]">支払い情報の変更は、下部の「変更を保存」で収支に反映されます。</p>
@@ -327,7 +340,7 @@ function MarketDetailContent() {
             </div>
           </CollapsibleCard>
 
-          <FinanceMemo eventId={event.id} totals={totals} />
+          <FinanceMemo eventId={event.id} totals={totals} onAddRevenue={addQuickRevenue} />
 
           <FormCard title="振り返り" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
             <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={4} placeholder="今日の反応、気づいたこと、次回やることなど" className="w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm leading-6 outline-none focus:border-[var(--mikke-accent)]" />
@@ -471,7 +484,30 @@ function SummaryCard({
   );
 }
 
-function FinanceMemo({ eventId, totals }: { eventId: string; totals: { revenue: number; expense: number; profit: number } }) {
+function FinanceMemo({
+  eventId,
+  totals,
+  onAddRevenue
+}: {
+  eventId: string;
+  totals: { revenue: number; expense: number; profit: number };
+  onAddRevenue: (amount: number) => Promise<void>;
+}) {
+  const [revenueAmount, setRevenueAmount] = useState("");
+  const [savingRevenue, setSavingRevenue] = useState(false);
+
+  async function submitRevenue() {
+    const amount = Number(revenueAmount || 0);
+    if (amount <= 0 || savingRevenue) return;
+    setSavingRevenue(true);
+    try {
+      await onAddRevenue(amount);
+      setRevenueAmount("");
+    } finally {
+      setSavingRevenue(false);
+    }
+  }
+
   return (
     <FormCard title="収支メモ" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
       <div className="grid grid-cols-[1fr_1px_1fr_1px_1fr] items-center">
@@ -481,7 +517,25 @@ function FinanceMemo({ eventId, totals }: { eventId: string; totals: { revenue: 
         <span className="h-9 bg-[var(--mikke-line)]" />
         <MoneyCell label="利益" value={totals.profit} profit />
       </div>
-      <Link href={`/marketnote/finance?eventId=${eventId}`} className="block text-right text-xs font-extrabold text-[var(--mikke-success)]">収支を詳しく見る →</Link>
+      <div className="grid grid-cols-[1fr_auto] gap-2 border-t border-[var(--mikke-line-soft)] pt-3">
+        <div className="grid h-11 grid-cols-[28px_1fr] overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)]">
+          <span className="grid place-items-center text-xs font-bold text-[var(--mikke-muted)]">¥</span>
+          <input
+            value={revenueAmount}
+            onChange={(inputEvent) => setRevenueAmount(inputEvent.target.value.replace(/\D/g, ""))}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            placeholder="売上を入力"
+            aria-label="売上金額"
+            className="min-w-0 bg-[var(--mikke-surface)] pr-2 text-right text-sm font-extrabold text-[var(--mikke-text)] outline-none"
+          />
+        </div>
+        <button type="button" onClick={submitRevenue} disabled={Number(revenueAmount || 0) <= 0 || savingRevenue} className="min-h-11 rounded-xl bg-[var(--mikke-success)] px-4 text-xs font-extrabold text-white disabled:opacity-40">
+          {savingRevenue ? "追加中" : "売上追加"}
+        </button>
+      </div>
+      <Link href={`/marketnote/finance?eventId=${eventId}`} className="block min-h-10 pt-2 text-right text-xs font-extrabold text-[var(--mikke-success)]">収支を追加する →</Link>
     </FormCard>
   );
 }

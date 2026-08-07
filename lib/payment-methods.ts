@@ -12,10 +12,10 @@ export type PaymentMethodSettings = {
 };
 
 const storageKey = "mikke-marketnote-payment-methods-v1";
-const defaults = ["現金", "QR", "カード", "ポイント", "振込", "その他"];
+export const fixedPaymentMethodNames = ["現金", "QR", "カード", "ポイント", "振込", "その他"];
 
 export const defaultPaymentMethodSettings: PaymentMethodSettings = {
-  items: defaults.map((name, index) => ({
+  items: fixedPaymentMethodNames.map((name, index) => ({
     id: `payment-${index + 1}`,
     name,
     isDefault: true,

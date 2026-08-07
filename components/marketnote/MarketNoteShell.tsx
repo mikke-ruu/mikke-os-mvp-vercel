@@ -74,13 +74,19 @@ export function MarketNoteShell({
   title = "MarketNote",
   subtitle = "Events and finance",
   isGuest = false,
+  addHref = "/marketnote/new",
   children
 }: {
   title?: string;
   subtitle?: string;
   isGuest?: boolean;
+  addHref?: string;
   children: React.ReactNode;
 }) {
+  const contextualBottomNavItems = marketNoteBottomNavItems.map((item) => (
+    item.primary ? { ...item, href: addHref } : item
+  ));
+
   return (
     <MikkeAppShell
       appName="MarketNote"
@@ -95,7 +101,7 @@ export function MarketNoteShell({
       otherApps={isGuest ? [] : loggedInRelatedApps}
       suggestedApps={isGuest ? guestSuggestedApps : loggedInSuggestedApps}
       navItems={marketNoteNavItems}
-      bottomNavItems={marketNoteBottomNavItems}
+      bottomNavItems={contextualBottomNavItems}
       footerLabel="MarketNote by mikke"
     >
       <InAppBrowserNotice />

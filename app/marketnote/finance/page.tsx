@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ChevronDown,
   ChevronLeft,
@@ -46,6 +47,7 @@ type EventFinanceRow = {
 };
 
 function MarketFinanceContent() {
+  const router = useRouter();
   const { profile, isGuest } = useAuth();
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [records, setRecords] = useState<MarketFinancialRecord[]>([]);
@@ -196,7 +198,9 @@ function MarketFinanceContent() {
 
         <header className="mb-4 pt-2">
           <div className="grid grid-cols-[40px_1fr_40px] items-center">
-            <span className="h-10 w-10" aria-hidden="true" />
+            <button type="button" onClick={() => router.back()} className="grid h-10 w-10 place-items-center rounded-full text-[var(--mikke-text)]" aria-label="戻る">
+              <ChevronLeft size={24} strokeWidth={1.7} />
+            </button>
             <h1 className="text-center text-[28px] font-semibold tracking-normal text-[var(--mikke-text)]">収支</h1>
             <span className="h-10 w-10" aria-hidden="true" />
           </div>
@@ -390,7 +394,7 @@ function FinanceDraftSection({
     <div className="mt-3">
       <div className="mb-1.5 flex items-center justify-between">
         <h5 className="text-xs font-extrabold text-[var(--mikke-text-soft)]">{title}</h5>
-        <span className="text-[10px] font-bold text-[var(--mikke-muted-light)]">カテゴリは設定で編集できます</span>
+        <span className="text-[10px] font-bold text-[var(--mikke-muted-light)]">項目は設定で編集できます</span>
       </div>
       <div className="space-y-1.5">
         {drafts.map((draft) => (
@@ -400,7 +404,7 @@ function FinanceDraftSection({
                 <input
                   value={draft.title}
                   onChange={(inputEvent) => onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value })}
-                  placeholder="カテゴリ名を入力"
+                  placeholder="項目名を入力"
                   autoFocus
                   className="h-8 w-full min-w-0 rounded-lg bg-[var(--mikke-surface-soft)] px-2 text-xs font-bold text-[var(--mikke-text)] outline-none"
                 />

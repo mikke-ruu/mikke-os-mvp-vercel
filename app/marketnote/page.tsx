@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clock3, Edit3, MapPin, Plus } from "lucide-react";
+import { Clock3, Edit3, MapPin, X } from "lucide-react";
 import { HomeCalendar } from "@/components/marketnote/HomeCalendar";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
@@ -14,10 +14,9 @@ import {
   importGuestMarketNoteRecords,
   listCheckItems,
   listFinancialRecords,
-  listMarketEvents,
-  listReflections
+  listMarketEvents
 } from "@/lib/marketnote";
-import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
+import type { MarketCheckItem, MarketEvent, MarketFinancialRecord } from "@/types/database";
 
 type HomeTab = "calendar" | "list";
 type ListTab = "confirmed" | "all";
@@ -34,15 +33,13 @@ function MarketNoteContent() {
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [checksByEvent, setChecksByEvent] = useState<Record<string, MarketCheckItem[]>>({});
   const [financesByEvent, setFinancesByEvent] = useState<Record<string, MarketFinancialRecord[]>>({});
-  const [reflectionsByEvent, setReflectionsByEvent] = useState<Record<string, MarketReflection | undefined>>({});
   const [activeTab, setActiveTab] = useState<ListTab>("confirmed");
   const [guestStats, setGuestStats] = useState<GuestImportStats | null>(null);
 
   const loadMarketNoteData = useCallback(async () => {
-    const [nextEvents, allFinances, allReflections] = await Promise.all([
+    const [nextEvents, allFinances] = await Promise.all([
       listMarketEvents(profile.id),
-      listFinancialRecords(profile.id),
-      listReflections(profile.id)
+      listFinancialRecords(profile.id)
     ]);
     const checkPairs = await Promise.all(
       nextEvents.map(async (event) => [event.id, await listCheckItems(profile.id, event.id)] as const)
@@ -51,7 +48,6 @@ function MarketNoteContent() {
     setEvents(nextEvents);
     setChecksByEvent(Object.fromEntries(checkPairs));
     setFinancesByEvent(groupByEventId(allFinances));
-    setReflectionsByEvent(Object.fromEntries(allReflections.map((reflection) => [reflection.market_event_id, reflection])));
     setGuestStats(getGuestMarketNoteImportStats());
   }, [profile.id]);
 
@@ -91,7 +87,7 @@ function MarketNoteContent() {
           <CloudImportNotice stats={guestStats} profile={profile} onImported={loadMarketNoteData} />
         ) : null}
 
-        <div className="mb-4 flex items-center justify-between gap-2 px-1">
+        <div className="mb-4 px-1">
           <div className="inline-flex rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-1">
             <SegmentButton active={homeTab === "calendar"} onClick={() => setHomeTab("calendar")}>
               カレンダー
@@ -100,10 +96,6 @@ function MarketNoteContent() {
               一覧
             </SegmentButton>
           </div>
-          <Link href="/marketnote/new" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-[var(--mikke-orange)] px-3.5 text-xs font-bold text-white">
-            <Plus size={15} strokeWidth={1.8} />
-            追加
-          </Link>
         </div>
 
         {homeTab === "calendar" ? (
@@ -111,7 +103,6 @@ function MarketNoteContent() {
             events={events}
             checksByEvent={checksByEvent}
             financesByEvent={financesByEvent}
-            reflectionsByEvent={reflectionsByEvent}
           />
         ) : (
           <div>
@@ -147,9 +138,35 @@ function MarketNoteContent() {
 }
 
 function GuestNotice() {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    try {
+      const dismissedAt = Number(localStorage.getItem("mikke-marketnote-login-notice-dismissed-at") ?? "0");
+      const oneWeek = 7 * 24 * 60 * 60 * 1000;
+      setVisible(!dismissedAt || Date.now() - dismissedAt >= oneWeek);
+    } catch {
+      setVisible(true);
+    }
+  }, []);
+
+  function dismiss() {
+    try {
+      localStorage.setItem("mikke-marketnote-login-notice-dismissed-at", String(Date.now()));
+    } catch {
+      // Storage unavailable: hide for the current page view only.
+    }
+    setVisible(false);
+  }
+
+  if (!visible) return null;
+
   return (
-    <div className="mb-4 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
-      ログインなしですぐ使えます。記録はこのブラウザに保存され、同じアイコン・同じブラウザから続きが見られます。
+    <div className="relative mb-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2.5 pr-11 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
+      <button type="button" onClick={dismiss} aria-label="案内を閉じる" className="absolute right-1.5 top-1.5 grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-muted)]">
+        <X size={17} />
+      </button>
+      ログインせずに使えます。記録はこのブラウザに保存されます。
       <Link href="/login?next=/marketnote" className="ml-2 text-[var(--mikke-blue)] underline underline-offset-2">
         ログインしてクラウド保存
       </Link>
