@@ -199,7 +199,7 @@ function NewMarketEventContent() {
 
   return (
     <MarketNoteShell title="出店予定を追加" subtitle="MarketNote" isGuest={isGuest} hideBottomNav>
-      <form onSubmit={submit} className="pb-5">
+      <form onSubmit={submit} className="pb-28">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button
             type="button"
@@ -289,7 +289,7 @@ function NewMarketEventContent() {
           </FormCard>
 
           <AccordionCard title="日時（任意）" tone="yellow" icon={<Clock3 size={16} />} open={timeOpen} onToggle={() => setTimeOpen((value) => !value)}>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
               <Field label="開始時間" compact>
                 <TextInput value={startTime} onChange={setStartTime} type="time" />
               </Field>
@@ -355,7 +355,7 @@ function NewMarketEventContent() {
               onChange={(event) => setMemo(event.target.value)}
               rows={4}
               placeholder="電源使用予定、搬入時間、主催者からの連絡など"
-              className="w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm leading-6 text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)]"
+              className="scroll-mb-28 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-base leading-6 text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)] sm:text-sm"
             />
           </FormCard>
 
@@ -540,7 +540,7 @@ function TextInput({
         type={type}
         required={required}
         placeholder={placeholder}
-        className="h-10 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 pr-9 text-sm font-semibold text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)]"
+        className="scroll-mb-28 h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 pr-9 text-base font-semibold text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)] sm:h-10 sm:text-sm"
       />
       {icon ? <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--mikke-muted)]">{icon}</span> : null}
     </div>
@@ -612,7 +612,7 @@ function SelectBox({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`h-10 w-full appearance-none rounded-xl border px-3 pr-7 text-xs font-extrabold outline-none ${toneClass}`}
+        className={`scroll-mb-28 h-11 w-full appearance-none rounded-xl border px-3 pr-7 text-base font-extrabold outline-none sm:h-10 sm:text-xs ${toneClass}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
@@ -634,7 +634,7 @@ function MoneyInput({ value, onChange }: { value: string; onChange: (value: stri
         inputMode="numeric"
         pattern="[0-9]*"
         placeholder="0"
-        className="min-w-0 bg-[var(--mikke-surface)] pr-2 text-right text-sm font-extrabold text-[var(--mikke-text)] outline-none"
+        className="scroll-mb-28 min-w-0 bg-[var(--mikke-surface)] pr-2 text-right text-base font-extrabold text-[var(--mikke-text)] outline-none sm:text-sm"
       />
     </div>
   );

@@ -7,7 +7,7 @@ import { HomeCalendar } from "@/components/marketnote/HomeCalendar";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { AuthGate, useAuth } from "@/components/AuthGate";
-import { formatDate } from "@/lib/format";
+import { formatDate, toDateKey } from "@/lib/format";
 import {
   getGuestMarketNoteImportStats,
   hasAppliedEntryStatus,
@@ -19,7 +19,7 @@ import {
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord } from "@/types/database";
 
 type HomeTab = "calendar" | "list";
-type ListTab = "confirmed" | "all";
+type ListTab = "upcoming" | "past";
 type PaymentState = "paid" | "unpaid" | "not_required";
 type EventSummary = {
   event: MarketEvent;
@@ -33,7 +33,7 @@ function MarketNoteContent() {
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [checksByEvent, setChecksByEvent] = useState<Record<string, MarketCheckItem[]>>({});
   const [financesByEvent, setFinancesByEvent] = useState<Record<string, MarketFinancialRecord[]>>({});
-  const [activeTab, setActiveTab] = useState<ListTab>("confirmed");
+  const [activeTab, setActiveTab] = useState<ListTab>("upcoming");
   const [guestStats, setGuestStats] = useState<GuestImportStats | null>(null);
 
   const loadMarketNoteData = useCallback(async () => {
@@ -73,10 +73,12 @@ function MarketNoteContent() {
   }, [checksByEvent, events]);
 
   const filtered = useMemo(() => {
+    const todayKey = toDateKey(new Date());
     return summaries
-      .filter(({ event }) => event.status !== "completed" && event.status !== "cancelled")
-      .filter(({ event }) => activeTab === "all" || event.status === "preparing")
-      .sort((a, b) => a.event.event_date.localeCompare(b.event.event_date));
+      .filter(({ event }) => activeTab === "upcoming" ? event.event_date >= todayKey : event.event_date < todayKey)
+      .sort((a, b) => activeTab === "upcoming"
+        ? a.event.event_date.localeCompare(b.event.event_date)
+        : b.event.event_date.localeCompare(a.event.event_date));
   }, [activeTab, summaries]);
 
   return (
@@ -108,17 +110,19 @@ function MarketNoteContent() {
           <div>
             <div className="-mx-4 mb-4 border-b border-[var(--mikke-line)]">
               <div className="grid grid-cols-2 text-center text-sm font-bold">
-                <TabButton active={activeTab === "confirmed"} onClick={() => setActiveTab("confirmed")}>
-                  出店確定
+                <TabButton active={activeTab === "upcoming"} onClick={() => setActiveTab("upcoming")}>
+                  これから
                 </TabButton>
-                <TabButton active={activeTab === "all"} onClick={() => setActiveTab("all")}>
-                  すべて
+                <TabButton active={activeTab === "past"} onClick={() => setActiveTab("past")}>
+                  過去
                 </TabButton>
               </div>
             </div>
 
             <div className="mb-4 px-1">
-              <span className="text-sm font-semibold text-[var(--mikke-text-soft)]">日付が近い順</span>
+              <span className="text-sm font-semibold text-[var(--mikke-text-soft)]">
+                {activeTab === "upcoming" ? "今日以降・日付が近い順" : "新しい日付順"}
+              </span>
             </div>
 
             {filtered.length > 0 ? (
@@ -128,7 +132,10 @@ function MarketNoteContent() {
                 ))}
               </div>
             ) : (
-              <MikkeEmptyState title="表示できる予定がありません" helper="出店予定を追加すると、ここに日付順で表示されます。" />
+              <MikkeEmptyState
+                title={activeTab === "upcoming" ? "これからの予定はありません" : "過去の予定はありません"}
+                helper={activeTab === "upcoming" ? "出店予定を追加すると、日付が近い順に表示されます。" : "過去の予定ができると、新しい日付順に表示されます。"}
+              />
             )}
           </div>
         )}

@@ -183,6 +183,13 @@ export function toggleGuestCheckItem(itemId: string, nextValue: boolean) {
   }));
 }
 
+export function deleteGuestCheckItem(itemId: string) {
+  writeStore((store) => ({
+    ...store,
+    checks: store.checks.filter((item) => item.id !== itemId)
+  }));
+}
+
 export function listGuestFinancialRecords(marketEventId?: string) {
   return readStore().finances
     .filter((record) => !marketEventId || record.market_event_id === marketEventId)

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { formatMonthDayWeekday, toDateKey } from "@/lib/format";
 import { hasAppliedEntryStatus } from "@/lib/marketnote";
 import { defaultReminderSettings, loadReminderSettings } from "@/lib/reminders";
@@ -25,6 +25,7 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
   const [reminderSettings, setReminderSettings] = useState(defaultReminderSettings);
+  const [overdueOpen, setOverdueOpen] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
@@ -52,24 +53,33 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
     () => activeEvents.filter((event) => event.event_date >= todayKey),
     [activeEvents, todayKey]
   );
-  const dueTasks = useMemo(() => {
-    if (!reminderSettings.enabled || !reminderSettings.targets.checkItemDue) return [];
+  const taskGroups = useMemo(() => {
+    if (!reminderSettings.enabled || !reminderSettings.targets.checkItemDue) return { current: [], overdue: [] };
     const tasks: Array<{ event: MarketEvent; item: MarketCheckItem; effectiveDue: string }> = [];
     for (const event of activeEvents) {
       for (const item of checksByEvent[event.id] ?? []) {
         if (item.is_done) continue;
         const effectiveDue = item.due_date ?? event.event_date;
         const daysUntilDue = daysBetween(todayKey, effectiveDue);
-        const shouldShow = daysUntilDue < 0
-          || daysUntilDue === 0 && reminderSettings.timings.sameDay
+        const shouldShow = daysUntilDue === 0 && reminderSettings.timings.sameDay
           || daysUntilDue === 1 && reminderSettings.timings.oneDayBefore
           || daysUntilDue === 3 && reminderSettings.timings.threeDaysBefore
           || daysUntilDue === 7 && reminderSettings.timings.sevenDaysBefore;
-        if (shouldShow) tasks.push({ event, item, effectiveDue });
+        if (daysUntilDue < 0 || shouldShow) tasks.push({ event, item, effectiveDue });
       }
     }
-    return tasks.sort((a, b) => a.effectiveDue.localeCompare(b.effectiveDue)).slice(0, 3);
+    return {
+      current: tasks
+        .filter((task) => task.effectiveDue >= todayKey)
+        .sort((a, b) => a.effectiveDue.localeCompare(b.effectiveDue))
+        .slice(0, 3),
+      overdue: tasks
+        .filter((task) => task.effectiveDue < todayKey)
+        .sort((a, b) => b.effectiveDue.localeCompare(a.effectiveDue))
+    };
   }, [activeEvents, checksByEvent, reminderSettings, todayKey]);
+  const currentTasks = taskGroups.current;
+  const overdueTasks = taskGroups.overdue;
   const unrecordedFinishedEvents = useMemo(
     () => events
       .filter((event) => event.status === "completed" && (financesByEvent[event.id]?.length ?? 0) === 0)
@@ -156,32 +166,27 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
         <CalendarLegend color="var(--mikke-green)" label="完了" />
       </div>
 
-      {dueTasks.length > 0 || upcomingEvents.length > 0 || unrecordedFinishedEvents.length > 0 ? (
+      {currentTasks.length > 0 || overdueTasks.length > 0 || upcomingEvents.length > 0 || unrecordedFinishedEvents.length > 0 ? (
         <div className="mt-5 space-y-4">
-          {dueTasks.length > 0 ? (
+          {currentTasks.length > 0 || overdueTasks.length > 0 ? (
             <section className="border-t border-[var(--mikke-line)] pt-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--mikke-blue)]" style={{ fontFamily: "var(--mikke-font-display)" }}>TODO</p>
               <h3 className="mt-1 text-sm font-bold text-[var(--mikke-text)]">やること（期限順）</h3>
-              <ul className="mt-2 space-y-1.5">
-                {dueTasks.map(({ event, item, effectiveDue }) => (
-                  <li key={item.id}>
-                    <Link
-                      href={`/marketnote/${event.id}`}
-                      className="grid min-h-11 grid-cols-[12px_1fr_auto] items-center gap-2 rounded-lg px-1 text-xs font-semibold text-[var(--mikke-text-soft)] hover:bg-[var(--mikke-surface-soft)]"
-                      aria-label={`${item.title}、${event.title}を開く`}
-                    >
-                      <span className={`h-3 w-3 rounded-full ${effectiveDue <= todayKey ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-yellow)]"}`} />
-                      <span className="min-w-0">
-                        <span className="block truncate">{item.title}</span>
-                        <span className="mt-0.5 block truncate text-[10px] text-[var(--mikke-muted)]">{event.title}</span>
-                      </span>
-                      <span className={`shrink-0 ${effectiveDue < todayKey ? "font-bold text-[var(--mikke-pink)]" : "text-[var(--mikke-muted)]"}`}>
-                        {effectiveDue < todayKey ? "期限切れ " : ""}{formatMonthDayWeekday(effectiveDue)}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <TaskList tasks={currentTasks} />
+              {overdueTasks.length > 0 ? (
+                <div className="mt-2 border-t border-[var(--mikke-line-soft)] pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setOverdueOpen((current) => !current)}
+                    className="flex min-h-10 w-full items-center justify-between rounded-lg px-1 text-xs font-extrabold text-[var(--mikke-text)]"
+                    aria-expanded={overdueOpen}
+                  >
+                    <span>期限切れ {overdueTasks.length}件</span>
+                    <ChevronDown size={16} className={`transition ${overdueOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {overdueOpen ? <TaskList tasks={overdueTasks} overdue /> : null}
+                </div>
+              ) : null}
             </section>
           ) : null}
 
@@ -232,6 +237,38 @@ function CalendarCellBody({ events }: { events: MarketEvent[] }) {
       ))}
       {events.length > 2 ? <span className="block text-right text-[9px] font-bold leading-none text-[var(--mikke-muted)]">+{events.length - 2}</span> : null}
     </div>
+  );
+}
+
+function TaskList({
+  tasks,
+  overdue = false
+}: {
+  tasks: Array<{ event: MarketEvent; item: MarketCheckItem; effectiveDue: string }>;
+  overdue?: boolean;
+}) {
+  if (tasks.length === 0) return null;
+  return (
+    <ul className="mt-2 space-y-1.5">
+      {tasks.map(({ event, item, effectiveDue }) => (
+        <li key={item.id}>
+          <Link
+            href={`/marketnote/${event.id}`}
+            className={`grid min-h-11 grid-cols-[12px_1fr_auto] items-center gap-2 rounded-lg px-1 text-xs font-semibold hover:bg-[var(--mikke-surface-soft)] ${overdue ? "text-[var(--mikke-text)]" : "text-[var(--mikke-text-soft)]"}`}
+            aria-label={`${item.title}、${event.title}を開く`}
+          >
+            <span className={`h-3 w-3 rounded-full ${overdue ? "bg-[var(--mikke-pink)]" : "bg-[var(--mikke-yellow)]"}`} />
+            <span className="min-w-0">
+              <span className="block truncate">{item.title}</span>
+              <span className={`mt-0.5 block truncate text-[10px] ${overdue ? "text-[var(--mikke-text-soft)]" : "text-[var(--mikke-muted)]"}`}>{event.title}</span>
+            </span>
+            <span className={`shrink-0 ${overdue ? "font-extrabold text-[var(--mikke-accent)]" : "text-[var(--mikke-muted)]"}`}>
+              {formatMonthDayWeekday(effectiveDue)}
+            </span>
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 

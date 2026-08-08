@@ -4,6 +4,7 @@ import {
   addGuestFinancialRecord,
   clearGuestMarketNoteStore,
   createGuestMarketEvent,
+  deleteGuestCheckItem,
   deleteGuestFinancialRecord,
   getGuestMarketEvent,
   getGuestMarketEventBundle,
@@ -415,6 +416,22 @@ export async function toggleCheckItem(profile: Profile, item: MarketCheckItem, n
     visibility: "private",
     displayOnStory: false
   });
+}
+
+export async function deleteCheckItem(profile: Profile, item: MarketCheckItem) {
+  if (isMarketNoteGuestProfile(profile)) {
+    deleteGuestCheckItem(item.id);
+    return;
+  }
+
+  const { error } = await supabase
+    .from("market_check_items")
+    .delete()
+    .eq("id", item.id)
+    .eq("profile_id", profile.id)
+    .eq("market_event_id", item.market_event_id);
+
+  if (error) throw error;
 }
 
 export async function listFinancialRecords(profileId: string, marketEventId?: string) {

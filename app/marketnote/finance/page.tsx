@@ -75,9 +75,6 @@ function MarketFinanceContent() {
         setVisibleMonth(startOfMonth(parseDate(focusEvent.event_date)));
         setOpenEventId(focusId);
       }
-    } else if (!openEventId && nextEvents.length > 0) {
-      const first = [...nextEvents].sort((a, b) => a.event_date.localeCompare(b.event_date))[0];
-      if (first) setVisibleMonth(startOfMonth(parseDate(first.event_date)));
     }
   }
 
@@ -111,6 +108,12 @@ function MarketFinanceContent() {
 
   function moveMonth(diff: number) {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + diff, 1));
+    setOpenEventId(null);
+    setMessage("");
+  }
+
+  function goToCurrentMonth() {
+    setVisibleMonth(startOfMonth(new Date()));
     setOpenEventId(null);
     setMessage("");
   }
@@ -214,6 +217,11 @@ function MarketFinanceContent() {
             </h2>
             <button type="button" className="grid h-10 place-items-center rounded-full text-[var(--mikke-muted)]" onClick={() => moveMonth(1)} aria-label="次の月">
               <ChevronRight size={24} />
+            </button>
+          </div>
+          <div className="mt-2 text-center">
+            <button type="button" onClick={goToCurrentMonth} className="min-h-9 rounded-full border border-[var(--mikke-blue)] px-3 text-xs font-bold text-[var(--mikke-blue)]">
+              今月
             </button>
           </div>
         </header>
@@ -398,7 +406,7 @@ function FinanceDraftSection({
       </div>
       <div className="space-y-1.5">
         {drafts.map((draft) => (
-          <div key={draft.id} className="grid grid-cols-[1fr_96px_24px] items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-2 py-1.5">
+          <div key={draft.id} className="grid grid-cols-[1fr_24px] items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-2 py-1.5 min-[360px]:grid-cols-[1fr_96px_24px]">
             <div className="relative min-w-0">
               {customDraftIds.includes(draft.id) ? (
                 <input
@@ -406,7 +414,7 @@ function FinanceDraftSection({
                   onChange={(inputEvent) => onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value })}
                   placeholder="項目名を入力"
                   autoFocus
-                  className="h-8 w-full min-w-0 rounded-lg bg-[var(--mikke-surface-soft)] px-2 text-xs font-bold text-[var(--mikke-text)] outline-none"
+                  className="h-9 w-full min-w-0 rounded-lg bg-[var(--mikke-surface-soft)] px-2 text-base font-bold text-[var(--mikke-text)] outline-none min-[360px]:text-xs"
                 />
               ) : (
                 <>
@@ -420,7 +428,7 @@ function FinanceDraftSection({
                       }
                       onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value });
                     }}
-                    className="h-8 w-full min-w-0 appearance-none rounded-lg bg-[var(--mikke-surface-soft)] px-2 pr-7 text-xs font-bold text-[var(--mikke-text)] outline-none"
+                    className="h-9 w-full min-w-0 appearance-none rounded-lg bg-[var(--mikke-surface-soft)] px-2 pr-7 text-base font-bold text-[var(--mikke-text)] outline-none min-[360px]:text-xs"
                   >
                     {draft.title && !categoryOptions.includes(draft.title) ? <option value={draft.title} hidden>{draft.title}</option> : null}
                     {categoryOptions.map((category) => (
@@ -435,8 +443,10 @@ function FinanceDraftSection({
                 <span className="mt-0.5 inline-flex rounded-full bg-[var(--mikke-surface-soft)] px-2 py-0.5 text-[10px] font-bold leading-none text-[var(--mikke-muted-light)]">支払い情報から反映</span>
               ) : null}
             </div>
-            <MoneyInput value={draft.amount} onChange={(value) => onChange(draft.id, { amount: value, occurredAt: draft.occurredAt || event.event_date })} />
-            <button type="button" onClick={() => onRemove(draft)} className="grid h-6 w-6 place-items-center rounded-full text-[var(--mikke-muted-light)]" aria-label="削除">
+            <div className="order-3 col-span-2 min-[360px]:order-2 min-[360px]:col-span-1">
+              <MoneyInput value={draft.amount} onChange={(value) => onChange(draft.id, { amount: value, occurredAt: draft.occurredAt || event.event_date })} />
+            </div>
+            <button type="button" onClick={() => onRemove(draft)} className="order-2 grid h-6 w-6 place-items-center rounded-full text-[var(--mikke-muted-light)] min-[360px]:order-3" aria-label="削除">
               <CircleX size={15} strokeWidth={1.7} />
             </button>
           </div>
@@ -466,7 +476,7 @@ function MoneyInput({ value, onChange }: { value: string; onChange: (value: stri
         inputMode="numeric"
         pattern="[0-9]*"
         placeholder="0"
-        className="min-w-0 bg-transparent pr-1.5 text-right text-xs font-extrabold text-[var(--mikke-text)] outline-none"
+        className="min-w-0 bg-transparent pr-1.5 text-right text-base font-extrabold text-[var(--mikke-text)] outline-none min-[360px]:text-xs"
       />
     </div>
   );

@@ -17,6 +17,7 @@ import {
   MapPin,
   Plus,
   ReceiptText,
+  Trash2,
   WalletCards,
   X
 } from "lucide-react";
@@ -27,6 +28,7 @@ import { formatDate, formatMonthDay, formatYen } from "@/lib/format";
 import {
   addCheckItem,
   addFinancialRecord,
+  deleteCheckItem,
   getMarketEventBundle,
   saveEventPaymentRecord,
   saveReflection,
@@ -100,6 +102,7 @@ function MarketDetailContent() {
   const [goodPoints, setGoodPoints] = useState("");
   const [nextActions, setNextActions] = useState("");
   const [saving, setSaving] = useState(false);
+  const [paymentSaving, setPaymentSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [editOpen, setEditOpen] = useState(false);
 
@@ -228,6 +231,13 @@ function MarketDetailContent() {
     await load();
   }
 
+  async function removeCheck(item: MarketCheckItem) {
+    if (!window.confirm(`「${item.title}」をこの予定から外しますか？`)) return;
+    await deleteCheckItem(profile, item);
+    await load();
+    setMessage("チェック項目をこの予定から外しました");
+  }
+
   async function addPhoto(inputEvent: ChangeEvent<HTMLInputElement>) {
     const file = inputEvent.target.files?.[0];
     inputEvent.target.value = "";
@@ -281,6 +291,43 @@ function MarketDetailContent() {
     setMessage("売上を追加しました");
   }
 
+  async function changePaymentStatus(nextStatus: PaymentStatus) {
+    if (!event || paymentSaving || nextStatus === paymentStatus) return;
+    const previousStatus = paymentStatus;
+    const currentPayment = getEventPayment(checks, finances, paymentMethod);
+    const paymentCheck = checks.find((check) => check.title.includes("支払い") || check.title.includes("謾ｯ謇"));
+    const nextCheckDone = nextStatus !== "unpaid";
+
+    setPaymentStatus(nextStatus);
+    setPaymentSaving(true);
+    setMessage("");
+    try {
+      const savedRecord = await saveEventPaymentRecord(profile, {
+        marketEventId: event.id,
+        eventDate: event.event_date,
+        amount: currentPayment.amount,
+        method: currentPayment.method,
+        paymentStatus: nextStatus
+      });
+
+      if (paymentCheck && paymentCheck.is_done !== nextCheckDone) {
+        await toggleCheckItem(profile, paymentCheck, nextCheckDone);
+        setChecks((current) => current.map((item) => item.id === paymentCheck.id ? { ...item, is_done: nextCheckDone } : item));
+      }
+      if (savedRecord) {
+        setFinances((current) => current.some((record) => record.id === savedRecord.id)
+          ? current.map((record) => record.id === savedRecord.id ? savedRecord : record)
+          : [savedRecord, ...current]);
+      }
+      setMessage(`支払いを「${paymentLabel(nextStatus)}」に変更しました`);
+    } catch (error) {
+      setPaymentStatus(previousStatus);
+      setMessage(error instanceof Error ? error.message : "支払いステータスを変更できませんでした。");
+    } finally {
+      setPaymentSaving(false);
+    }
+  }
+
   if (!event) {
     return (
       <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest}>
@@ -291,7 +338,7 @@ function MarketDetailContent() {
 
   return (
     <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest} addHref={`/marketnote/new?startDate=${eventDate}`}>
-      <form onSubmit={submit} className="pb-5">
+      <form onSubmit={submit} className="pb-28">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button type="button" onClick={() => router.back()} className="grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-text)]" aria-label="戻る">
             <ArrowLeft size={22} strokeWidth={1.7} />
@@ -322,10 +369,12 @@ function MarketDetailContent() {
           total={checks.length}
           progress={progress}
           checks={checks}
+          paymentSaving={paymentSaving}
           onStatusChange={(nextStatus) => {
             setStatus(nextStatus);
             setApplied(false);
           }}
+          onPaymentStatusChange={changePaymentStatus}
           onToggleCheck={async (item, nextValue) => {
             await toggleCheckItem(profile, item, nextValue);
             await load();
@@ -334,7 +383,7 @@ function MarketDetailContent() {
 
         <div className="mt-3 space-y-3">
           <FormCard title="メモ" icon={<FileText size={16} strokeWidth={1.8} />}>
-            <textarea value={memo} onChange={(inputEvent) => setMemo(inputEvent.target.value)} rows={2} className="w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm leading-6 text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]" />
+            <textarea value={memo} onChange={(inputEvent) => setMemo(inputEvent.target.value)} rows={2} className="scroll-mb-28 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-base leading-6 text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm" />
           </FormCard>
 
           <CollapsibleCard title="各項目編集" icon={<ClipboardList size={16} strokeWidth={1.8} />} open={editOpen} onToggle={() => setEditOpen((current) => !current)}>
@@ -351,7 +400,7 @@ function MarketDetailContent() {
               複数日イベント
             </button>
             {multiDay ? <Field label="終了日"><TextInput value={endDate} onChange={setEndDate} type="date" icon={<CalendarDays size={15} />} /></Field> : null}
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 gap-2.5 min-[360px]:grid-cols-2">
               <Field label="開始時間"><TextInput value={startTime} onChange={setStartTime} type="time" /></Field>
               <Field label="終了時間"><TextInput value={endTime} onChange={setEndTime} type="time" /></Field>
               <Field label="集合時間"><TextInput value={meetTime} onChange={setMeetTime} type="time" /></Field>
@@ -363,10 +412,10 @@ function MarketDetailContent() {
             <Field label="住所"><TextInput value={address} onChange={setAddress} placeholder="例）東京都江東区有明3-11-1" /></Field>
 
             <SectionLabel>支払い情報</SectionLabel>
-            <div className="grid grid-cols-[1fr_1fr_0.95fr] gap-2">
+            <div className="grid grid-cols-2 gap-2 min-[360px]:grid-cols-[1fr_1fr_0.95fr]">
               <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentTone(paymentStatus)} />
               <SelectBox value={paymentMethod} onChange={setPaymentMethod} options={getPaymentMethodOptions(fixedPaymentMethodNames, paymentMethod)} tone="gray" />
-              <MoneyInput value={paymentAmount} onChange={setPaymentAmount} />
+              <div className="col-span-2 min-[360px]:col-span-1"><MoneyInput value={paymentAmount} onChange={setPaymentAmount} /></div>
             </div>
             <p className="text-[11px] font-bold leading-5 text-[var(--mikke-muted-light)]">支払い情報の変更は、下部の「変更を保存」で収支に反映されます。</p>
             <div className="mt-2.5 flex w-full select-none items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted-light)]" aria-hidden="true">
@@ -377,20 +426,26 @@ function MarketDetailContent() {
             <SectionLabel>チェック項目</SectionLabel>
             <div className="grid gap-2 sm:grid-cols-2">
               {checks.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={async () => {
-                    await toggleCheckItem(profile, item, !item.is_done);
-                    await load();
-                  }}
-                  className="grid grid-cols-[22px_1fr] items-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-2.5 py-2 text-left"
-                >
-                  <span className={`grid h-5 w-5 place-items-center rounded-full border ${item.is_done ? "border-[var(--mikke-success)] bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]" : "border-[var(--mikke-line)] text-transparent"}`}>
-                    <Check size={13} strokeWidth={2} />
-                  </span>
-                  <span className="min-w-0 truncate text-xs font-bold text-[var(--mikke-text-soft)]">{item.title}</span>
-                </button>
+                <div key={item.id} className="grid grid-cols-[1fr_54px] items-center rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)]">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await toggleCheckItem(profile, item, !item.is_done);
+                      await load();
+                    }}
+                    className="grid min-h-11 grid-cols-[22px_1fr] items-center gap-2 px-2.5 py-2 text-left"
+                    aria-label={`${item.title}を${item.is_done ? "未完了" : "完了"}にする`}
+                  >
+                    <span className={`grid h-5 w-5 place-items-center rounded-full border ${item.is_done ? "border-[var(--mikke-success)] bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]" : "border-[var(--mikke-line)] text-transparent"}`}>
+                      <Check size={13} strokeWidth={2} />
+                    </span>
+                    <span className="min-w-0 truncate text-xs font-bold text-[var(--mikke-text-soft)]">{item.title}</span>
+                  </button>
+                  <button type="button" onClick={() => void removeCheck(item)} className="inline-flex h-10 items-center justify-center gap-1 rounded-full text-[10px] font-bold text-[var(--mikke-muted)]" aria-label={`${item.title}をこの予定から外す`} title="この予定から外す">
+                    <Trash2 size={16} strokeWidth={1.7} />
+                    外す
+                  </button>
+                </div>
               ))}
             </div>
             <div className="grid grid-cols-[1fr_40px] gap-2">
@@ -404,7 +459,7 @@ function MarketDetailContent() {
           <FinanceMemo eventId={event.id} totals={totals} onAddRevenue={addQuickRevenue} />
 
           <FormCard title="振り返り" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
-            <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={4} placeholder="今日の反応、気づいたこと、次回やることなど" className="w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm leading-6 outline-none focus:border-[var(--mikke-accent)]" />
+            <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={4} placeholder="今日の反応、気づいたこと、次回やることなど" className="scroll-mb-28 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-base leading-6 outline-none focus:border-[var(--mikke-accent)] sm:text-sm" />
             <label className="mt-3 block text-xs font-bold text-[var(--mikke-text-soft)]">
               次回やること
               <textarea
@@ -412,7 +467,7 @@ function MarketDetailContent() {
                 onChange={(inputEvent) => setNextActions(inputEvent.target.value)}
                 rows={3}
                 placeholder="次回に改善すること、準備しておくこと"
-                className="mt-1.5 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-sm font-medium leading-6 outline-none focus:border-[var(--mikke-accent)]"
+                className="mt-1.5 scroll-mb-28 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-base font-medium leading-6 outline-none focus:border-[var(--mikke-accent)] sm:text-sm"
               />
             </label>
           </FormCard>
@@ -490,7 +545,9 @@ function SummaryCard({
   total,
   progress,
   checks,
+  paymentSaving,
   onStatusChange,
+  onPaymentStatusChange,
   onToggleCheck
 }: {
   event: MarketEvent;
@@ -512,10 +569,13 @@ function SummaryCard({
   total: number;
   progress: number;
   checks: MarketCheckItem[];
+  paymentSaving: boolean;
   onStatusChange: (status: MarketEvent["status"]) => void;
+  onPaymentStatusChange: (status: PaymentStatus) => Promise<void>;
   onToggleCheck: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
 }) {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [paymentMenuOpen, setPaymentMenuOpen] = useState(false);
 
   return (
     <section className="rounded-[18px] border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-[0_4px_14px_rgba(45,33,22,0.04)]">
@@ -547,8 +607,34 @@ function SummaryCard({
         <span className="flex min-w-0 items-center gap-2"><Clock3 size={16} className="text-[var(--mikke-muted-light)]" />集合 {meetTime || "未設定"} / 撤収 {packUpTime || "未設定"}</span>
         <span className="flex min-w-0 items-center gap-2"><MapPin size={16} className="text-[var(--mikke-muted-light)]" />{[venueName, address].filter(Boolean).join(" / ") || "会場未設定"}</span>
       </div>
-      <div className="mt-3 flex items-center justify-between text-xs font-bold text-[var(--mikke-text-soft)]">
-        <span className="min-w-0 truncate">支払い：<PaymentChip status={paymentStatus} /> <span className="ml-1 text-[var(--mikke-muted)]">{paymentMethod} / {formatYen(Number(paymentAmount || 0))}</span></span>
+      <div className="mt-3 flex items-center justify-between gap-2 text-xs font-bold text-[var(--mikke-text-soft)]">
+        <div className="flex min-w-0 items-center gap-1">
+          <span className="shrink-0">支払い：</span>
+          <div className="relative shrink-0">
+            <button type="button" onClick={() => setPaymentMenuOpen((current) => !current)} aria-expanded={paymentMenuOpen} disabled={paymentSaving}>
+              <PaymentChip status={paymentStatus} withChevron />
+            </button>
+            {paymentMenuOpen ? (
+              <div className="absolute left-0 top-7 z-20 w-28 overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] py-1 shadow-[0_8px_22px_rgba(45,33,22,0.12)]">
+                {paymentStatusOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    disabled={paymentSaving}
+                    onClick={() => {
+                      setPaymentMenuOpen(false);
+                      void onPaymentStatusChange(option.value);
+                    }}
+                    className="block min-h-10 w-full px-3 py-2 text-left text-xs font-extrabold text-[var(--mikke-text-soft)] hover:bg-[var(--mikke-accent-soft)] disabled:opacity-50"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          <span className="min-w-0 truncate text-[var(--mikke-muted)]">{paymentMethod} / {formatYen(Number(paymentAmount || 0))}</span>
+        </div>
         <span>タスク {done}/{total}</span>
       </div>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--mikke-line-soft)]">
@@ -705,7 +791,7 @@ function TextInput({
 }) {
   return (
     <div className="relative">
-      <input value={value} onChange={(event) => onChange(event.target.value)} type={type} placeholder={placeholder} className="h-10 w-full rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 pr-9 text-sm font-semibold text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-accent)]" />
+      <input value={value} onChange={(event) => onChange(event.target.value)} type={type} placeholder={placeholder} className="scroll-mb-28 h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 pr-9 text-base font-semibold text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-accent)] sm:h-10 sm:text-sm" />
       {icon ? <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--mikke-muted)]">{icon}</span> : null}
     </div>
   );
@@ -730,7 +816,7 @@ function SelectBox({
 
   return (
     <label className="relative block">
-      <select value={value} onChange={(event) => onChange(event.target.value)} className={`h-10 w-full appearance-none rounded-xl border px-3 pr-7 text-xs font-extrabold outline-none ${toneClass}`}>
+      <select value={value} onChange={(event) => onChange(event.target.value)} className={`scroll-mb-28 h-11 w-full appearance-none rounded-xl border px-3 pr-7 text-base font-extrabold outline-none sm:h-10 sm:text-xs ${toneClass}`}>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
       <ChevronDown size={14} className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-current" />
@@ -742,7 +828,7 @@ function MoneyInput({ value, onChange }: { value: string; onChange: (value: stri
   return (
     <div className="grid h-10 grid-cols-[24px_1fr] overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)]">
       <span className="grid place-items-center text-xs font-bold text-[var(--mikke-muted)]">¥</span>
-      <input value={value} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))} type="text" inputMode="numeric" pattern="[0-9]*" placeholder="0" className="min-w-0 bg-[var(--mikke-surface)] pr-2 text-right text-sm font-extrabold text-[var(--mikke-text)] outline-none" />
+      <input value={value} onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))} type="text" inputMode="numeric" pattern="[0-9]*" placeholder="0" className="scroll-mb-28 min-w-0 bg-[var(--mikke-surface)] pr-2 text-right text-base font-extrabold text-[var(--mikke-text)] outline-none sm:text-sm" />
     </div>
   );
 }
@@ -765,13 +851,13 @@ function StatusChip({ status, applied = false, withChevron = false }: { status: 
   );
 }
 
-function PaymentChip({ status }: { status: PaymentStatus }) {
+function PaymentChip({ status, withChevron = false }: { status: PaymentStatus; withChevron?: boolean }) {
   const toneClass = status === "paid"
     ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]"
     : status === "unpaid"
       ? "bg-[var(--mikke-orange)] text-white"
       : "border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]";
-  return <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClass}`}>{paymentLabel(status)}</span>;
+  return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${toneClass}`}>{paymentLabel(status)}{withChevron ? <ChevronDown size={12} /> : null}</span>;
 }
 
 function parseEventMeta(event: MarketEvent): EventMeta {
