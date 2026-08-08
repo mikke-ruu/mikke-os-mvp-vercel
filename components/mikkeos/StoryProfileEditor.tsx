@@ -42,6 +42,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   const [viewMode, setViewMode] = useState<"edit" | "preview">("edit");
   const [cropDraft, setCropDraft] = useState<CropDraft | null>(null);
   const [persistedMediaPaths, setPersistedMediaPaths] = useState<string[]>([]);
+  const [tagsInput, setTagsInput] = useState("");
 
   useEffect(() => {
     if (mode === "start") setIntroStep(window.localStorage.getItem(introSeenKey) === "1" ? null : 0);
@@ -49,19 +50,29 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
 
   useEffect(() => {
     let cancelled = false;
-    setForm({ ...loadStoryProfileDraft(), handle: profile.handle });
+    const commonDisplayName = profile.display_name?.trim() ?? "";
+    const savedDraft = loadStoryProfileDraft();
+    const localDraft = {
+      ...savedDraft,
+      handle: profile.handle,
+      displayName: savedDraft.displayName.trim() || commonDisplayName
+    };
+    setForm(localDraft);
+    setTagsInput(localDraft.tags.join("、"));
     getMyStoryProfile(supabase).then((remote) => {
       if (!cancelled && remote) {
-        setForm(remote);
-        setPersistedMediaPaths(storyMediaPaths(remote));
-        saveStoryProfileDraft(remote);
+        const next = { ...remote, displayName: remote.displayName.trim() || commonDisplayName };
+        setForm(next);
+        setTagsInput(next.tags.join("、"));
+        setPersistedMediaPaths(storyMediaPaths(next));
+        saveStoryProfileDraft(next);
         setIntroStep(null);
       }
     }).catch(() => {
       if (!cancelled) setMessage("端末内の下書きを表示しています。");
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [profile.handle, user.id]);
+  }, [profile.display_name, profile.handle, user.id]);
 
   const update = <K extends keyof StoryProfileView>(key: K, value: StoryProfileView[K]) => {
     setMessage("");
@@ -130,7 +141,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
     saveStoryProfileDraft(next);
     try {
       const saved = await saveMyStoryProfile(supabase, next);
-      setForm(saved); saveStoryProfileDraft(saved); setIsError(false);
+      setForm(saved); setTagsInput(saved.tags.join("、")); saveStoryProfileDraft(saved); setIsError(false);
       const savedPaths = storyMediaPaths(saved);
       const removedPaths = persistedMediaPaths.filter((path) => !savedPaths.includes(path));
       if (removedPaths.length) void removeStoryImages(supabase, removedPaths).catch(() => undefined);
@@ -190,8 +201,8 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
           </div>
         </EditorSection>
 
-        <EditorSection eyebrow="KEYWORDS" title="あなたを表すキーワード" note="検索や共通点を見つけるための小さなバッジです。任意・最大8個。">
-          <input aria-label="キーワード" value={form.tags.join("、")} onChange={(event) => update("tags", event.target.value.split(/[,、]/).map((item) => item.trim().replace(/^#/, "")).filter(Boolean).slice(0, 8))} placeholder="焼き菓子、イベント出店、東京" className="w-full rounded-2xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-[var(--story-accent)]" />
+        <EditorSection eyebrow="KEYWORDS" title="あなたを表すキーワード" note="「、」またはカンマで区切って最大8個。空白を含む言葉も入力できます。">
+          <input aria-label="キーワード" value={tagsInput} onChange={(event) => { const value = event.target.value; setTagsInput(value); update("tags", parseStoryTags(value)); }} placeholder="焼き菓子、イベント出店、東京" className="w-full rounded-2xl border border-black/10 px-4 py-3 text-sm outline-none focus:border-[var(--story-accent)]" />
           {form.tags.length ? <div className="mt-3 flex flex-wrap gap-2">{form.tags.map((tag) => <span key={tag} className="rounded-full bg-[var(--story-soft)] px-3 py-1.5 text-[11px] font-medium text-[var(--story-ink)]">#{tag}</span>)}</div> : null}
         </EditorSection>
 
@@ -235,6 +246,10 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
       {confirmOpen ? <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-3 sm:items-center"><div role="dialog" aria-modal="true" className="w-full max-w-sm rounded-[24px] bg-white p-5"><div className="flex items-start justify-between"><div><p className="text-[10px] font-extrabold tracking-[0.18em] text-[var(--story-accent)]">PUBLIC STORY</p><h2 className="mt-2 text-xl font-extrabold">この内容を公開しますか？</h2></div><button type="button" aria-label="閉じる" onClick={() => setConfirmOpen(false)}><X size={20} /></button></div><p className="mt-3 text-sm leading-6 text-black/55">URLを知っている人は、ログインせずに写真・自己紹介・リンクを見ることができます。</p><p className="mt-3 break-all rounded-xl bg-black/[0.03] p-3 text-xs font-bold">{getStoryPublicUrl(form.handle)}</p><div className="mt-5 grid grid-cols-2 gap-2"><button type="button" onClick={() => setConfirmOpen(false)} className="rounded-xl border border-black/10 py-3 text-sm font-bold">戻る</button><button type="button" onClick={() => void persist(true)} className="rounded-xl bg-[var(--story-accent)] py-3 text-sm font-bold text-white">公開する</button></div></div></div> : null}
     </div>
   );
+}
+
+function parseStoryTags(value: string) {
+  return value.split(/[,、\n]/).map((item) => item.trim().replace(/^#/, "")).filter(Boolean).slice(0, 8);
 }
 
 function StoryCropDialog({ draft, onChange, onCancel, onConfirm }: { draft: CropDraft; onChange: (crop: StoryImageCrop) => void; onCancel: () => void; onConfirm: () => void }) {
