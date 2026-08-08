@@ -1,8 +1,8 @@
 "use client";
 
-import { ExternalLink, Instagram, MapPin, MessageCircle, Music2, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Instagram, MapPin, MessageCircle, Music2, Pencil, X } from "lucide-react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { getSafeStoryLinkUrl, getStoryAppPath, storySnsDefaults, storyThemes, type StoryProfileView } from "@/lib/mikkeos/story-profile-store";
 
 export function StoryNameCard({
@@ -16,6 +16,7 @@ export function StoryNameCard({
   preview?: boolean;
   collectionAction?: ReactNode;
 }) {
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const displayName = story.displayName.trim() || (preview ? "表示名" : "");
   const handle = story.handle.trim();
   const initials = displayName === "表示名" ? "ST" : displayName.slice(0, 2) || "ST";
@@ -30,6 +31,22 @@ export function StoryNameCard({
   ]
     .map((item) => ({ ...item, url: getSafeStoryLinkUrl(item.url) }))
     .filter((item) => item.label.trim() && item.url);
+
+  useEffect(() => {
+    if (selectedPhotoIndex === null) return;
+    const previousOverflow = document.body.style.overflow;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelectedPhotoIndex(null);
+      if (event.key === "ArrowLeft") setSelectedPhotoIndex((current) => current === null ? null : (current - 1 + story.portfolio.length) % story.portfolio.length);
+      if (event.key === "ArrowRight") setSelectedPhotoIndex((current) => current === null ? null : (current + 1) % story.portfolio.length);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [selectedPhotoIndex, story.portfolio.length]);
 
   if (!displayName || !handle) return <EmptyStory />;
 
@@ -68,10 +85,12 @@ export function StoryNameCard({
 
         {story.portfolio.length ? (
           <section aria-label="写真" className="border-t border-black/5 px-5 py-6">
-            <div className={story.portfolio.length === 6 ? "grid aspect-[2/1] grid-cols-4 grid-rows-2 gap-2" : "grid grid-cols-3 gap-2"}>
+            <div className="grid grid-cols-3 gap-2">
               {story.portfolio.map((item, index) => (
                 <figure key={item.id} className={`overflow-hidden rounded-xl bg-black/5 ${photoItemClass(story.portfolio.length, index)}`}>
-                  <img src={item.imageUrl} alt={item.caption || `写真 ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                  <button type="button" onClick={() => setSelectedPhotoIndex(index)} aria-label={`${item.caption || `写真 ${index + 1}`}を拡大`} className="block h-full w-full cursor-zoom-in">
+                    <img src={item.imageUrl} alt={item.caption || `写真 ${index + 1}`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                  </button>
                 </figure>
               ))}
             </div>
@@ -93,12 +112,31 @@ export function StoryNameCard({
 
         <footer className="border-t border-black/5 py-5 text-center text-[11px] font-normal tracking-[0.08em] text-black/30">STORY <span className="tracking-normal">by mikke</span></footer>
       </article>
+
+      {selectedPhotoIndex !== null && story.portfolio[selectedPhotoIndex] ? (
+        <div role="dialog" aria-modal="true" aria-label="写真を拡大表示" onClick={() => setSelectedPhotoIndex(null)} className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 px-3 py-16 text-white">
+          <button type="button" onClick={() => setSelectedPhotoIndex(null)} aria-label="閉じる" className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white/15 backdrop-blur"><X size={22} /></button>
+          {story.portfolio.length > 1 ? <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedPhotoIndex((selectedPhotoIndex - 1 + story.portfolio.length) % story.portfolio.length); }} aria-label="前の写真" className="absolute left-3 top-1/2 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/15 backdrop-blur"><ChevronLeft size={26} /></button> : null}
+          <figure onClick={(event) => event.stopPropagation()} className="flex max-h-full w-full max-w-5xl flex-col items-center justify-center">
+            <img src={story.portfolio[selectedPhotoIndex].imageUrl} alt={story.portfolio[selectedPhotoIndex].caption || `写真 ${selectedPhotoIndex + 1}`} className="max-h-[75vh] max-w-full rounded-lg object-contain" />
+            <figcaption className="mt-4 text-center text-sm font-normal text-white/80">{story.portfolio[selectedPhotoIndex].caption ? `${story.portfolio[selectedPhotoIndex].caption} ・ ` : ""}{selectedPhotoIndex + 1} / {story.portfolio.length}</figcaption>
+          </figure>
+          {story.portfolio.length > 1 ? <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedPhotoIndex((selectedPhotoIndex + 1) % story.portfolio.length); }} aria-label="次の写真" className="absolute right-3 top-1/2 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/15 backdrop-blur"><ChevronRight size={26} /></button> : null}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function photoItemClass(count: number, index: number) {
-  if (count === 6) return index === 0 || index === 5 ? "col-span-2" : "";
+  if (count === 6) {
+    if (index === 0) return "col-start-1 col-span-2 row-start-1 row-span-2 aspect-square";
+    if (index === 1) return "col-start-3 row-start-1 aspect-square";
+    if (index === 2) return "col-start-3 row-start-2 aspect-square";
+    if (index === 3) return "col-start-1 row-start-3 aspect-square";
+    if (index === 4) return "col-start-1 row-start-4 aspect-square";
+    return "col-start-2 col-span-2 row-start-3 row-span-2 aspect-square";
+  }
   return index === 0 ? "col-span-2 row-span-2 aspect-square" : "aspect-square";
 }
 

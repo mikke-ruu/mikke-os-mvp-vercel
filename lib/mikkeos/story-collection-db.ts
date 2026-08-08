@@ -12,6 +12,7 @@ export type StoryCollectionState = {
 export type StoryCollectionItem = {
   collectionId: string;
   savedAt: string;
+  isFavorite: boolean;
   available: boolean;
   handle: string;
   displayName: string;
@@ -46,12 +47,22 @@ export async function removeStoryFromCollectionByHandle(client: DbClient, handle
   if (error) throw error;
 }
 
+export async function setStoryCollectionFavorite(client: DbClient, collectionId: string, isFavorite: boolean) {
+  const { data, error } = await client.rpc("story_collection_set_favorite", {
+    p_collection_id: collectionId,
+    p_is_favorite: isFavorite
+  });
+  if (error) throw error;
+  return Boolean(data);
+}
+
 export async function listMyStoryCollection(client: DbClient): Promise<StoryCollectionItem[]> {
   const { data, error } = await client.rpc("story_collection_list_mine");
   if (error) throw error;
   return Promise.all((Array.isArray(data) ? data : []).map(async (row: any): Promise<StoryCollectionItem> => ({
     collectionId: row.collection_id,
     savedAt: row.saved_at,
+    isFavorite: Boolean(row.is_favorite),
     available: Boolean(row.available),
     handle: row.handle ?? "",
     displayName: row.display_name ?? "",
