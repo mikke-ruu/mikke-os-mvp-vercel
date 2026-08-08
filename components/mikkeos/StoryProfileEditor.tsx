@@ -50,22 +50,29 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
 
   useEffect(() => {
     let cancelled = false;
-    const localDraft = { ...loadStoryProfileDraft(), handle: profile.handle };
+    const commonDisplayName = profile.display_name?.trim() ?? "";
+    const savedDraft = loadStoryProfileDraft();
+    const localDraft = {
+      ...savedDraft,
+      handle: profile.handle,
+      displayName: savedDraft.displayName.trim() || commonDisplayName
+    };
     setForm(localDraft);
     setTagsInput(localDraft.tags.join("、"));
     getMyStoryProfile(supabase).then((remote) => {
       if (!cancelled && remote) {
-        setForm(remote);
-        setTagsInput(remote.tags.join("、"));
-        setPersistedMediaPaths(storyMediaPaths(remote));
-        saveStoryProfileDraft(remote);
+        const next = { ...remote, displayName: remote.displayName.trim() || commonDisplayName };
+        setForm(next);
+        setTagsInput(next.tags.join("、"));
+        setPersistedMediaPaths(storyMediaPaths(next));
+        saveStoryProfileDraft(next);
         setIntroStep(null);
       }
     }).catch(() => {
       if (!cancelled) setMessage("端末内の下書きを表示しています。");
     }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [profile.handle, user.id]);
+  }, [profile.display_name, profile.handle, user.id]);
 
   const update = <K extends keyof StoryProfileView>(key: K, value: StoryProfileView[K]) => {
     setMessage("");
