@@ -114,12 +114,14 @@ export function StoryNameCard({
       </article>
 
       {selectedPhotoIndex !== null && story.portfolio[selectedPhotoIndex] ? (
-        <div role="dialog" aria-modal="true" aria-label="写真を拡大表示" onClick={() => setSelectedPhotoIndex(null)} className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 px-3 py-16 text-white">
+        <div role="dialog" aria-modal="true" aria-label="写真を拡大表示" onClick={() => setSelectedPhotoIndex(null)} className="fixed inset-0 z-[90] flex flex-col items-center justify-center bg-black/90 px-3 pb-4 pt-16 text-white">
           <button type="button" onClick={() => setSelectedPhotoIndex(null)} aria-label="閉じる" className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white/15 backdrop-blur"><X size={22} /></button>
           {story.portfolio.length > 1 ? <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedPhotoIndex((selectedPhotoIndex - 1 + story.portfolio.length) % story.portfolio.length); }} aria-label="前の写真" className="absolute left-3 top-1/2 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/15 backdrop-blur"><ChevronLeft size={26} /></button> : null}
-          <figure onClick={(event) => event.stopPropagation()} className="flex max-h-full w-full max-w-5xl flex-col items-center justify-center">
-            <img src={story.portfolio[selectedPhotoIndex].imageUrl} alt={story.portfolio[selectedPhotoIndex].caption || `写真 ${selectedPhotoIndex + 1}`} className="max-h-[75vh] max-w-full rounded-lg object-contain" />
-            <figcaption className="mt-4 text-center text-sm font-normal text-white/80">{story.portfolio[selectedPhotoIndex].caption ? `${story.portfolio[selectedPhotoIndex].caption} ・ ` : ""}{selectedPhotoIndex + 1} / {story.portfolio.length}</figcaption>
+          <figure onClick={(event) => event.stopPropagation()} className="flex min-h-0 w-full max-w-5xl flex-1 flex-col items-center justify-center">
+            <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+              <img src={story.portfolio[selectedPhotoIndex].imageUrl} alt={story.portfolio[selectedPhotoIndex].caption || `写真 ${selectedPhotoIndex + 1}`} className="block h-auto max-h-full w-auto max-w-full rounded-lg object-contain" />
+            </div>
+            <figcaption className="mt-4 shrink-0 text-center text-sm font-normal text-white/80">{story.portfolio[selectedPhotoIndex].caption ? `${story.portfolio[selectedPhotoIndex].caption} ・ ` : ""}{selectedPhotoIndex + 1} / {story.portfolio.length}</figcaption>
           </figure>
           {story.portfolio.length > 1 ? <button type="button" onClick={(event) => { event.stopPropagation(); setSelectedPhotoIndex((selectedPhotoIndex + 1) % story.portfolio.length); }} aria-label="次の写真" className="absolute right-3 top-1/2 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-white/15 backdrop-blur"><ChevronRight size={26} /></button> : null}
         </div>
