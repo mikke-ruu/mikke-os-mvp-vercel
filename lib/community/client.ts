@@ -1,12 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   Community,
+  CommunityActivity,
   CommunityChatMessage,
   CommunityComment,
   CommunityConversationMode,
   CommunityDashboard,
   CommunityEntitlementDefinition,
   CommunityEvent,
+  CommunityHomeMetric,
   CommunityMemberEntitlement,
   CommunityMemberProfile,
   CommunityMembership,
@@ -22,6 +24,7 @@ import type {
   CommunityRoomAccessType,
   CommunityRoomColor,
   CommunityRoomKind,
+  CommunitySearchResult,
   CommunityStamp
 } from "./types";
 import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
@@ -38,7 +41,12 @@ function mapCommunity(row: any): Community {
     status: row.status,
     ownerUserId: row.owner_user_id ?? null,
     logoUrl: row.logo_url ?? null,
-    bannerUrl: row.banner_url ?? null
+    bannerUrl: row.banner_url ?? null,
+    homeMetrics: [
+      row.home_metric_1 ?? "unread",
+      row.home_metric_2 ?? "today_activity",
+      row.home_metric_3 ?? "upcoming_events"
+    ]
   };
 }
 
@@ -61,7 +69,10 @@ function mapProfile(row: any): CommunityMemberProfile {
     userId: row.user_id,
     displayName: row.display_name,
     bio: row.bio ?? null,
-    avatarUrl: row.avatar_url ?? null
+    avatarUrl: row.avatar_url ?? null,
+    avatarColor: row.avatar_color ?? "pink",
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
   };
 }
 
@@ -105,7 +116,12 @@ function mapRoom(row: any, requiredEntitlementKeys: string[], isLocked: boolean)
     isArchived: Boolean(row.is_archived),
     memberCanPost: Boolean(row.member_can_post),
     memberCanComment: Boolean(row.member_can_comment),
-    unreadCount: 0
+    unreadCount: 0,
+    postCount: 0,
+    commentCount: 0,
+    messageCount: 0,
+    recentSpeakerUserIds: [],
+    speakerCount: 0
   };
 }
 
@@ -120,7 +136,8 @@ function mapComment(row: any): CommunityComment {
     updatedAt: row.updated_at,
     stampId: row.stamp_id ?? null,
     stamp: null,
-    profile: null
+    profile: null,
+    reactions: []
   };
 }
 
@@ -144,7 +161,9 @@ function mapPost(row: any): CommunityPost {
       : null,
     profile: null,
     comments: [],
-    attachments: []
+    attachments: [],
+    reactions: [],
+    bookmarkedByMe: false
   };
 }
 
@@ -323,7 +342,7 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
   if (communityError) throw communityError;
 
   const community = mapCommunity(communityRow);
-  const [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult, roomReadsResult, chatActivityResult] = await Promise.all([
+  const [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult, roomReadsResult, postActivityResult, chatActivityResult] = await Promise.all([
     client.from("community_memberships").select("*").eq("community_id", community.id).eq("user_id", userId).maybeSingle(),
     client.from("community_memberships").select("*").eq("community_id", community.id).order("joined_at", { ascending: true }),
     client.from("community_member_profiles").select("*").eq("community_id", community.id),
@@ -332,10 +351,11 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     client.from("community_member_entitlements").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
     client.from("community_stamps").select("*").eq("community_id", community.id).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
     client.from("community_room_reads").select("room_id,last_seen_at").eq("community_id", community.id).eq("user_id", userId),
-    client.from("community_chat_messages").select("room_id,author_user_id,created_at").eq("community_id", community.id).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: false }).limit(500)
+    client.from("community_posts").select("id,room_id,author_user_id,created_at").eq("community_id", community.id).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: false }).limit(1000),
+    client.from("community_chat_messages").select("id,room_id,author_user_id,body,stamp_id,created_at").eq("community_id", community.id).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: false }).limit(1000)
   ]);
 
-  const firstError = [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult, roomReadsResult, chatActivityResult]
+  const firstError = [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult, roomReadsResult, postActivityResult, chatActivityResult]
     .find((result) => result.error)?.error;
   if (firstError) throw firstError;
 
@@ -370,16 +390,38 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     return mapRoom(row, keys, locked);
   });
 
-  const posts = (postsResult.data ?? []).map(mapPost);
+  let posts = (postsResult.data ?? []).map(mapPost);
+  const bookmarksResult = await client
+    .from("community_post_bookmarks")
+    .select("post_id")
+    .eq("community_id", community.id)
+    .eq("user_id", userId);
+  if (bookmarksResult.error) throw bookmarksResult.error;
+  const bookmarkedPostIds = new Set((bookmarksResult.data ?? []).map((row: any) => row.post_id));
+  const loadedPostIds = new Set(posts.map((post) => post.id));
+  const missingBookmarkedPostIds = [...bookmarkedPostIds].filter((postId) => !loadedPostIds.has(postId));
+  if (missingBookmarkedPostIds.length > 0) {
+    const missingPostsResult = await client
+      .from("community_posts")
+      .select("*, community_rooms(id,title,kind)")
+      .in("id", missingBookmarkedPostIds)
+      .eq("community_id", community.id)
+      .eq("is_hidden", false)
+      .is("deleted_at", null);
+    if (missingPostsResult.error) throw missingPostsResult.error;
+    posts = [...posts, ...(missingPostsResult.data ?? []).map(mapPost)];
+  }
   const postIds = posts.map((post) => post.id);
-  const [commentsResult, attachmentsResult] = postIds.length > 0
+  const [commentsResult, attachmentsResult, postReactionsResult] = postIds.length > 0
     ? await Promise.all([
-        client.from("community_comments").select("*").in("post_id", postIds).eq("is_hidden", false).order("created_at", { ascending: true }),
-        client.from("community_post_attachments").select("*").in("post_id", postIds).order("created_at", { ascending: true })
+        client.from("community_comments").select("*").in("post_id", postIds).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: true }),
+        client.from("community_post_attachments").select("*").in("post_id", postIds).order("created_at", { ascending: true }),
+        client.from("community_post_reactions").select("post_id,user_id,emoji").in("post_id", postIds)
       ])
-    : [{ data: [], error: null }, { data: [], error: null }];
+    : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
   if (commentsResult.error) throw commentsResult.error;
   if (attachmentsResult.error) throw attachmentsResult.error;
+  if (postReactionsResult.error) throw postReactionsResult.error;
 
   const profiles = (profilesResult.data ?? []).map(mapProfile);
   const profilesByUser = new Map(profiles.map((profile) => [profile.userId, profile]));
@@ -387,11 +429,32 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
   const stampsById = new Map(stamps.map((stamp) => [stamp.id, stamp]));
   const comments = (commentsResult.data ?? []).map(mapComment);
   const attachments = (attachmentsResult.data ?? []).map(mapAttachment);
+  const commentIds = comments.map((comment) => comment.id);
+  const commentReactionsResult = commentIds.length > 0
+    ? await client.from("community_comment_reactions").select("comment_id,user_id,emoji").in("comment_id", commentIds)
+    : { data: [], error: null };
+  if (commentReactionsResult.error) throw commentReactionsResult.error;
+  const groupReactions = (rows: any[], targetKey: "post_id" | "comment_id") => {
+    const grouped = new Map<string, Map<string, { count: number; reactedByMe: boolean }>>();
+    for (const row of rows) {
+      const targetId = row[targetKey];
+      const byEmoji = grouped.get(targetId) ?? new Map<string, { count: number; reactedByMe: boolean }>();
+      const current = byEmoji.get(row.emoji) ?? { count: 0, reactedByMe: false };
+      current.count += 1;
+      if (row.user_id === userId) current.reactedByMe = true;
+      byEmoji.set(row.emoji, current);
+      grouped.set(targetId, byEmoji);
+    }
+    return new Map([...grouped.entries()].map(([targetId, byEmoji]) => [targetId, [...byEmoji.entries()].map(([emoji, value]) => ({ emoji, ...value }))]));
+  };
+  const postReactions = groupReactions(postReactionsResult.data ?? [], "post_id");
+  const commentReactions = groupReactions(commentReactionsResult.data ?? [], "comment_id");
   const commentsByPost = new Map<string, CommunityComment[]>();
   const attachmentsByPost = new Map<string, CommunityPostAttachment[]>();
   for (const comment of comments) {
     comment.profile = profilesByUser.get(comment.authorUserId) ?? null;
     comment.stamp = comment.stampId ? stampsById.get(comment.stampId) ?? null : null;
+    comment.reactions = commentReactions.get(comment.id) ?? [];
     commentsByPost.set(comment.postId, [...(commentsByPost.get(comment.postId) ?? []), comment]);
   }
   for (const attachment of attachments) {
@@ -401,6 +464,8 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     post.profile = profilesByUser.get(post.authorUserId) ?? null;
     post.comments = commentsByPost.get(post.id) ?? [];
     post.attachments = attachmentsByPost.get(post.id) ?? [];
+    post.reactions = postReactions.get(post.id) ?? [];
+    post.bookmarkedByMe = bookmarkedPostIds.has(post.id);
   }
 
   const lastSeenByRoom = new Map<string, number>((roomReadsResult.data ?? []).map((row: any) => [row.room_id, new Date(row.last_seen_at).getTime()]));
@@ -418,7 +483,79 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     if (parentPost) addUnread(parentPost.roomId, comment.authorUserId, comment.createdAt);
   }
   for (const activity of chatActivityResult.data ?? []) addUnread(activity.room_id, activity.author_user_id, activity.created_at);
-  for (const room of rooms) room.unreadCount = unreadByRoom.get(room.id) ?? 0;
+  const roomStats = new Map<string, { postCount: number; commentCount: number; messageCount: number; speakers: Map<string, number> }>();
+  const statsFor = (roomId: string) => {
+    const current = roomStats.get(roomId) ?? { postCount: 0, commentCount: 0, messageCount: 0, speakers: new Map<string, number>() };
+    roomStats.set(roomId, current);
+    return current;
+  };
+  const rememberSpeaker = (roomId: string, authorUserId: string, createdAt: string) => {
+    const speakers = statsFor(roomId).speakers;
+    speakers.set(authorUserId, Math.max(speakers.get(authorUserId) ?? 0, new Date(createdAt).getTime()));
+  };
+  for (const post of postActivityResult.data ?? []) {
+    statsFor(post.room_id).postCount += 1;
+    rememberSpeaker(post.room_id, post.author_user_id, post.created_at);
+  }
+  for (const comment of comments) {
+    const parentPost = postsById.get(comment.postId);
+    if (!parentPost) continue;
+    statsFor(parentPost.roomId).commentCount += 1;
+    rememberSpeaker(parentPost.roomId, comment.authorUserId, comment.createdAt);
+  }
+  for (const message of chatActivityResult.data ?? []) {
+    statsFor(message.room_id).messageCount += 1;
+    rememberSpeaker(message.room_id, message.author_user_id, message.created_at);
+  }
+  for (const room of rooms) {
+    const stats = statsFor(room.id);
+    const speakers = [...stats.speakers.entries()].sort((left, right) => right[1] - left[1]);
+    room.unreadCount = unreadByRoom.get(room.id) ?? 0;
+    room.postCount = stats.postCount;
+    room.commentCount = stats.commentCount;
+    room.messageCount = stats.messageCount;
+    room.recentSpeakerUserIds = speakers.slice(0, 5).map(([speakerId]) => speakerId);
+    room.speakerCount = speakers.length;
+  }
+
+  const activities: CommunityActivity[] = [
+    ...posts.map((post) => ({
+      id: post.id,
+      kind: "post" as const,
+      roomId: post.roomId,
+      postId: post.id,
+      authorUserId: post.authorUserId,
+      title: post.title,
+      body: post.body,
+      createdAt: post.createdAt,
+      profile: post.profile
+    })),
+    ...comments.map((comment) => {
+      const parentPost = postsById.get(comment.postId)!;
+      return {
+        id: comment.id,
+        kind: "comment" as const,
+        roomId: parentPost.roomId,
+        postId: comment.postId,
+        authorUserId: comment.authorUserId,
+        title: `${parentPost.title}へのコメント`,
+        body: comment.stamp?.name ?? comment.body,
+        createdAt: comment.createdAt,
+        profile: comment.profile
+      };
+    }),
+    ...(chatActivityResult.data ?? []).map((message: any) => ({
+      id: message.id,
+      kind: "chat" as const,
+      roomId: message.room_id,
+      postId: null,
+      authorUserId: message.author_user_id,
+      title: rooms.find((room) => room.id === message.room_id)?.title ?? "チャット",
+      body: message.stamp_id ? stampsById.get(message.stamp_id)?.name ?? "スタンプ" : message.body,
+      createdAt: message.created_at,
+      profile: profilesByUser.get(message.author_user_id) ?? null
+    }))
+  ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()).slice(0, 12);
 
   const allMemberships = (membershipsResult.data ?? []).map(mapMembership);
   const ownerMembers = staff
@@ -441,7 +578,8 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     posts,
     events: (eventsResult.data ?? []).map(mapEvent),
     resources: (resourcesResult.data ?? []).map(mapResource),
-    stamps
+    stamps,
+    activities
   };
 }
 
@@ -483,20 +621,23 @@ export async function claimCommunityOwnership(client: DbClient, communityId: str
   if (error) throw error;
 }
 
-export async function saveCommunitySettings(client: DbClient, communityId: string, input: { name: string; description: string; joinMode: Community["joinMode"]; logoUrl?: string | null; bannerUrl?: string | null }) {
+export async function saveCommunitySettings(client: DbClient, communityId: string, input: { name: string; description: string; joinMode: Community["joinMode"]; homeMetrics: [CommunityHomeMetric, CommunityHomeMetric, CommunityHomeMetric]; logoUrl?: string | null; bannerUrl?: string | null }) {
   const { error } = await client.from("community_communities").update({
     name: input.name.trim(),
     description: input.description.trim() || null,
     join_mode: input.joinMode,
+    home_metric_1: input.homeMetrics[0],
+    home_metric_2: input.homeMetrics[1],
+    home_metric_3: input.homeMetrics[2],
     ...(input.logoUrl !== undefined ? { logo_url: input.logoUrl } : {}),
     ...(input.bannerUrl !== undefined ? { banner_url: input.bannerUrl } : {})
   }).eq("id", communityId);
   if (error) throw error;
 }
 
-export async function saveCommunityProfile(client: DbClient, communityId: string, userId: string, displayName: string, bio: string, avatarUrl?: string | null) {
+export async function saveCommunityProfile(client: DbClient, communityId: string, userId: string, displayName: string, bio: string, avatarColor: CommunityRoomColor, avatarUrl?: string | null) {
   const { error } = await client.from("community_member_profiles").upsert(
-    { community_id: communityId, user_id: userId, display_name: displayName.trim() || "COMMUNITY participant", bio: bio.trim() || null, ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}) },
+    { community_id: communityId, user_id: userId, display_name: displayName.trim() || "COMMUNITY participant", bio: bio.trim() || null, avatar_color: avatarColor, ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}) },
     { onConflict: "community_id,user_id" }
   );
   if (error) throw error;
@@ -656,7 +797,7 @@ export async function deleteCommunityComment(client: DbClient, commentId: string
 
 export async function loadCommunityChatMessages(client: DbClient, roomId: string, userId: string, profiles: CommunityMemberProfile[], stamps: CommunityStamp[]) {
   const [messagesResult, reactionsResult] = await Promise.all([
-    client.from("community_chat_messages").select("*").eq("room_id", roomId).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: true }).limit(200),
+    client.from("community_chat_messages").select("*").eq("room_id", roomId).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     client.from("community_chat_message_reactions").select("message_id,user_id,emoji,created_at").eq("room_id", roomId).order("created_at", { ascending: true }).limit(1000)
   ]);
   if (messagesResult.error) throw messagesResult.error;
@@ -664,7 +805,7 @@ export async function loadCommunityChatMessages(client: DbClient, roomId: string
 
   const profilesByUser = new Map(profiles.map((profile) => [profile.userId, profile]));
   const stampsById = new Map(stamps.map((stamp) => [stamp.id, stamp]));
-  const messages = (messagesResult.data ?? []).map(mapChatMessage);
+  const messages = (messagesResult.data ?? []).map(mapChatMessage).reverse();
   const messagesById = new Map(messages.map((message) => [message.id, message]));
   const reactionGroups = new Map<string, Map<string, { count: number; reactedByMe: boolean }>>();
   for (const reaction of reactionsResult.data ?? []) {
@@ -682,6 +823,87 @@ export async function loadCommunityChatMessages(client: DbClient, roomId: string
     message.reactions = [...(reactionGroups.get(message.id) ?? new Map()).entries()].map(([emoji, reaction]) => ({ emoji, count: reaction.count, reactedByMe: reaction.reactedByMe }));
   }
   return messages;
+}
+
+async function toggleCommunityReaction(client: DbClient, input: { table: "community_post_reactions" | "community_comment_reactions"; targetColumn: "post_id" | "comment_id"; targetId: string; communityId: string; roomId: string; postId: string; userId: string; emoji: string }) {
+  const { data: existing, error: lookupError } = await client
+    .from(input.table)
+    .select("id")
+    .eq(input.targetColumn, input.targetId)
+    .eq("user_id", input.userId)
+    .eq("emoji", input.emoji)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (existing) {
+    const { error } = await client.from(input.table).delete().eq("id", existing.id).eq("user_id", input.userId);
+    if (error) throw error;
+    return;
+  }
+  const values: Record<string, string> = {
+    community_id: input.communityId,
+    room_id: input.roomId,
+    post_id: input.postId,
+    user_id: input.userId,
+    emoji: input.emoji
+  };
+  values[input.targetColumn] = input.targetId;
+  const { error } = await client.from(input.table).insert(values);
+  if (error) throw error;
+}
+
+export async function toggleCommunityPostBookmark(client: DbClient, input: { communityId: string; roomId: string; postId: string; userId: string; bookmarked: boolean }) {
+  if (input.bookmarked) {
+    const { error } = await client
+      .from("community_post_bookmarks")
+      .delete()
+      .eq("post_id", input.postId)
+      .eq("user_id", input.userId);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await client.from("community_post_bookmarks").insert({
+    community_id: input.communityId,
+    room_id: input.roomId,
+    post_id: input.postId,
+    user_id: input.userId
+  });
+  if (error) throw error;
+}
+
+export async function searchCommunity(client: DbClient, communityId: string, communitySlug: string, rawQuery: string): Promise<CommunitySearchResult[]> {
+  const query = rawQuery.trim().replace(/[,%_\\()]/g, " ").replace(/\s+/g, " ");
+  if (query.length < 2) return [];
+  const pattern = `%${query}%`;
+  const [rooms, posts, comments, chat, events, resources] = await Promise.all([
+    client.from("community_rooms").select("id,title,description").eq("community_id", communityId).eq("is_archived", false).or(`title.ilike.${pattern},description.ilike.${pattern}`).limit(12),
+    client.from("community_posts").select("id,room_id,title,body,created_at").eq("community_id", communityId).eq("is_hidden", false).is("deleted_at", null).or(`title.ilike.${pattern},body.ilike.${pattern}`).order("created_at", { ascending: false }).limit(20),
+    client.from("community_comments").select("id,post_id,body,created_at,community_posts!inner(id,room_id,community_id,title)").eq("community_posts.community_id", communityId).eq("is_hidden", false).is("deleted_at", null).ilike("body", pattern).order("created_at", { ascending: false }).limit(20),
+    client.from("community_chat_messages").select("id,room_id,body,created_at").eq("community_id", communityId).eq("is_hidden", false).is("deleted_at", null).ilike("body", pattern).order("created_at", { ascending: false }).limit(20),
+    client.from("community_events").select("id,title,description,starts_at").eq("community_id", communityId).neq("status", "cancelled").or(`title.ilike.${pattern},description.ilike.${pattern}`).order("starts_at", { ascending: false }).limit(12),
+    client.from("community_resources").select("id,title,description,published_at").eq("community_id", communityId).eq("is_published", true).or(`title.ilike.${pattern},description.ilike.${pattern}`).limit(12)
+  ]);
+  const firstError = [rooms, posts, comments, chat, events, resources].find((result) => result.error)?.error;
+  if (firstError) throw firstError;
+  const base = `/community/c/${communitySlug}`;
+  const results: CommunitySearchResult[] = [];
+  for (const row of rooms.data ?? []) results.push({ id: row.id, kind: "room", title: row.title, excerpt: row.description ?? "", href: `${base}/rooms/${row.id}`, createdAt: null });
+  for (const row of posts.data ?? []) results.push({ id: row.id, kind: "post", title: row.title, excerpt: row.body, href: `${base}/rooms/${row.room_id}/posts/${row.id}`, createdAt: row.created_at });
+  for (const row of comments.data ?? []) {
+    const post: any = Array.isArray(row.community_posts) ? row.community_posts[0] : row.community_posts;
+    if (post) results.push({ id: row.id, kind: "comment", title: post.title, excerpt: row.body, href: `${base}/rooms/${post.room_id}/posts/${row.post_id}`, createdAt: row.created_at });
+  }
+  for (const row of chat.data ?? []) results.push({ id: row.id, kind: "chat", title: "チャットメッセージ", excerpt: row.body, href: `${base}/rooms/${row.room_id}`, createdAt: row.created_at });
+  for (const row of events.data ?? []) results.push({ id: row.id, kind: "event", title: row.title, excerpt: row.description ?? "", href: `${base}/events`, createdAt: row.starts_at });
+  for (const row of resources.data ?? []) results.push({ id: row.id, kind: "resource", title: row.title, excerpt: row.description ?? "", href: `${base}/library`, createdAt: row.published_at });
+  return results.sort((a, b) => (b.createdAt ? new Date(b.createdAt).getTime() : 0) - (a.createdAt ? new Date(a.createdAt).getTime() : 0));
+}
+
+export async function toggleCommunityPostReaction(client: DbClient, input: { communityId: string; roomId: string; postId: string; userId: string; emoji: string }) {
+  return toggleCommunityReaction(client, { ...input, table: "community_post_reactions", targetColumn: "post_id", targetId: input.postId });
+}
+
+export async function toggleCommunityCommentReaction(client: DbClient, input: { communityId: string; roomId: string; postId: string; commentId: string; userId: string; emoji: string }) {
+  return toggleCommunityReaction(client, { ...input, table: "community_comment_reactions", targetColumn: "comment_id", targetId: input.commentId });
 }
 
 export async function toggleCommunityChatReaction(client: DbClient, input: { communityId: string; roomId: string; messageId: string; userId: string; emoji: string }) {

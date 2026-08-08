@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
+  ArrowRight,
+  Bell,
+  Bookmark,
   BookOpen,
   CalendarDays,
   ChevronDown,
@@ -12,6 +15,7 @@ import {
   CircleChevronRight,
   DoorOpen,
   FileDown,
+  Flame,
   Home,
   KeyRound,
   Library,
@@ -22,6 +26,7 @@ import {
   Paperclip,
   Plus,
   Reply,
+  Search,
   Send,
   Smile,
   Settings,
@@ -29,7 +34,8 @@ import {
   Sticker,
   Trash2,
   UserRound,
-  Users
+  Users,
+  X
 } from "lucide-react";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
@@ -65,6 +71,9 @@ import {
   setEventAttendance,
   moderateCommunityChatMessage,
   toggleCommunityChatReaction,
+  toggleCommunityCommentReaction,
+  toggleCommunityPostReaction,
+  toggleCommunityPostBookmark,
   updateCommunityEvent,
   updateCommunityEventStatus,
   updateCommunityMembership,
@@ -76,15 +85,16 @@ import {
   updateCommunityResourceVisibility,
   updateCommunityRoom,
   updateCommunityRoomAccess,
-  uploadCommunityPostAttachment
+  uploadCommunityPostAttachment,
+  searchCommunity
 } from "@/lib/community/client";
-import type { CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEvent, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind } from "@/lib/community/types";
+import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEvent, CommunityHomeMetric, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind, CommunitySearchResult } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
 import { releasedApps } from "@/lib/mikkeos/released-apps";
 import { ensureProfile } from "@/lib/profile";
 
-type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
+type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "search" | "bookmarks" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
 
 type SessionUser = {
   id: string;
@@ -92,6 +102,13 @@ type SessionUser = {
 };
 
 const COMMUNITY_CHAT_REACTIONS = ["👍", "❤️", "😂", "🎉", "👏", "🙏"] as const;
+const COMMUNITY_AVATAR_COLORS: Array<{ value: CommunityRoomColor; label: string }> = [
+  { value: "blue", label: "ブルー" },
+  { value: "orange", label: "オレンジ" },
+  { value: "yellow", label: "イエロー" },
+  { value: "pink", label: "ピンク" },
+  { value: "green", label: "グリーン" }
+];
 
 function buildNavigation(base: string, showOwner: boolean) {
   const navItems: MikkeShellNavItem[] = [
@@ -189,6 +206,33 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
     };
   }, [communitySlug, router]);
 
+  useEffect(() => {
+    if (!user || !data?.community.id || data.membership?.status !== "active") return;
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleReload = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => void reload(user), 250);
+    };
+    const channel = supabase
+      .channel(`community-dashboard-${data.community.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_posts", filter: `community_id=eq.${data.community.id}` }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_comments" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_chat_messages", filter: `community_id=eq.${data.community.id}` }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_post_reactions", filter: `community_id=eq.${data.community.id}` }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_comment_reactions", filter: `community_id=eq.${data.community.id}` }, scheduleReload)
+      .subscribe();
+    const refreshOnFocus = () => scheduleReload();
+    const refreshWhenVisible = () => { if (document.visibilityState === "visible") scheduleReload(); };
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      void supabase.removeChannel(channel);
+    };
+  }, [data?.community.id, data?.membership?.status, user?.id]);
+
   async function signOut() {
     await supabase.auth.signOut();
     router.replace(`${base}/login`);
@@ -253,6 +297,8 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
       {view === "events" ? <EventsView events={data.events} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "library" ? <LibraryView data={data} /> : null}
       {view === "profile" ? <ProfileView data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
+      {view === "search" ? <CommunitySearchView base={base} data={data} /> : null}
+      {view === "bookmarks" ? <BookmarksView base={base} data={data} /> : null}
       {view === "owner" ? <OwnerView base={base} data={data} ownerLike={ownerLike} /> : null}
       {view === "owner-settings" ? <OwnerSettingsView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-rooms" ? <OwnerRoomsView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
@@ -372,61 +418,230 @@ function JoinPanel({ community, defaultName, error, onJoin }: { community: Commu
 }
 
 function HomeView({ base, data, userId, onReload, onMessage, onError }: ViewMutationProps & { base: string }) {
+  const [selectedProfile, setSelectedProfile] = useState<CommunityDashboard["profiles"][number] | null>(null);
   const visiblePosts = data.posts.filter((post) => !post.isHidden);
-  const visibleEvents = data.events.filter((event) => event.status !== "cancelled");
+  const now = Date.now();
+  const visibleEvents = data.events.filter((event) => event.status !== "cancelled" && new Date(event.endsAt ?? event.startsAt).getTime() >= now);
   const visibleResources = data.resources.filter((resource) => resource.isPublished);
-  const pinned = visiblePosts.filter((post) => post.isPinned).slice(0, 3);
-  const recent = visiblePosts.slice(0, 6);
+  const pinned = visiblePosts.find((post) => post.isPinned);
+  const recent = data.activities.slice(0, 7);
+  const roomsById = new Map(data.rooms.map((room) => [room.id, room]));
+  const unreadCount = data.rooms.reduce((total, room) => total + room.unreadCount, 0);
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const activeTodayRoomIds = new Set(data.activities.filter((activity) => new Date(activity.createdAt).getTime() >= todayStart.getTime()).map((activity) => activity.roomId));
+  const todayActivityCount = data.activities.filter((activity) => new Date(activity.createdAt).getTime() >= todayStart.getTime()).length;
+  const trendingRooms = data.rooms
+    .filter((room) => !room.isArchived && !room.isLocked && room.postCount + room.commentCount + room.messageCount > 0)
+    .sort((left, right) => (right.unreadCount * 3 + right.postCount + right.commentCount + right.messageCount) - (left.unreadCount * 3 + left.postCount + left.commentCount + left.messageCount))
+    .slice(0, 3);
+  const attentionRoom = data.rooms.find((room) => room.unreadCount > 0 && !room.isLocked && !room.isArchived) ?? trendingRooms[0];
+  const newMembers = [...data.profiles].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()).slice(0, 5);
+  const visibleRooms = data.rooms.filter((room) => !room.isArchived && !room.isLocked);
+  const metricCards: Record<CommunityHomeMetric, { icon: React.ReactNode; label: string; value: string; helper: string; color: string }> = {
+    unread: { icon: <Bell size={16} />, label: "未読", value: `${unreadCount}件`, helper: unreadCount > 0 ? "新着あり" : "確認済み", color: "var(--mikke-orange)" },
+    today_activity: { icon: <Flame size={16} />, label: "今日", value: `${todayActivityCount}件`, helper: `${activeTodayRoomIds.size} Room`, color: "var(--mikke-pink)" },
+    upcoming_events: { icon: <CalendarDays size={16} />, label: "開催予定", value: `${visibleEvents.length}件`, helper: "これからの予定", color: "var(--mikke-green)" },
+    rooms: { icon: <MessagesSquare size={16} />, label: "Room", value: `${visibleRooms.length}室`, helper: "参加できるRoom", color: "var(--mikke-blue)" },
+    posts: { icon: <MessageCircle size={16} />, label: "投稿", value: `${visibleRooms.reduce((sum, room) => sum + room.postCount, 0)}件`, helper: "スレッド投稿", color: "var(--mikke-orange)" },
+    comments: { icon: <Reply size={16} />, label: "コメント", value: `${visibleRooms.reduce((sum, room) => sum + room.commentCount, 0)}件`, helper: "会話への返信", color: "var(--mikke-pink)" },
+    chat_messages: { icon: <Send size={16} />, label: "チャット", value: `${visibleRooms.reduce((sum, room) => sum + room.messageCount, 0)}件`, helper: "メッセージ", color: "var(--mikke-blue)" },
+    resources: { icon: <Library size={16} />, label: "資料", value: `${visibleResources.length}件`, helper: "公開中の資料", color: "var(--mikke-green)" }
+  };
+
+  async function updateAttendance(event: CommunityEvent) {
+    try {
+      const nextStatus = event.attendeeStatus === "going" ? "cancelled" : "going";
+      await setEventAttendance(supabase, event.id, userId, nextStatus);
+      onMessage(nextStatus === "going" ? "参加予定にしました。" : "参加予定を取り消しました。");
+      await onReload();
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "参加予定を更新できませんでした。"));
+    }
+  }
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-      <div className="space-y-5">
-        <section className="border-t border-[var(--mikke-line)] pt-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold uppercase text-[var(--mikke-muted-light)]">Home</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-normal">最新のお知らせ</h2>
+    <div className="space-y-6 overflow-hidden">
+      <section className="relative overflow-hidden rounded-3xl border border-[var(--mikke-line-soft)] bg-[linear-gradient(135deg,color-mix(in_srgb,var(--mikke-yellow)_58%,white),color-mix(in_srgb,var(--mikke-pink)_42%,white))] px-5 py-6 sm:px-7 sm:py-8">
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--mikke-primary)]">TODAY&apos;S COMMUNITY</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-normal text-[var(--mikke-primary)] sm:text-3xl">おかえりなさい、{data.profile?.displayName ?? "member"}さん</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--mikke-text-soft)]">今日の動きや気になるRoomを、ここからのぞいてみましょう。</p>
+          </div>
+          {attentionRoom ? <Link href={`${base}/rooms/${attentionRoom.id}`} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--mikke-primary)] px-5 py-3 text-sm font-bold text-white shadow-sm">{attentionRoom.unreadCount > 0 ? `${attentionRoom.unreadCount}件の未読を見る` : `${attentionRoom.title}を見る`}<ArrowRight size={16} /></Link> : <Link href={`${base}/rooms`} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--mikke-primary)] px-5 py-3 text-sm font-bold text-white"><DoorOpen size={16} />Roomを見る</Link>}
+        </div>
+      </section>
+
+      <section className="grid grid-cols-2 gap-2 sm:max-w-md">
+        <Link href={`${base}/search`} className="flex items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-xs font-bold text-[var(--mikke-primary)]"><Search size={15} />Community内を検索</Link>
+        <Link href={`${base}/bookmarks`} className="flex items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-xs font-bold text-[var(--mikke-primary)]"><Bookmark size={15} />保存した投稿</Link>
+      </section>
+
+      <section className="grid grid-cols-3 gap-2 sm:gap-3">
+        {data.community.homeMetrics.map((metric) => <HomeSummaryCard key={metric} {...metricCards[metric]} />)}
+      </section>
+
+      {pinned ? (
+        <Link href={`${base}/rooms/${pinned.roomId}/posts/${pinned.id}`} className="group flex min-w-0 items-center gap-4 rounded-2xl border border-[color-mix(in_srgb,var(--mikke-orange)_45%,var(--mikke-line))] bg-[color-mix(in_srgb,var(--mikke-orange)_10%,white)] px-4 py-4 sm:px-5">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[var(--mikke-orange)] text-white"><Bell size={20} /></span>
+          <span className="min-w-0 flex-1"><span className="block text-xs font-bold text-[var(--mikke-accent-strong)]">運営からのお知らせ</span><span className="mt-1 block truncate font-bold">{pinned.title}</span></span>
+          <CircleChevronRight className="shrink-0 text-[var(--mikke-primary)] transition-transform group-hover:translate-x-0.5" size={22} />
+        </Link>
+      ) : null}
+
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-6">
+          <section>
+            <div className="flex items-end justify-between gap-3">
+              <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-muted-light)]">PICK UP ROOM</p><h2 className="mt-1 text-xl font-bold tracking-normal">注目Room</h2></div>
+              <Link href={`${base}/rooms`} className="shrink-0 text-xs font-bold text-[var(--mikke-primary)]">すべて見る →</Link>
             </div>
-            <Link href={`${base}/rooms`} className="inline-flex items-center gap-2 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">
-              <DoorOpen size={15} /> Roomへ
-            </Link>
-          </div>
-          <div className="mt-4 space-y-3">
-            {pinned.length > 0 ? pinned.map((post) => <ThreadListItem key={post.id} post={post} href={`${base}/rooms/${post.roomId}/posts/${post.id}`} />) : <MikkeEmptyState title="固定のお知らせはまだありません" helper="新アプリリリースや説明会情報をここに固定できます。" />}
-          </div>
-        </section>
-        <section className="border-t border-[var(--mikke-line)] pt-5">
-          <h2 className="text-lg font-bold tracking-normal">新着投稿</h2>
-          <div className="mt-4 space-y-3">
-            {recent.length > 0 ? recent.map((post) => <ThreadListItem key={post.id} post={post} href={`${base}/rooms/${post.roomId}/posts/${post.id}`} />) : <MikkeEmptyState title="投稿はまだありません" helper="Roomから最初の投稿を作成できます。" />}
-          </div>
-        </section>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {trendingRooms.map((room) => <HomeRoomCard key={room.id} room={room} profiles={data.profiles} href={`${base}/rooms/${room.id}`} />)}
+              {trendingRooms.length === 0 ? <div className="md:col-span-3"><MikkeEmptyState title="これから会話が始まります" helper="Roomをのぞいて、最初の話題を投稿してみましょう。" /></div> : null}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 sm:p-5">
+            <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-muted-light)]">RECENT ACTIVITY</p><h2 className="mt-1 text-xl font-bold tracking-normal">最新の動き</h2></div><MessageCircle className="text-[var(--mikke-primary)]" size={24} /></div>
+            <div className="mt-3 divide-y divide-[var(--mikke-line-soft)]">
+              {recent.length > 0 ? recent.map((activity) => <ActivityListItem key={`${activity.kind}-${activity.id}`} activity={activity} room={roomsById.get(activity.roomId)} href={activity.postId ? `${base}/rooms/${activity.roomId}/posts/${activity.postId}` : `${base}/rooms/${activity.roomId}`} />) : <MikkeEmptyState title="投稿はまだありません" helper="Roomから最初の投稿を作成できます。" />}
+            </div>
+          </section>
+        </div>
+
+        <aside className="min-w-0 space-y-4">
+          <section className="rounded-2xl border border-[color-mix(in_srgb,var(--mikke-yellow)_70%,var(--mikke-line))] bg-[color-mix(in_srgb,var(--mikke-yellow)_18%,white)] p-5">
+            <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-primary)]">NEXT EVENT</p><h2 className="mt-1 text-lg font-bold">次の予定</h2></div><CalendarDays className="text-[var(--mikke-primary)]" size={24} /></div>
+            {visibleEvents[0] ? <HomeEventCard event={visibleEvents[0]} onUpdate={() => updateAttendance(visibleEvents[0])} /> : <p className="mt-5 rounded-xl bg-white/80 px-4 py-5 text-sm text-[var(--mikke-muted)]">次の予定はまだありません。</p>}
+          </section>
+
+          <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-muted-light)]">NEW MEMBERS</p>
+            <h2 className="mt-1 text-lg font-bold">新しいメンバー</h2>
+            <div className="mt-4 space-y-3">
+              {newMembers.map((profile) => <button type="button" onClick={() => setSelectedProfile(profile)} key={profile.userId} className="flex w-full items-center gap-3 rounded-xl p-1 text-left transition hover:bg-[var(--mikke-surface-soft)]"><MemberAvatar name={profile.displayName} avatarUrl={profile.avatarUrl} color={profile.avatarColor} size="sm" /><div className="min-w-0"><p className="truncate text-sm font-bold">{profile.displayName}</p><p className="truncate text-xs text-[var(--mikke-muted-light)]">{profile.bio || "プロフィールはまだ未設定です"}</p></div></button>)}
+              {newMembers.length === 0 ? <p className="text-sm text-[var(--mikke-muted)]">メンバーが参加するとここに表示されます。</p> : null}
+            </div>
+            {data.profile && !data.profile.avatarUrl && !data.profile.bio ? <Link href={`${base}/profile`} className="mt-4 flex items-center justify-between rounded-xl bg-[var(--mikke-accent-soft)] px-3 py-2.5 text-xs font-bold text-[var(--mikke-primary)]">自分のプロフィールを設定する <ArrowRight size={14} /></Link> : null}
+          </section>
+
+          {visibleResources.length > 0 ? <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5"><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-muted-light)]">PICK UP</p><h2 className="mt-1 text-lg font-bold">資料</h2><div className="mt-3 space-y-1">{visibleResources.slice(0, 3).map((resource) => <a key={resource.id} href={resource.externalUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-bold text-[var(--mikke-primary)] hover:bg-[var(--mikke-surface-soft)]"><span className="truncate">{resource.title}</span><ArrowRight size={15} /></a>)}</div></section> : null}
+        </aside>
       </div>
-      <aside className="space-y-4">
-        <SidePanel title="次の予定">
-          {visibleEvents.slice(0, 3).map((event) => <EventMini key={event.id} event={event} />)}
-          {visibleEvents.length === 0 ? <p className="text-sm text-[var(--mikke-muted)]">予定はまだありません。</p> : null}
-        </SidePanel>
-        <SidePanel title="資料">
-          {visibleResources.slice(0, 4).map((resource) => (
-            <a key={resource.id} href={resource.externalUrl} target="_blank" rel="noreferrer" className="block border-t border-[var(--mikke-line-soft)] py-3 text-sm font-bold text-[var(--mikke-primary)] first:border-t-0">
-              {resource.title}
-            </a>
-          ))}
-          {visibleResources.length === 0 ? <p className="text-sm text-[var(--mikke-muted)]">資料リンクはまだありません。</p> : null}
-        </SidePanel>
-      </aside>
+      {selectedProfile ? <MemberProfilePreview profile={selectedProfile} onClose={() => setSelectedProfile(null)} /> : null}
     </div>
   );
 }
 
-function roomColorBorderClass(color: CommunityRoomColor) {
-  return {
-    blue: "border-[var(--mikke-blue)]",
-    orange: "border-[var(--mikke-orange)]",
-    yellow: "border-[var(--mikke-yellow)]",
-    pink: "border-[var(--mikke-pink)]",
-    green: "border-[var(--mikke-green)]"
-  }[color];
+function HomeSummaryCard({ icon, label, value, helper, color }: { icon: React.ReactNode; label: string; value: string; helper: string; color: string }) {
+  return (
+    <article className="min-w-0 rounded-xl border border-[var(--mikke-line-soft)] bg-white px-2 py-2.5 shadow-sm sm:rounded-2xl sm:p-4">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-3"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-white sm:h-9 sm:w-9" style={{ background: color }}>{icon}</span><div className="min-w-0"><p className="truncate text-[10px] font-bold text-[var(--mikke-muted)] sm:text-xs">{label}</p><p className="truncate text-sm font-bold tracking-normal sm:text-lg">{value}</p><p className="hidden truncate text-[10px] text-[var(--mikke-muted-light)] sm:block">{helper}</p></div></div>
+    </article>
+  );
+}
+
+function CommunitySearchView({ base, data }: { base: string; data: CommunityDashboard }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<CommunitySearchResult[]>([]);
+  const [searched, setSearched] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSearching(true);
+    setSearchError("");
+    try {
+      setResults(await searchCommunity(supabase, data.community.id, data.community.slug, query));
+      setSearched(true);
+    } catch (error) {
+      setSearchError(communityErrorMessage(error, "検索できませんでした。"));
+    } finally {
+      setSearching(false);
+    }
+  }
+  const labels: Record<CommunitySearchResult["kind"], string> = { room: "Room", post: "投稿", comment: "コメント", chat: "チャット", event: "イベント", resource: "資料" };
+  return (
+    <section className="mx-auto max-w-4xl">
+      <Link href={base} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} />HOMEへ戻る</Link>
+      <div className="mt-5 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 sm:p-6">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-muted-light)]">COMMUNITY SEARCH</p>
+        <h2 className="mt-1 text-2xl font-bold">Community内を検索</h2>
+        <form onSubmit={submit} className="mt-4 flex gap-2"><input required minLength={2} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Room・投稿・コメントを検索" className="min-w-0 flex-1 rounded-xl border border-[var(--mikke-line)] px-4 py-3 text-sm outline-none focus:border-[var(--mikke-primary)]" /><button disabled={searching} className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[var(--mikke-primary)] text-white disabled:opacity-60" aria-label="検索"><Search size={19} /></button></form>
+        {searchError ? <p className="mt-3 text-sm font-bold text-[var(--mikke-danger)]">{searchError}</p> : null}
+      </div>
+      <div className="mt-5 space-y-2">
+        {results.map((result) => <Link key={`${result.kind}-${result.id}`} href={result.href} className="flex min-w-0 items-center gap-3 rounded-2xl border border-[var(--mikke-line-soft)] bg-white px-4 py-3 transition hover:border-[var(--mikke-primary)]"><span className="shrink-0 rounded-full bg-[var(--mikke-yellow)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-primary)]">{labels[result.kind]}</span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{result.title}</span><span className="mt-0.5 block truncate text-xs text-[var(--mikke-muted)]">{result.excerpt || "内容を見る"}</span></span><CircleChevronRight size={20} className="shrink-0 text-[var(--mikke-primary)]" /></Link>)}
+        {searched && results.length === 0 ? <MikkeEmptyState title="一致する内容がありません" helper="別の言葉でもう一度検索してみてください。" /> : null}
+      </div>
+    </section>
+  );
+}
+
+function BookmarksView({ base, data }: { base: string; data: CommunityDashboard }) {
+  const posts = data.posts.filter((post) => post.bookmarkedByMe && !post.isHidden);
+  return (
+    <section className="mx-auto max-w-4xl">
+      <Link href={base} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} />HOMEへ戻る</Link>
+      <div className="mt-5 flex items-center gap-3"><span className="grid h-11 w-11 place-items-center rounded-2xl bg-[var(--mikke-yellow)] text-[var(--mikke-primary)]"><Bookmark size={21} /></span><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-muted-light)]">BOOKMARKS</p><h2 className="text-2xl font-bold">保存した投稿</h2></div></div>
+      <div className="mt-5 space-y-3">
+        {posts.map((post) => <Link key={post.id} href={`${base}/rooms/${post.roomId}/posts/${post.id}`} className="flex min-w-0 items-center gap-4 rounded-2xl border border-[var(--mikke-line)] bg-white px-4 py-4 shadow-sm transition hover:border-[var(--mikke-primary)]"><MemberAvatar name={post.profile?.displayName} avatarUrl={post.profile?.avatarUrl} color={post.profile?.avatarColor} size="sm" /><span className="min-w-0 flex-1"><span className="block truncate font-bold">{post.title}</span><span className="mt-1 block truncate text-xs text-[var(--mikke-muted)]">{post.body}</span><span className="mt-1 block text-[10px] text-[var(--mikke-muted-light)]">{post.room?.title ?? "Room"} ・ {formatDateTime(post.createdAt)}</span></span><CircleChevronRight size={21} className="shrink-0 text-[var(--mikke-primary)]" /></Link>)}
+        {posts.length === 0 ? <MikkeEmptyState title="保存した投稿はありません" helper="投稿画面のしおりアイコンから、あとで読みたい投稿を保存できます。" /> : null}
+      </div>
+    </section>
+  );
+}
+
+function HomeRoomCard({ room, profiles, href }: { room: CommunityRoom; profiles: CommunityDashboard["profiles"]; href: string }) {
+  const total = room.conversationMode === "chat" ? room.messageCount : room.postCount + room.commentCount;
+  return (
+    <Link href={href} className="group flex min-w-0 items-center gap-3 rounded-xl border-2 bg-white px-3 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md" style={{ borderColor: roomColorValue(room.themeColor) }}>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ background: `color-mix(in srgb, ${roomColorValue(room.themeColor)} 28%, white)`, color: "var(--mikke-primary)" }}>{room.conversationMode === "chat" ? <MessagesSquare size={18} /> : <MessageCircle size={18} />}</span>
+      <span className="min-w-0 flex-1"><span className="flex min-w-0 items-center gap-2"><span className="truncate text-sm font-bold">{room.title}</span>{room.unreadCount > 0 ? <span className="shrink-0 rounded-full bg-[var(--mikke-primary)] px-1.5 py-0.5 text-[9px] font-bold text-white">{room.unreadCount}</span> : null}</span><span className="mt-0.5 flex items-center gap-2 text-[10px] text-[var(--mikke-muted)]"><span>{total}件の会話</span><MiniMemberStack userIds={room.recentSpeakerUserIds.slice(0, 3)} speakerCount={room.speakerCount} profiles={profiles} /></span></span>
+      <CircleChevronRight className="shrink-0 text-[var(--mikke-primary)] transition-transform group-hover:translate-x-0.5" size={20} />
+    </Link>
+  );
+}
+
+function MiniMemberStack({ userIds, speakerCount, profiles }: { userIds: string[]; speakerCount: number; profiles: CommunityDashboard["profiles"] }) {
+  const profilesByUser = new Map(profiles.map((profile) => [profile.userId, profile]));
+  return <span className="flex min-w-0 items-center">{userIds.map((userId, index) => { const profile = profilesByUser.get(userId); return profile?.avatarUrl ? <img key={userId} src={profile.avatarUrl} alt={profile.displayName} className={`h-7 w-7 rounded-full border-2 border-white object-cover ${index > 0 ? "-ml-2" : ""}`} /> : <span key={userId} className={`grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-[var(--mikke-pink)] text-[10px] font-bold text-[var(--mikke-primary)] ${index > 0 ? "-ml-2" : ""}`}>{(profile?.displayName ?? "M").slice(0, 1).toUpperCase()}</span>; })}{speakerCount > 5 ? <span className="ml-1 text-xs tracking-widest text-[var(--mikke-muted)]">…</span> : null}</span>;
+}
+
+function HomeEventCard({ event, onUpdate }: { event: CommunityEvent; onUpdate: () => Promise<void> }) {
+  const date = new Date(event.startsAt);
+  return (
+    <article className="mt-4 overflow-hidden rounded-2xl border border-[color-mix(in_srgb,var(--mikke-orange)_35%,var(--mikke-line))] bg-[color-mix(in_srgb,var(--mikke-yellow)_35%,white)] shadow-sm">
+      <div className="flex items-stretch"><div className="grid w-20 shrink-0 place-items-center bg-[var(--mikke-orange)] px-2 py-4 text-center text-white"><span><span className="block text-xs font-bold">{date.toLocaleDateString("ja-JP", { month: "short" })}</span><span className="block text-3xl font-bold leading-none">{date.getDate()}</span><span className="mt-1 block text-[10px]">{date.toLocaleDateString("ja-JP", { weekday: "short" })}</span></span></div><div className="min-w-0 flex-1 p-4"><p className="truncate font-bold">{event.title}</p><p className="mt-1 text-xs font-bold text-[var(--mikke-accent-strong)]">{date.toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}</p>{event.locationLabel ? <p className="mt-1 truncate text-xs text-[var(--mikke-muted)]">{event.locationLabel}</p> : null}</div></div>
+      <button type="button" onClick={onUpdate} className={`w-full border-t border-[var(--mikke-line-soft)] px-4 py-3 text-xs font-bold ${event.attendeeStatus === "going" ? "bg-[var(--mikke-yellow)] text-[var(--mikke-primary)]" : "text-[var(--mikke-primary)]"}`}>{event.attendeeStatus === "going" ? "✓ 参加予定です" : "参加予定にする"}</button>
+    </article>
+  );
+}
+
+function ActivityListItem({ activity, room, href }: { activity: CommunityActivity; room?: CommunityRoom; href: string }) {
+  const label = activity.kind === "chat" ? "チャット" : activity.kind === "comment" ? "コメント" : "投稿";
+  return (
+    <Link href={href} className="flex min-w-0 gap-2.5 border-l-[3px] px-2 py-3 transition-colors hover:bg-[var(--mikke-surface-soft)] sm:px-4" style={{ borderLeftColor: room ? roomColorValue(room.themeColor) : "var(--mikke-yellow)" }}>
+      <MemberAvatar name={activity.profile?.displayName} avatarUrl={activity.profile?.avatarUrl} color={activity.profile?.avatarColor} size="sm" />
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-bold">{activity.profile?.displayName ?? "member"}</span>
+          <span className="rounded-full bg-[var(--mikke-yellow)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-primary)]">{label}</span>
+          <span className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(activity.createdAt)}</span>
+        </span>
+        <span className="mt-0.5 block truncate text-sm font-bold text-[var(--mikke-text)]">{activity.title}</span>
+        <span className="mt-0.5 block truncate text-xs text-[var(--mikke-muted)]">{activity.body}</span>
+        {room ? <span className="mt-1 block truncate text-[10px] text-[var(--mikke-muted-light)]">in {room.title}</span> : null}
+      </span>
+      <CircleChevronRight aria-hidden="true" className="mt-2 shrink-0 text-[var(--mikke-primary)]" size={20} />
+    </Link>
+  );
+}
+
+function MemberProfilePreview({ profile, onClose }: { profile: CommunityDashboard["profiles"][number]; onClose: () => void }) {
+  return <div className="fixed inset-0 z-[80] grid place-items-center bg-black/30 p-4" role="dialog" aria-modal="true" aria-label={`${profile.displayName}のプロフィール`} onClick={onClose}><article onClick={(event) => event.stopPropagation()} className="w-full max-w-md rounded-3xl border border-[var(--mikke-line)] bg-white p-6 shadow-xl"><div className="flex justify-end"><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full bg-[var(--mikke-surface-soft)] text-[var(--mikke-primary)]" aria-label="閉じる"><X size={18} /></button></div><div className="-mt-2 text-center"><div className="inline-flex"><MemberAvatar name={profile.displayName} avatarUrl={profile.avatarUrl} color={profile.avatarColor} /></div><h2 className="mt-3 text-xl font-bold">{profile.displayName}</h2><p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-muted)]">{profile.bio || "自己紹介はまだありません。"}</p></div></article></div>;
 }
 
 function roomColorValue(color: CommunityRoomColor) {
@@ -441,18 +656,31 @@ function roomColorValue(color: CommunityRoomColor) {
 
 function RoomsView({ base, data }: { base: string; data: CommunityDashboard }) {
   const visibleRooms = data.rooms.filter((room) => !room.isArchived && !room.isLocked);
+  const profilesByUser = new Map(data.profiles.map((profile) => [profile.userId, profile]));
   return (
     <section className="border-t border-[var(--mikke-line)] pt-5">
       <h2 className="text-2xl font-bold tracking-normal">ROOMS</h2>
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {visibleRooms.map((room) => (
-          <Link key={room.id} href={`${base}/rooms/${room.id}`} style={{ background: `color-mix(in srgb, ${roomColorValue(room.themeColor)} 24%, white)` }} className={`flex items-center gap-4 border-l-[6px] px-5 py-4 transition-opacity hover:opacity-80 ${roomColorBorderClass(room.themeColor)}`}>
+          <Link key={room.id} href={`${base}/rooms/${room.id}`} style={{ borderColor: roomColorValue(room.themeColor) }} className="flex items-center gap-4 rounded-2xl border-2 bg-white px-5 py-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
             <span className="min-w-0 flex-1">
             <span className="flex items-center gap-2">
               <h3 className="text-lg font-bold tracking-normal">{room.title}</h3>
               {room.unreadCount > 0 ? <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-[var(--mikke-blue)] px-1.5 py-0.5 text-xs font-bold text-white" aria-label={`未読${room.unreadCount}件`}>{room.unreadCount > 99 ? "99+" : room.unreadCount}</span> : null}
             </span>
             {room.description ? <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{room.description}</p> : null}
+            <span className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-bold text-[var(--mikke-muted)]">
+              <span>{room.conversationMode === "chat" ? `${room.messageCount}件のメッセージ` : `${room.postCount}件の投稿・${room.commentCount}件のコメント`}</span>
+              <span className="flex items-center">
+                {room.recentSpeakerUserIds.map((speakerId, index) => {
+                  const profile = profilesByUser.get(speakerId);
+                  return profile?.avatarUrl
+                    ? <img key={speakerId} src={profile.avatarUrl} alt={profile.displayName} title={profile.displayName} className={`h-7 w-7 rounded-full border-2 border-white object-cover ${index > 0 ? "-ml-2" : ""}`} />
+                    : <span key={speakerId} title={profile?.displayName ?? "member"} className={`grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-[var(--mikke-pink)] text-[10px] text-[var(--mikke-primary)] ${index > 0 ? "-ml-2" : ""}`}>{(profile?.displayName ?? "M").slice(0, 1).toUpperCase()}</span>;
+                })}
+                {room.speakerCount > 5 ? <span className="ml-1 tracking-widest" aria-label={`ほか${room.speakerCount - 5}人`}>…</span> : null}
+              </span>
+            </span>
             </span>
             <CircleChevronRight aria-hidden="true" className="shrink-0 text-[var(--mikke-primary)]" size={24} />
           </Link>
@@ -487,7 +715,7 @@ function RoomView({ data, userId, roomId, onReload, onMessage, onError }: ViewMu
   return (
     <section>
       <Link href={`${base}/rooms`} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> Room一覧へ戻る</Link>
-      <div className={`mt-4 border-t-4 pt-5 ${roomColorBorderClass(room.themeColor)}`}>
+      <div className="mt-4 border-t-4 pt-5" style={{ borderColor: roomColorValue(room.themeColor) }}>
         <h2 className="text-2xl font-bold tracking-normal">{room.title}</h2>
         {room.description ? <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{room.description}</p> : null}
       </div>
@@ -535,6 +763,9 @@ function ChatRoomView({ data, room, userId, staff, onMessage, onError }: { data:
     const channel = supabase
       .channel(`community-chat-${room.id}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "community_chat_messages", filter: `room_id=eq.${room.id}` }, () => {
+        if (active) void reloadMessages(true);
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "community_chat_message_reactions", filter: `room_id=eq.${room.id}` }, () => {
         if (active) void reloadMessages(true);
       })
       .subscribe();
@@ -669,7 +900,7 @@ function ChatMessageRow({ message, own, staff, userId, onReply, onReact, onReloa
 
   return (
     <article className={`flex items-end gap-2 ${own ? "justify-end" : "justify-start"}`}>
-      {!own ? <MemberAvatar name={message.profile?.displayName} avatarUrl={message.profile?.avatarUrl} /> : null}
+      {!own ? <MemberAvatar name={message.profile?.displayName} avatarUrl={message.profile?.avatarUrl} color={message.profile?.avatarColor} /> : null}
       <div className={`max-w-[82%] ${own ? "items-end" : "items-start"}`}>
         {!own ? <p className="mb-1 px-1 text-xs font-bold text-[var(--mikke-primary)]">{message.profile?.displayName ?? "member"}</p> : null}
         <div className={`rounded-2xl px-3 py-2 shadow-sm ${own ? "rounded-br-sm bg-[var(--mikke-yellow)]" : "rounded-bl-sm bg-white"}`}>
@@ -691,7 +922,7 @@ function ThreadListItem({ post, href }: { post: CommunityPost; href: string }) {
   const commentCount = (post.comments ?? []).filter((comment) => !comment.isHidden).length;
   return (
     <Link href={href} className="flex gap-3 px-2 py-4 transition-colors hover:bg-[var(--mikke-surface-soft)] sm:px-4">
-      <MemberAvatar name={post.profile?.displayName} avatarUrl={post.profile?.avatarUrl} />
+      <MemberAvatar name={post.profile?.displayName} avatarUrl={post.profile?.avatarUrl} color={post.profile?.avatarColor} />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="text-sm font-bold text-[var(--mikke-text)]">{post.profile?.displayName ?? "member"}</span>
@@ -787,9 +1018,10 @@ function PostThreadView({ base, data, userId, roomId, postId, onReload, onMessag
   );
 }
 
-function MemberAvatar({ name, avatarUrl }: { name?: string; avatarUrl?: string | null }) {
-  if (avatarUrl) return <img src={avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full border border-[var(--mikke-line-soft)] object-cover" />;
-  return <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[var(--mikke-pink)] text-sm font-bold text-[var(--mikke-primary)]">{(name ?? "M").trim().slice(0, 1).toUpperCase()}</span>;
+function MemberAvatar({ name, avatarUrl, color = "pink", size = "md" }: { name?: string; avatarUrl?: string | null; color?: CommunityRoomColor; size?: "sm" | "md" }) {
+  const sizeClass = size === "sm" ? "h-8 w-8 text-xs" : "h-10 w-10 text-sm";
+  if (avatarUrl) return <img src={avatarUrl} alt="" className={`${sizeClass} shrink-0 rounded-full border border-[var(--mikke-line-soft)] object-cover`} />;
+  return <span aria-hidden="true" style={{ background: roomColorValue(color) }} className={`grid ${sizeClass} shrink-0 place-items-center rounded-full font-bold text-[var(--mikke-primary)]`}>{(name ?? "M").trim().slice(0, 1).toUpperCase()}</span>;
 }
 
 function PostCard({ post, stamps, userId, canComment, onReload, onMessage, onError }: { post: CommunityPost; stamps: CommunityDashboard["stamps"]; userId: string; canComment: boolean; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
@@ -854,34 +1086,69 @@ function PostCard({ post, stamps, userId, canComment, onReload, onMessage, onErr
     } finally { setSaving(false); }
   }
 
+  async function reactToPost(emoji: string) {
+    try {
+      await toggleCommunityPostReaction(supabase, { communityId: post.communityId, roomId: post.roomId, postId: post.id, userId, emoji });
+      await onReload();
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "リアクションを更新できませんでした。"));
+    }
+  }
+
+  async function toggleBookmark() {
+    setSaving(true);
+    try {
+      await toggleCommunityPostBookmark(supabase, { communityId: post.communityId, roomId: post.roomId, postId: post.id, userId, bookmarked: post.bookmarkedByMe });
+      onMessage(post.bookmarkedByMe ? "保存を解除しました。" : "投稿を保存しました。");
+      await onReload();
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "投稿を保存できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <article className="border-t-4 border-[var(--mikke-blue)] bg-white px-4 py-5 sm:px-6">
       <div className="flex items-start gap-3">
-        <MemberAvatar name={post.profile?.displayName} avatarUrl={post.profile?.avatarUrl} />
+        <MemberAvatar name={post.profile?.displayName} avatarUrl={post.profile?.avatarUrl} color={post.profile?.avatarColor} />
         <div className="min-w-0 flex-1">
           <p className="font-bold">{post.profile?.displayName ?? "member"}</p>
           <p className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(post.createdAt)}{post.updatedAt !== post.createdAt ? "・編集済み" : ""}</p>
         </div>
-        {ownPost ? <div className="flex gap-1"><button type="button" onClick={() => setEditing((value) => !value)} className="p-2 text-[var(--mikke-primary)]" aria-label="投稿を編集"><Pencil size={16} /></button><button type="button" disabled={saving} onClick={removePost} className="p-2 text-[var(--mikke-danger)] disabled:opacity-50" aria-label="投稿を削除"><Trash2 size={16} /></button></div> : null}
+        <div className="flex gap-1"><button type="button" disabled={saving} onClick={toggleBookmark} className={`rounded-lg p-2 disabled:opacity-50 ${post.bookmarkedByMe ? "bg-[var(--mikke-yellow)] text-[var(--mikke-primary)]" : "text-[var(--mikke-muted)]"}`} aria-label={post.bookmarkedByMe ? "投稿の保存を解除" : "投稿を保存"} title={post.bookmarkedByMe ? "保存済み" : "あとで読む"}><Bookmark size={16} fill={post.bookmarkedByMe ? "currentColor" : "none"} /></button>{ownPost ? <><button type="button" onClick={() => setEditing((value) => !value)} className="p-2 text-[var(--mikke-primary)]" aria-label="投稿を編集"><Pencil size={16} /></button><button type="button" disabled={saving} onClick={removePost} className="p-2 text-[var(--mikke-danger)] disabled:opacity-50" aria-label="投稿を削除"><Trash2 size={16} /></button></> : null}</div>
       </div>
       {editing ? <form onSubmit={savePost} className="mt-4 border-l-4 border-[var(--mikke-pink)] pl-4"><input required value={title} onChange={(event) => setTitle(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-bold" /><textarea required rows={5} value={body} onChange={(event) => setBody(event.target.value)} className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-7" /><input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="参考URL（任意）" className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-3 flex gap-2"><button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white">保存</button><button type="button" onClick={() => setEditing(false)} className="rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold">キャンセル</button></div></form> : <><h3 className="mt-4 text-xl font-bold tracking-normal">{post.title}</h3>{post.imageUrl ? <img src={post.imageUrl} alt="投稿画像" className="mt-4 max-h-[520px] w-full rounded-xl border border-[var(--mikke-line-soft)] object-contain" /> : null}<p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--mikke-text-soft)]">{post.body}</p>{post.url ? <a href={post.url} target="_blank" rel="noreferrer" className="mt-3 inline-flex text-sm font-bold text-[var(--mikke-primary)]">参考リンクを開く</a> : null}{(post.attachments ?? []).length > 0 ? <div className="mt-4 flex flex-wrap gap-2">{(post.attachments ?? []).map((attachment) => <AttachmentButton key={attachment.id} attachment={attachment} onError={onError} />)}</div> : null}</>}
+      <div className="mt-4"><ReactionBar reactions={post.reactions} onReact={reactToPost} /></div>
       <div className="mt-4 border-t border-[var(--mikke-line-soft)] pt-3">
         <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--mikke-primary)]">Comments</p>
-        <div className="mt-2 space-y-1">{(post.comments ?? []).filter((item) => !item.isHidden).map((item) => <CommentRow key={item.id} comment={item} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div>
+        <div className="mt-2 space-y-1">{(post.comments ?? []).filter((item) => !item.isHidden).map((item) => <CommentRow key={item.id} comment={item} communityId={post.communityId} roomId={post.roomId} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div>
         {canComment ? <><form onSubmit={submit} className="mt-4 flex items-end gap-2"><input value={comment} onChange={(event) => setComment(event.target.value)} required placeholder="コメント" className="min-w-0 flex-1 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm outline-none focus:border-[var(--mikke-accent)]" /><button disabled={saving} className="grid h-10 w-10 place-items-center rounded-lg bg-[var(--mikke-primary)] text-white disabled:opacity-60" aria-label="コメント"><Send size={16} /></button></form>{stamps.length > 0 ? <div className="mt-3 flex gap-2 overflow-x-auto pb-2">{stamps.map((stamp) => <button key={stamp.id} type="button" disabled={saving} onClick={() => sendStamp(stamp.id)} title={stamp.name} className="shrink-0 rounded-xl border border-[var(--mikke-line)] bg-white p-2 transition hover:border-[var(--mikke-primary)] disabled:opacity-50"><img src={stamp.imageUrl} alt={stamp.name} className="h-12 w-12 object-contain" /></button>)}</div> : null}</> : null}
       </div>
     </article>
   );
 }
 
-function CommentRow({ comment, userId, onReload, onMessage, onError }: { comment: NonNullable<CommunityPost["comments"]>[number]; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+function ReactionBar({ reactions, onReact }: { reactions: CommunityPost["reactions"]; onReact: (emoji: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {reactions.map((reaction) => <button key={reaction.emoji} type="button" onClick={() => onReact(reaction.emoji)} className={`rounded-full border px-2.5 py-1 text-xs font-bold ${reaction.reactedByMe ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>{reaction.emoji} {reaction.count}</button>)}
+      <button type="button" onClick={() => setOpen((current) => !current)} className="grid h-8 w-8 place-items-center rounded-full border border-[var(--mikke-line)] bg-white text-[var(--mikke-primary)]" aria-label="リアクションを追加" aria-expanded={open}><Smile size={15} /></button>
+      {open ? <span className="flex gap-1 rounded-xl border border-[var(--mikke-line-soft)] bg-white p-1 shadow-sm">{COMMUNITY_CHAT_REACTIONS.map((emoji) => <button key={emoji} type="button" onClick={async () => { await onReact(emoji); setOpen(false); }} className="grid h-8 w-8 place-items-center rounded-lg text-lg hover:bg-[var(--mikke-surface-soft)]">{emoji}</button>)}</span> : null}
+    </div>
+  );
+}
+
+function CommentRow({ comment, communityId, roomId, userId, onReload, onMessage, onError }: { comment: NonNullable<CommunityPost["comments"]>[number]; communityId: string; roomId: string; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState(comment.body);
   const [saving, setSaving] = useState(false);
   const ownComment = comment.authorUserId === userId;
   async function save(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setSaving(true); try { await updateCommunityComment(supabase, comment.id, userId, body); setEditing(false); onMessage("コメントを更新しました。"); await onReload(); } catch (error) { onError(communityErrorMessage(error, "コメントを更新できませんでした。")); } finally { setSaving(false); } }
   async function remove() { if (!window.confirm("このコメントを削除しますか？")) return; setSaving(true); try { await deleteCommunityComment(supabase, comment.id, userId); onMessage("コメントを削除しました。"); await onReload(); } catch (error) { onError(communityErrorMessage(error, "コメントを削除できませんでした。")); } finally { setSaving(false); } }
-  return <div className="flex gap-3 border-l-4 border-[var(--mikke-pink)] bg-[var(--mikke-surface-soft)] px-3 py-3"><MemberAvatar name={comment.profile?.displayName} avatarUrl={comment.profile?.avatarUrl} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold">{comment.profile?.displayName ?? "member"}</span><span className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(comment.createdAt)}{comment.updatedAt !== comment.createdAt ? "・編集済み" : ""}</span></div>{comment.stamp ? <img src={comment.stamp.imageUrl} alt={comment.stamp.name} className="mt-2 h-24 w-24 object-contain" /> : editing ? <form onSubmit={save} className="mt-2"><textarea required rows={2} value={body} onChange={(event) => setBody(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-2 flex gap-2"><button disabled={saving} className="text-xs font-bold text-[var(--mikke-primary)]">保存</button><button type="button" onClick={() => setEditing(false)} className="text-xs font-bold text-[var(--mikke-muted)]">キャンセル</button></div></form> : <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{comment.body}</p>}</div>{ownComment && !editing ? <div className="flex">{!comment.stamp ? <button type="button" onClick={() => setEditing(true)} className="p-1.5 text-[var(--mikke-primary)]" aria-label="コメントを編集"><Pencil size={14} /></button> : null}<button type="button" disabled={saving} onClick={remove} className="p-1.5 text-[var(--mikke-danger)]" aria-label="コメントを削除"><Trash2 size={14} /></button></div> : null}</div>;
+  async function react(emoji: string) { try { await toggleCommunityCommentReaction(supabase, { communityId, roomId, postId: comment.postId, commentId: comment.id, userId, emoji }); await onReload(); } catch (error) { onError(communityErrorMessage(error, "リアクションを更新できませんでした。")); } }
+  return <div className="flex gap-3 border-l-4 border-[var(--mikke-pink)] bg-[var(--mikke-surface-soft)] px-3 py-3"><MemberAvatar name={comment.profile?.displayName} avatarUrl={comment.profile?.avatarUrl} color={comment.profile?.avatarColor} /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-sm font-bold">{comment.profile?.displayName ?? "member"}</span><span className="text-xs text-[var(--mikke-muted-light)]">{formatDateTime(comment.createdAt)}{comment.updatedAt !== comment.createdAt ? "・編集済み" : ""}</span></div>{comment.stamp ? <img src={comment.stamp.imageUrl} alt={comment.stamp.name} className="mt-2 h-24 w-24 object-contain" /> : editing ? <form onSubmit={save} className="mt-2"><textarea required rows={2} value={body} onChange={(event) => setBody(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" /><div className="mt-2 flex gap-2"><button disabled={saving} className="text-xs font-bold text-[var(--mikke-primary)]">保存</button><button type="button" onClick={() => setEditing(false)} className="text-xs font-bold text-[var(--mikke-muted)]">キャンセル</button></div></form> : <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text-soft)]">{comment.body}</p>}<div className="mt-2"><ReactionBar reactions={comment.reactions} onReact={react} /></div></div>{ownComment && !editing ? <div className="flex">{!comment.stamp ? <button type="button" onClick={() => setEditing(true)} className="p-1.5 text-[var(--mikke-primary)]" aria-label="コメントを編集"><Pencil size={14} /></button> : null}<button type="button" disabled={saving} onClick={remove} className="p-1.5 text-[var(--mikke-danger)]" aria-label="コメントを削除"><Trash2 size={14} /></button></div> : null}</div>;
 }
 
 function EventsView({ events, userId, onReload, onMessage, onError }: { events: CommunityEvent[]; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
@@ -945,6 +1212,7 @@ function LibraryView({ data }: { data: CommunityDashboard }) {
 function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutationProps) {
   const [displayName, setDisplayName] = useState(data.profile?.displayName ?? "");
   const [bio, setBio] = useState(data.profile?.bio ?? "");
+  const [avatarColor, setAvatarColor] = useState<CommunityRoomColor>(data.profile?.avatarColor ?? "pink");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -953,7 +1221,7 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
     setSaving(true);
     try {
       const avatar = avatarFile ? await uploadMikkeMediaImage({ userId, file: avatarFile, sourceApp: "community-profile" }) : null;
-      await saveCommunityProfile(supabase, data.community.id, userId, displayName, bio, avatar?.publicUrl);
+      await saveCommunityProfile(supabase, data.community.id, userId, displayName, bio, avatarColor, avatar?.publicUrl);
       if (avatar) await syncMikkeMediaUsages({ appKey: "community", entityType: "member-profile", entityId: `${data.community.id}:${userId}`, assetIds: [avatar.id] });
       setAvatarFile(null);
       onMessage("プロフィールを保存しました。");
@@ -968,7 +1236,8 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
   return (
     <form onSubmit={submit} className="max-w-2xl border-t border-[var(--mikke-line)] pt-5">
       <h2 className="text-2xl font-bold tracking-normal">PROFILE</h2>
-      <div className="mt-4 flex items-center gap-4"><MemberAvatar name={displayName} avatarUrl={data.profile?.avatarUrl} /><div className="min-w-0 flex-1"><ImageFilePicker label="プロフィール画像を選ぶ" file={avatarFile} onChange={setAvatarFile} compact /></div></div>
+      <div className="mt-4 flex items-center gap-4"><MemberAvatar name={displayName} avatarUrl={data.profile?.avatarUrl} color={avatarColor} /><div className="min-w-0 flex-1"><ImageFilePicker label="プロフィール画像を選ぶ" file={avatarFile} onChange={setAvatarFile} compact /></div></div>
+      <fieldset className="mt-4"><legend className="text-sm font-bold">プロフィールカラー</legend><div className="mt-2 grid grid-cols-5 gap-2">{COMMUNITY_AVATAR_COLORS.map((option) => <button key={option.value} type="button" onClick={() => setAvatarColor(option.value)} aria-pressed={avatarColor === option.value} className={`rounded-xl border-2 px-1 py-2 text-[10px] font-bold sm:text-xs ${avatarColor === option.value ? "border-[var(--mikke-primary)]" : "border-[var(--mikke-line)]"}`}><span className="mx-auto mb-1 block h-7 w-7 rounded-full" style={{ background: roomColorValue(option.value) }} />{option.label}</button>)}</div></fieldset>
       <label className="mt-4 block">
         <span className="text-sm font-bold">表示名</span>
         <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} required className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3 outline-none focus:border-[var(--mikke-accent)]" />
@@ -1360,6 +1629,7 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
   const [name, setName] = useState(data.community.name);
   const [description, setDescription] = useState(data.community.description ?? "");
   const [joinMode, setJoinMode] = useState(data.community.joinMode);
+  const [homeMetrics, setHomeMetrics] = useState<[CommunityHomeMetric, CommunityHomeMetric, CommunityHomeMetric]>(data.community.homeMetrics);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1379,13 +1649,17 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (new Set(homeMetrics).size !== 3) {
+      onError("HOMEに表示する3つの数字は、それぞれ別の項目を選んでください。");
+      return;
+    }
     setSaving(true);
     try {
       const [logo, banner] = await Promise.all([
         logoFile ? uploadMikkeMediaImage({ userId, file: logoFile, sourceApp: "community-logo" }) : null,
         bannerFile ? uploadMikkeMediaImage({ userId, file: bannerFile, sourceApp: "community-banner" }) : null
       ]);
-      await saveCommunitySettings(supabase, data.community.id, { name, description, joinMode, logoUrl: logo?.publicUrl, bannerUrl: banner?.publicUrl });
+      await saveCommunitySettings(supabase, data.community.id, { name, description, joinMode, homeMetrics, logoUrl: logo?.publicUrl, bannerUrl: banner?.publicUrl });
       if (logo) await syncMikkeMediaUsages({ appKey: "community", entityType: "community-logo", entityId: data.community.id, assetIds: [logo.id] });
       if (banner) await syncMikkeMediaUsages({ appKey: "community", entityType: "community-banner", entityId: data.community.id, assetIds: [banner.id] });
       setLogoFile(null);
@@ -1415,6 +1689,7 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
       <label className="mt-4 block"><span className="text-sm font-bold">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3 leading-6" /></label>
       <div className="mt-4 grid gap-4 sm:grid-cols-2"><ImageFilePicker label="ブランドロゴ" file={logoFile} onChange={setLogoFile} /><ImageFilePicker label="ブランドバナー" file={bannerFile} onChange={setBannerFile} /></div>
       <label className="mt-4 block"><span className="text-sm font-bold">参加方式</span><select value={joinMode} onChange={(event) => setJoinMode(event.target.value as typeof joinMode)} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3"><option value="open_free">無料で自由参加</option><option value="invite_only">招待制</option><option value="paid">有料申込制（決済接続後）</option></select></label>
+      <fieldset className="mt-5 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4"><legend className="px-2 text-sm font-bold">HOMEに表示する3つの数字</legend><p className="mb-3 text-xs leading-5 text-[var(--mikke-muted)]">Communityの特徴に合う数字を3つ選べます。同じ項目は重複できません。</p><div className="grid gap-3 sm:grid-cols-3">{homeMetrics.map((metric, index) => <label key={index} className="block"><span className="text-xs font-bold text-[var(--mikke-muted)]">{index + 1}番目</span><select value={metric} onChange={(event) => setHomeMetrics((current) => { const next = [...current] as [CommunityHomeMetric, CommunityHomeMetric, CommunityHomeMetric]; next[index] = event.target.value as CommunityHomeMetric; return next; })} className="mt-1 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm"><option value="unread">未読</option><option value="today_activity">今日の動き</option><option value="upcoming_events">開催予定</option><option value="rooms">Room数</option><option value="posts">投稿数</option><option value="comments">コメント数</option><option value="chat_messages">チャット数</option><option value="resources">公開資料数</option></select></label>)}</div></fieldset>
       <button disabled={saving} className="mt-5 rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{saving ? "保存中..." : "設定を保存"}</button>
     </form>
   );

@@ -9,6 +9,7 @@ export type CommunityEventStatus = "open" | "closed" | "cancelled";
 export type CommunityResourceKind = "web" | "pdf" | "video" | "other";
 export type CommunityEntitlementStatus = "active" | "revoked" | "expired";
 export type CommunityEntitlementSource = "manual" | "subscription" | "external";
+export type CommunityHomeMetric = "unread" | "today_activity" | "upcoming_events" | "rooms" | "posts" | "comments" | "chat_messages" | "resources";
 
 export type Community = {
   id: string;
@@ -20,6 +21,7 @@ export type Community = {
   ownerUserId: string | null;
   logoUrl: string | null;
   bannerUrl: string | null;
+  homeMetrics: [CommunityHomeMetric, CommunityHomeMetric, CommunityHomeMetric];
 };
 
 export type CommunityPublicEntry = Pick<Community, "slug" | "name" | "description" | "joinMode" | "status" | "logoUrl" | "bannerUrl">;
@@ -41,6 +43,9 @@ export type CommunityMemberProfile = {
   displayName: string;
   bio: string | null;
   avatarUrl: string | null;
+  avatarColor: CommunityRoomColor;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CommunityEntitlementDefinition = {
@@ -85,6 +90,11 @@ export type CommunityRoom = {
   memberCanPost: boolean;
   memberCanComment: boolean;
   unreadCount: number;
+  postCount: number;
+  commentCount: number;
+  messageCount: number;
+  recentSpeakerUserIds: string[];
+  speakerCount: number;
 };
 
 export type CommunityPost = {
@@ -102,9 +112,11 @@ export type CommunityPost = {
   createdAt: string;
   updatedAt: string;
   room?: Pick<CommunityRoom, "id" | "title" | "kind"> | null;
-  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
+  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl" | "avatarColor"> | null;
   comments?: CommunityComment[];
   attachments?: CommunityPostAttachment[];
+  reactions: CommunityReactionGroup[];
+  bookmarkedByMe: boolean;
 };
 
 export type CommunityPostAttachment = {
@@ -141,7 +153,8 @@ export type CommunityComment = {
   updatedAt: string;
   stampId: string | null;
   stamp?: CommunityStamp | null;
-  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
+  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl" | "avatarColor"> | null;
+  reactions: CommunityReactionGroup[];
 };
 
 export type CommunityChatMessage = {
@@ -156,16 +169,39 @@ export type CommunityChatMessage = {
   editedAt: string | null;
   createdAt: string;
   updatedAt: string;
-  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl"> | null;
+  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl" | "avatarColor"> | null;
   replyTo?: CommunityChatMessage | null;
   stamp?: CommunityStamp | null;
-  reactions: CommunityChatReactionGroup[];
+  reactions: CommunityReactionGroup[];
 };
 
-export type CommunityChatReactionGroup = {
+export type CommunitySearchResult = {
+  id: string;
+  kind: "room" | "post" | "comment" | "chat" | "event" | "resource";
+  title: string;
+  excerpt: string;
+  href: string;
+  createdAt: string | null;
+};
+
+export type CommunityReactionGroup = {
   emoji: string;
   count: number;
   reactedByMe: boolean;
+};
+
+export type CommunityChatReactionGroup = CommunityReactionGroup;
+
+export type CommunityActivity = {
+  id: string;
+  kind: "post" | "comment" | "chat";
+  roomId: string;
+  postId: string | null;
+  authorUserId: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  profile?: Pick<CommunityMemberProfile, "displayName" | "avatarUrl" | "avatarColor"> | null;
 };
 
 export type CommunityEvent = {
@@ -207,4 +243,5 @@ export type CommunityDashboard = {
   events: CommunityEvent[];
   resources: CommunityResource[];
   stamps: CommunityStamp[];
+  activities: CommunityActivity[];
 };
