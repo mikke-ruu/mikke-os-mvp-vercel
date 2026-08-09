@@ -3,9 +3,9 @@
 import { BookOpenText, ContactRound, Pencil, QrCode } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
-import { marketNoteApp, storyApp } from "@/lib/mikkeos/released-apps";
 import { supabase } from "@/lib/supabase/client";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "./MikkeAppShell";
+import { useOwnedMikkeApps } from "./useOwnedMikkeApps";
 
 const storyNavItems: MikkeShellNavItem[] = [
   { label: "マイSTORY", href: "/story", icon: BookOpenText, section: "STORY" },
@@ -23,7 +23,8 @@ const storyBottomNavItems: MikkeShellBottomNavItem[] = [
 
 export function StoryAppShell({ children, title = "STORY", subtitle }: { children: React.ReactNode; title?: string; subtitle?: string }) {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId: user.id, currentApp: "story" });
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -37,9 +38,9 @@ export function StoryAppShell({ children, title = "STORY", subtitle }: { childre
       subtitle={subtitle}
       theme="blue"
       menuEditItems={storyNavItems.map((item) => ({ title: item.label, href: item.href, icon: item.icon }))}
-      ownedApps={[storyApp]}
+      ownedApps={ownedApps}
       otherApps={[]}
-      suggestedApps={[{ name: marketNoteApp.title, helper: "出店予定や会計を記録できます", href: marketNoteApp.href }]}
+      suggestedApps={suggestedApps}
       mikkeId={profile.handle}
       onSignOut={() => void signOut()}
       navItems={storyNavItems}

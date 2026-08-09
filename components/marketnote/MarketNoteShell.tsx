@@ -14,7 +14,7 @@ import {
 import { useAuth } from "@/components/AuthGate";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import type { MikkeOwnerMenuItem, MikkeOwnerMenuSuggestedApp } from "@/components/mikkeos/MikkeOwnerMenu";
-import { marketNoteApp } from "@/lib/mikkeos/released-apps";
+import { useOwnedMikkeApps } from "@/components/mikkeos/useOwnedMikkeApps";
 import { supabase } from "@/lib/supabase/client";
 
 const marketNoteNavItems: MikkeShellNavItem[] = [
@@ -40,10 +40,6 @@ const marketNoteEditItems: MikkeOwnerMenuItem[] = [
 
 const guestSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
   { name: "Story", helper: "ログイン後にプロフィール機能を使えます", href: "/login?next=/story" }
-];
-
-const loggedInSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
-  { name: "Story", helper: "MarketNoteの実績掲載は、本人が選んだあとに開通します", href: "/story" }
 ];
 
 const installGuideUrl = "https://mikke-os.com/install.html";
@@ -78,7 +74,8 @@ export function MarketNoteShell({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
+  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId: user.id, currentApp: "marketnote", isGuest });
   const contextualBottomNavItems = marketNoteBottomNavItems.map((item) => (
     item.primary ? { ...item, href: addHref } : item
   ));
@@ -98,9 +95,9 @@ export function MarketNoteShell({
       primaryActionTone="orange"
       showBottomNavLabels
       menuEditItems={marketNoteEditItems}
-      ownedApps={[marketNoteApp]}
+      ownedApps={ownedApps}
       otherApps={[]}
-      suggestedApps={isGuest ? guestSuggestedApps : loggedInSuggestedApps}
+      suggestedApps={isGuest ? guestSuggestedApps : suggestedApps}
       mikkeId={isGuest ? undefined : profile.handle}
       isGuest={isGuest}
       onSignOut={isGuest ? undefined : () => void signOut()}
