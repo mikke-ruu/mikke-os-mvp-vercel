@@ -1,14 +1,16 @@
 "use client";
 
 import { FormEvent, Suspense, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getJapaneseAuthError } from "@/lib/mikkeos/auth-errors";
 import { supabase } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
 
 const loginDestinations = [
-  { prefix: "/story", eyebrow: "STORY", title: "Storyをつくる" },
-  { prefix: "/marketnote", eyebrow: "MARKETNOTE", title: "MarketNoteをはじめる" }
+  { prefix: "/story", eyebrow: "STORY", title: "Storyをつくる", description: "mikke IDひとつで、Storyとmikkeのすべてのアプリが使えます。" },
+  { prefix: "/marketnote", eyebrow: "MARKETNOTE", title: "MarketNoteをはじめる", description: "mikke IDひとつで、MarketNoteとmikkeのすべてのアプリが使えます。" }
 ] as const;
 
 function safeNextPath(value: string | null) {
@@ -17,10 +19,19 @@ function safeNextPath(value: string | null) {
 }
 
 function getLoginDestination(nextPath: string) {
+  if (nextPath.startsWith("/story/") && nextPath.includes("collect=1")) {
+    return {
+      prefix: "/story",
+      eyebrow: "STORY",
+      title: "このSTORYを保存する",
+      description: "ログインまたは新規登録のあと、開いていたSTORYをコレクションへ保存します。"
+    };
+  }
   return loginDestinations.find((destination) => nextPath.startsWith(destination.prefix)) ?? {
     prefix: "",
     eyebrow: "MIKKE",
-    title: "mikkeをはじめる"
+    title: "mikkeをはじめる",
+    description: "mikke IDひとつで、mikkeのすべてのアプリが使えます。"
   };
 }
 
@@ -33,6 +44,7 @@ function LoginPageContent() {
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -50,7 +62,7 @@ function LoginPageContent() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
       if (error) {
-        setMessage(error.message);
+        setMessage(getJapaneseAuthError(error.message));
         return;
       }
       router.replace(nextPath);
@@ -66,14 +78,14 @@ function LoginPageContent() {
     });
     setLoading(false);
     if (error) {
-      setMessage(error.message);
+      setMessage(getJapaneseAuthError(error.message));
       return;
     }
     if (data.session) {
       router.replace(nextPath);
       return;
     }
-    setMessage("確認メールを送りました。メール内のリンクからmikkeに戻ってください。");
+    setMessage("mikkeOSから確認メールを送りました。メール内の「メールアドレスを確認する」を押すと、続きの画面へ戻ります。");
   }
 
   return (
@@ -82,9 +94,7 @@ function LoginPageContent() {
         <section className="self-end md:self-auto">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--mikke-accent)]">{destination.eyebrow}</p>
           <h1 className="mt-3 text-3xl font-bold tracking-normal text-[var(--mikke-primary)] sm:text-4xl">{destination.title}</h1>
-          <p className="mt-4 max-w-xl text-sm leading-7 text-[var(--mikke-muted)]">
-            mikke IDひとつで、mikkeのすべてのアプリが使えます。
-          </p>
+          <p className="mt-4 max-w-xl text-sm leading-7 text-[var(--mikke-muted)]">{destination.description}</p>
         </section>
 
         <section className="self-start rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-5 shadow-sm sm:p-6 md:self-auto">
@@ -129,15 +139,22 @@ function LoginPageContent() {
             </label>
             <label className="block">
               <span className="text-sm font-bold text-[var(--mikke-text)]">パスワード</span>
-              <input
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                type="password"
-                autoComplete={mode === "login" ? "current-password" : "new-password"}
-                required
-                minLength={6}
-                className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-4 py-3 outline-none focus:border-[var(--mikke-accent)]"
-              />
+              <span className="relative mt-2 block">
+                <input
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={mode === "login" ? "current-password" : "new-password"}
+                  required
+                  minLength={6}
+                  aria-describedby={mode === "signup" ? "password-help" : undefined}
+                  className="w-full rounded-lg border border-[var(--mikke-line)] bg-white px-4 py-3 pr-12 outline-none focus:border-[var(--mikke-accent)]"
+                />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示する"} className="absolute inset-y-0 right-0 grid w-12 place-items-center text-[var(--mikke-muted)]">
+                  {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
+                </button>
+              </span>
+              {mode === "signup" ? <span id="password-help" className={`mt-2 block text-xs ${password.length >= 6 ? "text-[var(--mikke-green)]" : "text-[var(--mikke-muted)]"}`}>{password.length >= 6 ? "6文字以上になりました" : "6文字以上で入力してください"}</span> : null}
             </label>
 
             {message ? (

@@ -6,12 +6,14 @@ import { useEffect, useState } from "react";
 import { listMyStoryCollection, removeStoryFromCollection, setStoryCollectionFavorite, type StoryCollectionItem } from "@/lib/mikkeos/story-collection-db";
 import { getStoryAppPath, storyThemes } from "@/lib/mikkeos/story-profile-store";
 import { supabase } from "@/lib/supabase/client";
+import { StoryCollectionAdd } from "./StoryCollectionAdd";
 
 export function StoryCollectionPage() {
   const [items, setItems] = useState<StoryCollectionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [savingFavoriteId, setSavingFavoriteId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -20,7 +22,7 @@ export function StoryCollectionPage() {
       .catch(() => { if (!cancelled) setMessage("コレクションを読み込めませんでした。"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshKey]);
 
   const remove = async (collectionId: string) => {
     try {
@@ -50,6 +52,7 @@ export function StoryCollectionPage() {
 
   return (
     <section className="mx-auto w-full max-w-3xl">
+      <StoryCollectionAdd onSaved={() => setRefreshKey((value) => value + 1)} />
       <div className="mb-5 rounded-xl border border-[var(--mikke-line)] bg-white p-4">
         <p className="text-sm font-medium">受け取ったSTORY</p>
         <p className="mt-1 text-xs font-normal leading-5 text-[var(--mikke-muted)]">保存やお気に入りは相手に通知されません。星を付けたSTORYは上に並び、ここはあなたにだけ表示されます。</p>
