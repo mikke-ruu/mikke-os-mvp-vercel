@@ -110,7 +110,6 @@ export function getStoryProfileValidationError(profile: StoryProfileView, forPub
   if (!profile.displayName.trim()) return "表示名を入力してください。";
   if (!/^[a-z0-9_][a-z0-9_-]{2,29}$/.test(profile.handle)) return "mikke IDは3〜30文字の英小文字・数字・ハイフン・アンダースコアで入力してください。";
   if (isReservedStoryHandle(profile.handle)) return "このmikke IDは公式またはシステム用です。別のIDを選んでください。";
-  if (!profile.role.trim() && !profile.bio.trim()) return "肩書きまたは自己紹介のどちらかを入力してください。";
   const invalidLink = [profile.websiteUrl, profile.shopUrl, ...profile.sns.map((item) => item.url)].find((url) => url.trim() && !getSafeStoryLinkUrl(url));
   if (invalidLink) return "SNSとリンクは https:// または http:// から始まるURLを入力してください。";
   return "";

@@ -14,8 +14,8 @@ const loginDestinations = [
 ] as const;
 
 function safeNextPath(value: string | null) {
-  if (!value) return "/os";
-  return value.startsWith("/") && !value.startsWith("//") ? value : "/os";
+  if (!value) return "/marketnote";
+  return value.startsWith("/") && !value.startsWith("//") ? value : "/marketnote";
 }
 
 function getLoginDestination(nextPath: string) {
@@ -65,7 +65,7 @@ function LoginPageContent() {
         setMessage(getJapaneseAuthError(error.message));
         return;
       }
-      router.replace(nextPath);
+      window.location.replace(nextPath);
       return;
     }
 
@@ -82,7 +82,7 @@ function LoginPageContent() {
       return;
     }
     if (data.session) {
-      router.replace(nextPath);
+      window.location.replace(nextPath);
       return;
     }
     setMessage("mikkeOSから確認メールを送りました。メール内の「メールアドレスを確認する」を押すと、続きの画面へ戻ります。");
