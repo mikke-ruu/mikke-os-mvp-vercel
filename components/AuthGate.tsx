@@ -17,15 +17,24 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const authSessionTimeoutMs = 5000;
+const authSessionTimeoutMs = 15000;
 
 function withAuthTimeout<T>(promise: Promise<T>) {
-  return Promise.race([
-    promise,
-    new Promise<T>((_resolve, reject) => {
-      window.setTimeout(() => reject(new Error("Auth session check timed out.")), authSessionTimeoutMs);
-    })
-  ]);
+  return new Promise<T>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("Auth session check timed out.")), authSessionTimeoutMs);
+    promise.then(
+      (value) => { window.clearTimeout(timeout); resolve(value); },
+      (error) => { window.clearTimeout(timeout); reject(error); }
+    );
+  });
+}
+
+async function getSessionWithRetry() {
+  try {
+    return await withAuthTimeout(supabase.auth.getSession());
+  } catch {
+    return withAuthTimeout(supabase.auth.getSession());
+  }
 }
 
 export function useAuth() {
@@ -63,6 +72,7 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authUnavailable, setAuthUnavailable] = useState(false);
 
   async function loadProfile(nextUser: User) {
     const nextProfile = await ensureProfile(nextUser);
@@ -77,8 +87,9 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
   useEffect(() => {
     let mounted = true;
 
-    withAuthTimeout(supabase.auth.getSession()).then(async ({ data }) => {
+    getSessionWithRetry().then(async ({ data, error }) => {
       if (!mounted) return;
+      if (error) throw error;
       const nextUser = data.session?.user ?? null;
       setUser(nextUser);
       if (!nextUser) {
@@ -94,24 +105,32 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
       }
       try {
         await loadProfile(nextUser);
+      } catch {
+        if (mounted) setAuthUnavailable(true);
       } finally {
         if (mounted) setLoading(false);
       }
     }).catch(() => {
       if (!mounted) return;
-      if (allowGuest) {
-        setUser(marketNoteGuestUser);
-        setProfile(marketNoteGuestProfile);
-        setLoading(false);
-        return;
-      }
       setLoading(false);
-      if (pathname !== "/login") router.replace(`/login?next=${encodeURIComponent(nextPath)}`);
+      setAuthUnavailable(true);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       const nextUser = session?.user ?? null;
       setUser(nextUser);
+      setAuthUnavailable(false);
+      if (nextUser) {
+        window.setTimeout(() => {
+          if (!mounted) return;
+          void loadProfile(nextUser).then(() => {
+            if (mounted) setLoading(false);
+          }).catch(() => {
+            if (mounted) { setLoading(false); setAuthUnavailable(true); }
+          });
+        }, 0);
+        return;
+      }
       if (!nextUser) {
         if (allowGuest) {
           setUser(marketNoteGuestUser);
@@ -133,6 +152,18 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
     if (!user || !profile) return null;
     return { user, profile, isGuest: profile.id === marketNoteGuestProfile.id, refreshProfile };
   }, [user, profile]);
+
+  if (authUnavailable) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[var(--mikke-surface-soft)] px-5 text-center">
+        <div className="max-w-sm rounded-2xl border border-[var(--mikke-line)] bg-white p-6">
+          <h1 className="text-lg font-bold text-[var(--mikke-primary)]">ログイン状態を確認できませんでした</h1>
+          <p className="mt-3 text-sm leading-6 text-[var(--mikke-muted)]">通信状態を確認して、画面を読み込み直してください。ログアウトはされていません。</p>
+          <button type="button" onClick={() => window.location.reload()} className="mt-5 w-full rounded-xl bg-[var(--mikke-primary)] px-4 py-3 text-sm font-bold text-white">もう一度読み込む</button>
+        </div>
+      </main>
+    );
+  }
 
   if (loading || !value) return <LoadingScreen />;
 

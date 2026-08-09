@@ -4,7 +4,7 @@ import jsQR from "jsqr";
 import { Camera, Check, ImagePlus, Keyboard, X } from "lucide-react";
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { getPublishedStoryProfile } from "@/lib/mikkeos/story-profile-db";
-import { saveStoryToCollection } from "@/lib/mikkeos/story-collection-db";
+import { getStoryCollectionState, saveStoryToCollection } from "@/lib/mikkeos/story-collection-db";
 import { normalizeStoryHandle, type StoryProfileView } from "@/lib/mikkeos/story-profile-store";
 import { supabase } from "@/lib/supabase/client";
 
@@ -47,7 +47,7 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
           const result = image ? jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" }) : null;
           if (result?.data) {
             stop();
-            void inspectTarget(result.data);
+            void inspectTarget(result.data, true);
             return;
           }
         }
@@ -78,7 +78,7 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
     return stop;
   }, [mode]);
 
-  async function inspectTarget(value: string) {
+  async function inspectTarget(value: string, addAfterLookup = false) {
     const handle = parseStoryHandle(value);
     if (!handle) {
       setPreview(null);
@@ -98,6 +98,7 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
       } else {
         setPreview(story);
         setMode("input");
+        if (addAfterLookup) await save(story);
       }
     } catch {
       setPreview(null);
@@ -107,13 +108,23 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
     }
   }
 
-  async function save() {
-    if (!preview) return;
+  async function save(story = preview) {
+    if (!story) return;
     setBusy(true);
     setMessage("");
     try {
-      await saveStoryToCollection(supabase, preview.handle);
-      setMessage(`${preview.displayName}さんのSTORYをコレクションに保存しました。`);
+      const state = await getStoryCollectionState(supabase, story.handle);
+      if (state.isOwnStory) {
+        setMessage("自分のSTORYはコレクションへ追加する必要がありません。");
+        return;
+      }
+      if (state.isSaved) {
+        setMessage(`${story.displayName}さんのSTORYは、すでにコレクションに入っています。`);
+        onSaved();
+        return;
+      }
+      await saveStoryToCollection(supabase, story.handle);
+      setMessage(`${story.displayName}さんのSTORYをコレクションに保存しました。`);
       setPreview(null);
       setInput("");
       onSaved();
@@ -144,7 +155,7 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
         setMessage("画像からQRを読み取れませんでした。QRが大きく写った画像でお試しください。");
         return;
       }
-      await inspectTarget(result.data);
+      await inspectTarget(result.data, true);
     } catch {
       setMessage("画像を読み込めませんでした。別の画像でお試しください。");
     } finally {
@@ -187,18 +198,18 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
       ) : null}
 
       {mode === "input" ? (
-        <form className="mt-4" onSubmit={(event) => { event.preventDefault(); void inspectTarget(input); }}>
+        <form className="mt-4" onSubmit={(event) => { event.preventDefault(); void inspectTarget(input, true); }}>
           <label className="block text-xs font-medium text-[var(--mikke-muted)]" htmlFor="story-collection-id">mikke ID または STORYのURL</label>
           <div className="mt-2 flex gap-2">
             <input id="story-collection-id" value={input} onChange={(event) => { setInput(event.target.value); setPreview(null); setMessage(""); }} placeholder="@ayumi" autoCapitalize="none" autoCorrect="off" className="min-w-0 flex-1 rounded-xl border border-[var(--mikke-line)] px-4 py-3 text-base outline-none focus:border-[var(--mikke-blue)]" />
-            <button type="submit" disabled={busy || !input.trim()} className="rounded-xl bg-[var(--mikke-blue)] px-4 py-3 text-sm font-medium text-white disabled:opacity-50">確認</button>
+            <button type="submit" disabled={busy || !input.trim()} className="rounded-xl bg-[var(--mikke-blue)] px-4 py-3 text-sm font-medium text-white disabled:opacity-50">追加する</button>
           </div>
         </form>
       ) : null}
 
       {preview ? (
         <div className="mt-4 rounded-xl bg-[var(--story-soft)] p-4">
-          <p className="text-xs text-[var(--mikke-muted)]">このSTORYを保存します</p>
+          <p className="text-xs text-[var(--mikke-muted)]">STORYを確認しました</p>
           <div className="mt-2 flex items-center gap-3">
             <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-white text-sm font-medium">
               {preview.avatarUrl ? <img src={preview.avatarUrl} alt="" className="h-full w-full object-cover" /> : preview.displayName.slice(0, 2)}

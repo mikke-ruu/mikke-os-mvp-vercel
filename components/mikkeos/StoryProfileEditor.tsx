@@ -176,13 +176,13 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
         <section className="relative">
           <div className="relative h-36 overflow-hidden bg-[var(--story-soft)]">
             {form.bannerUrl ? <img src={form.bannerUrl} alt="バナー" className="h-full w-full object-cover" /> : <div className="absolute inset-0 grid place-items-center text-center text-xs font-bold text-black/35"><span><ImagePlus className="mx-auto mb-2" size={24} />バナーを追加</span></div>}
-            <FileButton label="バナー画像を選ぶ" className="absolute bottom-3 right-3 rounded-full" busy={uploading === "banner"} onFile={(file) => requestImage(file, "banner")}><Camera size={14} /> バナー</FileButton>
+              <FileButton label="バナー画像を選ぶ" className="absolute bottom-3 right-3 rounded-full bg-white/90" busy={uploading === "banner"} onFile={(file) => requestImage(file, "banner")}><Camera size={14} /> バナー</FileButton>
           </div>
           <div className="relative px-5 pb-6">
             <div className="absolute -top-12 left-5 h-24 w-24 overflow-hidden rounded-full border-4 border-white bg-[var(--story-soft)] shadow-sm">
               <div className="grid h-full w-full place-items-center text-xl font-semibold text-[var(--story-ink)]">{initials}</div>
               {form.avatarUrl ? <img src={form.avatarUrl} alt="プロフィール写真" className="absolute inset-0 h-full w-full object-cover" /> : null}
-              <FileButton label="プロフィール写真を選ぶ" className="absolute inset-x-0 bottom-0 rounded-none border-0 bg-black/60 py-1 text-[10px] text-white" busy={uploading === "avatar"} onFile={(file) => requestImage(file, "avatar")}><Camera size={11} /> 写真</FileButton>
+               <FileButton label="プロフィール写真を選ぶ" className="absolute bottom-1 right-1 h-8 w-8 rounded-full border-2 border-white bg-[var(--story-accent)] p-0 text-white" busy={uploading === "avatar"} onFile={(file) => requestImage(file, "avatar")}><Camera size={15} /></FileButton>
             </div>
             <div className="pt-16">
               <InlineInput label="表示名" value={form.displayName} placeholder="名前" onChange={(value) => update("displayName", value)} className="text-2xl font-semibold" />
@@ -225,7 +225,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
           {idEditing ? (
             <div>
               <label className="flex min-w-0 overflow-hidden rounded-2xl border border-black/10"><span className="bg-black/[0.03] px-3 py-3 text-sm font-extrabold text-black/45">@</span><input aria-label="mikke ID" value={form.handle} onChange={(event) => update("handle", normalizeStoryHandle(event.target.value))} className="min-w-0 flex-1 px-3 py-3 text-sm font-bold outline-none" /></label>
-              <p className="mt-2 text-xs font-bold leading-5 text-amber-700">変更すると、前のURLは使えなくなります。</p>
+               <p className="mt-2 text-xs font-bold leading-5 text-amber-700">英小文字・数字・「-」「_」で3文字以上。入力後、画面下の保存ボタンを押してください。変更すると前のURLは使えなくなります。</p>
               <button type="button" onClick={() => { update("handle", profile.handle); setIdEditing(false); }} className="mt-2 text-xs font-bold text-black/45 underline underline-offset-4">変更をやめる</button>
             </div>
           ) : (
@@ -270,15 +270,15 @@ function EditorSection({ eyebrow, title, note, children }: { eyebrow: string; ti
 }
 
 function InlineInput({ label, value, placeholder, onChange, className }: { label: string; value: string; placeholder: string; onChange: (value: string) => void; className: string }) {
-  return <input aria-label={label} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className={`block w-full min-w-0 rounded-lg border border-dashed border-transparent bg-transparent px-2 py-1 outline-none hover:border-black/15 focus:border-[var(--story-accent)] ${className}`} />;
+  return <label className="block min-w-0 flex-1"><span className="mb-1 block px-1 text-[10px] font-bold text-black/45">{label}</span><input aria-label={label} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} className={`block w-full min-w-0 rounded-xl border border-black/10 bg-black/[0.025] px-3 py-2 outline-none focus:border-[var(--story-accent)] focus:bg-white ${className}`} /></label>;
 }
 
 function InlineTextarea({ label, value, placeholder, onChange, className }: { label: string; value: string; placeholder: string; onChange: (value: string) => void; className: string }) {
-  return <textarea aria-label={label} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} rows={3} className={`block w-full resize-none rounded-lg border border-dashed border-transparent bg-transparent px-2 py-1 outline-none hover:border-black/15 focus:border-[var(--story-accent)] ${className}`} />;
+  return <label className="block"><span className="mb-1 block px-1 text-[10px] font-bold text-black/45">{label}</span><textarea aria-label={label} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} rows={3} className={`block w-full resize-none rounded-xl border border-black/10 bg-black/[0.025] px-3 py-2 outline-none focus:border-[var(--story-accent)] focus:bg-white ${className}`} /></label>;
 }
 
 function FileButton({ label, className, busy, onFile, children }: { label: string; className: string; busy: boolean; onFile: (file?: File) => void; children: React.ReactNode }) {
-  return <label aria-label={label} className={`inline-flex cursor-pointer items-center justify-center gap-1.5 border border-black/10 bg-white/90 px-3 py-2 text-xs font-bold shadow-sm ${className}`}><input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(event) => { onFile(event.target.files?.[0]); event.target.value = ""; }} />{busy ? "処理中…" : children}</label>;
+  return <label aria-label={label} className={`inline-flex cursor-pointer items-center justify-center gap-1.5 border border-black/10 px-3 py-2 text-xs font-bold shadow-sm ${className}`}><input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(event) => { onFile(event.target.files?.[0]); event.target.value = ""; }} />{busy ? "…" : children}</label>;
 }
 
 function UrlInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
