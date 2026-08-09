@@ -34,6 +34,7 @@ import {
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
+import { useOwnedMikkeApps } from "@/components/mikkeos/useOwnedMikkeApps";
 import {
   communityErrorMessage,
   archiveCommunityRoom,
@@ -81,7 +82,6 @@ import {
 import type { CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEvent, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
-import { communityApp } from "@/lib/mikkeos/released-apps";
 import { ensureProfile } from "@/lib/profile";
 
 type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
@@ -222,7 +222,7 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
 
   if (error && !data) {
     return (
-      <CommunityShell base={base} mikkeId={mikkeId} onSignOut={signOut} showOwner={false}>
+      <CommunityShell base={base} userId={user?.id} mikkeId={mikkeId} onSignOut={signOut} showOwner={false}>
         <MikkeEmptyState title="COMMUNITYの準備が必要です" helper={error} />
       </CommunityShell>
     );
@@ -235,14 +235,14 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
 
   if (!active || view === "join") {
     return (
-      <CommunityShell base={base} community={data} mikkeId={mikkeId} onSignOut={signOut} showOwner={false}>
+      <CommunityShell base={base} userId={user.id} community={data} mikkeId={mikkeId} onSignOut={signOut} showOwner={false}>
         <JoinPanel community={data} defaultName={data.profile?.displayName ?? user.email?.split("@")[0] ?? ""} error={error} onJoin={handleJoin} />
       </CommunityShell>
     );
   }
 
   return (
-    <CommunityShell base={base} community={data} mikkeId={mikkeId} onSignOut={signOut} showOwner={ownerLike}>
+    <CommunityShell base={base} userId={user.id} community={data} mikkeId={mikkeId} onSignOut={signOut} showOwner={ownerLike}>
       {message ? <Notice>{message}</Notice> : null}
       {error ? <Notice>{error}</Notice> : null}
       {view === "home" ? <HomeView base={base} data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
@@ -292,8 +292,9 @@ function PublicCommunityEntry({ community, base }: { community: CommunityPublicE
   );
 }
 
-function CommunityShell({ children, base, community, mikkeId, onSignOut, showOwner }: { children: React.ReactNode; base: string; community?: CommunityDashboard | null; mikkeId?: string; onSignOut: () => void; showOwner: boolean }) {
+function CommunityShell({ children, base, community, userId, mikkeId, onSignOut, showOwner }: { children: React.ReactNode; base: string; community?: CommunityDashboard | null; userId?: string; mikkeId?: string; onSignOut: () => void; showOwner: boolean }) {
   const { navItems, bottomNavItems } = buildNavigation(base, showOwner);
+  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId, currentApp: "community" });
   return (
     <MikkeAppShell
       appName="COMMUNITY"
@@ -303,9 +304,9 @@ function CommunityShell({ children, base, community, mikkeId, onSignOut, showOwn
       theme="yellow"
       navItems={navItems}
       bottomNavItems={bottomNavItems}
-      ownedApps={[communityApp]}
+      ownedApps={ownedApps}
       otherApps={[]}
-      suggestedApps={[]}
+      suggestedApps={suggestedApps}
       mikkeId={mikkeId}
       onSignOut={onSignOut}
       footerLabel="Community by mikke"
