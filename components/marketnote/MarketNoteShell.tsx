@@ -14,7 +14,7 @@ import {
 import { useAuth } from "@/components/AuthGate";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import type { MikkeOwnerMenuItem, MikkeOwnerMenuSuggestedApp } from "@/components/mikkeos/MikkeOwnerMenu";
-import { releasedApps } from "@/lib/mikkeos/released-apps";
+import { marketNoteApp } from "@/lib/mikkeos/released-apps";
 import { supabase } from "@/lib/supabase/client";
 
 const marketNoteNavItems: MikkeShellNavItem[] = [
@@ -98,7 +98,7 @@ export function MarketNoteShell({
       primaryActionTone="orange"
       showBottomNavLabels
       menuEditItems={marketNoteEditItems}
-      ownedApps={releasedApps}
+      ownedApps={[marketNoteApp]}
       otherApps={[]}
       suggestedApps={isGuest ? guestSuggestedApps : loggedInSuggestedApps}
       mikkeId={isGuest ? undefined : profile.handle}

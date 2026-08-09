@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState, type ComponentType, type ReactNode } from "react";
-import { releasedApps } from "@/lib/mikkeos/released-apps";
 import type { StatChipTone } from "./StatChip";
 
 type OwnerMenuIcon = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
@@ -52,11 +51,8 @@ export type MikkeOwnerMenuProps = {
 
 const defaultEditItems: MikkeOwnerMenuItem[] = [{ title: "表示設定", href: "/settings", icon: Settings }];
 
-const defaultOwnedApps = releasedApps;
-
-const defaultSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
-  { name: "Community", helper: "Communityを作成・運営しますか", href: "/community/for-organizers" }
-];
+const defaultOwnedApps: MikkeOwnerMenuItem[] = [];
+const defaultSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [];
 
 /**
  * 濃色(blue/orange)は白アイコン・淡色(pink/yellow/green)は黒アイコン（StatChipの可読性ルールと統一）。
@@ -185,7 +181,7 @@ export function MikkeOwnerMenu({
             className="mb-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--mikke-muted)]"
             style={{ fontFamily: "var(--mikke-font-display)" }}
           >
-            APPS
+            持ってるアプリ
           </p>
           <MikkeAppsTileGrid apps={appTiles} />
         </div>
@@ -281,7 +277,7 @@ function ConnectAppsSection({ apps }: { apps: MikkeOwnerMenuSuggestedApp[] }) {
         className="flex w-full items-center gap-2 text-sm font-bold text-[var(--mikke-muted)]"
       >
         <PlusCircle size={18} />
-        アプリをつなげる
+        つなげられるアプリ
         <ChevronDown size={16} className={`ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
       </button>
 

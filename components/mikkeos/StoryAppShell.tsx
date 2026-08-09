@@ -3,7 +3,7 @@
 import { BookOpenText, ContactRound, Pencil, QrCode } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
-import { releasedApps } from "@/lib/mikkeos/released-apps";
+import { marketNoteApp, storyApp } from "@/lib/mikkeos/released-apps";
 import { supabase } from "@/lib/supabase/client";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "./MikkeAppShell";
 
@@ -37,9 +37,9 @@ export function StoryAppShell({ children, title = "STORY", subtitle }: { childre
       subtitle={subtitle}
       theme="blue"
       menuEditItems={storyNavItems.map((item) => ({ title: item.label, href: item.href, icon: item.icon }))}
-      ownedApps={releasedApps}
+      ownedApps={[storyApp]}
       otherApps={[]}
-      suggestedApps={[]}
+      suggestedApps={[{ name: marketNoteApp.title, helper: "出店予定や会計を記録できます", href: marketNoteApp.href }]}
       mikkeId={profile.handle}
       onSignOut={() => void signOut()}
       navItems={storyNavItems}

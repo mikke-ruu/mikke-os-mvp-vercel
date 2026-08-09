@@ -1,0 +1,11 @@
+export function getJapaneseAuthError(message: string) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("invalid login credentials")) return "メールアドレスまたはパスワードが違います。入力内容をご確認ください。";
+  if (normalized.includes("email not confirmed")) return "メールアドレスの確認が完了していません。mikkeOSから届いた確認メールを開いてください。";
+  if (normalized.includes("user already registered") || normalized.includes("already been registered")) return "このメールアドレスは登録済みです。「ログイン」からお進みください。";
+  if (normalized.includes("password should be at least") || normalized.includes("password must be at least")) return "パスワードは6文字以上で入力してください。";
+  if (normalized.includes("signup is disabled")) return "現在、新規登録を受け付けていません。しばらくしてからお試しください。";
+  if (normalized.includes("rate limit") || normalized.includes("too many requests")) return "短時間に操作が集中しました。少し時間をおいてからお試しください。";
+  if (normalized.includes("network") || normalized.includes("fetch")) return "通信できませんでした。接続状態を確認して、もう一度お試しください。";
+  return "手続きを完了できませんでした。入力内容を確認して、もう一度お試しください。";
+}

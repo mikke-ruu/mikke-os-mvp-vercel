@@ -81,7 +81,7 @@ import {
 import type { CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEvent, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
-import { releasedApps } from "@/lib/mikkeos/released-apps";
+import { communityApp } from "@/lib/mikkeos/released-apps";
 import { ensureProfile } from "@/lib/profile";
 
 type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
@@ -303,7 +303,7 @@ function CommunityShell({ children, base, community, mikkeId, onSignOut, showOwn
       theme="yellow"
       navItems={navItems}
       bottomNavItems={bottomNavItems}
-      ownedApps={releasedApps}
+      ownedApps={[communityApp]}
       otherApps={[]}
       suggestedApps={[]}
       mikkeId={mikkeId}
