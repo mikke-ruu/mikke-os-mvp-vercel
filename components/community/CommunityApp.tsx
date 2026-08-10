@@ -332,7 +332,6 @@ function PublicCommunityEntry({ community, base }: { community: CommunityPublicE
             <Link href={loginHref} className="rounded-lg border border-[var(--mikke-line)] px-5 py-3 text-center text-sm font-bold text-[var(--mikke-primary)]">ログインして参加</Link>
           </div>
         </section>
-        <div className="mt-5"><InAppBrowserNotice /></div>
       </div>
     </main>
   );
@@ -2008,32 +2007,6 @@ function EventMini({ event }: { event: CommunityEvent }) {
   );
 }
 
-function isInAppBrowserUserAgent(userAgent: string) {
-  return /Line\//i.test(userAgent) || /Instagram/i.test(userAgent) || /FBAN|FBAV|FB_IAB/i.test(userAgent);
-}
-
-function InAppBrowserNotice() {
-  const [inAppBrowser, setInAppBrowser] = useState(false);
-
-  useEffect(() => {
-    setInAppBrowser(isInAppBrowserUserAgent(navigator.userAgent || ""));
-  }, []);
-
-  if (!inAppBrowser) return null;
-
-  return (
-    <section className="mb-4 rounded-lg border border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-accent-strong)]">
-      <p className="font-bold">登録前に、通常ブラウザで開いてください</p>
-      <p className="mt-1">
-        Instagram・LINE・Facebook内のブラウザでは、確認メール後にログイン状態が引き継がれないことがあります。
-      </p>
-      <a href="https://mikke-os.com/install.html" className="mt-2 inline-flex font-bold underline">
-        ブラウザで開く方法を見る
-      </a>
-    </section>
-  );
-}
-
 type CommunityAuthFormProps = {
   audience: "organizer" | "participant";
   community?: CommunityPublicEntry | null;
@@ -2091,7 +2064,6 @@ function CommunityAuthForm({ audience, community, defaultNext, signupNext = defa
           </p>
         </section>
         <form onSubmit={submit} className="rounded-lg border border-[var(--mikke-line)] bg-white p-6">
-          <InAppBrowserNotice />
           <p className="text-sm font-bold text-[var(--mikke-primary)]">{community ? `${community.name} 参加者向け` : isOrganizer ? "Community作成・運営者向け" : "参加者向け"}</p>
           <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{isOrganizer ? "運営に使うメールアドレスでログインまたは登録してください。" : "参加に使うメールアドレスでログインまたは登録してください。"}</p>
           <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-[var(--mikke-line)] p-1">
