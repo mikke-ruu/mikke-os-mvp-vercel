@@ -12,46 +12,28 @@ export type MikkeShareTarget = {
 
 export const mikkeShareTargets: MikkeShareTarget[] = [
   {
-    id: "marketnote-use",
+    id: "marketnote",
     source: "marketnote",
-    title: "MarketNoteをすぐ使ってもらう",
-    description: "ログインせずに、出店予定や会計の記録を始められます。",
+    title: "MarketNote",
+    description: "出店予定と会計を、ログインなしですぐ記録できます。",
     url: "https://mikke-os.com/marketnote",
     actionLabel: "MarketNoteを開く",
     tone: "orange"
   },
   {
-    id: "marketnote-about",
-    source: "marketnote",
-    title: "MarketNoteをおすすめする",
-    description: "どんなアプリか、使い方と一緒に紹介できます。",
-    url: "https://mikke-os.com/#app-marketnote",
-    actionLabel: "MarketNoteの説明を見る",
-    tone: "orange"
-  },
-  {
-    id: "story-start",
+    id: "story",
     source: "story",
-    title: "Storyをつくってもらう",
-    description: "写真やリンクをまとめた、自分の名刺ページを作る入口です。",
+    title: "Story",
+    description: "写真やリンクをまとめた、自分の名刺ページを作れます。",
     url: "https://mikke-os.com/story/start",
     actionLabel: "Storyをつくる",
     tone: "blue"
   },
   {
-    id: "story-about",
-    source: "story",
-    title: "Storyをおすすめする",
-    description: "どんなページを作れるか、見本と一緒に紹介できます。",
-    url: "https://mikke-os.com/#app-story",
-    actionLabel: "Storyの説明を見る",
-    tone: "blue"
-  },
-  {
     id: "mikke-home",
     source: "mikke",
-    title: "mikkeのホームページを教える",
-    description: "MarketNoteやStoryなど、使えるアプリをまとめて紹介します。",
+    title: "mikke",
+    description: "使えるアプリをホームページでまとめて見られます。",
     url: "https://mikke-os.com/",
     actionLabel: "ホームページを見る",
     tone: "pink"
@@ -63,6 +45,8 @@ export function normalizeMikkeShareSource(value: string | null | undefined): Mik
   if (normalized === "marketnote" || normalized === "story" || normalized === "community") return normalized;
   return "mikke";
 }
+
+export const mikkeInstallGuideUrl = "https://mikke-os.com/install.html";
 
 export function shareSourceFromAppName(appName: string): MikkeShareSource {
   const normalized = appName.trim().toLowerCase().replace(/\s+/g, "");

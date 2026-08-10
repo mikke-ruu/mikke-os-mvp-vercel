@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Share2, type LucideIcon } from "lucide-react";
-import { shareSourceFromAppName } from "@/lib/mikkeos/share-targets";
+import { HousePlus, Share2, type LucideIcon } from "lucide-react";
+import { getExternalBrowserShareUrl, mikkeInstallGuideUrl, shareSourceFromAppName } from "@/lib/mikkeos/share-targets";
 import { AppHeader } from "./AppHeader";
 import {
   MikkeAppsTileGrid,
@@ -239,15 +239,18 @@ export function MikkeAppShell({
                   </div>
                 );
               })}
-              {!hasShareNavItem ? (
-                <Link
-                  href={shareHref}
-                  className="mt-3 flex items-center gap-2.5 border-t border-[var(--mikke-line)] px-3 pt-4 text-[13.5px] font-semibold text-[var(--mikke-primary)]"
-                >
-                  <Share2 size={17} strokeWidth={1.8} />
-                  シェア・QR
-                </Link>
-              ) : null}
+              <div className="mt-3 border-t border-[var(--mikke-line)] pt-2">
+                {!hasShareNavItem ? (
+                  <Link href={shareHref} className="flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13.5px] font-semibold text-[var(--mikke-primary)]">
+                    <Share2 size={17} strokeWidth={1.8} />
+                    シェア・QR
+                  </Link>
+                ) : null}
+                <a href={getExternalBrowserShareUrl(mikkeInstallGuideUrl)} className="flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13.5px] font-semibold text-[var(--mikke-primary)]">
+                  <HousePlus size={17} strokeWidth={1.8} />
+                  ホーム画面に追加
+                </a>
+              </div>
             </nav>
 
             {appTiles.length > 0 ? (

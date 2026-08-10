@@ -4,6 +4,7 @@ import {
   ChevronDown,
   Copy,
   Grid3X3,
+  HousePlus,
   Link as LinkIcon,
   LogOut,
   PlusCircle,
@@ -13,7 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useState, type ComponentType, type ReactNode } from "react";
-import { shareSourceFromAppName } from "@/lib/mikkeos/share-targets";
+import { getExternalBrowserShareUrl, mikkeInstallGuideUrl, shareSourceFromAppName } from "@/lib/mikkeos/share-targets";
 import type { StatChipTone } from "./StatChip";
 
 type OwnerMenuIcon = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
@@ -187,6 +188,16 @@ export function MikkeOwnerMenu({
         </span>
         シェア・QR
       </Link>
+
+      <a
+        href={getExternalBrowserShareUrl(mikkeInstallGuideUrl)}
+        className="-mt-3 flex min-h-12 items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-sm font-bold text-[var(--mikke-primary)]"
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--mikke-accent-soft)]">
+          <HousePlus size={16} />
+        </span>
+        ホーム画面に追加
+      </a>
 
       {appTiles.length > 0 ? (
         <div>
