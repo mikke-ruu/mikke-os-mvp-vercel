@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
+import { Share2, type LucideIcon } from "lucide-react";
+import { shareSourceFromAppName } from "@/lib/mikkeos/share-targets";
 import { AppHeader } from "./AppHeader";
 import {
   MikkeAppsTileGrid,
@@ -137,6 +138,8 @@ export function MikkeAppShell({
         )
       : null;
   const appTiles = [...(ownedApps ?? []), ...(otherApps ?? [])];
+  const hasShareNavItem = navItems?.some((item) => item.href.startsWith("/share")) ?? false;
+  const shareHref = `/share?from=${shareSourceFromAppName(appName)}`;
   const SidebarFooterIcon = sidebarFooterAction?.icon;
 
   let lastSection: string | undefined;
@@ -236,6 +239,15 @@ export function MikkeAppShell({
                   </div>
                 );
               })}
+              {!hasShareNavItem ? (
+                <Link
+                  href={shareHref}
+                  className="mt-3 flex items-center gap-2.5 border-t border-[var(--mikke-line)] px-3 pt-4 text-[13.5px] font-semibold text-[var(--mikke-primary)]"
+                >
+                  <Share2 size={17} strokeWidth={1.8} />
+                  シェア・QR
+                </Link>
+              ) : null}
             </nav>
 
             {appTiles.length > 0 ? (
