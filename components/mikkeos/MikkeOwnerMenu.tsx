@@ -7,11 +7,13 @@ import {
   Link as LinkIcon,
   LogOut,
   PlusCircle,
+  Share2,
   Settings,
   X
 } from "lucide-react";
 import Link from "next/link";
 import { useState, type ComponentType, type ReactNode } from "react";
+import { shareSourceFromAppName } from "@/lib/mikkeos/share-targets";
 import type { StatChipTone } from "./StatChip";
 
 type OwnerMenuIcon = ComponentType<{ size?: number; strokeWidth?: number; color?: string }>;
@@ -130,6 +132,7 @@ export function MikkeOwnerMenu({
 }: MikkeOwnerMenuProps) {
   const themeStyle = tileToneStyles[theme];
   const appTiles = [...ownedApps, ...otherApps];
+  const shareHref = `/share?from=${shareSourceFromAppName(appName)}`;
 
   return (
     <section className="flex flex-col gap-5">
@@ -174,6 +177,16 @@ export function MikkeOwnerMenu({
           })}
         </div>
       ) : null}
+
+      <Link
+        href={shareHref}
+        className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 text-sm font-bold text-[var(--mikke-primary)]"
+      >
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: themeStyle.background }}>
+          <Share2 size={16} color={themeStyle.foreground} />
+        </span>
+        シェア・QR
+      </Link>
 
       {appTiles.length > 0 ? (
         <div>

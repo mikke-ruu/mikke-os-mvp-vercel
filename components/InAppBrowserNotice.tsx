@@ -15,10 +15,10 @@ function detectInAppBrowser(): InAppBrowser | null {
   return null;
 }
 
-function hintFor(appName: InAppBrowser) {
-  if (appName === "Instagram") return "右上の「…」から「外部ブラウザで開く」";
-  if (appName === "LINE") return "メニューから「他のアプリで開く」";
-  return "メニューから「ブラウザで開く」";
+function withExternalBrowserHint(value: string) {
+  const url = new URL(value);
+  url.searchParams.set("openExternalBrowser", "1");
+  return url.toString();
 }
 
 export function InAppBrowserNotice() {
@@ -34,6 +34,8 @@ export function InAppBrowserNotice() {
 
   if (!appName) return null;
 
+  const externalUrl = withExternalBrowserHint(window.location.href);
+
   const close = () => {
     window.sessionStorage.setItem(storageKey, "1");
     setAppName(null);
@@ -41,7 +43,7 @@ export function InAppBrowserNotice() {
 
   const copyUrl = async () => {
     try {
-      await navigator.clipboard.writeText(window.location.href);
+      await navigator.clipboard.writeText(externalUrl);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
@@ -61,15 +63,23 @@ export function InAppBrowserNotice() {
       </button>
       <p className="pr-8 text-sm font-extrabold">{appName}の中で開いています</p>
       <p className="mt-2 pr-6 text-xs leading-6 text-[var(--mikke-muted)]">
-        このままでも見られますが、{hintFor(appName)}を選んでSafariやChromeで開くと、記録がきちんと残り、ホーム画面にも追加できます。
+        {appName === "LINE"
+          ? "下のボタンから、いつも使うブラウザで開けます。記録やコレクションを残すためにおすすめです。"
+          : "記録やコレクションを残すには、右上の「…」から「外部ブラウザで開く」を選んでください。"}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={copyUrl} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white">
-          {copied ? "コピーしました" : "URLをコピー"}
+        {appName === "LINE" ? (
+          <a href={externalUrl} className="rounded-xl bg-[var(--mikke-orange)] px-4 py-2.5 text-xs font-bold text-white">
+            いつものブラウザで開く
+          </a>
+        ) : (
+          <a href={withExternalBrowserHint(installGuideUrl)} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white">
+            画像で開き方を見る
+          </a>
+        )}
+        <button type="button" onClick={copyUrl} className="rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2.5 text-xs font-bold text-[var(--mikke-primary)]">
+          {copied ? "コピーしました" : "うまく開かないときはURLコピー"}
         </button>
-        <a href={installGuideUrl} className="rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2.5 text-xs font-bold text-[var(--mikke-primary)]">
-          開き方を見る
-        </a>
       </div>
     </div>
   );

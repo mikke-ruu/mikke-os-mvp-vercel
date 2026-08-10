@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
@@ -41,22 +40,6 @@ const marketNoteEditItems: MikkeOwnerMenuItem[] = [
 const guestSuggestedApps: MikkeOwnerMenuSuggestedApp[] = [
   { name: "Story", helper: "ログイン後にプロフィール機能を使えます", href: "/login?next=/story" }
 ];
-
-const installGuideUrl = "https://mikke-os.com/install.html";
-
-function detectInAppBrowser() {
-  if (typeof navigator === "undefined") return false;
-
-  const ua = navigator.userAgent || "";
-  const inLine = /Line\//i.test(ua);
-  const inInstagram = /Instagram/i.test(ua);
-  const inFacebook = /FBAN|FBAV|FB_IAB/i.test(ua);
-  const isIOS =
-    /iPhone|iPad|iPod/.test(ua) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-
-  return inLine || inInstagram || inFacebook || isIOS && (inInstagram || inFacebook);
-}
 
 export function MarketNoteShell({
   title = "MarketNote",
@@ -105,30 +88,7 @@ export function MarketNoteShell({
       bottomNavItems={hideBottomNav ? undefined : contextualBottomNavItems}
       footerLabel="MarketNote by mikke"
     >
-      <InAppBrowserNotice />
       {children}
     </MikkeAppShell>
-  );
-}
-
-function InAppBrowserNotice() {
-  const [visible, setVisible] = useState(false);
-
-  useEffect(() => {
-    setVisible(detectInAppBrowser());
-  }, []);
-
-  if (!visible) return null;
-
-  return (
-    <div className="mb-4 rounded-2xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-accent-strong)]">
-      <p>Instagram、LINE、Facebookの中で開いている可能性があります。</p>
-      <p className="mt-1 text-[var(--mikke-text-soft)]">
-        ゲスト記録を安全に続けるには、SafariやChromeなど普段使うブラウザで開いてください。
-      </p>
-      <a href={installGuideUrl} className="mt-2 inline-flex text-[var(--mikke-accent)] underline">
-        通常ブラウザで開く・インストール手順を見る
-      </a>
-    </div>
   );
 }
