@@ -30,7 +30,7 @@ export function useOwnedMikkeApps({
   isGuest = false
 }: {
   userId?: string;
-  currentApp: MikkeOwnedAppKey;
+  currentApp?: MikkeOwnedAppKey;
   isGuest?: boolean;
 }) {
   const [detectedKeys, setDetectedKeys] = useState<MikkeOwnedAppKey[]>([]);
@@ -75,7 +75,7 @@ export function useOwnedMikkeApps({
 
   return useMemo(() => {
     const keys = new Set<MikkeOwnedAppKey>(detectedKeys);
-    keys.add(currentApp);
+    if (currentApp) keys.add(currentApp);
     const ownedApps = appOrder.filter((key) => keys.has(key)).map((key) => appByKey[key]);
     const suggestedApps = (["marketnote", "story"] as const)
       .filter((key) => !keys.has(key))

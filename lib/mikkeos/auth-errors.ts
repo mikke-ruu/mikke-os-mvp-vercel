@@ -1,7 +1,8 @@
 export function getJapaneseAuthError(message: string) {
   const normalized = message.toLowerCase();
   if (normalized.includes("invalid login credentials")) return "メールアドレスまたはパスワードが違います。入力内容をご確認ください。";
-  if (normalized.includes("email not confirmed")) return "メールアドレスの確認が完了していません。mikkeOSから届いた確認メールを開いてください。";
+  if (normalized.includes("email not confirmed")) return "メールアドレスの確認が完了していません。確認コードを入力するか、確認メールをもう一度送ってください。";
+  if (normalized.includes("token has expired") || normalized.includes("otp expired") || normalized.includes("invalid token") || normalized.includes("token is invalid")) return "確認コードが違うか、有効期限が切れています。コードを確認するか、確認メールをもう一度送ってください。";
   if (normalized.includes("user already registered") || normalized.includes("already been registered")) return "このメールアドレスは登録済みです。「ログイン」からお進みください。";
   if (normalized.includes("password should be at least") || normalized.includes("password must be at least")) return "パスワードは6文字以上で入力してください。";
   if (normalized.includes("signup is disabled")) return "現在、新規登録を受け付けていません。しばらくしてからお試しください。";

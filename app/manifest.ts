@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "mikke",
     short_name: "mikke",
     description: "MarketNote, Story, DESK, and connected apps by mikke",
-    start_url: "/marketnote",
+    start_url: "/home",
     scope: "/",
     display: "standalone",
     background_color: "#fffdfb",

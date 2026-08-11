@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, Suspense, useState } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getJapaneseAuthError } from "@/lib/mikkeos/auth-errors";
@@ -14,8 +14,8 @@ const loginDestinations = [
 ] as const;
 
 function safeNextPath(value: string | null) {
-  if (!value) return "/marketnote";
-  return value.startsWith("/") && !value.startsWith("//") ? value : "/marketnote";
+  if (!value) return "/home";
+  return value.startsWith("/") && !value.startsWith("//") ? value : "/home";
 }
 
 function getLoginDestination(nextPath: string) {
@@ -45,12 +45,63 @@ function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [pendingSignupEmail, setPendingSignupEmail] = useState("");
+  const [confirmationCode, setConfirmationCode] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setInterval(() => {
+      setResendCooldown((value) => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendCooldown]);
+
   function selectMode(nextMode: AuthMode) {
     setMode(nextMode);
+    setPendingSignupEmail("");
+    setConfirmationCode("");
     setMessage("");
+  }
+
+  async function verifyConfirmationCode(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const token = confirmationCode.trim();
+    if (!token) return;
+
+    setLoading(true);
+    setMessage("");
+    const { error } = await supabase.auth.verifyOtp({
+      email: pendingSignupEmail,
+      token,
+      type: "signup"
+    });
+    setLoading(false);
+    if (error) {
+      setMessage(getJapaneseAuthError(error.message));
+      return;
+    }
+    window.location.replace(nextPath);
+  }
+
+  async function resendConfirmationCode() {
+    if (resendCooldown > 0 || loading) return;
+    setLoading(true);
+    setMessage("");
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: pendingSignupEmail,
+      options: { emailRedirectTo: `${window.location.origin}${nextPath}` }
+    });
+    setLoading(false);
+    if (error) {
+      setMessage(getJapaneseAuthError(error.message));
+      return;
+    }
+    setResendCooldown(60);
+    setMessage("確認メールをもう一度送りました。迷惑メールフォルダもご確認ください。");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -62,6 +113,10 @@ function LoginPageContent() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setLoading(false);
       if (error) {
+        if (error.message.toLowerCase().includes("email not confirmed")) {
+          setPendingSignupEmail(email);
+          setResendCooldown(0);
+        }
         setMessage(getJapaneseAuthError(error.message));
         return;
       }
@@ -85,7 +140,10 @@ function LoginPageContent() {
       window.location.replace(nextPath);
       return;
     }
-    setMessage("mikkeOSから確認メールを送りました。メール内の「メールアドレスを確認する」を押すと、続きの画面へ戻ります。");
+    setPendingSignupEmail(email);
+    setConfirmationCode("");
+    setPassword("");
+    setResendCooldown(60);
   }
 
   return (
@@ -98,6 +156,65 @@ function LoginPageContent() {
         </section>
 
         <section className="self-start rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-5 shadow-sm sm:p-6 md:self-auto">
+          {pendingSignupEmail ? (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--mikke-accent)]">メールアドレスの確認</p>
+              <h2 className="mt-2 text-xl font-bold text-[var(--mikke-primary)]">確認メールを送りました</h2>
+              <p className="mt-3 text-sm leading-6 text-[var(--mikke-muted)]">
+                <span className="break-all font-bold text-[var(--mikke-text)]">{pendingSignupEmail}</span>
+                <br />
+                迷惑メールフォルダに入ることもあります。
+              </p>
+
+              <form onSubmit={verifyConfirmationCode} className="mt-5 space-y-4">
+                <label className="block">
+                  <span className="text-sm font-bold text-[var(--mikke-text)]">メールに届いた確認コードを入力してください</span>
+                  <input
+                    value={confirmationCode}
+                    onChange={(event) => setConfirmationCode(event.target.value.replace(/\s/g, ""))}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    autoFocus
+                    required
+                    className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-4 py-3 text-center text-xl font-bold tracking-[0.25em] outline-none focus:border-[var(--mikke-accent)]"
+                  />
+                </label>
+
+                {message ? (
+                  <p className="rounded-lg bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-accent-strong)]" aria-live="polite">
+                    {message}
+                  </p>
+                ) : null}
+
+                <button type="submit" disabled={loading || !confirmationCode.trim()} className="w-full rounded-lg bg-[var(--mikke-primary)] px-4 py-3 font-bold text-white disabled:opacity-60">
+                  {loading ? "確認中..." : "確認して続ける"}
+                </button>
+              </form>
+
+              <button
+                type="button"
+                onClick={() => void resendConfirmationCode()}
+                disabled={loading || resendCooldown > 0}
+                className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-4 py-3 text-sm font-bold text-[var(--mikke-primary)] disabled:text-[var(--mikke-muted-light)]"
+              >
+                {resendCooldown > 0 ? `もう一度送る（あと${resendCooldown}秒）` : "確認メールをもう一度送る"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingSignupEmail("");
+                  setConfirmationCode("");
+                  setMessage("");
+                }}
+                className="mt-3 w-full px-4 py-2 text-sm font-bold text-[var(--mikke-muted)]"
+              >
+                メールアドレスを直す
+              </button>
+              <p className="mt-4 text-center text-xs font-semibold text-[var(--mikke-muted-light)]">by mikke</p>
+            </div>
+          ) : (
+            <>
           <div className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-1" aria-label="ログイン方法">
             <button
               type="button"
@@ -191,6 +308,8 @@ function LoginPageContent() {
           ) : null}
 
           <p className="mt-5 text-center text-xs font-semibold text-[var(--mikke-muted-light)]">by mikke</p>
+            </>
+          )}
         </section>
       </div>
     </main>
