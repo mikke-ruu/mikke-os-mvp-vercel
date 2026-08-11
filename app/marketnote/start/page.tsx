@@ -8,10 +8,10 @@ export default function MarketNoteStartPage() {
           <header>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--mikke-primary)]">MARKETNOTE</p>
             <h1 className="mt-3 text-2xl font-bold tracking-normal text-[var(--mikke-primary)] sm:text-3xl">
-              出店の記録を、かんたんに。
+              仕事の予定と収支を、かんたんに。
             </h1>
             <p className="mt-4 text-sm leading-7 text-[var(--mikke-muted)]">
-              出店日を入れて、持ち物を整えて、売上と材料費を記録すると、出店ごとの利益がその場でわかります。
+              予定を入れて、タスクを整えて、必要なときだけ売上と経費を記録できます。
             </p>
           </header>
 

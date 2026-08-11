@@ -123,6 +123,7 @@ export function updateGuestMarketEventDetails(eventId: string, input: {
   eventDate: string;
   venueName: string;
   area: string;
+  genre: string;
   status: MarketEvent["status"];
   publicNote: string;
   privateNote: string;
@@ -138,6 +139,7 @@ export function updateGuestMarketEventDetails(eventId: string, input: {
         event_date: input.eventDate,
         venue_name: input.venueName || null,
         area: input.area || null,
+        genre: input.genre || "出店",
         status: input.status,
         public_note: input.publicNote || null,
         private_note: input.privateNote || null,
@@ -205,6 +207,8 @@ export function addGuestFinancialRecord(input: {
   category: string;
   memo: string;
   paymentStatus?: "unpaid" | "paid" | "not_required";
+  paymentMethod?: string;
+  entryKind?: MarketFinancialRecord["entry_kind"];
 }) {
   const now = timestamp();
   const record: MarketFinancialRecord = {
@@ -218,6 +222,8 @@ export function addGuestFinancialRecord(input: {
     occurred_at: input.occurredAt,
     category: input.category || null,
     payment_status: input.paymentStatus ?? "paid",
+    payment_method: input.paymentMethod || null,
+    entry_kind: input.entryKind ?? "manual",
     memo: input.memo || null,
     created_at: now,
     updated_at: now
@@ -235,6 +241,8 @@ export function updateGuestFinancialRecord(recordId: string, input: {
   category: string;
   memo: string;
   paymentStatus?: "unpaid" | "paid" | "not_required";
+  paymentMethod?: string;
+  entryKind?: MarketFinancialRecord["entry_kind"];
 }) {
   let updated: MarketFinancialRecord | null = null;
   writeStore((store) => ({
@@ -250,6 +258,8 @@ export function updateGuestFinancialRecord(recordId: string, input: {
         category: input.category || null,
         memo: input.memo || null,
         payment_status: input.paymentStatus ?? "paid",
+        payment_method: input.paymentMethod || null,
+        entry_kind: input.entryKind ?? record.entry_kind ?? "manual",
         updated_at: timestamp()
       };
       return updated;
@@ -340,18 +350,23 @@ export function upsertGuestEventPaymentRecord(input: {
   method: string;
   paymentStatus: "unpaid" | "paid" | "not_required";
 }) {
+  const advanceExisting = listGuestFinancialRecords(input.marketEventId)
+    .find((row) => row.record_type === "expense" && row.entry_kind === "advance_expense");
   const existing = listGuestFinancialRecords(input.marketEventId)
     .find((row) => row.record_type === "expense" && (row.title.includes("出店") || row.category === "出店料"));
 
-  if (existing) {
-    return updateGuestFinancialRecord(existing.id, {
+  if (advanceExisting || existing) {
+    const selectedExisting = advanceExisting ?? existing!;
+    return updateGuestFinancialRecord(selectedExisting.id, {
       recordType: "expense",
-      title: existing.title,
+      title: selectedExisting.title,
       amount: input.amount,
-      occurredAt: input.eventDate,
-      category: "出店料",
-      memo: input.method,
-      paymentStatus: input.paymentStatus
+      occurredAt: input.paymentStatus === "paid" ? dateKey(new Date()) : input.eventDate,
+      category: selectedExisting.category || "事前経費",
+      memo: selectedExisting.memo ?? "",
+      paymentStatus: input.paymentStatus,
+      paymentMethod: input.method,
+      entryKind: "advance_expense"
     });
   }
 
@@ -362,10 +377,12 @@ export function upsertGuestEventPaymentRecord(input: {
     recordType: "expense",
     title: "出店料",
     amount: input.amount,
-    occurredAt: input.eventDate,
-    category: "出店料",
-    memo: input.method,
-    paymentStatus: input.paymentStatus
+    occurredAt: input.paymentStatus === "paid" ? dateKey(new Date()) : input.eventDate,
+    category: "事前経費",
+    memo: "",
+    paymentStatus: input.paymentStatus,
+    paymentMethod: input.method,
+    entryKind: "advance_expense"
   });
 }
 
@@ -377,9 +394,17 @@ function readStore(): GuestMarketNoteStore {
     if (!raw) return emptyStore;
     const parsed = JSON.parse(raw) as Partial<GuestMarketNoteStore>;
     return {
-      events: Array.isArray(parsed.events) ? parsed.events : [],
+      events: Array.isArray(parsed.events) ? parsed.events.map((event) => ({ ...event, genre: event.genre || "出店" })) : [],
       checks: Array.isArray(parsed.checks) ? parsed.checks : [],
-      finances: Array.isArray(parsed.finances) ? parsed.finances : [],
+      finances: Array.isArray(parsed.finances) ? parsed.finances.map((record) => ({
+        ...record,
+        payment_method: record.payment_method ?? (record.entry_kind === "advance_expense" ? record.memo : null),
+        entry_kind: record.entry_kind ?? (
+          record.record_type === "expense" && (record.title.includes("出店") || record.category === "出店料")
+            ? "advance_expense"
+            : "manual"
+        )
+      })) : [],
       reflections: Array.isArray(parsed.reflections) ? parsed.reflections : []
     };
   } catch {
@@ -402,4 +427,11 @@ function createId(prefix: string) {
 
 function timestamp() {
   return new Date().toISOString();
+}
+
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }

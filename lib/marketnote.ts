@@ -25,6 +25,7 @@ import {
 } from "@/lib/marketnote-guest";
 import { supabase } from "@/lib/supabase/client";
 import { importGuestMarketNotePhotos } from "@/lib/marketnote-photos";
+import { toDateKey } from "@/lib/format";
 import type {
   ActivityLog,
   MarketCheckItem,
@@ -169,7 +170,7 @@ async function ensureImportedGuestCheckItem(profile: Profile, marketEventId: str
 async function ensureImportedGuestFinancialRecord(profile: Profile, marketEventId: string | null, record: MarketFinancialRecord) {
   let query = supabase
     .from("market_financial_records")
-    .select("id,category,memo,payment_status")
+    .select("id,category,memo,payment_status,payment_method,entry_kind")
     .eq("profile_id", profile.id)
     .eq("record_type", record.record_type)
     .eq("title", record.title)
@@ -183,7 +184,9 @@ async function ensureImportedGuestFinancialRecord(profile: Profile, marketEventI
   if ((existing ?? []).some((row) =>
     row.category === record.category &&
     row.memo === record.memo &&
-    row.payment_status === record.payment_status
+    row.payment_status === record.payment_status &&
+    row.payment_method === (record.payment_method ?? null) &&
+    row.entry_kind === (record.entry_kind ?? "manual")
   )) return false;
 
   const { error } = await supabase.from("market_financial_records").insert({
@@ -196,6 +199,8 @@ async function ensureImportedGuestFinancialRecord(profile: Profile, marketEventI
     occurred_at: record.occurred_at,
     category: record.category,
     payment_status: record.payment_status,
+    payment_method: record.payment_method ?? null,
+    entry_kind: record.entry_kind ?? "manual",
     memo: record.memo
   });
 
@@ -310,7 +315,7 @@ export async function createMarketEvent(
     profileId: profile.id,
     activityType: "market_event_added",
     sourceRecordId: event.id,
-    title: `${event.title}を出店予定に追加しました`,
+    title: `${event.title}を予定に追加しました`,
     description: [event.venue_name, event.area, event.genre].filter(Boolean).join(" / ") || null,
     occurredAt: event.event_date,
     visibility: "private",
@@ -330,6 +335,7 @@ export async function updateMarketEventDetails(
     eventDate: string;
     venueName: string;
     area: string;
+    genre: string;
     status: MarketEvent["status"];
     publicNote: string;
     privateNote: string;
@@ -344,6 +350,7 @@ export async function updateMarketEventDetails(
       event_date: input.eventDate,
       venue_name: input.venueName || null,
       area: input.area || null,
+      genre: input.genre || "出店",
       status: input.status,
       public_note: input.publicNote || null,
       private_note: input.privateNote || null
@@ -411,7 +418,7 @@ export async function toggleCheckItem(profile: Profile, item: MarketCheckItem, n
     profileId: profile.id,
     activityType: "market_event_prepared",
     sourceRecordId: `${item.id}:${nextValue ? "done" : "todo"}`,
-    title: nextValue ? "出店準備を完了しました" : "出店準備を更新しました",
+    title: nextValue ? "予定の準備を完了しました" : "予定の準備を更新しました",
     description: item.title,
     visibility: "private",
     displayOnStory: false
@@ -461,6 +468,8 @@ export async function addFinancialRecord(
     category: string;
     memo: string;
     paymentStatus?: "unpaid" | "paid" | "not_required";
+    paymentMethod?: string;
+    entryKind?: MarketFinancialRecord["entry_kind"];
   }
 ) {
   if (isMarketNoteGuestProfile(profile)) return addGuestFinancialRecord(input);
@@ -477,6 +486,8 @@ export async function addFinancialRecord(
       occurred_at: input.occurredAt,
       category: input.category || null,
       payment_status: input.paymentStatus ?? "paid",
+      payment_method: input.paymentMethod || null,
+      entry_kind: input.entryKind ?? "manual",
       memo: input.memo || null
     })
     .select("*")
@@ -490,7 +501,7 @@ export async function addFinancialRecord(
     profileId: profile.id,
     activityType: input.recordType === "revenue" ? "market_sales_recorded" : "market_expense_recorded",
     sourceRecordId: record.id,
-    title: input.recordType === "revenue" ? "出店売上を記録しました" : "出店経費を記録しました",
+    title: input.recordType === "revenue" ? "売上を記録しました" : "経費を記録しました",
     description: record.title,
     occurredAt: record.occurred_at,
     visibility: "private",
@@ -514,6 +525,8 @@ export async function updateFinancialRecord(
     category: string;
     memo: string;
     paymentStatus?: "unpaid" | "paid" | "not_required";
+    paymentMethod?: string;
+    entryKind?: MarketFinancialRecord["entry_kind"];
   }
 ) {
   if (isMarketNoteGuestProfile(profile)) return updateGuestFinancialRecord(recordId, input);
@@ -527,7 +540,9 @@ export async function updateFinancialRecord(
       occurred_at: input.occurredAt,
       category: input.category || null,
       memo: input.memo || null,
-      payment_status: input.paymentStatus ?? "paid"
+      payment_status: input.paymentStatus ?? "paid",
+      payment_method: input.paymentMethod || null,
+      entry_kind: input.entryKind ?? "manual"
     })
     .eq("id", recordId)
     .eq("profile_id", profile.id)
@@ -565,20 +580,25 @@ export async function saveEventPaymentRecord(
 ) {
   if (isMarketNoteGuestProfile(profile)) return upsertGuestEventPaymentRecord(input);
 
+  const advanceExisting = (await listFinancialRecords(profile.id, input.marketEventId))
+    .find((row) => row.record_type === "expense" && row.entry_kind === "advance_expense");
+
   const existing = (await listFinancialRecords(profile.id, input.marketEventId))
     .find((row) => row.record_type === "expense" && (row.title.includes("出店") || row.title.includes("蜃ｺ蠎") || row.category === "出店料"));
 
-  if (existing) {
+  if (advanceExisting || existing) {
+    const selectedExisting = advanceExisting ?? existing!;
     const { data, error } = await supabase
       .from("market_financial_records")
       .update({
         amount: input.amount,
-        occurred_at: input.eventDate,
-        category: "出店料",
+        occurred_at: input.paymentStatus === "paid" ? toDateKey(new Date()) : input.eventDate,
+        category: selectedExisting.category || "事前経費",
         payment_status: input.paymentStatus,
-        memo: input.method || null
+        payment_method: input.method || null,
+        entry_kind: "advance_expense"
       })
-      .eq("id", existing.id)
+      .eq("id", selectedExisting.id)
       .eq("profile_id", profile.id)
       .select("*")
       .single();
@@ -594,10 +614,12 @@ export async function saveEventPaymentRecord(
     recordType: "expense",
     title: "出店料",
     amount: input.amount,
-    occurredAt: input.eventDate,
-    category: "出店料",
-    memo: input.method,
-    paymentStatus: input.paymentStatus
+    occurredAt: input.paymentStatus === "paid" ? toDateKey(new Date()) : input.eventDate,
+    category: "事前経費",
+    memo: "",
+    paymentStatus: input.paymentStatus,
+    paymentMethod: input.method,
+    entryKind: "advance_expense"
   });
 }
 
@@ -664,7 +686,7 @@ export async function saveReflection(
     profileId: profile.id,
     activityType: "market_reflection_created",
     sourceRecordId: reflection.id,
-    title: "出店の振り返りを記録しました",
+    title: "予定の振り返りを記録しました",
     description: reflection.public_summary,
     visibility: "private",
     displayOnStory: false,
@@ -694,7 +716,7 @@ export async function completeMarketEvent(profile: Profile, event: MarketEvent) 
     profileId: profile.id,
     activityType: "market_event_completed",
     sourceRecordId: `${event.id}:completed`,
-    title: `${event.title}に出店しました`,
+    title: `${event.title}を完了しました`,
     description: [event.venue_name, event.area, event.genre].filter(Boolean).join(" / ") || null,
     occurredAt: event.event_date,
     visibility: "private",

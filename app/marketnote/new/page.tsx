@@ -20,7 +20,8 @@ import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { getActiveCheckItems, getInitiallySelectedCheckItems, loadCheckTemplate, resolveDueDate } from "@/lib/check-templates";
 import { toDateKey } from "@/lib/format";
-import { addCheckItem, addFinancialRecord, createMarketEvent, toggleCheckItem } from "@/lib/marketnote";
+import { addCheckItem, addFinancialRecord, createMarketEvent } from "@/lib/marketnote";
+import { getMarketEventTypeNames, loadMarketEventTypeSettings } from "@/lib/marketnote-event-types";
 import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import type { MarketEvent } from "@/types/database";
 
@@ -29,16 +30,11 @@ type PaymentStatus = "unpaid" | "paid" | "not_required";
 type PaymentMethod = string;
 type PaymentEntry = {
   id: string;
+  title: string;
   status: PaymentStatus;
   method: PaymentMethod;
   amount: string;
 };
-
-const statusOptions: Array<{ label: string; value: EntryStatus }> = [
-  { label: "検討中", value: "planned" },
-  { label: "申込済み", value: "applied" },
-  { label: "出店確定", value: "preparing" }
-];
 
 const paymentStatusOptions: Array<{ label: string; value: PaymentStatus }> = [
   { label: "未払い", value: "unpaid" },
@@ -49,6 +45,8 @@ const paymentStatusOptions: Array<{ label: string; value: PaymentStatus }> = [
 function NewMarketEventContent() {
   const router = useRouter();
   const { profile, isGuest } = useAuth();
+  const [eventType, setEventType] = useState("出店");
+  const [eventTypes, setEventTypes] = useState<string[]>(["出店"]);
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -61,7 +59,7 @@ function NewMarketEventContent() {
   const [venueName, setVenueName] = useState("");
   const [address, setAddress] = useState("");
   const [payments, setPayments] = useState<PaymentEntry[]>([
-    { id: "payment-1", status: "unpaid", method: "現金", amount: "" }
+    { id: "payment-1", title: "出店料", status: "unpaid", method: "現金", amount: "" }
   ]);
   const [memo, setMemo] = useState("");
   const [templateChecks, setTemplateChecks] = useState<string[]>([]);
@@ -79,6 +77,8 @@ function NewMarketEventContent() {
     const initialStartDate = new URLSearchParams(window.location.search).get("startDate") || toDateKey(new Date());
     setStartDate(initialStartDate);
     setEndDate(initialStartDate);
+    const nextEventTypes = getMarketEventTypeNames(loadMarketEventTypeSettings());
+    setEventTypes(nextEventTypes.length ? nextEventTypes : ["出店"]);
 
     const template = loadCheckTemplate();
     const activeTemplateItems = getActiveCheckItems(template);
@@ -89,10 +89,15 @@ function NewMarketEventContent() {
 
   const normalizedEndDate = multiDay ? (endDate || startDate) : startDate;
   const canSave = title.trim().length > 0 && startDate.length > 0 && !saving;
+  const statusOptions = useMemo<Array<{ label: string; value: EntryStatus }>>(() => [
+    { label: "検討中", value: "planned" },
+    { label: eventType === "出店" ? "申込済み" : "調整中", value: "applied" },
+    { label: "確定", value: "preparing" }
+  ], [eventType]);
 
   const privateNote = useMemo(() => {
     return [
-      `入力ステータス: ${statusLabel(status)}`,
+      `入力ステータス: ${statusLabel(status, eventType)}`,
       startDate ? `start_date: ${startDate}` : "",
       normalizedEndDate ? `end_date: ${normalizedEndDate}` : "",
       `複数日イベント: ${multiDay ? "true" : "false"}`,
@@ -100,11 +105,11 @@ function NewMarketEventContent() {
       endTime ? `終了時間: ${endTime}` : "",
       meetTime ? `集合時間: ${meetTime}` : "",
       packUpTime ? `撤収時間: ${packUpTime}` : "",
-      ...payments.map((payment) => payment.status !== "not_required"
-        ? `支払い: ${paymentLabel(payment.status)} / ${payment.method} / ${payment.amount || 0}円`
-        : "支払い: 不要")
+      ...payments.filter((payment) => payment.title.trim() || payment.amount).map((payment) => payment.status !== "not_required"
+        ? `事前経費: ${payment.title || "経費"} / ${paymentLabel(payment.status)} / ${payment.method} / ${payment.amount || 0}円`
+        : `事前経費: ${payment.title || "経費"} / 不要`)
     ].filter(Boolean).join("\n");
-  }, [endTime, meetTime, multiDay, normalizedEndDate, packUpTime, payments, startDate, startTime, status]);
+  }, [endTime, eventType, meetTime, multiDay, normalizedEndDate, packUpTime, payments, startDate, startTime, status]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,7 +129,7 @@ function NewMarketEventContent() {
         eventDate: startDate,
         venueName: venueName.trim(),
         area: address.trim(),
-        genre: "出店",
+        genre: eventType,
         status: status === "preparing" ? "preparing" : "planned",
         publicNote: memo.trim(),
         privateNote
@@ -141,13 +146,8 @@ function NewMarketEventContent() {
   }
 
   async function savePayment(created: MarketEvent) {
-    const requiredPayments = payments.filter((payment) => payment.status !== "not_required");
+    const requiredPayments = payments.filter((payment) => payment.status !== "not_required" && Number(payment.amount || 0) > 0);
     if (requiredPayments.length === 0) return;
-
-    const paymentCheck = await addCheckItem(profile, created.id, "支払い済み");
-    if (requiredPayments.every((payment) => payment.status === "paid")) {
-      await toggleCheckItem(profile, paymentCheck, true);
-    }
 
     await Promise.all(requiredPayments.map((payment) => {
       const amount = Number(payment.amount || 0);
@@ -155,12 +155,14 @@ function NewMarketEventContent() {
       return addFinancialRecord(profile, {
         marketEventId: created.id,
         recordType: "expense",
-        title: "出店料",
+        title: payment.title.trim() || "事前経費",
         amount,
-        occurredAt: startDate,
-        category: "出店料",
-        memo: payment.method,
-        paymentStatus: payment.status
+        occurredAt: payment.status === "paid" ? toDateKey(new Date()) : startDate,
+        category: payment.title.trim() || "事前経費",
+        memo: "",
+        paymentStatus: payment.status,
+        paymentMethod: payment.method,
+        entryKind: "advance_expense"
       });
     }));
   }
@@ -169,10 +171,19 @@ function NewMarketEventContent() {
     setPayments((current) => current.map((payment) => payment.id === id ? { ...payment, ...patch } : payment));
   }
 
+  function selectEventType(nextType: string) {
+    setEventType(nextType);
+    setPayments((current) => current.map((payment, index) => (
+      index === 0 && (payment.title === "出店料" || payment.title === "事前経費")
+        ? { ...payment, title: nextType === "出店" ? "出店料" : "事前経費" }
+        : payment
+    )));
+  }
+
   function addPayment() {
     setPayments((current) => [
       ...current,
-      { id: `payment-${Date.now()}`, status: "unpaid", method: fixedPaymentMethodNames[0] ?? "現金", amount: "" }
+      { id: `payment-${Date.now()}`, title: "", status: "unpaid", method: fixedPaymentMethodNames[0] ?? "現金", amount: "" }
     ]);
   }
 
@@ -198,7 +209,7 @@ function NewMarketEventContent() {
   }
 
   return (
-    <MarketNoteShell title="出店予定を追加" subtitle="MarketNote" isGuest={isGuest} hideBottomNav>
+    <MarketNoteShell title="予定を追加" subtitle="MarketNote" isGuest={isGuest} hideBottomNav>
       <form onSubmit={submit} className="pb-28">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button
@@ -209,7 +220,7 @@ function NewMarketEventContent() {
           >
             <ArrowLeft size={22} strokeWidth={1.7} />
           </button>
-          <h1 className="text-center text-xl font-semibold tracking-normal text-[var(--mikke-text)]">出店予定を追加</h1>
+          <h1 className="text-center text-xl font-semibold tracking-normal text-[var(--mikke-text)]">予定を追加</h1>
           <Link href="/marketnote" className="grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-muted)]" aria-label="閉じる">
             <X size={20} strokeWidth={1.7} />
           </Link>
@@ -218,10 +229,19 @@ function NewMarketEventContent() {
         <div className="space-y-3">
           {isGuest ? <GuestNotice /> : null}
 
+          <FormCard title="予定の種類" tone="blue" icon={<CalendarDays size={16} />}>
+            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+              {eventTypes.map((type) => (
+                <button key={type} type="button" onClick={() => selectEventType(type)} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-bold ${eventType === type ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"}`}>{type}</button>
+              ))}
+            </div>
+            <Link href="/settings/event-types" className="inline-flex min-h-9 items-center text-xs font-bold text-[var(--mikke-blue)]">予定の種類を設定</Link>
+          </FormCard>
+
           <FormCard title="基本情報" tone="blue" icon={<ClipboardList size={16} strokeWidth={1.8} />}>
             <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-[1fr_0.86fr]">
-              <Field label="イベント名" required compact>
-                <TextInput value={title} onChange={setTitle} placeholder="例）ハンドメイドフェス 2025" required />
+              <Field label="予定名" required compact>
+                <TextInput value={title} onChange={setTitle} placeholder="例）ハンドメイドフェス" required />
               </Field>
               {multiDay ? (
                 <Field label="開始日" required compact>
@@ -237,7 +257,7 @@ function NewMarketEventContent() {
                   />
                 </Field>
               ) : (
-                <Field label="開催日" required compact>
+                <Field label="予定日" required compact>
                   <TextInput
                     value={startDate}
                     onChange={(value) => {
@@ -275,7 +295,7 @@ function NewMarketEventContent() {
               <span className={`grid h-4 w-4 place-items-center rounded border ${multiDay ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white text-transparent"}`}>
                 <Check size={11} strokeWidth={2} />
               </span>
-              複数日イベント
+              複数日の予定
             </button>
           </FormCard>
 
@@ -316,26 +336,28 @@ function NewMarketEventContent() {
             </div>
           </AccordionCard>
 
-          <FormCard title="支払い情報" tone="orange" icon={<WalletCards size={16} />}>
-            <p className="text-xs font-bold text-[var(--mikke-muted)]">出店料</p>
+          <FormCard title="事前経費" tone="orange" icon={<WalletCards size={16} />}>
+            <p className="text-xs font-bold leading-5 text-[var(--mikke-muted)]">入力しなくても予定は保存できます。支払済みの項目だけが経費に反映されます。</p>
             <div className="space-y-2.5">
               {payments.map((payment, index) => (
                 <div key={payment.id} className="rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-2.5">
                   <div className="mb-2 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-[var(--mikke-muted)]">支払い {index + 1}</span>
+                    <span className="text-[11px] font-bold text-[var(--mikke-muted)]">事前経費 {index + 1}</span>
                     {payments.length > 1 ? (
                       <button type="button" onClick={() => setPayments((current) => current.filter((item) => item.id !== payment.id))} className="grid h-7 w-7 place-items-center rounded-full text-[var(--mikke-muted)]" aria-label={`支払い ${index + 1} を削除`}>
                         <X size={15} />
                       </button>
                     ) : null}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 min-[360px]:grid-cols-[1fr_1fr_0.95fr]">
+                  <div className="grid grid-cols-2 gap-2">
+                    <TextInput value={payment.title} onChange={(value) => updatePayment(payment.id, { title: value })} placeholder="項目" />
                     <SelectBox value={payment.status} onChange={(value) => updatePayment(payment.id, { status: value as PaymentStatus })} options={paymentStatusOptions} tone={payment.status === "paid" ? "green" : payment.status === "unpaid" ? "orange" : "gray"} />
                     <SelectBox value={payment.method} onChange={(value) => updatePayment(payment.id, { method: value })} options={getPaymentMethodOptions(fixedPaymentMethodNames, payment.method)} tone="gray" />
-                    <div className="col-span-2 min-[360px]:col-span-1">
+                    <div>
                       <MoneyInput value={payment.amount} onChange={(value) => updatePayment(payment.id, { amount: value })} />
                     </div>
                   </div>
+                  {payment.status === "unpaid" && Number(payment.amount || 0) > 0 ? <p className="mt-2 rounded-lg bg-[var(--mikke-yellow)] px-2.5 py-2 text-[11px] font-bold leading-4 text-[var(--mikke-text)]">未払いの事前経費は、支払済みにすると経費へ反映されます。</p> : null}
                 </div>
               ))}
             </div>
@@ -345,7 +367,7 @@ function NewMarketEventContent() {
               className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-3 py-2 text-xs font-bold text-[var(--mikke-accent)]"
             >
               <Plus size={14} strokeWidth={1.7} />
-              支払い追加
+              事前経費を追加
             </button>
           </FormCard>
 
@@ -405,13 +427,13 @@ function NewMarketEventContent() {
           {error ? <p className="rounded-xl bg-[var(--mikke-pink)] px-4 py-3 text-sm font-bold text-[var(--mikke-text)]">{error}</p> : null}
 
           <div className="space-y-2.5 pt-0.5">
-            <p className="text-center text-xs font-bold text-[var(--mikke-muted-light)]">イベント名と開催日だけでも保存できます</p>
+            <p className="text-center text-xs font-bold text-[var(--mikke-muted-light)]">予定名と予定日だけでも保存できます</p>
             <button
               type="submit"
               disabled={!canSave}
               className="w-full rounded-xl bg-[var(--mikke-orange)] px-4 py-3.5 text-base font-extrabold text-white disabled:opacity-50"
             >
-              {saving ? "保存中..." : "出店予定を保存"}
+              {saving ? "保存中..." : "予定を保存"}
             </button>
             <Link
               href="/marketnote"
@@ -429,7 +451,7 @@ function NewMarketEventContent() {
 function GuestNotice() {
   return (
     <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
-      保存すると、このブラウザに出店予定が残ります。同じアイコン・同じブラウザから続きが見られ、あとでログインするとクラウド保存へ進めます。
+      保存すると、このブラウザに予定が残ります。同じアイコン・同じブラウザから続きが見られ、あとでログインするとクラウド保存へ進めます。
     </div>
   );
 }
@@ -640,9 +662,9 @@ function MoneyInput({ value, onChange }: { value: string; onChange: (value: stri
   );
 }
 
-function statusLabel(status: EntryStatus) {
-  if (status === "preparing") return "出店確定";
-  if (status === "applied") return "申込済み";
+function statusLabel(status: EntryStatus, eventType = "出店") {
+  if (status === "preparing") return "確定";
+  if (status === "applied") return eventType === "出店" ? "申込済み" : "調整中";
   return "検討中";
 }
 
