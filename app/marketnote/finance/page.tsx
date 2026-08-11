@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  BarChart3,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -11,12 +12,17 @@ import {
   Clock3,
   MapPin,
   Plus,
-  ReceiptText
+  ReceiptText,
+  Save,
+  StickyNote,
+  X
 } from "lucide-react";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { defaultFinanceCategorySettings, getFinanceCategoryNames, loadFinanceCategorySettings } from "@/lib/finance-categories";
-import { formatMonthDay, formatYen } from "@/lib/format";
+import { formatMonthDay, formatYen, toDateKey } from "@/lib/format";
+import { getMarketEventType, getMarketEventTypeNames, loadMarketEventTypeSettings } from "@/lib/marketnote-event-types";
+import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import {
   addFinancialRecord,
   deleteFinancialRecord,
@@ -36,6 +42,8 @@ type FinanceDraft = {
   category: string;
   memo: string;
   paymentStatus: "unpaid" | "paid" | "not_required";
+  paymentMethod: string;
+  entryKind: MarketFinancialRecord["entry_kind"];
 };
 
 type EventFinanceRow = {
@@ -46,17 +54,22 @@ type EventFinanceRow = {
   profit: number;
 };
 
+type CategoryBreakdown = { label: string; amount: number; ratio: number; color: string }[];
+
 function MarketFinanceContent() {
   const router = useRouter();
   const { profile, isGuest } = useAuth();
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [records, setRecords] = useState<MarketFinancialRecord[]>([]);
   const [categorySettings, setCategorySettings] = useState(defaultFinanceCategorySettings);
+  const [eventTypes, setEventTypes] = useState<string[]>([]);
+  const [activeEventType, setActiveEventType] = useState("全体");
   const [visibleMonth, setVisibleMonth] = useState(() => startOfMonth(new Date()));
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, FinanceDraft[]>>({});
   const [savingEventId, setSavingEventId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [noteEditor, setNoteEditor] = useState<{ eventId: string; draftId: string } | null>(null);
 
   async function load() {
     const [nextEvents, nextRecords] = await Promise.all([
@@ -80,6 +93,7 @@ function MarketFinanceContent() {
 
   useEffect(() => {
     setCategorySettings(loadFinanceCategorySettings());
+    setEventTypes(getMarketEventTypeNames(loadMarketEventTypeSettings()));
     load();
   }, [profile.id]);
 
@@ -89,6 +103,7 @@ function MarketFinanceContent() {
   const rows = useMemo<EventFinanceRow[]>(() => {
     return events
       .filter((event) => isSameMonth(parseDate(event.event_date), visibleMonth))
+      .filter((event) => activeEventType === "全体" || getMarketEventType(event) === activeEventType)
       .sort((a, b) => a.event_date.localeCompare(b.event_date))
       .map((event) => {
         const eventRecords = records.filter((record) => record.market_event_id === event.id);
@@ -96,15 +111,20 @@ function MarketFinanceContent() {
         const expense = sumRecords(eventRecords, "expense");
         return { event, records: eventRecords, revenue, expense, profit: revenue - expense };
       });
-  }, [events, records, visibleMonth]);
+  }, [activeEventType, events, records, visibleMonth]);
 
   const monthly = useMemo(() => {
-    const monthEventIds = new Set(rows.map((row) => row.event.id));
-    const monthRecords = records.filter((record) => record.market_event_id && monthEventIds.has(record.market_event_id));
+    const allowedEventIds = new Set(events.filter((event) => activeEventType === "全体" || getMarketEventType(event) === activeEventType).map((event) => event.id));
+    const monthRecords = records.filter((record) => isSameMonth(parseDate(record.occurred_at), visibleMonth) && (!record.market_event_id || allowedEventIds.has(record.market_event_id)));
     const revenue = sumRecords(monthRecords, "revenue");
     const expense = sumRecords(monthRecords, "expense");
-    return { revenue, expense, profit: revenue - expense };
-  }, [records, rows]);
+    return { revenue, expense, profit: revenue - expense, records: monthRecords };
+  }, [activeEventType, events, records, visibleMonth]);
+
+  const breakdowns = useMemo(() => ({
+    revenue: getCategoryBreakdown(monthly.records, "revenue"),
+    expense: getCategoryBreakdown(monthly.records, "expense")
+  }), [monthly.records]);
 
   function moveMonth(diff: number) {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + diff, 1));
@@ -139,7 +159,9 @@ function MarketFinanceContent() {
           occurredAt: event.event_date,
           category: title,
           memo: "",
-          paymentStatus: "paid"
+          paymentStatus: "paid",
+          paymentMethod: fixedPaymentMethodNames[0] ?? "現金",
+          entryKind: "manual"
         }
       ]
     }));
@@ -173,7 +195,9 @@ function MarketFinanceContent() {
           occurredAt: draft.occurredAt || event.event_date,
           category: draft.category.trim() || draft.title.trim(),
           memo: draft.memo.trim(),
-          paymentStatus: draft.paymentStatus
+          paymentStatus: draft.paymentStatus,
+          paymentMethod: draft.paymentMethod,
+          entryKind: draft.entryKind
         };
 
         if (draft.persistedId) {
@@ -226,7 +250,14 @@ function MarketFinanceContent() {
           </div>
         </header>
 
+        <div className="mb-3 -mx-1 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="予定の種類で絞り込む">
+          {["全体", ...eventTypes].map((type) => (
+            <button key={type} type="button" onClick={() => setActiveEventType(type)} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-bold ${activeEventType === type ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"}`}>{type}</button>
+          ))}
+        </div>
+
         <MonthlySummary totals={monthly} />
+        <FinanceBreakdownPanel revenue={breakdowns.revenue} expense={breakdowns.expense} />
 
         {message ? <p className="mt-3 rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-accent-strong)]">{message}</p> : null}
 
@@ -263,54 +294,50 @@ function MarketFinanceContent() {
                 {open ? (
                   <div className="border-t border-[var(--mikke-line-soft)] px-3.5 pb-3.5 pt-3">
                     <h4 className="mb-2.5 text-sm font-extrabold text-[var(--mikke-text)]">収支詳細</h4>
+                    <div className="mb-3 grid grid-cols-3 gap-1.5">
+                      <FinanceAction label="＋売上" onClick={() => addDraft(row.event, "revenue", revenueCategories[0] ?? "売上")} />
+                      <FinanceAction label="＋経費" onClick={() => addDraft(row.event, "expense", expenseCategories[0] ?? "経費")} />
+                      <button type="button" onClick={() => saveEventFinance(row.event)} disabled={savingEventId === row.event.id} className="inline-flex min-h-10 items-center justify-center gap-1 rounded-xl bg-[var(--mikke-accent)] px-1 text-xs font-extrabold text-white disabled:opacity-50"><Save size={14} />{savingEventId === row.event.id ? "保存中" : "保存"}</button>
+                    </div>
                     <FinanceDraftSection
                       title="売上内訳"
-                      actionLabel="売上を追加"
                       recordType="revenue"
                       event={row.event}
                       drafts={eventDrafts.filter((draft) => draft.recordType === "revenue")}
                       categoryOptions={revenueCategories}
-                      onAdd={() => addDraft(row.event, "revenue", revenueCategories[0] ?? "売上")}
                       onChange={(draftId, patch) => updateDraft(row.event.id, draftId, patch)}
                       onRemove={(draft) => removeDraft(row.event.id, draft)}
+                      onEditNote={(draftId) => setNoteEditor({ eventId: row.event.id, draftId })}
                     />
                     <FinanceDraftSection
                       title="経費内訳"
-                      actionLabel="経費を追加"
                       recordType="expense"
                       event={row.event}
                       drafts={eventDrafts.filter((draft) => draft.recordType === "expense")}
                       categoryOptions={expenseCategories}
-                      onAdd={() => addDraft(row.event, "expense", expenseCategories[0] ?? "経費")}
                       onChange={(draftId, patch) => updateDraft(row.event.id, draftId, patch)}
                       onRemove={(draft) => removeDraft(row.event.id, draft)}
+                      onEditNote={(draftId) => setNoteEditor({ eventId: row.event.id, draftId })}
                     />
                     <div className="mt-3.5 flex items-end justify-between border-t border-[var(--mikke-line-soft)] pt-3">
                       <span className="text-sm font-extrabold text-[var(--mikke-text)]">利益</span>
                       <span className="text-xl font-semibold tracking-normal text-[var(--mikke-success)]">{formatYen(getDraftTotals(eventDrafts).profit)}</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => saveEventFinance(row.event)}
-                      disabled={savingEventId === row.event.id}
-                      className="mt-3.5 w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-extrabold text-[var(--mikke-surface)] shadow-[0_8px_18px_rgba(255,90,31,0.16)] disabled:opacity-50"
-                    >
-                      {savingEventId === row.event.id ? "保存中..." : "保存"}
-                    </button>
                   </div>
                 ) : null}
               </article>
             );
           }) : (
             <div className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-6 text-center shadow-[0_4px_16px_rgba(45,33,22,0.04)]">
-              <p className="text-sm font-bold text-[var(--mikke-text)]">この月の出店予定はありません</p>
+              <p className="text-sm font-bold text-[var(--mikke-text)]">この月の予定はありません</p>
               <Link href="/marketnote/new" className="mt-4 inline-flex items-center gap-2 rounded-full border border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-4 py-2 text-sm font-extrabold text-[var(--mikke-accent)]">
                 <Plus size={16} strokeWidth={1.8} />
-                出店予定を追加
+                予定を追加
               </Link>
             </div>
           )}
         </section>
+        {noteEditor ? <FinanceNoteDialog draft={drafts[noteEditor.eventId]?.find((draft) => draft.id === noteEditor.draftId)} onChange={(memo) => updateDraft(noteEditor.eventId, noteEditor.draftId, { memo })} onClose={() => setNoteEditor(null)} /> : null}
       </div>
     </MarketNoteShell>
   );
@@ -320,6 +347,47 @@ function GuestNotice() {
   return (
     <div className="mb-4 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
       会計もこのブラウザに保存されます。同じアイコン・同じブラウザから続きが見られます。クラウド保存とDESK連携は、ログイン後の検証が済んでから開放します。
+    </div>
+  );
+}
+
+function FinanceAction({ label, onClick }: { label: string; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className="min-h-10 rounded-xl border border-[var(--mikke-blue)] bg-white px-1 text-xs font-extrabold text-[var(--mikke-blue)]">{label}</button>;
+}
+
+function FinanceBreakdownPanel({ revenue, expense }: { revenue: CategoryBreakdown; expense: CategoryBreakdown }) {
+  return (
+    <section className="mt-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-3.5 shadow-[0_4px_14px_rgba(45,33,22,0.04)]">
+      <div className="flex items-center gap-2"><BarChart3 size={17} className="text-[var(--mikke-blue)]" /><h2 className="text-sm font-extrabold">内訳</h2></div>
+      <div className="mt-3 grid gap-3 min-[440px]:grid-cols-2">
+        <BreakdownGroup title="売上内訳" items={revenue} />
+        <BreakdownGroup title="経費内訳" items={expense} />
+      </div>
+    </section>
+  );
+}
+
+function BreakdownGroup({ title, items }: { title: string; items: CategoryBreakdown }) {
+  return (
+    <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-3">
+      <h3 className="text-xs font-extrabold text-[var(--mikke-text)]">{title}</h3>
+      {items.length ? <>
+        <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-white">{items.map((item) => <span key={item.label} style={{ width: `${item.ratio}%`, backgroundColor: item.color }} />)}</div>
+        <div className="mt-2 space-y-1.5">{items.map((item) => <div key={item.label} className="grid grid-cols-[8px_1fr_auto] items-center gap-2 text-[10px] font-bold"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} /><span className="truncate text-[var(--mikke-muted)]">{item.label}</span><span>{formatYen(item.amount)} <span className="text-[var(--mikke-muted-light)]">{Math.round(item.ratio)}%</span></span></div>)}</div>
+      </> : <p className="mt-2 text-[11px] font-bold text-[var(--mikke-muted-light)]">まだ記録はありません</p>}
+    </div>
+  );
+}
+
+function FinanceNoteDialog({ draft, onChange, onClose }: { draft?: FinanceDraft; onChange: (memo: string) => void; onClose: () => void }) {
+  if (!draft) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-3 sm:items-center" role="dialog" aria-modal="true" aria-label="備考を編集">
+      <div className="w-full max-w-md rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl">
+        <div className="flex items-center justify-between"><h2 className="text-base font-extrabold">備考</h2><button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center" aria-label="閉じる"><X size={19} /></button></div>
+        <textarea value={draft.memo} onChange={(event) => onChange(event.target.value)} rows={6} autoFocus placeholder="備考を入力" className="mt-3 w-full resize-none rounded-xl border border-[var(--mikke-line)] px-3 py-2.5 text-base leading-6 outline-none focus:border-[var(--mikke-blue)]" />
+        <button type="button" onClick={onClose} className="mt-3 w-full rounded-xl bg-[var(--mikke-orange)] px-4 py-3 text-sm font-extrabold text-white">入力を反映</button>
+      </div>
     </div>
   );
 }
@@ -377,24 +445,22 @@ function FinanceAmount({
 
 function FinanceDraftSection({
   title,
-  actionLabel,
   recordType,
   event,
   drafts,
   categoryOptions,
-  onAdd,
   onChange,
-  onRemove
+  onRemove,
+  onEditNote
 }: {
   title: string;
-  actionLabel: string;
   recordType: "revenue" | "expense";
   event: MarketEvent;
   drafts: FinanceDraft[];
   categoryOptions: string[];
-  onAdd: () => void;
   onChange: (draftId: string, patch: Partial<FinanceDraft>) => void;
   onRemove: (draft: FinanceDraft) => void;
+  onEditNote: (draftId: string) => void;
 }) {
   const [customDraftIds, setCustomDraftIds] = useState<string[]>([]);
 
@@ -406,7 +472,8 @@ function FinanceDraftSection({
       </div>
       <div className="space-y-1.5">
         {drafts.map((draft) => (
-          <div key={draft.id} className="grid grid-cols-[1fr_24px] items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-2 py-1.5 min-[360px]:grid-cols-[1fr_96px_24px]">
+          <div key={draft.id} className={`rounded-xl border p-2 ${recordType === "revenue" ? "border-[var(--mikke-green)] bg-[color-mix(in_srgb,var(--mikke-green)_10%,white)]" : "border-[var(--mikke-pink)] bg-[color-mix(in_srgb,var(--mikke-pink)_18%,white)]"}`}>
+            <div className="grid grid-cols-[1.1fr_0.9fr_0.9fr_24px] items-center gap-1.5">
             <div className="relative min-w-0">
               {customDraftIds.includes(draft.id) ? (
                 <input
@@ -428,7 +495,7 @@ function FinanceDraftSection({
                       }
                       onChange(draft.id, { title: inputEvent.target.value, category: inputEvent.target.value });
                     }}
-                    className="h-9 w-full min-w-0 appearance-none rounded-lg bg-[var(--mikke-surface-soft)] px-2 pr-7 text-base font-bold text-[var(--mikke-text)] outline-none min-[360px]:text-xs"
+                    className="h-9 w-full min-w-0 appearance-none rounded-lg bg-white px-2 pr-7 text-[11px] font-bold text-[var(--mikke-text)] outline-none"
                   >
                     {draft.title && !categoryOptions.includes(draft.title) ? <option value={draft.title} hidden>{draft.title}</option> : null}
                     {categoryOptions.map((category) => (
@@ -443,12 +510,23 @@ function FinanceDraftSection({
                 <span className="mt-0.5 inline-flex rounded-full bg-[var(--mikke-surface-soft)] px-2 py-0.5 text-[10px] font-bold leading-none text-[var(--mikke-muted-light)]">支払い情報から反映</span>
               ) : null}
             </div>
-            <div className="order-3 col-span-2 min-[360px]:order-2 min-[360px]:col-span-1">
+            <div className="relative min-w-0">
+              <select value={draft.paymentMethod} onChange={(event) => onChange(draft.id, { paymentMethod: event.target.value })} className="h-9 w-full appearance-none rounded-lg bg-white px-2 pr-6 text-[11px] font-bold outline-none">
+                {getPaymentMethodOptions(fixedPaymentMethodNames, draft.paymentMethod).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+              <ChevronDown size={12} className="pointer-events-none absolute right-1.5 top-3 text-[var(--mikke-muted)]" />
+            </div>
+            <div>
               <MoneyInput value={draft.amount} onChange={(value) => onChange(draft.id, { amount: value, occurredAt: draft.occurredAt || event.event_date })} />
             </div>
-            <button type="button" onClick={() => onRemove(draft)} className="order-2 grid h-6 w-6 place-items-center rounded-full text-[var(--mikke-muted-light)] min-[360px]:order-3" aria-label="削除">
+            <button type="button" onClick={() => onRemove(draft)} className="grid h-6 w-6 place-items-center rounded-full text-[var(--mikke-muted-light)]" aria-label="削除">
               <CircleX size={15} strokeWidth={1.7} />
             </button>
+            </div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <button type="button" onClick={() => onChange(draft.id, { paymentStatus: draft.paymentStatus === "paid" ? "unpaid" : "paid", occurredAt: draft.paymentStatus === "paid" ? draft.occurredAt : toDateKey(new Date()) })} className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-bold ${draft.paymentStatus === "paid" ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]" : "bg-[var(--mikke-yellow)] text-[var(--mikke-text)]"}`}>{draft.recordType === "revenue" ? (draft.paymentStatus === "paid" ? "入金済" : "未入金") : (draft.paymentStatus === "paid" ? "支払済" : "未払い")}</button>
+              <button type="button" onClick={() => onEditNote(draft.id)} className="flex min-w-0 flex-1 items-center gap-1 rounded-lg bg-white/80 px-2 py-1.5 text-left text-[10px] font-bold text-[var(--mikke-muted)]"><StickyNote size={12} className="shrink-0" /><span className="truncate">{draft.memo || "備考を追加"}</span></button>
+            </div>
           </div>
         ))}
         {drafts.length === 0 ? (
@@ -457,10 +535,6 @@ function FinanceDraftSection({
           </p>
         ) : null}
       </div>
-      <button type="button" onClick={onAdd} className="mt-1.5 inline-flex items-center gap-1 rounded-full px-1 py-1 text-xs font-extrabold text-[var(--mikke-accent)]">
-        <Plus size={15} strokeWidth={1.8} />
-        {actionLabel}
-      </button>
     </div>
   );
 }
@@ -506,26 +580,44 @@ function recordToDraft(record: MarketFinancialRecord): FinanceDraft {
     occurredAt: record.occurred_at,
     category: record.category ?? record.title,
     memo: record.memo ?? "",
-    paymentStatus: record.payment_status
+    paymentStatus: record.payment_status,
+    paymentMethod: record.payment_method ?? "現金",
+    entryKind: record.entry_kind ?? "manual"
   };
 }
 
 function isPaymentLinkedDraft(draft: FinanceDraft) {
   if (draft.recordType !== "expense") return false;
   const text = `${draft.title} ${draft.category} ${draft.memo}`;
-  return text.includes("出店") || text.includes("支払い") || draft.paymentStatus === "unpaid" || draft.paymentStatus === "not_required";
+  return draft.entryKind === "advance_expense" || text.includes("出店") || text.includes("支払い");
 }
 
 function getDraftTotals(drafts: FinanceDraft[]) {
-  const revenue = drafts.filter((draft) => draft.recordType === "revenue").reduce((sum, draft) => sum + Number(draft.amount || 0), 0);
-  const expense = drafts.filter((draft) => draft.recordType === "expense").reduce((sum, draft) => sum + Number(draft.amount || 0), 0);
+  const revenue = drafts.filter((draft) => draft.recordType === "revenue" && draft.paymentStatus === "paid").reduce((sum, draft) => sum + Number(draft.amount || 0), 0);
+  const expense = drafts.filter((draft) => draft.recordType === "expense" && draft.paymentStatus === "paid").reduce((sum, draft) => sum + Number(draft.amount || 0), 0);
   return { revenue, expense, profit: revenue - expense };
 }
 
 function sumRecords(records: MarketFinancialRecord[], type: "revenue" | "expense") {
   return records
-    .filter((record) => record.record_type === type)
+    .filter((record) => record.record_type === type && record.payment_status === "paid")
     .reduce((sum, record) => sum + Number(record.amount), 0);
+}
+
+function getCategoryBreakdown(records: MarketFinancialRecord[], type: "revenue" | "expense"): CategoryBreakdown {
+  const totals = new Map<string, number>();
+  for (const record of records) {
+    if (record.record_type !== type || record.payment_status !== "paid") continue;
+    const label = record.category?.trim() || record.title.trim() || (type === "revenue" ? "売上" : "経費");
+    totals.set(label, (totals.get(label) ?? 0) + Number(record.amount));
+  }
+  const palette = ["#3f4eb5", "#8bc7ad", "#ffd370", "#f9d3d2", "#f75a3b"];
+  const sum = [...totals.values()].reduce((total, amount) => total + amount, 0);
+  return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([label, amount], index) => ({ label, amount, ratio: sum > 0 ? (amount / sum) * 100 : 0, color: palette[index % palette.length] }));
+}
+
+function getPaymentMethodOptions(names: string[], current: string) {
+  return Array.from(new Set([current, ...names].filter(Boolean))).map((value) => ({ label: value, value }));
 }
 
 function getInitialEventId() {

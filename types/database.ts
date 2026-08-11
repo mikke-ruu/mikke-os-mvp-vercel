@@ -56,6 +56,8 @@ export type MarketFinancialRecord = {
   occurred_at: string;
   category: string | null;
   payment_status: "unpaid" | "paid" | "not_required";
+  payment_method: string | null;
+  entry_kind: "manual" | "advance_expense" | "quick_note";
   memo: string | null;
   created_at: string;
   updated_at: string;

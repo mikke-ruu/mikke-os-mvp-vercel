@@ -80,13 +80,6 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
   }, [activeEvents, checksByEvent, reminderSettings, todayKey]);
   const currentTasks = taskGroups.current;
   const overdueTasks = taskGroups.overdue;
-  const unrecordedFinishedEvents = useMemo(
-    () => events
-      .filter((event) => event.status === "completed" && (financesByEvent[event.id]?.length ?? 0) === 0)
-      .sort((a, b) => b.event_date.localeCompare(a.event_date)),
-    [events, financesByEvent]
-  );
-
   function moveMonth(delta: number) {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   }
@@ -162,11 +155,11 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
 
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-[var(--mikke-muted)]" aria-label="予定の色分け">
         <CalendarLegend color="var(--mikke-blue)" label="予定" />
-        <CalendarLegend color="var(--mikke-orange)" label="出店確定" />
+        <CalendarLegend color="var(--mikke-orange)" label="確定" />
         <CalendarLegend color="var(--mikke-green)" label="完了" />
       </div>
 
-      {currentTasks.length > 0 || overdueTasks.length > 0 || upcomingEvents.length > 0 || unrecordedFinishedEvents.length > 0 ? (
+      {currentTasks.length > 0 || overdueTasks.length > 0 || upcomingEvents.length > 0 ? (
         <div className="mt-5 space-y-4">
           {currentTasks.length > 0 || overdueTasks.length > 0 ? (
             <section className="border-t border-[var(--mikke-line)] pt-4">
@@ -193,18 +186,18 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
           {upcomingEvents.length > 0 ? (
             <section className="border-t border-[var(--mikke-line)] pt-4">
               <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--mikke-blue)]" style={{ fontFamily: "var(--mikke-font-display)" }}>NEXT EVENTS</p>
-              <h3 className="mt-1 text-sm font-bold text-[var(--mikke-text)]">次回イベント</h3>
+              <h3 className="mt-1 text-sm font-bold text-[var(--mikke-text)]">次の予定</h3>
               <ul className="mt-2 space-y-2">
                 {upcomingEvents.slice(0, 3).map((event) => {
                   const checks = checksByEvent[event.id] ?? [];
                   const done = checks.filter((check) => check.is_done).length;
-                  const payment = getPaymentState(checks);
+                  const payment = getPaymentState(financesByEvent[event.id] ?? []);
                   return (
                     <li key={event.id}>
                       <Link href={`/marketnote/${event.id}`} className="block text-xs font-semibold text-[var(--mikke-text-soft)]">
                         <span className="font-bold text-[var(--mikke-text)]">{formatMonthDayWeekday(event.event_date)}　{event.title}</span>
                         <span className="mt-0.5 block text-[var(--mikke-muted)]">
-                          {hasAppliedEntryStatus(event.private_note) && event.status === "planned" ? "申込済み" : statusLabel(event.status)} / {payment === "paid" ? "支払済" : payment === "unpaid" ? "未払い" : "支払い不要"} / {done}/{checks.length}
+                          {hasAppliedEntryStatus(event.private_note) && event.status === "planned" ? "申込済み" : statusLabel(event.status)}{payment === "unpaid" ? " / 未払いあり" : ""} / タスク {done}/{checks.length}
                         </span>
                       </Link>
                     </li>
@@ -214,12 +207,6 @@ export function HomeCalendar({ events, checksByEvent, financesByEvent }: Props) 
             </section>
           ) : null}
 
-          {unrecordedFinishedEvents.length > 0 ? (
-            <p className="px-1 text-xs font-semibold text-[var(--mikke-muted)]">
-              未記録の終了イベントが{unrecordedFinishedEvents.length}件あります。
-              <Link href={`/marketnote/${unrecordedFinishedEvents[0].id}`} className="ml-1 font-bold text-[var(--mikke-blue)]">確認する</Link>
-            </p>
-          ) : null}
         </div>
       ) : null}
     </div>
@@ -319,15 +306,16 @@ function daysBetween(fromDateKey: string, toDateKeyValue: string) {
   return Math.round((to - from) / 86_400_000);
 }
 
-function getPaymentState(checks: MarketCheckItem[]): PaymentState {
-  const paymentCheck = checks.find((check) => check.title.includes("支払い") || check.title.includes("支払"));
-  if (!paymentCheck) return "not_required";
-  return paymentCheck.is_done ? "paid" : "unpaid";
+function getPaymentState(finances: MarketFinancialRecord[]): PaymentState {
+  const advanceExpenses = finances.filter((record) => record.record_type === "expense" && (record.entry_kind === "advance_expense" || record.category === "出店料"));
+  if (advanceExpenses.some((record) => record.payment_status === "unpaid")) return "unpaid";
+  if (advanceExpenses.some((record) => record.payment_status === "paid")) return "paid";
+  return "not_required";
 }
 
 function statusLabel(status: MarketEvent["status"]) {
   if (status === "completed") return "終了";
-  if (status === "preparing") return "出店確定";
+  if (status === "preparing") return "確定";
   if (status === "cancelled") return "中止";
   return "検討中";
 }

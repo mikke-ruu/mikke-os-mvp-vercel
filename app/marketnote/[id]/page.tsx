@@ -43,6 +43,7 @@ import {
   type MarketNotePhoto
 } from "@/lib/marketnote-photos";
 import { fixedPaymentMethodNames } from "@/lib/payment-methods";
+import { getMarketEventType, getMarketEventTypeNames, loadMarketEventTypeSettings } from "@/lib/marketnote-event-types";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
 type PaymentStatus = "unpaid" | "paid" | "not_required";
@@ -60,7 +61,7 @@ type EventMeta = {
 
 const statusOptions: Array<{ label: string; value: MarketEvent["status"] }> = [
   { label: "検討中", value: "planned" },
-  { label: "出店確定", value: "preparing" },
+  { label: "確定", value: "preparing" },
   { label: "終了", value: "completed" },
   { label: "中止", value: "cancelled" }
 ];
@@ -83,6 +84,8 @@ function MarketDetailContent() {
   const [photoBusy, setPhotoBusy] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState("");
+  const [eventType, setEventType] = useState("出店");
+  const [eventTypes, setEventTypes] = useState<string[]>(["出店"]);
   const [eventDate, setEventDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [multiDay, setMultiDay] = useState(false);
@@ -125,6 +128,7 @@ function MarketDetailContent() {
     setFinances(nextFinances);
     setReflection(nextReflection);
     setTitle(nextEvent.title);
+    setEventType(getMarketEventType(nextEvent));
     setEventDate(nextEvent.event_date);
     setEndDate(meta.endDate || nextEvent.event_date);
     setMultiDay(meta.multiDay || Boolean(meta.endDate && meta.endDate !== nextEvent.event_date));
@@ -145,6 +149,7 @@ function MarketDetailContent() {
   }
 
   useEffect(() => {
+    setEventTypes(getMarketEventTypeNames(loadMarketEventTypeSettings()));
     load();
   }, [params.id, profile.id]);
 
@@ -196,6 +201,7 @@ function MarketDetailContent() {
         eventDate,
         venueName: venueName.trim(),
         area: address.trim(),
+        genre: eventType,
         status,
         publicNote: memo.trim(),
         privateNote
@@ -330,20 +336,20 @@ function MarketDetailContent() {
 
   if (!event) {
     return (
-      <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest}>
+      <MarketNoteShell title="予定詳細" subtitle="MarketNote" isGuest={isGuest}>
         <MikkeEmptyState title="読み込み中です" />
       </MarketNoteShell>
     );
   }
 
   return (
-    <MarketNoteShell title="出店詳細" subtitle="MarketNote" isGuest={isGuest} addHref={`/marketnote/new?startDate=${eventDate}`}>
+    <MarketNoteShell title="予定詳細" subtitle="MarketNote" isGuest={isGuest} addHref={`/marketnote/new?startDate=${eventDate}`}>
       <form onSubmit={submit} className="pb-28">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button type="button" onClick={() => router.back()} className="grid h-9 w-9 place-items-center rounded-full text-[var(--mikke-text)]" aria-label="戻る">
             <ArrowLeft size={22} strokeWidth={1.7} />
           </button>
-          <h1 className="text-center text-xl font-semibold tracking-normal text-[var(--mikke-text)]">出店詳細</h1>
+          <h1 className="text-center text-xl font-semibold tracking-normal text-[var(--mikke-text)]">予定詳細</h1>
           <span />
         </header>
 
@@ -365,6 +371,7 @@ function MarketDetailContent() {
           paymentStatus={paymentStatus}
           paymentMethod={paymentMethod}
           paymentAmount={paymentAmount}
+          hasUnpaid={finances.some((record) => record.record_type === "expense" && record.payment_status === "unpaid")}
           done={done}
           total={checks.length}
           progress={progress}
@@ -388,8 +395,9 @@ function MarketDetailContent() {
 
           <CollapsibleCard title="各項目編集" icon={<ClipboardList size={16} strokeWidth={1.8} />} open={editOpen} onToggle={() => setEditOpen((current) => !current)}>
             <SectionLabel>基本情報</SectionLabel>
-            <Field label="イベント名"><TextInput value={title} onChange={setTitle} /></Field>
-            <Field label={multiDay ? "開始日" : "開催日"}><TextInput value={eventDate} onChange={(value) => {
+            <Field label="予定の種類"><div className="flex gap-2 overflow-x-auto pb-1">{eventTypes.map((type) => <button key={type} type="button" onClick={() => setEventType(type)} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-bold ${eventType === type ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"}`}>{type}</button>)}</div></Field>
+            <Field label="予定名"><TextInput value={title} onChange={setTitle} /></Field>
+            <Field label={multiDay ? "開始日" : "予定日"}><TextInput value={eventDate} onChange={(value) => {
               setEventDate(value);
               if (!multiDay) setEndDate(value);
             }} type="date" icon={<CalendarDays size={15} />} /></Field>
@@ -397,7 +405,7 @@ function MarketDetailContent() {
               <span className={`grid h-4 w-4 place-items-center rounded border ${multiDay ? "border-[var(--mikke-accent)] bg-[var(--mikke-accent)] text-[var(--mikke-surface)]" : "border-[var(--mikke-line)] bg-[var(--mikke-surface)] text-transparent"}`}>
                 <Check size={11} strokeWidth={2} />
               </span>
-              複数日イベント
+              複数日の予定
             </button>
             {multiDay ? <Field label="終了日"><TextInput value={endDate} onChange={setEndDate} type="date" icon={<CalendarDays size={15} />} /></Field> : null}
             <div className="grid grid-cols-1 gap-2.5 min-[360px]:grid-cols-2">
@@ -411,16 +419,16 @@ function MarketDetailContent() {
             <Field label="会場名"><TextInput value={venueName} onChange={setVenueName} placeholder="例）東京ビッグサイト 西1・2ホール" /></Field>
             <Field label="住所"><TextInput value={address} onChange={setAddress} placeholder="例）東京都江東区有明3-11-1" /></Field>
 
-            <SectionLabel>支払い情報</SectionLabel>
+            <SectionLabel>事前経費</SectionLabel>
             <div className="grid grid-cols-2 gap-2 min-[360px]:grid-cols-[1fr_1fr_0.95fr]">
               <SelectBox value={paymentStatus} onChange={(value) => setPaymentStatus(value as PaymentStatus)} options={paymentStatusOptions} tone={paymentTone(paymentStatus)} />
               <SelectBox value={paymentMethod} onChange={setPaymentMethod} options={getPaymentMethodOptions(fixedPaymentMethodNames, paymentMethod)} tone="gray" />
               <div className="col-span-2 min-[360px]:col-span-1"><MoneyInput value={paymentAmount} onChange={setPaymentAmount} /></div>
             </div>
-            <p className="text-[11px] font-bold leading-5 text-[var(--mikke-muted-light)]">支払い情報の変更は、下部の「変更を保存」で収支に反映されます。</p>
+            <p className="text-[11px] font-bold leading-5 text-[var(--mikke-muted-light)]">支払済みの項目だけが経費へ反映されます。未払いは支払予定として残ります。</p>
             <div className="mt-2.5 flex w-full select-none items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted-light)]" aria-hidden="true">
               <Plus size={14} strokeWidth={1.7} />
-              支払い追加
+              追加の事前経費は収支ページで編集
             </div>
 
             <SectionLabel>チェック項目</SectionLabel>
@@ -541,6 +549,7 @@ function SummaryCard({
   paymentStatus,
   paymentMethod,
   paymentAmount,
+  hasUnpaid,
   done,
   total,
   progress,
@@ -565,6 +574,7 @@ function SummaryCard({
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   paymentAmount: string;
+  hasUnpaid: boolean;
   done: number;
   total: number;
   progress: number;
@@ -602,6 +612,7 @@ function SummaryCard({
         ) : null}
       </div>
       <h2 className="mt-3 truncate text-xl font-extrabold tracking-normal text-[var(--mikke-text)]">{title}</h2>
+      {hasUnpaid ? <span className="mt-2 inline-flex rounded-full bg-[var(--mikke-yellow)] px-2.5 py-1 text-[10px] font-bold text-[var(--mikke-text)]">未払いあり</span> : null}
       <div className="mt-3 grid gap-1.5 text-sm font-semibold text-[var(--mikke-text-soft)]">
         <span className="flex min-w-0 items-center gap-2"><Clock3 size={16} className="text-[var(--mikke-muted-light)]" />{dateRangeLabel(eventDate, endDate)} / {timeLabel(startTime, endTime)}</span>
         <span className="flex min-w-0 items-center gap-2"><Clock3 size={16} className="text-[var(--mikke-muted-light)]" />集合 {meetTime || "未設定"} / 撤収 {packUpTime || "未設定"}</span>
@@ -609,7 +620,7 @@ function SummaryCard({
       </div>
       <div className="mt-3 flex items-center justify-between gap-2 text-xs font-bold text-[var(--mikke-text-soft)]">
         <div className="flex min-w-0 items-center gap-1">
-          <span className="shrink-0">支払い：</span>
+          <span className="shrink-0">事前経費：</span>
           <div className="relative shrink-0">
             <button type="button" onClick={() => setPaymentMenuOpen((current) => !current)} aria-expanded={paymentMenuOpen} disabled={paymentSaving}>
               <PaymentChip status={paymentStatus} withChevron />
@@ -912,14 +923,16 @@ function buildPrivateNote(input: {
 }
 
 function getEventPayment(checks: MarketCheckItem[], finances: MarketFinancialRecord[], fallbackMethod: PaymentMethod) {
+  const advancePaymentRecord = finances.find((row) => row.record_type === "expense" && row.entry_kind === "advance_expense");
   const paymentCheck = checks.find((check) => check.title.includes("支払い") || check.title.includes("謾ｯ謇"));
   const paymentRecord = finances.find((row) => row.record_type === "expense" && (row.title.includes("出店") || row.title.includes("蜃ｺ蠎") || row.category === "出店料"));
 
-  if (paymentRecord) {
+  if (advancePaymentRecord || paymentRecord) {
+    const selectedPaymentRecord = advancePaymentRecord ?? paymentRecord!;
     return {
-      status: paymentRecord.payment_status as PaymentStatus,
-      method: normalizePaymentMethod(paymentRecord.memo) || fallbackMethod,
-      amount: Number(paymentRecord.amount)
+      status: selectedPaymentRecord.payment_status as PaymentStatus,
+      method: normalizePaymentMethod(selectedPaymentRecord.payment_method ?? selectedPaymentRecord.memo) || fallbackMethod,
+      amount: Number(selectedPaymentRecord.amount)
     };
   }
 
@@ -935,8 +948,8 @@ function normalizePaymentMethod(value: string | null | undefined): PaymentMethod
 }
 
 function getTotals(finances: MarketFinancialRecord[]) {
-  const revenue = finances.filter((row) => row.record_type === "revenue").reduce((sum, row) => sum + Number(row.amount), 0);
-  const expense = finances.filter((row) => row.record_type === "expense").reduce((sum, row) => sum + Number(row.amount), 0);
+  const revenue = finances.filter((row) => row.record_type === "revenue" && row.payment_status === "paid").reduce((sum, row) => sum + Number(row.amount), 0);
+  const expense = finances.filter((row) => row.record_type === "expense" && row.payment_status === "paid").reduce((sum, row) => sum + Number(row.amount), 0);
   return { revenue, expense, profit: revenue - expense };
 }
 
@@ -955,7 +968,7 @@ function timeLabel(startTime: string, endTime: string) {
 
 function statusLabel(status: MarketEvent["status"]) {
   if (status === "completed") return "終了";
-  if (status === "preparing") return "出店確定";
+  if (status === "preparing") return "確定";
   if (status === "cancelled") return "中止";
   return "検討中";
 }

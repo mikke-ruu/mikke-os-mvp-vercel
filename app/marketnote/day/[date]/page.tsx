@@ -106,8 +106,8 @@ function MarketNoteDayContent() {
 
 function DayEventCard({ event, checks, finances }: { event: MarketEvent; checks: MarketCheckItem[]; finances: MarketFinancialRecord[] }) {
   const done = checks.filter((check) => check.is_done).length;
-  const revenue = finances.filter((record) => record.record_type === "revenue").reduce((sum, record) => sum + Number(record.amount), 0);
-  const expense = finances.filter((record) => record.record_type === "expense").reduce((sum, record) => sum + Number(record.amount), 0);
+  const revenue = finances.filter((record) => record.record_type === "revenue" && record.payment_status === "paid").reduce((sum, record) => sum + Number(record.amount), 0);
+  const expense = finances.filter((record) => record.record_type === "expense" && record.payment_status === "paid").reduce((sum, record) => sum + Number(record.amount), 0);
   const status = hasAppliedEntryStatus(event.private_note) && event.status === "planned" ? "申込済み" : statusLabel(event.status);
 
   return (
@@ -138,7 +138,7 @@ function statusClass(event: MarketEvent) {
 
 function statusLabel(status: MarketEvent["status"]) {
   if (status === "completed") return "終了";
-  if (status === "preparing") return "出店確定";
+  if (status === "preparing") return "確定";
   if (status === "cancelled") return "中止";
   return "検討中";
 }

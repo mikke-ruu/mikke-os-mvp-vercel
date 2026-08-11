@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BellRing, ChevronRight, ClipboardCheck, Tag, type LucideIcon } from "lucide-react";
+import { BellRing, CalendarRange, ChevronRight, ClipboardCheck, Tag, type LucideIcon } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 
@@ -14,8 +14,14 @@ type SettingsItem = {
 
 const settingsItems: SettingsItem[] = [
   {
+    title: "予定の種類",
+    description: "出店・営業日・制作などの種類を設定します。",
+    href: "/settings/event-types",
+    icon: CalendarRange
+  },
+  {
     title: "チェック項目",
-    description: "出店準備で使う項目と期限を設定します。",
+    description: "予定で使うタスクと期限を設定します。",
     href: "/settings/check-templates",
     icon: ClipboardCheck
   },
@@ -41,7 +47,7 @@ function MarketNoteSettingsContent() {
       <section>
         <h1 className="text-xl font-bold tracking-normal text-[var(--mikke-text)]">MarketNoteの設定</h1>
         <p className="mt-2 text-sm font-semibold leading-6 text-[var(--mikke-muted)]">
-          出店準備と収支記録に使う項目を、自分の仕事に合わせて整えられます。
+          予定・タスク・収支に使う項目を、自分の仕事に合わせて整えられます。
         </p>
 
         <div className="mt-5 overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] shadow-sm">

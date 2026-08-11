@@ -24,6 +24,7 @@ type PaymentState = "paid" | "unpaid" | "not_required";
 type EventSummary = {
   event: MarketEvent;
   checks: MarketCheckItem[];
+  finances: MarketFinancialRecord[];
 };
 type GuestImportStats = ReturnType<typeof getGuestMarketNoteImportStats>;
 
@@ -68,9 +69,10 @@ function MarketNoteContent() {
   const summaries = useMemo<EventSummary[]>(() => {
     return events.map((event) => ({
       event,
-      checks: checksByEvent[event.id] ?? []
+      checks: checksByEvent[event.id] ?? [],
+      finances: financesByEvent[event.id] ?? []
     }));
-  }, [checksByEvent, events]);
+  }, [checksByEvent, events, financesByEvent]);
 
   const filtered = useMemo(() => {
     const todayKey = toDateKey(new Date());
@@ -134,7 +136,7 @@ function MarketNoteContent() {
             ) : (
               <MikkeEmptyState
                 title={activeTab === "upcoming" ? "これからの予定はありません" : "過去の予定はありません"}
-                helper={activeTab === "upcoming" ? "出店予定を追加すると、日付が近い順に表示されます。" : "過去の予定ができると、新しい日付順に表示されます。"}
+                helper={activeTab === "upcoming" ? "予定を追加すると、日付が近い順に表示されます。" : "過去の予定ができると、新しい日付順に表示されます。"}
               />
             )}
           </div>
@@ -200,7 +202,7 @@ function CloudImportNotice({
     try {
       const result = await importGuestMarketNoteRecords(profile);
       await onImported();
-      setMessage(`${result.events}件の出店予定${result.photos > 0 ? `と写真${result.photos}枚` : ""}をクラウドへ保存しました。これからはログインした状態で続きが見られます。`);
+      setMessage(`${result.events}件の予定${result.photos > 0 ? `と写真${result.photos}枚` : ""}をクラウドへ保存しました。これからはログインした状態で続きが見られます。`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "クラウド保存に失敗しました。端末内の記録は残っているので、時間をおいてもう一度お試しください。");
     } finally {
@@ -213,7 +215,7 @@ function CloudImportNotice({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p>
           このブラウザに保存されたMarketNote記録があります。
-          <span className="ml-1 text-[var(--mikke-blue)]">出店予定 {stats.events}件</span>
+          <span className="ml-1 text-[var(--mikke-blue)]">予定 {stats.events}件</span>
           <span className="mt-1 block text-[var(--mikke-muted)]">
             クラウド保存が完了するまで、端末内のゲスト記録は残ります。
           </span>
@@ -270,10 +272,10 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
 }
 
 function EventListCard({ summary }: { summary: EventSummary }) {
-  const { event, checks } = summary;
+  const { event, checks, finances } = summary;
   const done = checks.filter((check) => check.is_done).length;
   const progress = checks.length ? Math.round((done / checks.length) * 100) : 0;
-  const payment = getPaymentState(checks);
+  const payment = getPaymentState(finances);
 
   return (
     <Link
@@ -299,10 +301,7 @@ function EventListCard({ summary }: { summary: EventSummary }) {
       </div>
 
       <div className="mt-4 flex items-center justify-between gap-3 text-xs">
-        <span className="inline-flex items-center gap-1.5 font-semibold text-[var(--mikke-text-soft)]">
-          支払い：
-          <PaymentChip payment={payment} />
-        </span>
+        <span>{payment === "unpaid" ? <span className="rounded-full bg-[var(--mikke-yellow)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-text)]">未払いあり</span> : null}</span>
         <span className="whitespace-nowrap font-semibold text-[var(--mikke-text-soft)]">タスク {done}/{checks.length}</span>
       </div>
 
@@ -340,15 +339,16 @@ function PaymentChip({ payment }: { payment: PaymentState }) {
   return <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold leading-none ${toneClass}`}>{paymentLabel(payment)}</span>;
 }
 
-function getPaymentState(checks: MarketCheckItem[]): PaymentState {
-  const paymentCheck = checks.find((check) => check.title.includes("支払い") || check.title.includes("支払"));
-  if (!paymentCheck) return "not_required";
-  return paymentCheck.is_done ? "paid" : "unpaid";
+function getPaymentState(finances: MarketFinancialRecord[]): PaymentState {
+  const advanceExpenses = finances.filter((record) => record.record_type === "expense" && (record.entry_kind === "advance_expense" || record.category === "出店料"));
+  if (advanceExpenses.some((record) => record.payment_status === "unpaid")) return "unpaid";
+  if (advanceExpenses.some((record) => record.payment_status === "paid")) return "paid";
+  return "not_required";
 }
 
 function statusLabel(status: MarketEvent["status"]) {
   if (status === "completed") return "終了";
-  if (status === "preparing") return "出店確定";
+  if (status === "preparing") return "確定";
   if (status === "cancelled") return "中止";
   return "検討中";
 }
