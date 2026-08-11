@@ -66,6 +66,8 @@ type MikkeAppShellProps = {
   bottomNavItems?: MikkeShellBottomNavItem[];
   /** 中央の主要操作だけ別の固定色にする。未指定時はthemeと同じ。 */
   primaryActionTone?: StatChipTone;
+  /** 共有・ホーム画面追加は利用者向けアプリだけに表示する。本部など内部画面ではfalse。 */
+  showSharedUtilities?: boolean;
   /** 初見でも意味が分かるよう、モバイル下部メニューに短いラベルを表示する。 */
   showBottomNavLabels?: boolean;
   sidebarFooterAction?: {
@@ -107,6 +109,7 @@ export function MikkeAppShell({
   navItems,
   bottomNavItems,
   primaryActionTone,
+  showSharedUtilities = true,
   showBottomNavLabels = false,
   sidebarFooterAction,
   children
@@ -239,7 +242,7 @@ export function MikkeAppShell({
                   </div>
                 );
               })}
-              <div className="mt-3 border-t border-[var(--mikke-line)] pt-2">
+              {showSharedUtilities ? <div className="mt-3 border-t border-[var(--mikke-line)] pt-2">
                 {!hasShareNavItem ? (
                   <Link href={shareHref} className="flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13.5px] font-semibold text-[var(--mikke-primary)]">
                     <Share2 size={17} strokeWidth={1.8} />
@@ -250,7 +253,7 @@ export function MikkeAppShell({
                   <HousePlus size={17} strokeWidth={1.8} />
                   ホーム画面に追加
                 </a>
-              </div>
+              </div> : null}
             </nav>
 
             {appTiles.length > 0 ? (
