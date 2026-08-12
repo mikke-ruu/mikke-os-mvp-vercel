@@ -1,0 +1,2 @@
+create index mikkeos_email_deliveries_recipient_user_idx
+  on public.mikkeos_email_deliveries(recipient_user_id);
