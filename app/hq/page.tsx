@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowRight, BellRing, BookOpen, CalendarDays, ClipboardList, RefreshCw, Users } from "lucide-react";
-import { getHqSummary, type HqSummary } from "@/lib/hq";
+import { HqDashboardCharts } from "@/components/hq/HqDashboardCharts";
+import { getHqSummary, getHqTimeseries, type HqSummary, type HqTimeseriesPoint } from "@/lib/hq";
 
 function StatCard({ label, value, note, icon: Icon }: { label: string; value: number; note: string; icon: typeof Users }) {
   return (
@@ -20,6 +21,7 @@ function StatCard({ label, value, note, icon: Icon }: { label: string; value: nu
 
 export default function HqDashboardPage() {
   const [summary, setSummary] = useState<HqSummary | null>(null);
+  const [timeseries, setTimeseries] = useState<HqTimeseriesPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -27,7 +29,9 @@ export default function HqDashboardPage() {
     setLoading(true);
     setError("");
     try {
-      setSummary(await getHqSummary());
+      const [nextSummary, nextTimeseries] = await Promise.all([getHqSummary(), getHqTimeseries()]);
+      setSummary(nextSummary);
+      setTimeseries(nextTimeseries);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "集計を読み込めませんでした。");
     } finally {
@@ -77,6 +81,8 @@ export default function HqDashboardPage() {
         <StatCard label="30日以内に記録あり" value={summary.active_users_30d} note="アプリを開いた人数ではなく、記録を残した人数" icon={RefreshCw} />
         <StatCard label="未完了のお問い合わせ" value={summary.inquiries_open} note={`うち至急 ${summary.inquiries_urgent}件`} icon={ClipboardList} />
       </section>
+
+      <HqDashboardCharts summary={summary} timeseries={timeseries} />
 
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm md:p-5">
         <div className="flex items-center gap-2">

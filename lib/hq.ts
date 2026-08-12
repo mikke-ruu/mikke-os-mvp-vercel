@@ -21,6 +21,13 @@ export type HqSummary = {
   updates_drafts: number;
 };
 
+export type HqTimeseriesPoint = {
+  day: string;
+  new_profiles: number;
+  active_users: number;
+  activity_records: number;
+};
+
 export type HqInquiryStatus = "new" | "in_progress" | "waiting" | "resolved";
 export type HqInquiryPriority = "low" | "normal" | "high" | "urgent";
 
@@ -101,6 +108,21 @@ export async function getHqSummary(): Promise<HqSummary> {
     .maybeSingle();
 
   return requireData((data?.summary as HqSummary | null) ?? null, error);
+}
+
+export async function getHqTimeseries(): Promise<HqTimeseriesPoint[]> {
+  const { data, error } = await supabase
+    .from("mikkeos_hq_dashboard_timeseries")
+    .select("day, new_profiles, active_users, activity_records")
+    .order("day", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((point) => ({
+    day: String(point.day),
+    new_profiles: Number(point.new_profiles),
+    active_users: Number(point.active_users),
+    activity_records: Number(point.activity_records)
+  }));
 }
 
 export async function listHqInquiries(): Promise<HqInquiry[]> {
