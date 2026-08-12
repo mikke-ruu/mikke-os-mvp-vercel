@@ -10,6 +10,10 @@ export type CommunityResourceKind = "web" | "pdf" | "video" | "other";
 export type CommunityEntitlementStatus = "active" | "revoked" | "expired";
 export type CommunityEntitlementSource = "manual" | "subscription" | "external";
 export type CommunityHomeMetric = "unread" | "today_activity" | "upcoming_events" | "rooms" | "posts" | "comments" | "chat_messages" | "resources";
+export type CommunityApprovalMode = "auto" | "manual";
+export type CommunityApplicationStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type CommunityReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
+export type CommunityInquiryStatus = "open" | "reviewing" | "answered" | "closed";
 
 export type Community = {
   id: string;
@@ -72,6 +76,72 @@ export type CommunityOwnerMember = {
   membership: CommunityMembership;
   profile: CommunityMemberProfile | null;
   entitlements: CommunityMemberEntitlement[];
+};
+
+export type CommunitySafetySettings = {
+  communityId: string;
+  approvalMode: CommunityApprovalMode;
+  requireLegalName: boolean;
+  requirePhone: boolean;
+  requireJoinReason: boolean;
+  termsVersion: number;
+  termsText: string;
+  rulesVersion: number;
+  rulesText: string;
+  privacyVersion: number;
+  privacyText: string;
+  newMemberLimitEnabled: boolean;
+  newMemberLimitHours: number;
+  newMemberMaxActions: number;
+};
+
+export type CommunityJoinApplication = {
+  id: string;
+  communityId: string;
+  userId: string;
+  displayName: string;
+  legalName: string | null;
+  email: string;
+  phone: string | null;
+  joinReason: string | null;
+  status: CommunityApplicationStatus;
+  reviewNote: string | null;
+  submittedAt: string;
+  reviewedAt: string | null;
+};
+
+export type CommunityBlockedWord = {
+  id: string;
+  communityId: string;
+  term: string;
+  action: "warn" | "block";
+  isActive: boolean;
+  createdAt: string;
+};
+
+export type CommunityReport = {
+  id: string;
+  communityId: string;
+  reporterUserId: string;
+  targetType: "post" | "comment" | "chat" | "profile" | "member" | "other";
+  targetId: string | null;
+  reason: string;
+  details: string | null;
+  status: CommunityReportStatus;
+  resolutionNote: string | null;
+  createdAt: string;
+};
+
+export type CommunityInquiry = {
+  id: string;
+  communityId: string;
+  userId: string;
+  category: string;
+  subject: string;
+  body: string;
+  status: CommunityInquiryStatus;
+  responseNote: string | null;
+  createdAt: string;
 };
 
 export type CommunityRoom = {
@@ -244,4 +314,10 @@ export type CommunityDashboard = {
   resources: CommunityResource[];
   stamps: CommunityStamp[];
   activities: CommunityActivity[];
+  safetySettings: CommunitySafetySettings | null;
+  myJoinApplication: CommunityJoinApplication | null;
+  joinApplications: CommunityJoinApplication[];
+  blockedWords: CommunityBlockedWord[];
+  reports: CommunityReport[];
+  inquiries: CommunityInquiry[];
 };

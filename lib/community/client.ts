@@ -9,6 +9,10 @@ import type {
   CommunityEntitlementDefinition,
   CommunityEvent,
   CommunityHomeMetric,
+  CommunityBlockedWord,
+  CommunityInquiry,
+  CommunityInquiryStatus,
+  CommunityJoinApplication,
   CommunityMemberEntitlement,
   CommunityMemberProfile,
   CommunityMembership,
@@ -20,11 +24,14 @@ import type {
   CommunityResource,
   CommunityResourceKind,
   CommunityRole,
+  CommunityReport,
+  CommunityReportStatus,
   CommunityRoom,
   CommunityRoomAccessType,
   CommunityRoomColor,
   CommunityRoomKind,
   CommunitySearchResult,
+  CommunitySafetySettings,
   CommunityStamp
 } from "./types";
 import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
@@ -74,6 +81,47 @@ function mapProfile(row: any): CommunityMemberProfile {
     createdAt: row.created_at,
     updatedAt: row.updated_at
   };
+}
+
+function mapSafetySettings(row: any): CommunitySafetySettings {
+  return {
+    communityId: row.community_id,
+    approvalMode: row.approval_mode,
+    requireLegalName: Boolean(row.require_legal_name),
+    requirePhone: Boolean(row.require_phone),
+    requireJoinReason: Boolean(row.require_join_reason),
+    termsVersion: row.terms_version,
+    termsText: row.terms_text,
+    rulesVersion: row.rules_version,
+    rulesText: row.rules_text,
+    privacyVersion: row.privacy_version,
+    privacyText: row.privacy_text,
+    newMemberLimitEnabled: Boolean(row.new_member_limit_enabled),
+    newMemberLimitHours: row.new_member_limit_hours,
+    newMemberMaxActions: row.new_member_max_actions
+  };
+}
+
+function mapJoinApplication(row: any): CommunityJoinApplication {
+  return {
+    id: row.id, communityId: row.community_id, userId: row.user_id,
+    displayName: row.display_name, legalName: row.legal_name ?? null,
+    email: row.email, phone: row.phone ?? null, joinReason: row.join_reason ?? null,
+    status: row.status, reviewNote: row.review_note ?? null,
+    submittedAt: row.submitted_at, reviewedAt: row.reviewed_at ?? null
+  };
+}
+
+function mapBlockedWord(row: any): CommunityBlockedWord {
+  return { id: row.id, communityId: row.community_id, term: row.term, action: row.action, isActive: Boolean(row.is_active), createdAt: row.created_at };
+}
+
+function mapReport(row: any): CommunityReport {
+  return { id: row.id, communityId: row.community_id, reporterUserId: row.reporter_user_id, targetType: row.target_type, targetId: row.target_id ?? null, reason: row.reason, details: row.details ?? null, status: row.status, resolutionNote: row.resolution_note ?? null, createdAt: row.created_at };
+}
+
+function mapInquiry(row: any): CommunityInquiry {
+  return { id: row.id, communityId: row.community_id, userId: row.user_id, category: row.category, subject: row.subject, body: row.body, status: row.status, responseNote: row.response_note ?? null, createdAt: row.created_at };
 }
 
 function mapEntitlementDefinition(row: any): CommunityEntitlementDefinition {
@@ -342,7 +390,7 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
   if (communityError) throw communityError;
 
   const community = mapCommunity(communityRow);
-  const [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult, roomReadsResult, postActivityResult, chatActivityResult] = await Promise.all([
+  const [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult, roomReadsResult, postActivityResult, chatActivityResult, safetyResult, myApplicationResult] = await Promise.all([
     client.from("community_memberships").select("*").eq("community_id", community.id).eq("user_id", userId).maybeSingle(),
     client.from("community_memberships").select("*").eq("community_id", community.id).order("joined_at", { ascending: true }),
     client.from("community_member_profiles").select("*").eq("community_id", community.id),
@@ -352,10 +400,12 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     client.from("community_stamps").select("*").eq("community_id", community.id).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
     client.from("community_room_reads").select("room_id,last_seen_at").eq("community_id", community.id).eq("user_id", userId),
     client.from("community_posts").select("id,room_id,author_user_id,created_at").eq("community_id", community.id).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: false }).limit(1000),
-    client.from("community_chat_messages").select("id,room_id,author_user_id,body,stamp_id,created_at").eq("community_id", community.id).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: false }).limit(1000)
+    client.from("community_chat_messages").select("id,room_id,author_user_id,body,stamp_id,created_at").eq("community_id", community.id).eq("is_hidden", false).is("deleted_at", null).order("created_at", { ascending: false }).limit(1000),
+    client.from("community_safety_settings").select("*").eq("community_id", community.id).maybeSingle(),
+    client.from("community_join_applications").select("*").eq("community_id", community.id).eq("user_id", userId).maybeSingle()
   ]);
 
-  const firstError = [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult, roomReadsResult, postActivityResult, chatActivityResult]
+  const firstError = [membershipResult, membershipsResult, profilesResult, roomRulesResult, definitionsResult, grantsResult, stampsResult, roomReadsResult, postActivityResult, chatActivityResult, safetyResult, myApplicationResult]
     .find((result) => result.error)?.error;
   if (firstError) throw firstError;
 
@@ -364,6 +414,22 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
   const ownEntitlements = allGrants.filter((item) => item.userId === userId);
   const activeKeys = new Set(ownEntitlements.filter(isCurrentlyActive).map((item) => item.entitlementKey));
   const staff = community.ownerUserId === userId || membership?.role === "owner" || membership?.role === "moderator";
+
+  const [applicationsResult, blockedWordsResult, reportsResult, inquiriesResult] = staff
+    ? await Promise.all([
+        client.from("community_join_applications").select("*").eq("community_id", community.id).order("submitted_at", { ascending: false }),
+        client.from("community_blocked_words").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
+        client.from("community_reports").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
+        client.from("community_inquiries").select("*").eq("community_id", community.id).order("created_at", { ascending: false })
+      ])
+    : [
+        { data: [], error: null },
+        membership?.status === "active" ? await client.from("community_blocked_words").select("*").eq("community_id", community.id).eq("is_active", true) : { data: [], error: null },
+        membership?.status === "active" ? await client.from("community_reports").select("*").eq("community_id", community.id).eq("reporter_user_id", userId).order("created_at", { ascending: false }) : { data: [], error: null },
+        membership?.status === "active" ? await client.from("community_inquiries").select("*").eq("community_id", community.id).eq("user_id", userId).order("created_at", { ascending: false }) : { data: [], error: null }
+      ];
+  const safetyError = [applicationsResult, blockedWordsResult, reportsResult, inquiriesResult].find((result) => result.error)?.error;
+  if (safetyError) throw safetyError;
 
   let roomsQuery = client.from("community_rooms").select("*").eq("community_id", community.id).order("is_archived", { ascending: true }).order("sort_order", { ascending: true });
   if (!staff) roomsQuery = roomsQuery.eq("is_archived", false);
@@ -579,41 +645,75 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     events: (eventsResult.data ?? []).map(mapEvent),
     resources: (resourcesResult.data ?? []).map(mapResource),
     stamps,
-    activities
+    activities,
+    safetySettings: safetyResult.data ? mapSafetySettings(safetyResult.data) : null,
+    myJoinApplication: myApplicationResult.data ? mapJoinApplication(myApplicationResult.data) : null,
+    joinApplications: (applicationsResult.data ?? []).map(mapJoinApplication),
+    blockedWords: (blockedWordsResult.data ?? []).map(mapBlockedWord),
+    reports: (reportsResult.data ?? []).map(mapReport),
+    inquiries: (inquiriesResult.data ?? []).map(mapInquiry)
   };
 }
 
-export async function joinCommunity(client: DbClient, communityId: string, userId: string, displayName: string, email?: string) {
-  const safeDisplayName = displayName.trim() || email?.split("@")[0] || "COMMUNITY participant";
-  const { data: community, error: communityError } = await client
-    .from("community_communities")
-    .select("join_mode,status")
-    .eq("id", communityId)
-    .single();
-  if (communityError) throw communityError;
-  if (community?.status !== "active") throw new Error("このCOMMUNITYは現在参加できません。");
-  if (community?.join_mode !== "open_free") throw new Error("このCOMMUNITYは現在、無料の自由参加を受け付けていません。");
+export async function submitCommunityJoinApplication(client: DbClient, communityId: string, input: { displayName: string; legalName: string; phone: string; joinReason: string; acceptTerms: boolean; acceptRules: boolean; acceptPrivacy: boolean }) {
+  const { data, error } = await client.rpc("community_submit_join_application", {
+    p_community_id: communityId,
+    p_display_name: input.displayName.trim(),
+    p_legal_name: input.legalName.trim(),
+    p_phone: input.phone.trim(),
+    p_join_reason: input.joinReason.trim(),
+    p_accept_terms: input.acceptTerms,
+    p_accept_rules: input.acceptRules,
+    p_accept_privacy: input.acceptPrivacy
+  });
+  if (error) throw error;
+  return mapJoinApplication(Array.isArray(data) ? data[0] : data);
+}
 
-  const { data: existingMembership, error: existingMembershipError } = await client
-    .from("community_memberships")
-    .select("id,status")
-    .eq("community_id", communityId)
-    .eq("user_id", userId)
-    .maybeSingle();
-  if (existingMembershipError) throw existingMembershipError;
-  if (existingMembership?.status === "suspended") throw new Error("このCOMMUNITYへの参加は一時停止されています。運営にお問い合わせください。");
+export async function saveCommunitySafetySettings(client: DbClient, communityId: string, input: Omit<CommunitySafetySettings, "communityId">) {
+  const { error } = await client.from("community_safety_settings").upsert({
+    community_id: communityId, approval_mode: input.approvalMode,
+    require_legal_name: input.requireLegalName, require_phone: input.requirePhone, require_join_reason: input.requireJoinReason,
+    terms_version: input.termsVersion, terms_text: input.termsText.trim(), rules_version: input.rulesVersion, rules_text: input.rulesText.trim(),
+    privacy_version: input.privacyVersion, privacy_text: input.privacyText.trim(), new_member_limit_enabled: input.newMemberLimitEnabled,
+    new_member_limit_hours: input.newMemberLimitHours, new_member_max_actions: input.newMemberMaxActions
+  });
+  if (error) throw error;
+}
 
-  const membershipMutation = existingMembership
-    ? client.from("community_memberships").update({ status: "active" }).eq("id", existingMembership.id)
-    : client.from("community_memberships").insert({ community_id: communityId, user_id: userId, role: "member", status: "active" });
-  const { error: membershipError } = await membershipMutation;
-  if (membershipError) throw membershipError;
+export async function reviewCommunityJoinApplication(client: DbClient, applicationId: string, decision: "approved" | "rejected", note = "") {
+  const { error } = await client.rpc("community_review_join_application", { p_application_id: applicationId, p_decision: decision, p_review_note: note.trim() || null });
+  if (error) throw error;
+}
 
-  const { error: profileError } = await client.from("community_member_profiles").upsert(
-    { community_id: communityId, user_id: userId, display_name: safeDisplayName },
-    { onConflict: "community_id,user_id" }
-  );
-  if (profileError) throw profileError;
+export async function addCommunityBlockedWord(client: DbClient, communityId: string, userId: string, term: string, action: "warn" | "block") {
+  const { error } = await client.from("community_blocked_words").insert({ community_id: communityId, created_by_user_id: userId, term: term.trim(), action });
+  if (error) throw error;
+}
+
+export async function deleteCommunityBlockedWord(client: DbClient, id: string) {
+  const { error } = await client.from("community_blocked_words").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function createCommunityReport(client: DbClient, input: { communityId: string; reporterUserId: string; targetType: CommunityReport["targetType"]; targetId?: string; reason: string; details: string; snapshot?: Record<string, unknown> }) {
+  const { error } = await client.from("community_reports").insert({ community_id: input.communityId, reporter_user_id: input.reporterUserId, target_type: input.targetType, target_id: input.targetId ?? null, reason: input.reason, details: input.details.trim() || null, content_snapshot: input.snapshot ?? {} });
+  if (error) throw error;
+}
+
+export async function updateCommunityReportStatus(client: DbClient, id: string, status: CommunityReportStatus, note: string, handlerUserId: string) {
+  const { error } = await client.from("community_reports").update({ status, resolution_note: note.trim() || null, handled_by_user_id: handlerUserId, resolved_at: status === "resolved" || status === "dismissed" ? new Date().toISOString() : null }).eq("id", id);
+  if (error) throw error;
+}
+
+export async function createCommunityInquiry(client: DbClient, input: { communityId: string; userId: string; category: string; subject: string; body: string }) {
+  const { error } = await client.from("community_inquiries").insert({ community_id: input.communityId, user_id: input.userId, category: input.category, subject: input.subject.trim(), body: input.body.trim() });
+  if (error) throw error;
+}
+
+export async function updateCommunityInquiryStatus(client: DbClient, id: string, status: CommunityInquiryStatus, note: string, handlerUserId: string) {
+  const { error } = await client.from("community_inquiries").update({ status, response_note: note.trim() || null, handled_by_user_id: handlerUserId, closed_at: status === "closed" ? new Date().toISOString() : null }).eq("id", id);
+  if (error) throw error;
 }
 
 export async function claimCommunityOwnership(client: DbClient, communityId: string, userId: string) {
@@ -740,7 +840,19 @@ export async function updateCommunityMembership(client: DbClient, membershipId: 
   if (error) throw error;
 }
 
+async function assertCommunityContentAllowed(client: DbClient, communityId: string, content: string) {
+  if (!content.trim()) return;
+  const { data, error } = await client.from("community_blocked_words").select("term,action").eq("community_id", communityId).eq("is_active", true);
+  if (error) throw error;
+  const normalized = content.toLocaleLowerCase("ja");
+  const match = (data ?? []).find((item: any) => normalized.includes(String(item.term).toLocaleLowerCase("ja")));
+  if (!match) return;
+  if (match.action === "block") throw new Error("禁止ワードが含まれているため送信できません。表現を変更してください。");
+  throw new Error("運営者が注意表現に設定した言葉が含まれています。内容を確認して表現を変更してください。");
+}
+
 export async function createCommunityPost(client: DbClient, input: { communityId: string; roomId: string; authorUserId: string; title: string; body: string; kind: CommunityPostKind; url?: string; imageUrl?: string; isPinned?: boolean }) {
+  await assertCommunityContentAllowed(client, input.communityId, `${input.title} ${input.body}`);
   const { data, error } = await client.from("community_posts").insert({
     community_id: input.communityId,
     room_id: input.roomId,
@@ -766,6 +878,9 @@ export async function updateCommunityPostVisibility(client: DbClient, postId: st
 }
 
 export async function updateCommunityPost(client: DbClient, postId: string, input: { title: string; body: string; url?: string; isPinned: boolean }) {
+  const { data: current, error: currentError } = await client.from("community_posts").select("community_id").eq("id", postId).single();
+  if (currentError) throw currentError;
+  await assertCommunityContentAllowed(client, current.community_id, `${input.title} ${input.body}`);
   const { error } = await client.from("community_posts").update({
     title: input.title.trim(),
     body: input.body.trim(),
@@ -781,11 +896,20 @@ export async function deleteCommunityPost(client: DbClient, postId: string, auth
 }
 
 export async function createCommunityComment(client: DbClient, postId: string, authorUserId: string, body: string, stampId?: string) {
+  if (body.trim()) {
+    const { data: parent, error: parentError } = await client.from("community_posts").select("community_id").eq("id", postId).single();
+    if (parentError) throw parentError;
+    await assertCommunityContentAllowed(client, parent.community_id, body);
+  }
   const { error } = await client.from("community_comments").insert({ post_id: postId, author_user_id: authorUserId, body: body.trim() || "スタンプ", stamp_id: stampId ?? null });
   if (error) throw error;
 }
 
 export async function updateCommunityComment(client: DbClient, commentId: string, authorUserId: string, body: string) {
+  const { data: current, error: currentError } = await client.from("community_comments").select("community_posts(community_id)").eq("id", commentId).single();
+  if (currentError) throw currentError;
+  const post = Array.isArray(current.community_posts) ? current.community_posts[0] : current.community_posts;
+  await assertCommunityContentAllowed(client, post.community_id, body);
   const { error } = await client.from("community_comments").update({ body: body.trim() }).eq("id", commentId).eq("author_user_id", authorUserId);
   if (error) throw error;
 }
@@ -941,6 +1065,7 @@ export async function markCommunityRoomSeen(client: DbClient, communityId: strin
 }
 
 export async function createCommunityChatMessage(client: DbClient, input: { communityId: string; roomId: string; authorUserId: string; body: string; replyToMessageId?: string; stampId?: string }) {
+  if (input.body.trim()) await assertCommunityContentAllowed(client, input.communityId, input.body);
   const { error } = await client.from("community_chat_messages").insert({
     community_id: input.communityId,
     room_id: input.roomId,
@@ -953,6 +1078,9 @@ export async function createCommunityChatMessage(client: DbClient, input: { comm
 }
 
 export async function updateCommunityChatMessage(client: DbClient, messageId: string, authorUserId: string, body: string) {
+  const { data: current, error: currentError } = await client.from("community_chat_messages").select("community_id").eq("id", messageId).single();
+  if (currentError) throw currentError;
+  await assertCommunityContentAllowed(client, current.community_id, body);
   const { error } = await client.from("community_chat_messages").update({ body: body.trim(), edited_at: new Date().toISOString() }).eq("id", messageId).eq("author_user_id", authorUserId);
   if (error) throw error;
 }

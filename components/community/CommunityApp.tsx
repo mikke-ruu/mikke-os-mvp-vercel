@@ -58,7 +58,6 @@ import {
   deleteCommunityChatMessage,
   deleteCommunityPost,
   grantMemberEntitlement,
-  joinCommunity,
   loadCommunityDashboard,
   loadCommunityChatMessages,
   loadCommunityPublicEntry,
@@ -89,12 +88,14 @@ import {
   uploadCommunityPostAttachment,
   searchCommunity
 } from "@/lib/community/client";
+import { submitCommunityJoinApplication } from "@/lib/community/client";
+import { CommunityHelpView, CommunityRulesView, OwnerCommunityModerationView, OwnerCommunitySafetyView } from "@/components/community/CommunitySafetyViews";
 import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEvent, CommunityHomeMetric, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind, CommunitySearchResult } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
 import { ensureProfile } from "@/lib/profile";
 
-type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "search" | "bookmarks" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content";
+type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "search" | "bookmarks" | "rules" | "help" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content" | "owner-safety" | "owner-moderation";
 
 type SessionUser = {
   id: string;
@@ -116,7 +117,9 @@ function buildNavigation(base: string, showOwner: boolean) {
     { label: "ROOMS", href: `${base}/rooms`, icon: MessagesSquare, section: "参加する" },
     { label: "EVENTS", href: `${base}/events`, icon: CalendarDays, section: "参加する" },
     { label: "LIBRARY", href: `${base}/library`, icon: Library, section: "見る・残す" },
-    { label: "PROFILE", href: `${base}/profile`, icon: UserRound, section: "見る・残す" }
+    { label: "PROFILE", href: `${base}/profile`, icon: UserRound, section: "見る・残す" },
+    { label: "RULES", href: `${base}/rules`, icon: ShieldCheck, section: "安心して使う" },
+    { label: "HELP", href: `${base}/help`, icon: MessageCircle, section: "安心して使う" }
   ];
   if (showOwner) navItems.push({ label: "OWNER", href: `${base}/owner`, icon: ShieldCheck, section: "運営" });
   const bottomNavItems: MikkeShellBottomNavItem[] = [
@@ -238,15 +241,19 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
     router.replace(`${base}/login`);
   }
 
-  async function handleJoin(displayName: string) {
+  async function handleJoin(input: { displayName: string; legalName: string; phone: string; joinReason: string; acceptTerms: boolean; acceptRules: boolean; acceptPrivacy: boolean }) {
     if (!user || !data?.community) return;
     setMessage("");
     setError("");
     try {
-      await joinCommunity(supabase, data.community.id, user.id, displayName, user.email);
+      const application = await submitCommunityJoinApplication(supabase, data.community.id, input);
       await reload(user);
-      setMessage("COMMUNITYに参加しました。");
-      router.replace(base);
+      if (application.status === "approved") {
+        setMessage("COMMUNITYに参加しました。");
+        router.replace(base);
+      } else {
+        setMessage("参加申請を受け付けました。運営者の承認をお待ちください。");
+      }
     } catch (nextError) {
       setError(communityErrorMessage(nextError, "参加処理に失敗しました。"));
     }
@@ -280,7 +287,7 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
   if (!active || view === "join") {
     return (
       <CommunityShell base={base} userId={user.id} community={data} mikkeId={mikkeId} onSignOut={signOut} showOwner={false}>
-        <JoinPanel community={data} defaultName={data.profile?.displayName ?? user.email?.split("@")[0] ?? ""} error={error} onJoin={handleJoin} />
+        <JoinPanel community={data} email={user.email ?? ""} defaultName={data.profile?.displayName ?? user.email?.split("@")[0] ?? ""} error={error} onJoin={handleJoin} />
       </CommunityShell>
     );
   }
@@ -299,11 +306,15 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
       {view === "profile" ? <ProfileView data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "search" ? <CommunitySearchView base={base} data={data} /> : null}
       {view === "bookmarks" ? <BookmarksView base={base} data={data} /> : null}
+      {view === "rules" ? <CommunityRulesView data={data} /> : null}
+      {view === "help" ? <CommunityHelpView data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner" ? <OwnerView base={base} data={data} ownerLike={ownerLike} /> : null}
       {view === "owner-settings" ? <OwnerSettingsView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-rooms" ? <OwnerRoomsView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-members" ? <OwnerMembersView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-content" ? <OwnerContentView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
+      {view === "owner-safety" ? <OwnerCommunitySafetyView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
+      {view === "owner-moderation" ? <OwnerCommunityModerationView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
     </CommunityShell>
   );
 }
@@ -371,10 +382,18 @@ function Notice({ children }: { children: React.ReactNode }) {
   return <p className="mb-4 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-accent-strong)]">{children}</p>;
 }
 
-function JoinPanel({ community, defaultName, error, onJoin }: { community: CommunityDashboard; defaultName: string; error: string; onJoin: (displayName: string) => Promise<void> }) {
+function JoinPanel({ community, email, defaultName, error, onJoin }: { community: CommunityDashboard; email: string; defaultName: string; error: string; onJoin: (input: { displayName: string; legalName: string; phone: string; joinReason: string; acceptTerms: boolean; acceptRules: boolean; acceptPrivacy: boolean }) => Promise<void> }) {
   const [displayName, setDisplayName] = useState(defaultName);
+  const [legalName, setLegalName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [joinReason, setJoinReason] = useState("");
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [acceptRules, setAcceptRules] = useState(false);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [saving, setSaving] = useState(false);
   const canSelfJoin = community.community.joinMode === "open_free";
+  const safety = community.safetySettings;
+  const pending = community.myJoinApplication?.status === "pending";
   const joinModeCopy = community.community.joinMode === "invite_only"
     ? { badge: "招待制", title: "このCommunityは招待制です", helper: "運営者から参加権限が付与されると利用できます。" }
     : community.community.joinMode === "paid"
@@ -383,9 +402,9 @@ function JoinPanel({ community, defaultName, error, onJoin }: { community: Commu
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSelfJoin) return;
+    if (!canSelfJoin || pending) return;
     setSaving(true);
-    await onJoin(displayName);
+    await onJoin({ displayName, legalName, phone, joinReason, acceptTerms, acceptRules, acceptPrivacy });
     setSaving(false);
   }
 
@@ -399,8 +418,20 @@ function JoinPanel({ community, defaultName, error, onJoin }: { community: Commu
         </p>
       </div>
       <form onSubmit={submit} className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+        {pending ? <div className="rounded-lg bg-[var(--mikke-yellow-soft)] p-4"><p className="font-bold text-[var(--mikke-primary)]">参加申請を確認中です</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">運営者の承認後にRoomへ入れます。</p></div> : null}
+        <label className="mb-4 block">
+          <span className="text-sm font-bold text-[var(--mikke-text)]">メールアドレス</span>
+          <input
+            type="email"
+            value={email}
+            readOnly
+            aria-readonly="true"
+            className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-[var(--mikke-muted)]"
+          />
+          <span className="mt-1 block text-xs text-[var(--mikke-muted)]">ログイン中のmikke IDに登録されたメールアドレスです。</span>
+        </label>
         <label className="block">
-          <span className="text-sm font-bold text-[var(--mikke-text)]">表示名</span>
+          <span className="text-sm font-bold text-[var(--mikke-text)]">Community内の表示名</span>
           <input
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
@@ -408,13 +439,25 @@ function JoinPanel({ community, defaultName, error, onJoin }: { community: Commu
             className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 outline-none focus:border-[var(--mikke-accent)]"
           />
         </label>
+        {safety?.requireLegalName ? <label className="mt-4 block"><span className="text-sm font-bold">運営確認用のお名前</span><input value={legalName} onChange={(event) => setLegalName(event.target.value)} required className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3" /><span className="mt-1 block text-xs text-[var(--mikke-muted)]">一般参加者には公開されません。</span></label> : null}
+        {safety?.requirePhone ? <label className="mt-4 block"><span className="text-sm font-bold">電話番号</span><input type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} required className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3" /><span className="mt-1 block text-xs text-[var(--mikke-muted)]">本人確認・重要連絡・トラブル対応にのみ使用します。</span></label> : null}
+        {safety?.requireJoinReason ? <label className="mt-4 block"><span className="text-sm font-bold">参加目的</span><textarea value={joinReason} onChange={(event) => setJoinReason(event.target.value)} required rows={3} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3" /></label> : null}
+        {safety ? <div className="mt-5 space-y-3 border-t border-[var(--mikke-line-soft)] pt-4">
+          <ConsentCheck checked={acceptTerms} onChange={setAcceptTerms} label={`Community利用規約（第${safety.termsVersion}版）に同意します`} text={safety.termsText} />
+          <ConsentCheck checked={acceptRules} onChange={setAcceptRules} label={`Communityルール（第${safety.rulesVersion}版）に同意します`} text={safety.rulesText} />
+          <ConsentCheck checked={acceptPrivacy} onChange={setAcceptPrivacy} label={`個人情報の取扱い（第${safety.privacyVersion}版）に同意します`} text={safety.privacyText} />
+        </div> : null}
         {error ? <p className="mt-3 text-sm font-bold text-[var(--mikke-danger)]">{error}</p> : null}
-        <button disabled={saving || !canSelfJoin} className="mt-4 w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-          {saving ? "参加中..." : canSelfJoin ? "無料で参加する" : "現在は参加受付外です"}
+        <button disabled={saving || !canSelfJoin || pending || Boolean(safety && !(acceptTerms && acceptRules && acceptPrivacy))} className="mt-4 w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
+          {saving ? "申請中..." : pending ? "承認待ち" : canSelfJoin ? safety?.approvalMode === "manual" ? "参加を申請する" : "同意して参加する" : "現在は参加受付外です"}
         </button>
       </form>
     </section>
   );
+}
+
+function ConsentCheck({ checked, onChange, label, text }: { checked: boolean; onChange: (value: boolean) => void; label: string; text: string }) {
+  return <div className="rounded-lg border border-[var(--mikke-line-soft)] p-3"><label className="flex items-start gap-2 text-sm font-bold"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="mt-1" />{label}</label><details className="mt-2"><summary className="cursor-pointer text-xs font-bold text-[var(--mikke-primary)]">内容を確認</summary><p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-[var(--mikke-muted)]">{text}</p></details></div>;
 }
 
 function HomeView({ base, data, userId, onReload, onMessage, onError }: ViewMutationProps & { base: string }) {
@@ -1013,6 +1056,7 @@ function PostThreadView({ base, data, userId, roomId, postId, onReload, onMessag
   return (
     <section className="max-w-4xl">
       <Link href={`${base}/rooms/${room.id}`} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> {room.title}へ戻る</Link>
+      <Link href={`${base}/help?target=post&id=${post.id}`} className="ml-4 inline-flex items-center gap-1 text-xs font-bold text-[var(--mikke-muted)]"><ShieldCheck size={14} />この投稿を通報</Link>
       <div className="mt-4"><PostCard post={post} stamps={data.stamps.filter((stamp) => stamp.isActive)} userId={userId} canComment={room.memberCanComment} onReload={onReload} onMessage={onMessage} onError={onError} /></div>
     </section>
   );
@@ -1272,6 +1316,8 @@ function OwnerView({ base, data, ownerLike }: { base: string; data: CommunityDas
           <OwnerLink href={`${base}/owner/rooms`} icon={MessagesSquare} title="Room設定" helper="無料・限定・運営Room" />
           <OwnerLink href={`${base}/owner/members`} icon={KeyRound} title="参加者と権限" helper="手動で利用権限を付与" />
           <OwnerLink href={`${base}/owner/content`} icon={BookOpen} title="コンテンツ管理" helper="告知・イベント・資料" />
+          <OwnerLink href={`${base}/owner/safety`} icon={ShieldCheck} title="参加・安全設定" helper="参加承認・規約・禁止ワード" />
+          <OwnerLink href={`${base}/owner/moderation`} icon={MessageCircle} title="通報・問い合わせ" helper="確認・対応・記録" />
         </div>
       ) : null}
       {!ownerLike ? <MikkeEmptyState title="運営操作は owner / moderator のみです" helper="最初の参加者、またはDB上でroleを付与されたユーザーが運営画面を操作できます。" /> : null}
@@ -1926,6 +1972,8 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
   const [savingMembership, setSavingMembership] = useState(false);
   const active = member.entitlements.filter((item) => item.status === "active");
   const isSelf = member.membership.userId === operatorUserId;
+  const isCanonicalOwner = member.membership.userId === data.community.ownerUserId;
+  const operatorIsCanonicalOwner = operatorUserId === data.community.ownerUserId;
   async function grant() {
     if (!keyName) return;
     try {
@@ -1961,13 +2009,13 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
     <article className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold">{member.profile?.displayName ?? "参加者"}</p><p className="text-xs text-[var(--mikke-muted)]">{member.membership.role} / {member.membership.status}</p></div><div className="flex flex-wrap gap-2">{active.map((item) => <button key={item.id} type="button" onClick={() => revoke(item.id)} className="rounded-full border border-[var(--mikke-line)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ×</button>)}</div></div>
       <div className="mt-3 grid gap-2 md:grid-cols-[160px_auto_auto]">
-        <select value={role} onChange={(event) => setRole(event.target.value as typeof role)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm">
-          <option value="member">member</option>
-          <option value="moderator">moderator</option>
-          <option value="owner">owner</option>
+        <select value={isCanonicalOwner ? "owner" : role} disabled={isCanonicalOwner || !operatorIsCanonicalOwner} onChange={(event) => setRole(event.target.value as typeof role)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm disabled:bg-[var(--mikke-surface-soft)] disabled:text-[var(--mikke-muted)]">
+          <option value="member">参加者</option>
+          <option value="moderator">モデレーター（共同運営）</option>
+          {isCanonicalOwner ? <option value="owner">オーナー</option> : null}
         </select>
-        <button type="button" disabled={savingMembership} onClick={() => saveMembership()} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-60">役割を保存</button>
-        <button type="button" disabled={savingMembership || isSelf} onClick={() => saveMembership(member.membership.status === "suspended" ? "active" : "suspended")} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-60">{isSelf ? "自分は停止不可" : member.membership.status === "suspended" ? "復帰" : "停止"}</button>
+        <button type="button" disabled={savingMembership || isCanonicalOwner || !operatorIsCanonicalOwner} onClick={() => saveMembership()} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-60">役割を保存</button>
+        <button type="button" disabled={savingMembership || isSelf || isCanonicalOwner} onClick={() => saveMembership(member.membership.status === "suspended" ? "active" : "suspended")} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-60">{isCanonicalOwner ? "オーナーは停止不可" : isSelf ? "自分は停止不可" : member.membership.status === "suspended" ? "復帰" : "停止"}</button>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]"><EntitlementSelect data={data} value={keyName} onChange={setKeyName} /><button type="button" disabled={!keyName} onClick={grant} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60">付与</button></div>
     </article>
