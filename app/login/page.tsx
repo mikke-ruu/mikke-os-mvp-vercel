@@ -5,6 +5,7 @@ import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getJapaneseAuthError } from "@/lib/mikkeos/auth-errors";
 import { saveEmailPreferences } from "@/lib/email-preferences";
+import { sendWelcomeEmail } from "@/lib/email-delivery";
 import { supabase } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
@@ -94,6 +95,11 @@ function LoginPageContent() {
       } catch {
         // Registration remains complete. The preference can be set again from Settings.
       }
+      try {
+        await sendWelcomeEmail();
+      } catch {
+        // Registration remains complete even if the optional welcome email cannot be delivered.
+      }
     }
     window.location.replace(nextPath);
   }
@@ -156,6 +162,11 @@ function LoginPageContent() {
         }, "signup");
       } catch {
         // Registration remains complete. The preference can be set again from Settings.
+      }
+      try {
+        await sendWelcomeEmail();
+      } catch {
+        // Registration remains complete even if the optional welcome email cannot be delivered.
       }
       window.location.replace(nextPath);
       return;

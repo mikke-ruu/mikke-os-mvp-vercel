@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { Mail, Send, ShieldAlert, Users } from "lucide-react";
+import { Mail, Send, ShieldCheck, Users } from "lucide-react";
+import { sendCampaignTestEmail } from "@/lib/email-delivery";
 import {
   createHqEmailCampaign,
   getHqEmailAudienceSummary,
@@ -30,6 +31,7 @@ export default function HqEmailPage() {
   const [previewText, setPreviewText] = useState("");
   const [bodyText, setBodyText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [testingId, setTestingId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   async function load() {
@@ -42,6 +44,19 @@ export default function HqEmailPage() {
       setCampaigns(nextCampaigns);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "メール配信設定を読み込めませんでした。");
+    }
+  }
+
+  async function sendTest(campaign: HqEmailCampaign) {
+    setTestingId(campaign.id);
+    setMessage("");
+    try {
+      const result = await sendCampaignTestEmail(campaign.id);
+      setMessage(`テストメールを ${result.recipient ?? "あなたの登録メール"} へ送りました。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "テストメールを送信できませんでした。");
+    } finally {
+      setTestingId(null);
     }
   }
 
@@ -93,9 +108,9 @@ export default function HqEmailPage() {
         ))}
       </section>
 
-      <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-800">
-        <ShieldAlert size={17} className="mt-0.5 shrink-0" />
-        現在は安全のため「下書き保存」までです。Resendの配信用キーを接続するまで、メールが送信されることはありません。
+      <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800">
+        <ShieldCheck size={17} className="mt-0.5 shrink-0" />
+        まず自分宛てのテストメールで文章を確認します。利用者への一斉送信ボタンは、まだ有効にしていません。
       </div>
 
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm md:p-5">
@@ -123,6 +138,7 @@ export default function HqEmailPage() {
               <div className="flex flex-wrap items-center gap-2 text-xs font-bold"><span className="rounded-full bg-[var(--mikke-primary-soft)] px-2 py-1 text-[var(--mikke-primary)]">{typeLabels[campaign.campaign_type]}</span><span className="text-[var(--mikke-muted)]">{audienceLabels[campaign.audience_kind]}</span><span className="ml-auto text-[var(--mikke-muted)]">{campaign.status === "draft" ? "下書き" : campaign.status}</span></div>
               <h3 className="mt-3 font-bold text-[var(--mikke-text)]">{campaign.subject}</h3>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-muted)]">{campaign.preview_text || campaign.body_text.slice(0, 100)}</p>
+              <button type="button" onClick={() => void sendTest(campaign)} disabled={testingId !== null} className="mt-3 inline-flex items-center gap-2 rounded-xl border border-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50"><Send size={15} />{testingId === campaign.id ? "送信中…" : "自分にテスト送信"}</button>
             </article>
           ))}
         </div>
