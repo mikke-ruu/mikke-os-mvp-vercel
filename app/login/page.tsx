@@ -4,6 +4,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getJapaneseAuthError } from "@/lib/mikkeos/auth-errors";
+import { saveEmailPreferences } from "@/lib/email-preferences";
 import { supabase } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
@@ -45,6 +46,7 @@ function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [emailUpdatesOptIn, setEmailUpdatesOptIn] = useState(false);
   const [pendingSignupEmail, setPendingSignupEmail] = useState("");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -73,7 +75,7 @@ function LoginPageContent() {
 
     setLoading(true);
     setMessage("");
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: pendingSignupEmail,
       token,
       type: "signup"
@@ -82,6 +84,16 @@ function LoginPageContent() {
     if (error) {
       setMessage(getJapaneseAuthError(error.message));
       return;
+    }
+    if (data.user) {
+      try {
+        await saveEmailPreferences(data.user.id, {
+          newsletter_enabled: emailUpdatesOptIn,
+          product_updates_enabled: emailUpdatesOptIn
+        }, "signup");
+      } catch {
+        // Registration remains complete. The preference can be set again from Settings.
+      }
     }
     window.location.replace(nextPath);
   }
@@ -136,7 +148,15 @@ function LoginPageContent() {
       setMessage(getJapaneseAuthError(error.message));
       return;
     }
-    if (data.session) {
+    if (data.session && data.user) {
+      try {
+        await saveEmailPreferences(data.user.id, {
+          newsletter_enabled: emailUpdatesOptIn,
+          product_updates_enabled: emailUpdatesOptIn
+        }, "signup");
+      } catch {
+        // Registration remains complete. The preference can be set again from Settings.
+      }
       window.location.replace(nextPath);
       return;
     }
@@ -273,6 +293,16 @@ function LoginPageContent() {
               </span>
               {mode === "signup" ? <span id="password-help" className={`mt-2 block text-xs ${password.length >= 6 ? "text-[var(--mikke-green)]" : "text-[var(--mikke-muted)]"}`}>{password.length >= 6 ? "6文字以上になりました" : "6文字以上で入力してください"}</span> : null}
             </label>
+
+            {mode === "signup" ? (
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+                <input type="checkbox" checked={emailUpdatesOptIn} onChange={(event) => setEmailUpdatesOptIn(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--mikke-primary)]" />
+                <span>
+                  <span className="block text-sm font-bold text-[var(--mikke-text)]">mikkeOSのお知らせをメールで受け取る（任意）</span>
+                  <span className="mt-1 block text-xs leading-5 text-[var(--mikke-muted)]">使い方、新機能、イベントなどをご案内します。あとから設定で変更できます。</span>
+                </span>
+              </label>
+            ) : null}
 
             {message ? (
               <p className="rounded-lg bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-accent-strong)]" aria-live="polite">

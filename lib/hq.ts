@@ -84,6 +84,28 @@ export type HqAuditLog = {
   created_at: string;
 };
 
+export type HqEmailAudienceSummary = {
+  all_accounts: number;
+  newsletter_subscribers: number;
+  product_update_subscribers: number;
+  campaign_drafts: number;
+};
+
+export type HqEmailCampaign = {
+  id: string;
+  campaign_type: "essential_notice" | "newsletter" | "product_update";
+  audience_kind: "all_accounts" | "newsletter_subscribers" | "product_update_subscribers";
+  subject: string;
+  preview_text: string;
+  body_text: string;
+  status: "draft" | "scheduled" | "sending" | "sent" | "cancelled";
+  scheduled_for: string | null;
+  sent_at: string | null;
+  recipient_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
 function requireData<T>(data: T | null, error: { message: string } | null): T {
   if (error) throw new Error(error.message);
   if (data === null) throw new Error("データを取得できませんでした。");
@@ -240,4 +262,40 @@ export async function listHqAuditLogs(): Promise<HqAuditLog[]> {
     .limit(100);
   if (error) throw new Error(error.message);
   return (data ?? []) as HqAuditLog[];
+}
+
+export async function getHqEmailAudienceSummary(): Promise<HqEmailAudienceSummary> {
+  const { data, error } = await supabase
+    .from("mikkeos_hq_email_audience_summary")
+    .select("summary")
+    .maybeSingle();
+  return requireData((data?.summary as HqEmailAudienceSummary | null) ?? null, error);
+}
+
+export async function listHqEmailCampaigns(): Promise<HqEmailCampaign[]> {
+  const { data, error } = await supabase
+    .from("mikkeos_email_campaigns")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as HqEmailCampaign[];
+}
+
+export async function createHqEmailCampaign(input: {
+  campaign_type: HqEmailCampaign["campaign_type"];
+  subject: string;
+  preview_text: string;
+  body_text: string;
+}): Promise<void> {
+  const audienceByType: Record<HqEmailCampaign["campaign_type"], HqEmailCampaign["audience_kind"]> = {
+    essential_notice: "all_accounts",
+    newsletter: "newsletter_subscribers",
+    product_update: "product_update_subscribers"
+  };
+  const { error } = await supabase.from("mikkeos_email_campaigns").insert({
+    ...input,
+    audience_kind: audienceByType[input.campaign_type],
+    status: "draft"
+  });
+  if (error) throw new Error(error.message);
 }

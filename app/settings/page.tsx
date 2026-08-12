@@ -13,6 +13,7 @@ import {
   type LucideIcon
 } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
+import { EmailPreferencesCard } from "@/components/settings/EmailPreferencesCard";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { supabase } from "@/lib/supabase/client";
@@ -56,7 +57,7 @@ const osItems: SettingsItem[] = [
 
 function SettingsContent() {
   const router = useRouter();
-  const { profile, isGuest } = useAuth();
+  const { user, profile, isGuest } = useAuth();
 
   async function logout() {
     await supabase.auth.signOut();
@@ -97,6 +98,7 @@ function SettingsContent() {
       )}
 
       {!isGuest ? <SettingsSection title="共通設定" items={osItems} /> : null}
+      {!isGuest ? <EmailPreferencesCard userId={user.id} /> : null}
       <SettingsSection title="MarketNoteの設定" items={marketNoteItems} />
 
       {!isGuest ? <section className="mt-4 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] shadow-sm">
