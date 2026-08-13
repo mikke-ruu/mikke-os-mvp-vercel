@@ -1,22 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { mockActivityLogs } from "./mock-data";
 import type { UnifiedActivityLog } from "./types";
 
 const STORAGE_KEY = "mikkeos.activityLogs.v1";
 
+/**
+ * Activity Logは内部台帳であり、見本データを持たない。
+ * 記録が無いときは必ず空にする（架空の売上・経費を画面に出さないため）。
+ */
+const EMPTY_LOGS: UnifiedActivityLog[] = [];
+
 function readLogsFromStorage() {
-  if (typeof window === "undefined") return mockActivityLogs;
+  if (typeof window === "undefined") return EMPTY_LOGS;
 
   const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (!stored) return mockActivityLogs;
+  if (!stored) return EMPTY_LOGS;
 
   try {
     const parsed = JSON.parse(stored) as UnifiedActivityLog[];
-    return Array.isArray(parsed) ? parsed : mockActivityLogs;
+    return Array.isArray(parsed) ? parsed : EMPTY_LOGS;
   } catch {
-    return mockActivityLogs;
+    return EMPTY_LOGS;
   }
 }
 
@@ -26,7 +31,7 @@ function writeLogsToStorage(logs: UnifiedActivityLog[]) {
 }
 
 export function useUnifiedActivityLogs() {
-  const [logs, setLogs] = useState<UnifiedActivityLog[]>(mockActivityLogs);
+  const [logs, setLogs] = useState<UnifiedActivityLog[]>(EMPTY_LOGS);
 
   useEffect(() => {
     setLogs(readLogsFromStorage());
@@ -66,8 +71,8 @@ export function useUnifiedActivityLogs() {
   }
 
   function resetLogs() {
-    writeLogsToStorage(mockActivityLogs);
-    setLogs(mockActivityLogs);
+    writeLogsToStorage(EMPTY_LOGS);
+    setLogs(EMPTY_LOGS);
   }
 
   return { logs, addLog, removeLog, resetLogs };
