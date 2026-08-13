@@ -23,6 +23,7 @@ export type MarketEvent = {
   venue_name: string | null;
   area: string | null;
   genre: string | null;
+  event_type_id: string | null;
   status: "planned" | "preparing" | "completed" | "cancelled";
   visibility: "public" | "private";
   display_on_story: boolean;

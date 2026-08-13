@@ -105,6 +105,7 @@ export function createGuestMarketEvent(input: {
     venue_name: input.venueName || null,
     area: input.area || null,
     genre: input.genre || null,
+    event_type_id: null,
     status: input.status ?? "planned",
     visibility: "private",
     display_on_story: false,
@@ -394,7 +395,7 @@ function readStore(): GuestMarketNoteStore {
     if (!raw) return emptyStore;
     const parsed = JSON.parse(raw) as Partial<GuestMarketNoteStore>;
     return {
-      events: Array.isArray(parsed.events) ? parsed.events.map((event) => ({ ...event, genre: event.genre || "出店" })) : [],
+      events: Array.isArray(parsed.events) ? parsed.events.map((event) => ({ ...event, genre: event.genre || "出店", event_type_id: event.event_type_id ?? null })) : [],
       checks: Array.isArray(parsed.checks) ? parsed.checks : [],
       finances: Array.isArray(parsed.finances) ? parsed.finances.map((record) => ({
         ...record,
