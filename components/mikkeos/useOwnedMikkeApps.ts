@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { MikkeOwnerMenuItem, MikkeOwnerMenuSuggestedApp } from "./MikkeOwnerMenu";
+import { getGuestMarketNoteStats } from "@/lib/marketnote-guest";
 import { communityApp, marketNoteApp, storyApp } from "@/lib/mikkeos/released-apps";
 import { supabase } from "@/lib/supabase/client";
 
@@ -26,14 +27,27 @@ const connectableApps: Record<Exclude<MikkeOwnedAppKey, "community">, MikkeOwner
  */
 export function useOwnedMikkeApps({
   userId,
-  currentApp,
   isGuest = false
 }: {
   userId?: string;
-  currentApp?: MikkeOwnedAppKey;
   isGuest?: boolean;
 }) {
   const [detectedKeys, setDetectedKeys] = useState<MikkeOwnedAppKey[]>([]);
+  const [hasGuestMarketNoteData, setHasGuestMarketNoteData] = useState(false);
+
+  useEffect(() => {
+    function syncGuestMarketNoteData() {
+      setHasGuestMarketNoteData(getGuestMarketNoteStats().total > 0);
+    }
+
+    syncGuestMarketNoteData();
+    window.addEventListener("mikke:marketnote-guest-updated", syncGuestMarketNoteData);
+    window.addEventListener("storage", syncGuestMarketNoteData);
+    return () => {
+      window.removeEventListener("mikke:marketnote-guest-updated", syncGuestMarketNoteData);
+      window.removeEventListener("storage", syncGuestMarketNoteData);
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId || isGuest) {
@@ -75,13 +89,13 @@ export function useOwnedMikkeApps({
 
   return useMemo(() => {
     const keys = new Set<MikkeOwnedAppKey>(detectedKeys);
-    if (currentApp) keys.add(currentApp);
+    if (hasGuestMarketNoteData) keys.add("marketnote");
     const ownedApps = appOrder.filter((key) => keys.has(key)).map((key) => appByKey[key]);
     const suggestedApps = (["marketnote", "story"] as const)
       .filter((key) => !keys.has(key))
       .map((key) => connectableApps[key]);
     return { ownedApps, suggestedApps };
-  }, [currentApp, detectedKeys]);
+  }, [detectedKeys, hasGuestMarketNoteData]);
 }
 
 function isOwnedAppKey(value: string): value is MikkeOwnedAppKey {

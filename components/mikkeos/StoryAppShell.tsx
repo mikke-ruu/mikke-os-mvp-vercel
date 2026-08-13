@@ -24,7 +24,7 @@ const storyBottomNavItems: MikkeShellBottomNavItem[] = [
 export function StoryAppShell({ children, title = "STORY", subtitle }: { children: React.ReactNode; title?: string; subtitle?: string }) {
   const router = useRouter();
   const { profile, user } = useAuth();
-  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId: user.id, currentApp: "story" });
+  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId: user.id });
 
   async function signOut() {
     await supabase.auth.signOut();
