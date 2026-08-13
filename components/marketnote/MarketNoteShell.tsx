@@ -58,7 +58,7 @@ export function MarketNoteShell({
 }) {
   const router = useRouter();
   const { profile, user } = useAuth();
-  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId: user.id, currentApp: "marketnote", isGuest });
+  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId: user.id, isGuest });
   const contextualBottomNavItems = marketNoteBottomNavItems.map((item) => (
     item.primary ? { ...item, href: addHref } : item
   ));

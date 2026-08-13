@@ -350,7 +350,7 @@ function PublicCommunityEntry({ community, base }: { community: CommunityPublicE
 
 function CommunityShell({ children, base, community, userId, mikkeId, onSignOut, showOwner }: { children: React.ReactNode; base: string; community?: CommunityDashboard | null; userId?: string; mikkeId?: string; onSignOut: () => void; showOwner: boolean }) {
   const { navItems, bottomNavItems } = buildNavigation(base, showOwner);
-  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId, currentApp: "community" });
+  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId });
   return (
     <MikkeAppShell
       appName="COMMUNITY"

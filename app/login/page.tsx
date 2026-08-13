@@ -4,6 +4,7 @@ import { FormEvent, Suspense, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getJapaneseAuthError } from "@/lib/mikkeos/auth-errors";
+import { markLoginDestinationAsOwned } from "@/lib/mikkeos/app-ownership";
 import { saveEmailPreferences } from "@/lib/email-preferences";
 import { sendWelcomeEmail } from "@/lib/email-delivery";
 import { supabase } from "@/lib/supabase/client";
@@ -54,6 +55,15 @@ function LoginPageContent() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
+  async function finishLogin() {
+    try {
+      await markLoginDestinationAsOwned(nextPath);
+    } catch (error) {
+      console.error("Failed to record the selected mikke app", error);
+    }
+    window.location.replace(nextPath);
+  }
+
   useEffect(() => {
     if (resendCooldown <= 0) return;
     const timer = window.setInterval(() => {
@@ -101,7 +111,7 @@ function LoginPageContent() {
         // Registration remains complete even if the optional welcome email cannot be delivered.
       }
     }
-    window.location.replace(nextPath);
+    await finishLogin();
   }
 
   async function resendConfirmationCode() {
@@ -138,7 +148,7 @@ function LoginPageContent() {
         setMessage(getJapaneseAuthError(error.message));
         return;
       }
-      window.location.replace(nextPath);
+      await finishLogin();
       return;
     }
 
@@ -168,7 +178,7 @@ function LoginPageContent() {
       } catch {
         // Registration remains complete even if the optional welcome email cannot be delivered.
       }
-      window.location.replace(nextPath);
+      await finishLogin();
       return;
     }
     setPendingSignupEmail(email);
