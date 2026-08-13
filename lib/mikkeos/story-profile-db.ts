@@ -88,5 +88,6 @@ export function getStorySaveErrorMessage(error: unknown) {
   if (value?.code === "23505" || value?.message?.includes("handle_unique") || value?.message?.includes("story_profiles_handle_lower_key")) return "このmikke IDはすでに使われています。別のIDを選んでください。";
   if (value?.message?.includes("Reserved mikke ID") || value?.message?.includes("story_profiles_reserved_handle")) return "このmikke IDは公式またはシステム用です。別のIDを選んでください。";
   if (value?.message?.includes("Invalid mikke ID")) return "mikke IDの文字数または文字の種類を確認してください。";
+  if (value?.code === "22023" && value.message) return value.message;
   return "STORYをサーバーへ保存できませんでした。通信状態を確認して、もう一度お試しください。";
 }
