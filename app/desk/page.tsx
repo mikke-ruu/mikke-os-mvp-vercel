@@ -1,21 +1,9 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { DeskSummary } from "@/components/mikkeos/DeskSummary";
-import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
-import { useUnifiedActivityLogs } from "@/lib/mikkeos/activity-client-store";
-
+/**
+ * DESKは未公開。他アプリが揃ってから収支を集約する計画のため、
+ * それまで本番では開けないようにする（/os と同じ扱い）。
+ */
 export default function DeskPage() {
-  const { logs } = useUnifiedActivityLogs();
-
-  return (
-    <MikkeAppShell
-      appName="DESK"
-      title="DESK"
-      subtitle="Activity Logから、売上・経費・利益を軽く把握する画面です。"
-      currentApp={{ label: "DESK", href: "/desk" }}
-      footerLabel="DESK by mikke"
-    >
-      <DeskSummary logs={logs} />
-    </MikkeAppShell>
-  );
+  redirect("https://mikke-os.com/");
 }

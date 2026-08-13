@@ -1,14 +1,13 @@
 "use client";
 
-import { Activity, AppWindow, BookOpenText, LayoutDashboard, ListChecks } from "lucide-react";
+import { AppWindow, BookOpenText, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+// Activity Log（/log）とDESK（/desk）は顧客向けに公開しないため、ここには置かない。
 const items = [
   { href: "/os", label: "OS", icon: LayoutDashboard },
-  { href: "/log", label: "Log", icon: Activity },
   { href: "/story", label: "Story", icon: BookOpenText },
-  { href: "/desk", label: "DESK", icon: ListChecks },
   { href: "/apps", label: "Apps", icon: AppWindow }
 ];
 
@@ -17,7 +16,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-[#eee9e4] bg-white/95 px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur">
-      <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+      <div className="mx-auto grid max-w-md grid-cols-3 gap-1">
         {items.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
