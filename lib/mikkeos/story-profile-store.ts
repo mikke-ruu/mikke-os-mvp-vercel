@@ -98,6 +98,10 @@ export function normalizeStoryHandle(value: string) {
   return decoded.trim().replace(/^@/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
 }
 
+export function normalizeStoryHandleInput(value: string) {
+  return value.trim().replace(/^@/, "").toLowerCase().slice(0, 30);
+}
+
 export function isReservedStoryHandle(handle: string) {
   const normalized = normalizeStoryHandle(handle);
   return reservedStoryHandles.has(normalized) || reservedStoryPrefixes.some((prefix) => normalized.startsWith(prefix));

@@ -12,7 +12,7 @@ import { getMyStoryProfile, getStorySaveErrorMessage, saveMyStoryProfile } from 
 import { removeStoryImages, uploadStoryImage, type StoryImageCrop } from "@/lib/mikkeos/story-profile-media";
 import {
   defaultStoryProfile, getStoryProfileValidationError, getStoryPublicUrl, loadStoryProfileDraft,
-  normalizeStoryHandle, saveStoryProfileDraft, storySnsDefaults, storyThemes,
+  normalizeStoryHandleInput, saveStoryProfileDraft, storySnsDefaults, storyThemes,
   type StoryProfileLink, type StoryProfileView, type StoryThemeKey
 } from "@/lib/mikkeos/story-profile-store";
 import { supabase } from "@/lib/supabase/client";
@@ -224,7 +224,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
         <EditorSection eyebrow="MIKKE ID" title="あなたのmikke ID" note="すべてのmikkeアプリで共通の、人に教えるためのIDです。ログインには使いません。">
           {idEditing ? (
             <div>
-              <label className="flex min-w-0 overflow-hidden rounded-2xl border border-black/10"><span className="bg-black/[0.03] px-3 py-3 text-sm font-extrabold text-black/45">@</span><input aria-label="mikke ID" value={form.handle} onChange={(event) => update("handle", normalizeStoryHandle(event.target.value))} className="min-w-0 flex-1 px-3 py-3 text-sm font-bold outline-none" /></label>
+              <label className="flex min-w-0 overflow-hidden rounded-2xl border border-black/10"><span className="bg-black/[0.03] px-3 py-3 text-sm font-extrabold text-black/45">@</span><input aria-label="mikke ID" value={form.handle} onChange={(event) => update("handle", normalizeStoryHandleInput(event.target.value))} className="min-w-0 flex-1 px-3 py-3 text-sm font-bold outline-none" /></label>
                <p className="mt-2 text-xs font-bold leading-5 text-amber-700">英小文字・数字・「-」「_」で3文字以上。入力後、画面下の保存ボタンを押してください。変更すると前のURLは使えなくなります。</p>
               <button type="button" onClick={() => { update("handle", profile.handle); setIdEditing(false); }} className="mt-2 text-xs font-bold text-black/45 underline underline-offset-4">変更をやめる</button>
             </div>
