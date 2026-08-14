@@ -25,6 +25,7 @@ import {
 } from "@/lib/marketnote-guest";
 import { supabase } from "@/lib/supabase/client";
 import { importGuestMarketNotePhotos } from "@/lib/marketnote-photos";
+import { syncMarketEventActivityLog } from "@/lib/marketnote-activity-log";
 import { findMarketEventTypeId, loadMarketEventTypeSettingsForProfile } from "@/lib/marketnote-event-types";
 import { toDateKey } from "@/lib/format";
 import type {
@@ -72,7 +73,7 @@ export async function importGuestMarketNoteRecords(profile: Profile): Promise<Ma
     const privateNote = [event.private_note, guestImportMarker].filter(Boolean).join("\n") || null;
     const { data: existing, error: existingError } = await supabase
       .from("market_events")
-      .select("id")
+      .select("*")
       .eq("profile_id", profile.id)
       .eq("private_note", privateNote)
       .maybeSingle();
@@ -80,6 +81,7 @@ export async function importGuestMarketNoteRecords(profile: Profile): Promise<Ma
     if (existingError) throw existingError;
     if (existing?.id) {
       eventIdMap.set(event.id, existing.id);
+      await syncMarketEventActivityLog(profile, existing as MarketEvent);
       continue;
     }
 
@@ -105,7 +107,9 @@ export async function importGuestMarketNoteRecords(profile: Profile): Promise<Ma
       .single();
 
     if (error) throw error;
-    eventIdMap.set(event.id, (data as MarketEvent).id);
+    const importedEvent = data as MarketEvent;
+    eventIdMap.set(event.id, importedEvent.id);
+    await syncMarketEventActivityLog(profile, importedEvent);
   }
 
   let importedChecks = 0;
@@ -316,19 +320,7 @@ export async function createMarketEvent(
   if (error) throw error;
   const event = data as MarketEvent;
 
-  await createActivityLog({
-    userId: profile.user_id,
-    profileId: profile.id,
-    activityType: "market_event_added",
-    sourceRecordId: event.id,
-    title: `${event.title}を予定に追加しました`,
-    description: [event.venue_name, event.area, event.genre].filter(Boolean).join(" / ") || null,
-    occurredAt: event.event_date,
-    visibility: "private",
-    displayOnStory: false,
-    displayInTimeline: false,
-    countsTowardSummary: false
-  });
+  await syncMarketEventActivityLog(profile, event);
 
   return event;
 }
@@ -369,7 +361,9 @@ export async function updateMarketEventDetails(
     .single();
 
   if (error) throw error;
-  return data as MarketEvent;
+  const event = data as MarketEvent;
+  await syncMarketEventActivityLog(profile, event);
+  return event;
 }
 
 export async function listCheckItems(profileId: string, marketEventId: string) {
@@ -719,20 +713,7 @@ export async function completeMarketEvent(profile: Profile, event: MarketEvent) 
   if (error) throw error;
   const updated = data as MarketEvent;
 
-  await createActivityLog({
-    userId: profile.user_id,
-    profileId: profile.id,
-    activityType: "market_event_completed",
-    sourceRecordId: `${event.id}:completed`,
-    title: `${event.title}を完了しました`,
-    description: [event.venue_name, event.area, event.genre].filter(Boolean).join(" / ") || null,
-    occurredAt: event.event_date,
-    visibility: "private",
-    displayOnStory: false,
-    displayInTimeline: false,
-    displayAsAchievement: true,
-    countsTowardSummary: false
-  });
+  await syncMarketEventActivityLog(profile, updated);
 
   return updated;
 }
@@ -753,7 +734,9 @@ export async function updateMarketEventStatus(
     .single();
 
   if (error) throw error;
-  return data as MarketEvent;
+  const updated = data as MarketEvent;
+  await syncMarketEventActivityLog(profile, updated);
+  return updated;
 }
 
 export async function listActivityLogs(profileId: string, storyOnly = false) {
