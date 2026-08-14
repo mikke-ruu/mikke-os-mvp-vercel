@@ -377,6 +377,8 @@ export type ActivityLog = {
   source_service: string;
   source_record_id: string;
   occurred_at: string;
+  ended_at: string | null;
+  subject_type_key: string | null;
   title: string;
   description: string | null;
   visibility: "public" | "private" | "limited";
