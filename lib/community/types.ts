@@ -9,6 +9,10 @@ export type CommunityEventStatus = "open" | "closed" | "cancelled";
 export type CommunityResourceKind = "web" | "pdf" | "video" | "other";
 export type CommunityEntitlementStatus = "active" | "revoked" | "expired";
 export type CommunityEntitlementSource = "manual" | "subscription" | "external";
+export type CommunityInvitationStatus = "pending" | "accepted" | "declined" | "revoked" | "expired";
+export type CommunityMembershipPlanStatus = "draft" | "active" | "archived";
+export type CommunityPaymentClaimStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type CommunityDataRequestStatus = "received" | "identity_check" | "processing" | "completed" | "rejected" | "cancelled";
 export type CommunityHomeMetric = "unread" | "today_activity" | "upcoming_events" | "rooms" | "posts" | "comments" | "chat_messages" | "resources";
 export type CommunityApprovalMode = "auto" | "manual";
 export type CommunityApplicationStatus = "pending" | "approved" | "rejected" | "cancelled";
@@ -76,6 +80,72 @@ export type CommunityOwnerMember = {
   membership: CommunityMembership;
   profile: CommunityMemberProfile | null;
   entitlements: CommunityMemberEntitlement[];
+};
+
+export type CommunityInvitation = {
+  id: string;
+  communityId: string;
+  invitedUserId: string;
+  invitedByUserId: string;
+  invitedMikkeId: string;
+  entitlementKey: string | null;
+  status: CommunityInvitationStatus;
+  expiresAt: string | null;
+  acceptedAt: string | null;
+  createdAt: string;
+};
+
+export type CommunityMembershipPlan = {
+  id: string;
+  communityId: string;
+  entitlementKey: string;
+  name: string;
+  description: string | null;
+  amountYen: number;
+  billingInterval: "month" | "year" | "one_time";
+  paymentProviderLabel: string;
+  externalPaymentUrl: string;
+  status: CommunityMembershipPlanStatus;
+  sortOrder: number;
+};
+
+export type CommunityPaymentClaim = {
+  id: string;
+  communityId: string;
+  planId: string;
+  userId: string;
+  payerName: string;
+  externalReference: string | null;
+  note: string | null;
+  status: CommunityPaymentClaimStatus;
+  reviewNote: string | null;
+  createdAt: string;
+};
+
+export type CommunityMemberDataRequest = {
+  id: string;
+  communityId: string;
+  userId: string;
+  requestType: "data_export" | "personal_data_delete";
+  status: CommunityDataRequestStatus;
+  memberNote: string | null;
+  responseNote: string | null;
+  createdAt: string;
+};
+
+export type CommunityOperatorProfile = {
+  communityId: string;
+  businessName: string;
+  representativeName: string;
+  businessType: "individual" | "sole_proprietor" | "corporation" | "organization";
+  postalAddress: string;
+  contactEmail: string;
+  contactPhone: string | null;
+  websiteUrl: string | null;
+  commercialDisclosureUrl: string | null;
+  privacyPolicyUrl: string | null;
+  termsUrl: string | null;
+  status: "incomplete" | "submitted" | "verified";
 };
 
 export type CommunitySafetySettings = {
@@ -308,6 +378,11 @@ export type CommunityDashboard = {
   entitlements: CommunityMemberEntitlement[];
   entitlementDefinitions: CommunityEntitlementDefinition[];
   ownerMembers: CommunityOwnerMember[];
+  invitations: CommunityInvitation[];
+  membershipPlans: CommunityMembershipPlan[];
+  paymentClaims: CommunityPaymentClaim[];
+  dataRequests: CommunityMemberDataRequest[];
+  operatorProfile: CommunityOperatorProfile | null;
   rooms: CommunityRoom[];
   posts: CommunityPost[];
   events: CommunityEvent[];

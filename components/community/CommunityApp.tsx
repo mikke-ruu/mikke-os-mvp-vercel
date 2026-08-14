@@ -51,6 +51,9 @@ import {
   createCommunityComment,
   createCommunityAttachmentDownloadUrl,
   createCommunityResource,
+  createCommunityDataRequest,
+  createCommunityMembershipPlan,
+  createCommunityPaymentClaim,
   createEntitlementDefinition,
   createCommunityPost,
   createCommunityStamp,
@@ -58,6 +61,8 @@ import {
   deleteCommunityChatMessage,
   deleteCommunityPost,
   grantMemberEntitlement,
+  inviteCommunityMemberByMikkeId,
+  leaveCommunity,
   loadCommunityDashboard,
   loadCommunityChatMessages,
   loadCommunityPublicEntry,
@@ -65,8 +70,10 @@ import {
   revokeMemberEntitlement,
   reorderCommunityRooms,
   restoreCommunityRoom,
+  reviewCommunityPaymentClaim,
   saveCommunitySettings,
   saveCommunityProfile,
+  saveCommunityOperatorProfile,
   setCommunityStampActive,
   setEventAttendance,
   moderateCommunityChatMessage,
@@ -117,7 +124,7 @@ function buildNavigation(base: string, showOwner: boolean) {
     { label: "ROOMS", href: `${base}/rooms`, icon: MessagesSquare, section: "参加する" },
     { label: "EVENTS", href: `${base}/events`, icon: CalendarDays, section: "参加する" },
     { label: "LIBRARY", href: `${base}/library`, icon: Library, section: "見る・残す" },
-    { label: "PROFILE", href: `${base}/profile`, icon: UserRound, section: "見る・残す" },
+    { label: "MY PAGE", href: `${base}/profile`, icon: UserRound, section: "見る・残す" },
     { label: "RULES", href: `${base}/rules`, icon: ShieldCheck, section: "安心して使う" },
     { label: "HELP", href: `${base}/help`, icon: MessageCircle, section: "安心して使う" }
   ];
@@ -127,7 +134,7 @@ function buildNavigation(base: string, showOwner: boolean) {
     { label: "ROOMS", href: `${base}/rooms`, icon: MessagesSquare },
     { label: "POST", href: `${base}/post`, icon: Plus, primary: true },
     { label: "EVENTS", href: `${base}/events`, icon: CalendarDays },
-    { label: "PROFILE", href: `${base}/profile`, icon: UserRound }
+    { label: "MY PAGE", href: `${base}/profile`, icon: UserRound }
   ];
   return { navItems, bottomNavItems };
 }
@@ -391,11 +398,14 @@ function JoinPanel({ community, email, defaultName, error, onJoin }: { community
   const [acceptRules, setAcceptRules] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const canSelfJoin = community.community.joinMode === "open_free";
+  const invited = community.invitations.some((invitation) => invitation.status === "pending");
+  const canSelfJoin = community.community.joinMode === "open_free" || invited;
   const safety = community.safetySettings;
   const pending = community.myJoinApplication?.status === "pending";
   const joinModeCopy = community.community.joinMode === "invite_only"
-    ? { badge: "招待制", title: "このCommunityは招待制です", helper: "運営者から参加権限が付与されると利用できます。" }
+    ? invited
+      ? { badge: "招待済み", title: "招待を確認しました", helper: "必要事項と規約への同意を入力すると参加できます。" }
+      : { badge: "招待制", title: "このCommunityは招待制です", helper: "運営者からmikke IDへの招待を受けてからお進みください。" }
     : community.community.joinMode === "paid"
       ? { badge: "有料申込制", title: "このCommunityは有料エリア準備中です", helper: "決済接続後、申込済みメンバーに参加導線を開放します。" }
       : { badge: "無料参加", title: `${community.community.name} に参加`, helper: community.community.description ?? "無料登録すると、このCommunityの無料Roomへ参加できます。" };
@@ -1259,6 +1269,9 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
   const [avatarColor, setAvatarColor] = useState<CommunityRoomColor>(data.profile?.avatarColor ?? "pink");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+  const [payerName, setPayerName] = useState(data.profile?.displayName ?? "");
+  const [paymentReference, setPaymentReference] = useState("");
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1277,9 +1290,51 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
     }
   }
 
+  async function requestData(requestType: "data_export" | "personal_data_delete") {
+    setRequesting(true);
+    try {
+      await createCommunityDataRequest(supabase, data.community.id, userId, requestType);
+      onMessage(requestType === "data_export" ? "データ開示申請を受け付けました。" : "個人データ削除申請を受け付けました。");
+      await onReload();
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "申請を受け付けられませんでした。"));
+    } finally {
+      setRequesting(false);
+    }
+  }
+
+  async function submitPaymentClaim(planId: string) {
+    if (!payerName.trim()) return onError("決済に使用した名義を入力してください。");
+    setRequesting(true);
+    try {
+      await createCommunityPaymentClaim(supabase, data.community.id, planId, userId, payerName, paymentReference, "");
+      onMessage("支払い確認を申請しました。運営の確認後に利用権限が反映されます。");
+      setPaymentReference("");
+      await onReload();
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "支払い確認を申請できませんでした。"));
+    } finally {
+      setRequesting(false);
+    }
+  }
+
+  async function leave() {
+    if (!window.confirm(`${data.community.name}を退会しますか？閲覧・投稿権限はすぐに停止します。`)) return;
+    setRequesting(true);
+    try {
+      await leaveCommunity(supabase, data.community.id);
+      window.location.href = "/community";
+    } catch (nextError) {
+      onError(communityErrorMessage(nextError, "退会処理を完了できませんでした。"));
+      setRequesting(false);
+    }
+  }
+
   return (
-    <form onSubmit={submit} className="max-w-2xl border-t border-[var(--mikke-line)] pt-5">
-      <h2 className="text-2xl font-bold tracking-normal">PROFILE</h2>
+    <section className="max-w-3xl space-y-6 border-t border-[var(--mikke-line)] pt-5">
+      <div><p className="text-xs font-bold text-[var(--mikke-muted-light)]">ACCOUNT</p><h2 className="mt-1 text-2xl font-bold tracking-normal">MY PAGE</h2><p className="mt-2 text-sm text-[var(--mikke-muted)]">プロフィール、会員プラン、退会・個人データの手続きをまとめています。</p></div>
+      <form onSubmit={submit} className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+      <h3 className="text-lg font-bold">プロフィール</h3>
       <div className="mt-4 flex items-center gap-4"><MemberAvatar name={displayName} avatarUrl={data.profile?.avatarUrl} color={avatarColor} /><div className="min-w-0 flex-1"><ImageFilePicker label="プロフィール画像を選ぶ" file={avatarFile} onChange={setAvatarFile} compact /></div></div>
       <fieldset className="mt-4"><legend className="text-sm font-bold">プロフィールカラー</legend><div className="mt-2 grid grid-cols-5 gap-2">{COMMUNITY_AVATAR_COLORS.map((option) => <button key={option.value} type="button" onClick={() => setAvatarColor(option.value)} aria-pressed={avatarColor === option.value} className={`rounded-xl border-2 px-1 py-2 text-[10px] font-bold sm:text-xs ${avatarColor === option.value ? "border-[var(--mikke-primary)]" : "border-[var(--mikke-line)]"}`}><span className="mx-auto mb-1 block h-7 w-7 rounded-full" style={{ background: roomColorValue(option.value) }} />{option.label}</button>)}</div></fieldset>
       <label className="mt-4 block">
@@ -1291,7 +1346,27 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
         <textarea value={bio} onChange={(event) => setBio(event.target.value)} rows={5} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3 leading-6 outline-none focus:border-[var(--mikke-accent)]" />
       </label>
       <button disabled={saving} className="mt-4 rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{saving ? "保存中..." : "保存"}</button>
-    </form>
+      </form>
+
+      <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+        <h3 className="text-lg font-bold">会員情報</h3>
+        <p className="mt-2 text-sm text-[var(--mikke-muted)]">現在の役割: {data.membership?.role ?? "未参加"}</p>
+        <div className="mt-3 flex flex-wrap gap-2">{data.entitlements.filter((item) => item.status === "active").map((item) => <MikkeStatusBadge key={item.id} tone="primary">{item.entitlementKey}</MikkeStatusBadge>)}{data.entitlements.every((item) => item.status !== "active") ? <span className="text-sm text-[var(--mikke-muted)]">追加の利用権限はありません。</span> : null}</div>
+      </section>
+
+      {data.membershipPlans.filter((plan) => plan.status === "active").length > 0 ? <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+        <h3 className="text-lg font-bold">有料会員プラン</h3>
+        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">決済はこのCommunityの運営者が契約する外部サービスで行います。mikkeは決済情報を保持しません。</p>
+        <div className="mt-4 grid gap-3">{data.membershipPlans.filter((plan) => plan.status === "active").map((plan) => <article key={plan.id} className="rounded-lg border border-[var(--mikke-line-soft)] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold">{plan.name}</p><p className="mt-1 text-sm text-[var(--mikke-muted)]">{plan.description}</p></div><p className="font-bold text-[var(--mikke-primary)]">¥{plan.amountYen.toLocaleString()} / {plan.billingInterval === "month" ? "月" : plan.billingInterval === "year" ? "年" : "1回"}</p></div><a href={plan.externalPaymentUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white">{plan.paymentProviderLabel}で支払う</a><div className="mt-3 grid gap-2 sm:grid-cols-2"><input value={payerName} onChange={(event) => setPayerName(event.target.value)} placeholder="決済名義" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder="決済番号（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/></div><button type="button" disabled={requesting || data.paymentClaims.some((claim) => claim.planId === plan.id && claim.status === "pending")} onClick={() => submitPaymentClaim(plan.id)} className="mt-2 rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">{data.paymentClaims.some((claim) => claim.planId === plan.id && claim.status === "pending") ? "確認待ち" : "支払い確認を申請"}</button></article>)}</div>
+      </section> : null}
+
+      <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+        <h3 className="text-lg font-bold">データと退会</h3>
+        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">退会すると閲覧・投稿権限はすぐ停止します。会話の整合性や不正対応の記録として投稿が残る場合があります。データ開示・個人データ削除は本人確認後に運営が処理します。</p>
+        <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={requesting} onClick={() => requestData("data_export")} className="rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold text-[var(--mikke-primary)]">データ開示を申請</button><button type="button" disabled={requesting} onClick={() => requestData("personal_data_delete")} className="rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold text-[var(--mikke-danger)]">個人データ削除を申請</button><button type="button" disabled={requesting} onClick={leave} className="rounded-lg bg-[var(--mikke-danger)] px-4 py-2 text-sm font-bold text-white">Communityを退会</button></div>
+        {data.dataRequests.length > 0 ? <div className="mt-4 space-y-2">{data.dataRequests.map((request) => <p key={request.id} className="text-xs text-[var(--mikke-muted)]">{request.requestType === "data_export" ? "データ開示" : "個人データ削除"}: {request.status}</p>)}</div> : null}
+      </section>
+    </section>
   );
 }
 
@@ -1678,6 +1753,16 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
   const [homeMetrics, setHomeMetrics] = useState<[CommunityHomeMetric, CommunityHomeMetric, CommunityHomeMetric]>(data.community.homeMetrics);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [businessName, setBusinessName] = useState(data.operatorProfile?.businessName ?? "");
+  const [representativeName, setRepresentativeName] = useState(data.operatorProfile?.representativeName ?? "");
+  const [businessType, setBusinessType] = useState(data.operatorProfile?.businessType ?? "individual");
+  const [postalAddress, setPostalAddress] = useState(data.operatorProfile?.postalAddress ?? "");
+  const [contactEmail, setContactEmail] = useState(data.operatorProfile?.contactEmail ?? "");
+  const [contactPhone, setContactPhone] = useState(data.operatorProfile?.contactPhone ?? "");
+  const [websiteUrl, setWebsiteUrl] = useState(data.operatorProfile?.websiteUrl ?? "");
+  const [commercialDisclosureUrl, setCommercialDisclosureUrl] = useState(data.operatorProfile?.commercialDisclosureUrl ?? "");
+  const [privacyPolicyUrl, setPrivacyPolicyUrl] = useState(data.operatorProfile?.privacyPolicyUrl ?? "");
+  const [termsUrl, setTermsUrl] = useState(data.operatorProfile?.termsUrl ?? "");
   const [saving, setSaving] = useState(false);
 
   async function claim() {
@@ -1719,6 +1804,23 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
     }
   }
 
+  async function submitOperator(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await saveCommunityOperatorProfile(supabase, data.community.id, {
+        businessName, representativeName, businessType, postalAddress, contactEmail,
+        contactPhone, websiteUrl, commercialDisclosureUrl, privacyPolicyUrl, termsUrl
+      });
+      onMessage("運営者・契約情報を保存しました。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "運営者情報を保存できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (!ownerLike && data.community.ownerUserId) return <MikkeEmptyState title="owner権限が必要です" helper="Communityの基本設定はownerだけが変更できます。" />;
   if (!ownerLike) {
     return (
@@ -1729,7 +1831,8 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
     );
   }
   return (
-    <form onSubmit={submit} className="max-w-2xl border-t border-[var(--mikke-line)] pt-5">
+    <section className="max-w-3xl space-y-6 border-t border-[var(--mikke-line)] pt-5">
+    <form onSubmit={submit} className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
       <h2 className="text-2xl font-bold tracking-normal">COMMUNITY SETTINGS</h2>
       <label className="mt-4 block"><span className="text-sm font-bold">Community名</span><input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3" /></label>
       <label className="mt-4 block"><span className="text-sm font-bold">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3 leading-6" /></label>
@@ -1738,6 +1841,25 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
       <fieldset className="mt-5 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4"><legend className="px-2 text-sm font-bold">HOMEに表示する3つの数字</legend><p className="mb-3 text-xs leading-5 text-[var(--mikke-muted)]">Communityの特徴に合う数字を3つ選べます。同じ項目は重複できません。</p><div className="grid gap-3 sm:grid-cols-3">{homeMetrics.map((metric, index) => <label key={index} className="block"><span className="text-xs font-bold text-[var(--mikke-muted)]">{index + 1}番目</span><select value={metric} onChange={(event) => setHomeMetrics((current) => { const next = [...current] as [CommunityHomeMetric, CommunityHomeMetric, CommunityHomeMetric]; next[index] = event.target.value as CommunityHomeMetric; return next; })} className="mt-1 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm"><option value="unread">未読</option><option value="today_activity">今日の動き</option><option value="upcoming_events">開催予定</option><option value="rooms">Room数</option><option value="posts">投稿数</option><option value="comments">コメント数</option><option value="chat_messages">チャット数</option><option value="resources">公開資料数</option></select></label>)}</div></fieldset>
       <button disabled={saving} className="mt-5 rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{saving ? "保存中..." : "設定を保存"}</button>
     </form>
+    <form onSubmit={submitOperator} className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+      <p className="text-xs font-bold text-[var(--mikke-muted-light)]">OPERATOR</p>
+      <h3 className="mt-1 text-xl font-bold">運営者・契約情報</h3>
+      <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">一般販売、有料会員募集、問い合わせ対応に必要な情報です。個人・法人どちらでも登録できます。住所等はこの段階では参加者へ自動公開しません。</p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <select value={businessType} onChange={(event) => setBusinessType(event.target.value as typeof businessType)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="individual">個人</option><option value="sole_proprietor">個人事業主</option><option value="corporation">法人</option><option value="organization">任意団体</option></select>
+        <input required value={businessName} onChange={(event) => setBusinessName(event.target.value)} placeholder="法人名・屋号・団体名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <input required value={representativeName} onChange={(event) => setRepresentativeName(event.target.value)} placeholder="代表者名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <input required type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)} placeholder="問い合わせ先メール" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)} placeholder="問い合わせ先電話" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <input required value={postalAddress} onChange={(event) => setPostalAddress(event.target.value)} placeholder="所在地" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <input type="url" value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} placeholder="WebサイトURL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 sm:col-span-2" />
+        <input type="url" value={commercialDisclosureUrl} onChange={(event) => setCommercialDisclosureUrl(event.target.value)} placeholder="特定商取引法に基づく表記URL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 sm:col-span-2" />
+        <input type="url" value={privacyPolicyUrl} onChange={(event) => setPrivacyPolicyUrl(event.target.value)} placeholder="プライバシーポリシーURL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 sm:col-span-2" />
+        <input type="url" value={termsUrl} onChange={(event) => setTermsUrl(event.target.value)} placeholder="利用規約URL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 sm:col-span-2" />
+      </div>
+      <button disabled={saving} className="mt-4 rounded-lg bg-[var(--mikke-primary)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">運営者情報を保存</button>
+    </form>
+    </section>
   );
 }
 
@@ -1933,7 +2055,17 @@ function EntitlementSelect({ data, value, onChange }: { data: CommunityDashboard
 function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onError }: ViewMutationProps & { ownerLike: boolean }) {
   const [keyName, setKeyName] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [inviteMikkeId, setInviteMikkeId] = useState("");
+  const [inviteEntitlement, setInviteEntitlement] = useState("");
+  const [planName, setPlanName] = useState("");
+  const [planDescription, setPlanDescription] = useState("");
+  const [planEntitlement, setPlanEntitlement] = useState(data.entitlementDefinitions[0]?.key ?? "");
+  const [planAmount, setPlanAmount] = useState("1000");
+  const [planInterval, setPlanInterval] = useState<"month" | "year" | "one_time">("month");
+  const [paymentProvider, setPaymentProvider] = useState("Stripe");
+  const [paymentUrl, setPaymentUrl] = useState("");
   const [saving, setSaving] = useState(false);
+  const inviteUrl = `https://mikke-os.com/community/c/${data.community.slug}`;
   async function createDefinition(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
@@ -1949,15 +2081,87 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
       setSaving(false);
     }
   }
+
+  async function inviteByMikkeId(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await inviteCommunityMemberByMikkeId(supabase, data.community.id, inviteMikkeId, inviteEntitlement || undefined);
+      setInviteMikkeId("");
+      onMessage("mikke IDへ招待を登録しました。参加者は招待URLから規約同意と参加登録を行います。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "mikke IDで招待できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function createPlan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await createCommunityMembershipPlan(supabase, data.community.id, userId, {
+        entitlementKey: planEntitlement, name: planName, description: planDescription,
+        amountYen: Number(planAmount), billingInterval: planInterval,
+        paymentProviderLabel: paymentProvider, externalPaymentUrl: paymentUrl, status: "active"
+      });
+      setPlanName(""); setPlanDescription(""); setPaymentUrl("");
+      onMessage("有料会員プランを公開しました。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "有料会員プランを作成できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function reviewClaim(claimId: string, approved: boolean) {
+    setSaving(true);
+    try {
+      await reviewCommunityPaymentClaim(supabase, claimId, userId, approved);
+      onMessage(approved ? "支払いを承認し、利用権限を付与しました。" : "支払い申請を却下しました。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "支払い申請を更新できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
   if (!ownerLike) return <MikkeEmptyState title="運営権限が必要です" helper="参加者と利用権限はownerまたはmoderatorが管理できます。" />;
   return (
     <section className="border-t border-[var(--mikke-line)] pt-5">
       <h2 className="text-2xl font-bold tracking-normal">MEMBERS & ACCESS</h2>
+      <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+        <p className="text-sm font-bold">参加者用の招待URL</p>
+        <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 text-sm text-[var(--mikke-primary)]">{inviteUrl}</p>
+        <button type="button" onClick={async () => { await navigator.clipboard.writeText(inviteUrl); onMessage("招待URLをコピーしました。"); }} className="mt-2 rounded-lg border border-[var(--mikke-line)] bg-white px-4 py-2 text-xs font-bold text-[var(--mikke-primary)]">URLをコピー</button>
+        <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">このURLを参加者へ渡してください。登録・規約同意・参加申請を通るため、URLだけで権限が付くことはありません。</p>
+      </section>
+      <form onSubmit={inviteByMikkeId} className="mt-4 grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:grid-cols-[1fr_1fr_auto]">
+        <div className="md:col-span-3"><p className="font-bold">mikke IDで招待</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">メールアドレスは表示しません。招待された本人が上のURLから参加手続きを完了します。</p></div>
+        <input required value={inviteMikkeId} onChange={(event) => setInviteMikkeId(event.target.value)} placeholder="@mikke-id" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <select value={inviteEntitlement} onChange={(event) => setInviteEntitlement(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="">参加のみ（追加権限なし）</option>{data.entitlementDefinitions.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select>
+        <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">招待する</button>
+        {data.invitations.length > 0 ? <div className="md:col-span-3 flex flex-wrap gap-2">{data.invitations.map((invitation) => <span key={invitation.id} className="rounded-full bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold">@{invitation.invitedMikkeId} / {invitation.status}</span>)}</div> : null}
+      </form>
       <form onSubmit={createDefinition} className="mt-4 grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:grid-cols-[1fr_1fr_auto]">
+        <div className="md:col-span-3"><p className="font-bold">利用権限ランク</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">Roomの公開範囲、有料プラン、Academy等の外部会員資格を同じ権限キーで結びます。</p></div>
         <input required value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="表示名 例: プレミアム" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <input required value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder="キー 例: paid:premium" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">権限を追加</button>
       </form>
+      <form onSubmit={createPlan} className="mt-4 grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:grid-cols-2">
+        <div className="md:col-span-2"><p className="font-bold">参加者向け有料会員プラン</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">運営本部が契約するStripe・Square・STORES等の決済URLを使います。mikkeへのCommunityアプリ利用料とは別です。</p></div>
+        <input required value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="プラン名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <EntitlementSelect data={data} value={planEntitlement} onChange={setPlanEntitlement} />
+        <textarea value={planDescription} onChange={(event) => setPlanDescription(event.target.value)} placeholder="内容・特典" rows={3} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 md:col-span-2" />
+        <input required min="0" type="number" value={planAmount} onChange={(event) => setPlanAmount(event.target.value)} placeholder="金額（円）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <select value={planInterval} onChange={(event) => setPlanInterval(event.target.value as typeof planInterval)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="month">月額</option><option value="year">年額</option><option value="one_time">1回</option></select>
+        <input required value={paymentProvider} onChange={(event) => setPaymentProvider(event.target.value)} placeholder="決済サービス名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <input required type="url" value={paymentUrl} onChange={(event) => setPaymentUrl(event.target.value)} placeholder="https:// 決済URL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <button disabled={saving || !planEntitlement} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">有料プランを公開</button>
+        {data.membershipPlans.length > 0 ? <div className="md:col-span-2 space-y-2">{data.membershipPlans.map((plan) => <p key={plan.id} className="text-sm"><b>{plan.name}</b> ¥{plan.amountYen.toLocaleString()} / {plan.billingInterval} → {plan.entitlementKey}（{plan.status}）</p>)}</div> : null}
+      </form>
+      {data.paymentClaims.some((claim) => claim.status === "pending") ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">支払い確認待ち</h3><div className="mt-3 space-y-3">{data.paymentClaims.filter((claim) => claim.status === "pending").map((claim) => { const member = data.ownerMembers.find((item) => item.membership.userId === claim.userId); const plan = data.membershipPlans.find((item) => item.id === claim.planId); return <div key={claim.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><div><p className="text-sm font-bold">{member?.profile?.displayName ?? claim.payerName} / {plan?.name ?? "有料プラン"}</p><p className="text-xs text-[var(--mikke-muted)]">名義: {claim.payerName}{claim.externalReference ? ` / 番号: ${claim.externalReference}` : ""}</p></div><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => reviewClaim(claim.id, true)} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">承認</button><button type="button" disabled={saving} onClick={() => reviewClaim(claim.id, false)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)]">却下</button></div></div>; })}</div></section> : null}
       <div className="mt-5 space-y-3">
         {data.ownerMembers.map((member) => <MemberAccessEditor key={member.membership.id} data={data} member={member} operatorUserId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />)}
         {data.ownerMembers.length === 0 ? <MikkeEmptyState title="参加者はまだいません" helper="無料登録した参加者がここに表示されます。" /> : null}
