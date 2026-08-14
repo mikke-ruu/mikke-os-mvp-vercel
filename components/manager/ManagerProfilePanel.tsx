@@ -1,0 +1,312 @@
+"use client";
+
+import { AlertTriangle, Check, Copy, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState, type FormEvent } from "react";
+import { useAuth } from "@/components/AuthGate";
+import { getJapaneseAuthError } from "@/lib/mikkeos/auth-errors";
+import { supabase } from "@/lib/supabase/client";
+import { ManagerShell } from "./ManagerShell";
+
+type Notice = { type: "success" | "error"; text: string } | null;
+
+const inputClassName =
+  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm font-semibold text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-primary-border)]";
+const primaryButtonClassName =
+  "inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50";
+const secondaryButtonClassName =
+  "inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2.5 text-sm font-bold text-[var(--mikke-text)] disabled:cursor-not-allowed disabled:opacity-50";
+
+function StatusNotice({ notice }: { notice: Notice }) {
+  if (!notice) return null;
+  return (
+    <p
+      role={notice.type === "error" ? "alert" : "status"}
+      className={`mt-3 rounded-xl px-3 py-2 text-sm font-semibold ${
+        notice.type === "error"
+          ? "border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-danger)]"
+          : "border border-[var(--mikke-line)] bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]"
+      }`}
+    >
+      {notice.text}
+    </p>
+  );
+}
+
+function authErrorMessage(message: string) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("same password")) return "現在と異なるパスワードを入力してください。";
+  if (normalized.includes("current password") || normalized.includes("reauthentication")) {
+    return "現在のパスワードを確認できませんでした。入力を確認し、必要であればログインし直してからお試しください。";
+  }
+  if (normalized.includes("email address") && normalized.includes("already")) return "このメールアドレスはすでに使用されています。";
+  return getJapaneseAuthError(message);
+}
+
+export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEnabled: boolean }) {
+  const router = useRouter();
+  const { user, profile, refreshProfile } = useAuth();
+  const [displayName, setDisplayName] = useState(profile.display_name ?? "");
+  const [displayNameNotice, setDisplayNameNotice] = useState<Notice>(null);
+  const [savingDisplayName, setSavingDisplayName] = useState(false);
+  const [mikkeId, setMikkeId] = useState(profile.handle ?? "");
+  const [mikkeIdConfirmed, setMikkeIdConfirmed] = useState(false);
+  const [mikkeIdNotice, setMikkeIdNotice] = useState<Notice>(null);
+  const [savingMikkeId, setSavingMikkeId] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [email, setEmail] = useState(user.email ?? "");
+  const [emailNotice, setEmailNotice] = useState<Notice>(null);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordNotice, setPasswordNotice] = useState<Notice>(null);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutNotice, setSignOutNotice] = useState<Notice>(null);
+
+  async function saveDisplayName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextDisplayName = displayName.trim();
+    setDisplayNameNotice(null);
+    if (!nextDisplayName) {
+      setDisplayNameNotice({ type: "error", text: "表示名を入力してください。" });
+      return;
+    }
+
+    setSavingDisplayName(true);
+    const { error } = await supabase
+      .from("profiles")
+      .update({ display_name: nextDisplayName })
+      .eq("id", profile.id)
+      .eq("user_id", user.id);
+    if (error) {
+      setDisplayNameNotice({ type: "error", text: "表示名を保存できませんでした。時間をおいてもう一度お試しください。" });
+    } else {
+      await refreshProfile();
+      setDisplayName(nextDisplayName);
+      setDisplayNameNotice({ type: "success", text: "表示名を保存しました。" });
+    }
+    setSavingDisplayName(false);
+  }
+
+  async function copyMikkeId() {
+    if (!profile.handle) return;
+    try {
+      await navigator.clipboard.writeText(profile.handle);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setMikkeIdNotice({ type: "error", text: "コピーできませんでした。mikke IDを選択してコピーしてください。" });
+    }
+  }
+
+  async function saveMikkeId(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMikkeIdNotice(null);
+    if (!mikkeIdChangeEnabled) {
+      setMikkeIdNotice({ type: "error", text: "mikke IDの変更は、専用RPCの本番適用後に利用できます。" });
+      return;
+    }
+    if (!mikkeIdConfirmed) {
+      setMikkeIdNotice({ type: "error", text: "公開URLが変わることを確認してください。" });
+      return;
+    }
+
+    setSavingMikkeId(true);
+    const { error } = await supabase.rpc("mikke_update_my_mikke_id", { p_handle: mikkeId.trim() });
+    if (error) {
+      setMikkeIdNotice({ type: "error", text: error.message || "mikke IDを変更できませんでした。" });
+    } else {
+      await refreshProfile();
+      setMikkeIdConfirmed(false);
+      setMikkeIdNotice({ type: "success", text: "mikke IDを変更しました。新しい公開URLをご確認ください。" });
+    }
+    setSavingMikkeId(false);
+  }
+
+  async function saveEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextEmail = email.trim();
+    setEmailNotice(null);
+    if (!nextEmail || nextEmail === user.email) {
+      setEmailNotice({ type: "error", text: nextEmail ? "現在と異なるメールアドレスを入力してください。" : "メールアドレスを入力してください。" });
+      return;
+    }
+
+    setSavingEmail(true);
+    const { error } = await supabase.auth.updateUser({ email: nextEmail });
+    setEmailNotice(
+      error
+        ? { type: "error", text: authErrorMessage(error.message) }
+        : { type: "success", text: "確認メールを送信しました。メール内の案内に沿って変更を完了してください。" }
+    );
+    setSavingEmail(false);
+  }
+
+  async function savePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordNotice(null);
+    if (!currentPassword) {
+      setPasswordNotice({ type: "error", text: "現在のパスワードを入力してください。" });
+      return;
+    }
+    if (newPassword.length < 8) {
+      setPasswordNotice({ type: "error", text: "新しいパスワードは8文字以上で入力してください。" });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordNotice({ type: "error", text: "新しいパスワードが一致していません。" });
+      return;
+    }
+
+    setSavingPassword(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword, current_password: currentPassword });
+    if (error) {
+      setPasswordNotice({ type: "error", text: authErrorMessage(error.message) });
+    } else {
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordNotice({ type: "success", text: "パスワードを変更しました。" });
+    }
+    setSavingPassword(false);
+  }
+
+  async function signOut() {
+    setSignOutNotice(null);
+    setSigningOut(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setSigningOut(false);
+      setSignOutNotice({ type: "error", text: "ログアウトできませんでした。通信状態を確認してもう一度お試しください。" });
+      return;
+    }
+    router.replace("/login");
+    router.refresh();
+  }
+
+  return (
+    <ManagerShell title="基本情報" subtitle="表示名、mikke ID、ログイン情報を管理します。">
+      <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm">
+        <header className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--mikke-surface-soft)] text-[var(--mikke-primary)]">
+              <UserRound size={22} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-bold text-[var(--mikke-text)]">{profile.display_name || "名前未設定"}</h2>
+              <p className="truncate text-sm font-semibold text-[var(--mikke-muted)]">
+                {profile.handle ? `@${profile.handle}` : "mikke ID未設定"} ・ {user.email ?? "メールアドレス未設定"}
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
+          <h2 className="text-base font-bold text-[var(--mikke-text)]">表示名</h2>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">mikkeOS内であなたの名前として表示されます。</p>
+          <form onSubmit={saveDisplayName} className="mt-4 max-w-xl">
+            <label className="grid gap-2">
+              <span className="text-sm font-bold">表示名</span>
+              <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={80} autoComplete="name" className={inputClassName} />
+            </label>
+            <button type="submit" disabled={savingDisplayName} className={`${primaryButtonClassName} mt-3`}>
+              {savingDisplayName ? "保存中…" : "表示名を保存"}
+            </button>
+            <StatusNotice notice={displayNameNotice} />
+          </form>
+        </section>
+
+        <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
+          <h2 className="text-base font-bold text-[var(--mikke-text)]">mikke ID</h2>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">StoryやFundの公開ページで使われる、あなた専用のIDです。</p>
+          <div className="mt-4 flex max-w-xl items-center gap-2">
+            <code className="min-w-0 flex-1 truncate rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2.5 text-sm font-bold text-[var(--mikke-text)]">
+              {profile.handle ? `@${profile.handle}` : "未設定"}
+            </code>
+            <button type="button" onClick={copyMikkeId} disabled={!profile.handle} className={secondaryButtonClassName}>
+              {copied ? <Check size={16} /> : <Copy size={16} />}
+              {copied ? "コピー済み" : "コピー"}
+            </button>
+          </div>
+
+          {!mikkeIdChangeEnabled ? (
+            <p className="mt-4 max-w-xl rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm font-semibold text-[var(--mikke-muted)]">
+              mikke IDの変更は準備中です。現在は表示とコピーのみ利用できます。
+            </p>
+          ) : (
+            <form onSubmit={saveMikkeId} className="mt-5 max-w-xl">
+              <div className="rounded-xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] p-4">
+                <p className="flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><AlertTriangle size={17} />変更前にご確認ください</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--mikke-text)]">
+                  mikke IDを変えると、StoryとFundの公開ページURLも変わります。以前のURLは転送されず、名刺・QRコード・SNS・印刷物などの案内も更新が必要です。
+                </p>
+              </div>
+              <label className="mt-4 grid gap-2">
+                <span className="text-sm font-bold">新しいmikke ID</span>
+                <input value={mikkeId} onChange={(event) => setMikkeId(event.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} className={inputClassName} />
+              </label>
+              <label className="mt-3 flex items-start gap-2 text-sm font-semibold text-[var(--mikke-text)]">
+                <input type="checkbox" checked={mikkeIdConfirmed} onChange={(event) => setMikkeIdConfirmed(event.target.checked)} className="mt-0.5 h-5 w-5 accent-[var(--mikke-accent)]" />
+                StoryとFundの公開URLが変わることを確認しました
+              </label>
+              <button type="submit" disabled={savingMikkeId || !mikkeIdConfirmed} className={`${primaryButtonClassName} mt-4`}>
+                {savingMikkeId ? "変更中…" : "mikke IDを変更"}
+              </button>
+            </form>
+          )}
+          <StatusNotice notice={mikkeIdNotice} />
+        </section>
+
+        <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
+          <h2 className="flex items-center gap-2 text-base font-bold text-[var(--mikke-text)]"><Mail size={18} />メールアドレス</h2>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">ログインや大切なお知らせに使います。変更時は確認メールが届きます。</p>
+          <form onSubmit={saveEmail} className="mt-4 max-w-xl">
+            <label className="grid gap-2">
+              <span className="text-sm font-bold">新しいメールアドレス</span>
+              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" className={inputClassName} />
+            </label>
+            <button type="submit" disabled={savingEmail} className={`${primaryButtonClassName} mt-3`}>
+              {savingEmail ? "送信中…" : "確認メールを送る"}
+            </button>
+            <StatusNotice notice={emailNotice} />
+          </form>
+        </section>
+
+        <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
+          <h2 className="flex items-center gap-2 text-base font-bold text-[var(--mikke-text)]"><KeyRound size={18} />パスワード</h2>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">ログイン中の本人が、現在のパスワードを使って変更します。</p>
+          <form onSubmit={savePassword} className="mt-4 grid max-w-xl gap-3">
+            <label className="grid gap-2">
+              <span className="text-sm font-bold">現在のパスワード</span>
+              <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" className={inputClassName} />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-bold">新しいパスワード（8文字以上）</span>
+              <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-sm font-bold">新しいパスワード（確認）</span>
+              <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
+            </label>
+            <button type="submit" disabled={savingPassword} className={`${primaryButtonClassName} mt-1 w-fit`}>
+              {savingPassword ? "変更中…" : "パスワードを変更"}
+            </button>
+            <StatusNotice notice={passwordNotice} />
+          </form>
+        </section>
+
+        <section className="p-5 sm:p-6">
+          <h2 className="text-base font-bold text-[var(--mikke-text)]">ログアウト</h2>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">この端末のmikkeOSからログアウトします。</p>
+          <button type="button" onClick={signOut} disabled={signingOut} className={`${secondaryButtonClassName} mt-4`}>
+            <LogOut size={17} />
+            {signingOut ? "ログアウト中…" : "ログアウト"}
+          </button>
+          <StatusNotice notice={signOutNotice} />
+        </section>
+      </div>
+    </ManagerShell>
+  );
+}

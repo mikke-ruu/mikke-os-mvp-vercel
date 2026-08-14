@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, CalendarDays, ClipboardList, History, LayoutDashboard, Settings } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, History, LayoutDashboard, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
@@ -11,6 +11,7 @@ const managerNavItems = [
   { href: "/manager/tasks", label: "タスク", icon: ClipboardList },
   { href: "/manager/progress", label: "進行", icon: BarChart3 },
   { href: "/manager/history", label: "履歴", icon: History },
+  { href: "/manager/account", label: "基本情報", icon: UserRound },
   { href: "/manager/settings", label: "設定", icon: Settings }
 ];
 
