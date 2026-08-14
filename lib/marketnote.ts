@@ -25,6 +25,7 @@ import {
 } from "@/lib/marketnote-guest";
 import { supabase } from "@/lib/supabase/client";
 import { importGuestMarketNotePhotos } from "@/lib/marketnote-photos";
+import { findMarketEventTypeId, loadMarketEventTypeSettingsForProfile } from "@/lib/marketnote-event-types";
 import { toDateKey } from "@/lib/format";
 import type {
   ActivityLog,
@@ -63,6 +64,7 @@ export async function importGuestMarketNoteRecords(profile: Profile): Promise<Ma
     return { events: 0, checks: 0, finances: 0, reflections: 0, photos: 0 };
   }
 
+  await loadMarketEventTypeSettingsForProfile(profile);
   const eventIdMap = new Map<string, string>();
 
   for (const event of store.events) {
@@ -81,6 +83,7 @@ export async function importGuestMarketNoteRecords(profile: Profile): Promise<Ma
       continue;
     }
 
+    const eventTypeId = await findMarketEventTypeId(profile.id, event.genre ?? "出店");
     const { data, error } = await supabase
       .from("market_events")
       .insert({
@@ -91,6 +94,7 @@ export async function importGuestMarketNoteRecords(profile: Profile): Promise<Ma
         venue_name: event.venue_name,
         area: event.area,
         genre: event.genre,
+        event_type_id: eventTypeId ?? null,
         status: event.status,
         visibility: "private",
         display_on_story: false,
@@ -288,6 +292,7 @@ export async function createMarketEvent(
 ) {
   if (isMarketNoteGuestProfile(profile)) return createGuestMarketEvent(input);
 
+  const eventTypeId = await findMarketEventTypeId(profile.id, input.genre || "出店");
   const { data, error } = await supabase
     .from("market_events")
     .insert({
@@ -298,6 +303,7 @@ export async function createMarketEvent(
       venue_name: input.venueName || null,
       area: input.area || null,
       genre: input.genre || null,
+      event_type_id: eventTypeId ?? null,
       status: input.status ?? "planned",
       visibility: "private",
       display_on_story: false,
@@ -343,6 +349,7 @@ export async function updateMarketEventDetails(
 ) {
   if (isMarketNoteGuestProfile(profile)) return updateGuestMarketEventDetails(eventId, input);
 
+  const eventTypeId = await findMarketEventTypeId(profile.id, input.genre || "出店");
   const { data, error } = await supabase
     .from("market_events")
     .update({
@@ -351,6 +358,7 @@ export async function updateMarketEventDetails(
       venue_name: input.venueName || null,
       area: input.area || null,
       genre: input.genre || "出店",
+      event_type_id: eventTypeId ?? null,
       status: input.status,
       public_note: input.publicNote || null,
       private_note: input.privateNote || null

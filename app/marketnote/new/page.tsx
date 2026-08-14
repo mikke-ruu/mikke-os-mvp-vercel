@@ -21,7 +21,7 @@ import { AuthGate, useAuth } from "@/components/AuthGate";
 import { getActiveCheckItems, getInitiallySelectedCheckItems, loadCheckTemplate, resolveDueDate } from "@/lib/check-templates";
 import { toDateKey } from "@/lib/format";
 import { addCheckItem, addFinancialRecord, createMarketEvent } from "@/lib/marketnote";
-import { getMarketEventTypeNames, loadMarketEventTypeSettings } from "@/lib/marketnote-event-types";
+import { getMarketEventTypeNames, loadMarketEventTypeSettingsForProfile } from "@/lib/marketnote-event-types";
 import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import type { MarketEvent } from "@/types/database";
 
@@ -77,15 +77,18 @@ function NewMarketEventContent() {
     const initialStartDate = new URLSearchParams(window.location.search).get("startDate") || toDateKey(new Date());
     setStartDate(initialStartDate);
     setEndDate(initialStartDate);
-    const nextEventTypes = getMarketEventTypeNames(loadMarketEventTypeSettings());
-    setEventTypes(nextEventTypes.length ? nextEventTypes : ["出店"]);
+    void loadMarketEventTypeSettingsForProfile(profile).then((settings) => {
+      const nextEventTypes = getMarketEventTypeNames(settings);
+      setEventTypes(nextEventTypes.length ? nextEventTypes : ["出店"]);
+      setEventType((current) => nextEventTypes.includes(current) ? current : (nextEventTypes[0] ?? "出店"));
+    }).catch(() => setError("予定の種類を読み込めませんでした。"));
 
     const template = loadCheckTemplate();
     const activeTemplateItems = getActiveCheckItems(template);
     setTemplateChecks(activeTemplateItems.map((item) => item.title));
     setTemplateDueRules(Object.fromEntries(activeTemplateItems.map((item) => [item.title, item.dueRule])));
     setSelectedChecks(getInitiallySelectedCheckItems(template).map((item) => item.title));
-  }, []);
+  }, [profile]);
 
   const normalizedEndDate = multiDay ? (endDate || startDate) : startDate;
   const canSave = title.trim().length > 0 && startDate.length > 0 && !saving;

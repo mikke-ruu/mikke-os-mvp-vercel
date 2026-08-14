@@ -21,7 +21,7 @@ import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { defaultFinanceCategorySettings, getFinanceCategoryNames, loadFinanceCategorySettings } from "@/lib/finance-categories";
 import { formatMonthDay, formatYen, toDateKey } from "@/lib/format";
-import { getMarketEventType, getMarketEventTypeNames, loadMarketEventTypeSettings } from "@/lib/marketnote-event-types";
+import { getMarketEventType, getMarketEventTypeNames, loadMarketEventTypeSettingsForProfile } from "@/lib/marketnote-event-types";
 import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import {
   addFinancialRecord,
@@ -93,9 +93,11 @@ function MarketFinanceContent() {
 
   useEffect(() => {
     setCategorySettings(loadFinanceCategorySettings());
-    setEventTypes(getMarketEventTypeNames(loadMarketEventTypeSettings()));
+    void loadMarketEventTypeSettingsForProfile(profile)
+      .then((settings) => setEventTypes(getMarketEventTypeNames(settings)))
+      .catch(() => setMessage("予定の種類を読み込めませんでした。"));
     load();
-  }, [profile.id]);
+  }, [profile]);
 
   const revenueCategories = useMemo(() => getFinanceCategoryNames(categorySettings, "revenue"), [categorySettings]);
   const expenseCategories = useMemo(() => getFinanceCategoryNames(categorySettings, "expense"), [categorySettings]);

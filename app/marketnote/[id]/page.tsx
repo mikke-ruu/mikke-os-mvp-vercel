@@ -43,7 +43,7 @@ import {
   type MarketNotePhoto
 } from "@/lib/marketnote-photos";
 import { fixedPaymentMethodNames } from "@/lib/payment-methods";
-import { getMarketEventType, getMarketEventTypeNames, loadMarketEventTypeSettings } from "@/lib/marketnote-event-types";
+import { getMarketEventType, getMarketEventTypeNames, loadMarketEventTypeSettingsForProfile } from "@/lib/marketnote-event-types";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
 type PaymentStatus = "unpaid" | "paid" | "not_required";
@@ -149,9 +149,11 @@ function MarketDetailContent() {
   }
 
   useEffect(() => {
-    setEventTypes(getMarketEventTypeNames(loadMarketEventTypeSettings()));
+    void loadMarketEventTypeSettingsForProfile(profile)
+      .then((settings) => setEventTypes(getMarketEventTypeNames(settings)))
+      .catch(() => setMessage("予定の種類を読み込めませんでした。"));
     load();
-  }, [params.id, profile.id]);
+  }, [params.id, profile]);
 
   useEffect(() => {
     let active = true;
