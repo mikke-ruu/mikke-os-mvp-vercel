@@ -12,11 +12,16 @@ import type {
   CommunityBlockedWord,
   CommunityInquiry,
   CommunityInquiryStatus,
+  CommunityInvitation,
   CommunityJoinApplication,
+  CommunityMemberDataRequest,
   CommunityMemberEntitlement,
   CommunityMemberProfile,
   CommunityMembership,
+  CommunityMembershipPlan,
   CommunityMembershipStatus,
+  CommunityOperatorProfile,
+  CommunityPaymentClaim,
   CommunityPost,
   CommunityPostAttachment,
   CommunityPostKind,
@@ -145,6 +150,52 @@ function mapMemberEntitlement(row: any): CommunityMemberEntitlement {
     status: row.status,
     startsAt: row.starts_at,
     endsAt: row.ends_at ?? null
+  };
+}
+
+function mapInvitation(row: any): CommunityInvitation {
+  return {
+    id: row.id, communityId: row.community_id, invitedUserId: row.invited_user_id,
+    invitedByUserId: row.invited_by_user_id, invitedMikkeId: row.invited_mikke_id, entitlementKey: row.entitlement_key ?? null,
+    status: row.status, expiresAt: row.expires_at ?? null, acceptedAt: row.accepted_at ?? null,
+    createdAt: row.created_at
+  };
+}
+
+function mapMembershipPlan(row: any): CommunityMembershipPlan {
+  return {
+    id: row.id, communityId: row.community_id, entitlementKey: row.entitlement_key,
+    name: row.name, description: row.description ?? null, amountYen: row.amount_yen,
+    billingInterval: row.billing_interval, paymentProviderLabel: row.payment_provider_label,
+    externalPaymentUrl: row.external_payment_url, status: row.status, sortOrder: row.sort_order ?? 0
+  };
+}
+
+function mapPaymentClaim(row: any): CommunityPaymentClaim {
+  return {
+    id: row.id, communityId: row.community_id, planId: row.plan_id, userId: row.user_id,
+    payerName: row.payer_name, externalReference: row.external_reference ?? null, note: row.note ?? null,
+    status: row.status, reviewNote: row.review_note ?? null, createdAt: row.created_at
+  };
+}
+
+function mapDataRequest(row: any): CommunityMemberDataRequest {
+  return {
+    id: row.id, communityId: row.community_id, userId: row.user_id,
+    requestType: row.request_type, status: row.status, memberNote: row.member_note ?? null,
+    responseNote: row.response_note ?? null, createdAt: row.created_at
+  };
+}
+
+function mapOperatorProfile(row: any): CommunityOperatorProfile {
+  return {
+    communityId: row.community_id, businessName: row.business_name,
+    representativeName: row.representative_name, businessType: row.business_type,
+    postalAddress: row.postal_address, contactEmail: row.contact_email,
+    contactPhone: row.contact_phone ?? null, websiteUrl: row.website_url ?? null,
+    commercialDisclosureUrl: row.commercial_disclosure_url ?? null,
+    privacyPolicyUrl: row.privacy_policy_url ?? null, termsUrl: row.terms_url ?? null,
+    status: row.status
   };
 }
 
@@ -431,6 +482,16 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
   const safetyError = [applicationsResult, blockedWordsResult, reportsResult, inquiriesResult].find((result) => result.error)?.error;
   if (safetyError) throw safetyError;
 
+  const [invitationsResult, membershipPlansResult, paymentClaimsResult, dataRequestsResult, operatorProfileResult] = await Promise.all([
+    client.from("community_invitations").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
+    client.from("community_membership_plans").select("*").eq("community_id", community.id).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
+    client.from("community_payment_claims").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
+    client.from("community_member_data_requests").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
+    staff ? client.from("community_operator_profiles").select("*").eq("community_id", community.id).maybeSingle() : Promise.resolve({ data: null, error: null })
+  ]);
+  const commercialError = [invitationsResult, membershipPlansResult, paymentClaimsResult, dataRequestsResult, operatorProfileResult].find((result) => result.error)?.error;
+  if (commercialError) throw commercialError;
+
   let roomsQuery = client.from("community_rooms").select("*").eq("community_id", community.id).order("is_archived", { ascending: true }).order("sort_order", { ascending: true });
   if (!staff) roomsQuery = roomsQuery.eq("is_archived", false);
   let postsQuery = client.from("community_posts").select("*, community_rooms(id,title,kind)").eq("community_id", community.id).order("is_pinned", { ascending: false }).order("created_at", { ascending: false }).limit(50);
@@ -640,6 +701,11 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     entitlements: ownEntitlements,
     entitlementDefinitions: (definitionsResult.data ?? []).map(mapEntitlementDefinition),
     ownerMembers,
+    invitations: (invitationsResult.data ?? []).map(mapInvitation),
+    membershipPlans: (membershipPlansResult.data ?? []).map(mapMembershipPlan),
+    paymentClaims: (paymentClaimsResult.data ?? []).map(mapPaymentClaim),
+    dataRequests: (dataRequestsResult.data ?? []).map(mapDataRequest),
+    operatorProfile: operatorProfileResult.data ? mapOperatorProfile(operatorProfileResult.data) : null,
     rooms,
     posts,
     events: (eventsResult.data ?? []).map(mapEvent),
@@ -809,6 +875,97 @@ export async function createEntitlementDefinition(client: DbClient, communityId:
     description: input.description?.trim() || null,
     status: "active"
   });
+  if (error) throw error;
+}
+
+export async function inviteCommunityMemberByMikkeId(client: DbClient, communityId: string, mikkeId: string, entitlementKey?: string) {
+  const { data, error } = await client.rpc("community_invite_by_mikke_id", {
+    p_community_id: communityId,
+    p_mikke_id: mikkeId.trim(),
+    p_entitlement_key: entitlementKey?.trim() || null,
+    p_expires_at: null
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function createCommunityMembershipPlan(client: DbClient, communityId: string, userId: string, input: {
+  entitlementKey: string;
+  name: string;
+  description: string;
+  amountYen: number;
+  billingInterval: CommunityMembershipPlan["billingInterval"];
+  paymentProviderLabel: string;
+  externalPaymentUrl: string;
+  status: CommunityMembershipPlan["status"];
+}) {
+  const { error } = await client.from("community_membership_plans").insert({
+    community_id: communityId,
+    entitlement_key: input.entitlementKey,
+    name: input.name.trim(),
+    description: input.description.trim() || null,
+    amount_yen: input.amountYen,
+    billing_interval: input.billingInterval,
+    payment_provider_label: input.paymentProviderLabel.trim() || "外部決済",
+    external_payment_url: input.externalPaymentUrl.trim(),
+    status: input.status,
+    created_by_user_id: userId
+  });
+  if (error) throw error;
+}
+
+export async function createCommunityPaymentClaim(client: DbClient, communityId: string, planId: string, userId: string, payerName: string, externalReference: string, note: string) {
+  const { error } = await client.from("community_payment_claims").insert({
+    community_id: communityId, plan_id: planId, user_id: userId,
+    payer_name: payerName.trim(), external_reference: externalReference.trim() || null,
+    note: note.trim() || null, status: "pending"
+  });
+  if (error) throw error;
+}
+
+export async function reviewCommunityPaymentClaim(client: DbClient, claimId: string, reviewerUserId: string, approved: boolean, note = "") {
+  const { data: claim, error: claimError } = await client.from("community_payment_claims").select("community_id,plan_id,user_id").eq("id", claimId).single();
+  if (claimError) throw claimError;
+  const { data: plan, error: planError } = await client.from("community_membership_plans").select("entitlement_key").eq("id", claim.plan_id).single();
+  if (planError) throw planError;
+  const { error } = await client.from("community_payment_claims").update({
+    status: approved ? "approved" : "rejected", reviewed_by_user_id: reviewerUserId,
+    reviewed_at: new Date().toISOString(), review_note: note.trim() || null
+  }).eq("id", claimId);
+  if (error) throw error;
+  if (approved) {
+    const { error: grantError } = await client.from("community_member_entitlements").upsert({
+      community_id: claim.community_id, user_id: claim.user_id, entitlement_key: plan.entitlement_key,
+      source: "external", source_reference: `payment-claim:${claimId}`, status: "active",
+      starts_at: new Date().toISOString(), ends_at: null, granted_by_user_id: reviewerUserId
+    }, { onConflict: "community_id,user_id,entitlement_key,source" });
+    if (grantError) throw grantError;
+  }
+}
+
+export async function createCommunityDataRequest(client: DbClient, communityId: string, userId: string, requestType: CommunityMemberDataRequest["requestType"], note = "") {
+  const { error } = await client.from("community_member_data_requests").insert({
+    community_id: communityId, user_id: userId, request_type: requestType,
+    member_note: note.trim() || null, status: "received"
+  });
+  if (error) throw error;
+}
+
+export async function leaveCommunity(client: DbClient, communityId: string) {
+  const { error } = await client.rpc("community_leave", { p_community_id: communityId });
+  if (error) throw error;
+}
+
+export async function saveCommunityOperatorProfile(client: DbClient, communityId: string, input: Omit<CommunityOperatorProfile, "communityId" | "status">) {
+  const { error } = await client.from("community_operator_profiles").upsert({
+    community_id: communityId, business_name: input.businessName.trim(),
+    representative_name: input.representativeName.trim(), business_type: input.businessType,
+    postal_address: input.postalAddress.trim(), contact_email: input.contactEmail.trim(),
+    contact_phone: input.contactPhone?.trim() || null, website_url: input.websiteUrl?.trim() || null,
+    commercial_disclosure_url: input.commercialDisclosureUrl?.trim() || null,
+    privacy_policy_url: input.privacyPolicyUrl?.trim() || null, terms_url: input.termsUrl?.trim() || null,
+    status: "submitted"
+  }, { onConflict: "community_id" });
   if (error) throw error;
 }
 
