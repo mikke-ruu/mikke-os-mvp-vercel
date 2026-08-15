@@ -3,6 +3,8 @@ import { supabase } from "@/lib/supabase/client";
 export type ImplementationProjectStatus = "planning" | "active" | "waiting" | "release_waiting" | "completed" | "paused";
 export type PublicState = "not_public" | "internal" | "partial" | "public";
 export type ImplementationItemStatus = "open" | "in_progress" | "waiting_user" | "approved" | "rejected" | "completed" | "archived";
+export type ImplementationConversationStatus = "active" | "queued" | "responding" | "executing" | "waiting_user" | "archived";
+export type ImplementationMessageMode = "discussion" | "execution";
 
 export type ImplementationProject = {
   id: string; app_key: string; app_name: string; summary: string;
@@ -22,20 +24,59 @@ export type ImplementationItem = {
   task_ref: string; created_at: string; updated_at: string;
   dispatcher_attempts?: number; dispatcher_claimed_at?: string | null; dispatcher_last_error?: string;
 };
+export type ImplementationConversation = {
+  id: string; project_id: string | null; title: string;
+  status: ImplementationConversationStatus; branch_ref: string;
+  last_message_at: string; last_response_at: string | null;
+  created_at: string; updated_at: string;
+};
+export type ImplementationMessage = {
+  id: string; conversation_id: string; role: "user" | "assistant";
+  mode: ImplementationMessageMode; status: "pending" | "in_progress" | "completed" | "failed";
+  content: string; evidence_ref: string; created_at: string; updated_at: string;
+};
 
 export async function loadImplementationCenter() {
-  const [projectsResult, gatesResult, itemsResult] = await Promise.all([
+  const [projectsResult, gatesResult, itemsResult, conversationsResult, messagesResult] = await Promise.all([
     supabase.from("mikkeos_implementation_projects").select("*").is("archived_at", null).order("sort_order"),
     supabase.from("mikkeos_implementation_gates").select("*").order("gate_key"),
-    supabase.from("mikkeos_implementation_items").select("*").is("archived_at", null).order("created_at", { ascending: false })
+    supabase.from("mikkeos_implementation_items").select("*").is("archived_at", null).order("created_at", { ascending: false }),
+    supabase.from("mikkeos_implementation_conversations").select("*").is("archived_at", null).order("last_message_at", { ascending: false }),
+    supabase.from("mikkeos_implementation_messages").select("*").order("created_at", { ascending: true })
   ]);
-  const error = projectsResult.error ?? gatesResult.error ?? itemsResult.error;
+  const error = projectsResult.error ?? gatesResult.error ?? itemsResult.error ?? conversationsResult.error ?? messagesResult.error;
   if (error) throw new Error(error.message);
   return {
     projects: (projectsResult.data ?? []) as ImplementationProject[],
     gates: (gatesResult.data ?? []) as ImplementationGate[],
-    items: (itemsResult.data ?? []) as ImplementationItem[]
+    items: (itemsResult.data ?? []) as ImplementationItem[],
+    conversations: (conversationsResult.data ?? []) as ImplementationConversation[],
+    messages: (messagesResult.data ?? []) as ImplementationMessage[]
   };
+}
+
+export async function startImplementationConversation(input: {
+  projectId: string | null; title: string; content: string;
+}) {
+  const { data, error } = await supabase.rpc("mikkeos_start_implementation_conversation", {
+    p_project_id: input.projectId,
+    p_title: input.title,
+    p_content: input.content,
+  });
+  if (error) throw new Error(error.message);
+  return String(data);
+}
+
+export async function sendImplementationMessage(input: {
+  conversationId: string; mode: ImplementationMessageMode; content: string;
+}) {
+  const { data, error } = await supabase.rpc("mikkeos_send_implementation_message", {
+    p_conversation_id: input.conversationId,
+    p_mode: input.mode,
+    p_content: input.content,
+  });
+  if (error) throw new Error(error.message);
+  return String(data);
 }
 
 export async function createImplementationConsultation(input: {
