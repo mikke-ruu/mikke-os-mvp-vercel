@@ -1,4 +1,5 @@
 import { isMarketNoteGuestProfile } from "@/lib/marketnote-guest";
+import { syncMarketEventTypeSummaryEligibility } from "@/lib/marketnote-activity-log";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile } from "@/types/database";
 
@@ -8,6 +9,7 @@ export type MarketEventTypeItem = {
   color: string;
   isDefault: boolean;
   isActive: boolean;
+  countsTowardSummary: boolean;
   sortOrder: number;
 };
 
@@ -29,6 +31,7 @@ export const defaultMarketEventTypeSettings: MarketEventTypeSettings = {
     color: marketEventTypePalette[index % marketEventTypePalette.length],
     isDefault: true,
     isActive: true,
+    countsTowardSummary: false,
     sortOrder: index + 1
   }))
 };
@@ -41,6 +44,7 @@ type MarketEventTypeRow = {
   color: string;
   is_default: boolean;
   is_active: boolean;
+  counts_toward_summary: boolean;
   sort_order: number;
 };
 
@@ -68,6 +72,7 @@ function normalizeSettings(settings: MarketEventTypeSettings): MarketEventTypeSe
       ...item,
       name: item.name.trim(),
       color: normalizeMarketEventTypeColor(item.color, index),
+      countsTowardSummary: item.countsTowardSummary === true,
       sortOrder: Math.max(0, item.sortOrder)
     }))
   };
@@ -80,6 +85,7 @@ function rowToItem(row: MarketEventTypeRow): MarketEventTypeItem {
     color: normalizeMarketEventTypeColor(row.color),
     isDefault: row.is_default,
     isActive: row.is_active,
+    countsTowardSummary: row.counts_toward_summary,
     sortOrder: row.sort_order
   };
 }
@@ -87,7 +93,7 @@ function rowToItem(row: MarketEventTypeRow): MarketEventTypeItem {
 async function fetchMarketEventTypeRows(profileId: string) {
   const { data, error } = await supabase
     .from("market_event_types")
-    .select("id,user_id,profile_id,name,color,is_default,is_active,sort_order")
+    .select("id,user_id,profile_id,name,color,is_default,is_active,counts_toward_summary,sort_order")
     .eq("profile_id", profileId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
@@ -165,6 +171,7 @@ export async function saveMarketEventTypeSettingsForProfile(profile: Profile, se
       color: item.color,
       is_default: item.isDefault,
       is_active: item.isActive,
+      counts_toward_summary: item.countsTowardSummary,
       sort_order: item.sortOrder
     };
   });
@@ -172,7 +179,7 @@ export async function saveMarketEventTypeSettingsForProfile(profile: Profile, se
   const { data, error } = await supabase
     .from("market_event_types")
     .upsert(payload, { onConflict: "id" })
-    .select("id,user_id,profile_id,name,color,is_default,is_active,sort_order");
+    .select("id,user_id,profile_id,name,color,is_default,is_active,counts_toward_summary,sort_order");
   if (error) throw error;
 
   const omittedIds = existingRows.filter((row) => !retainedIds.has(row.id)).map((row) => row.id);
@@ -193,6 +200,12 @@ export async function saveMarketEventTypeSettingsForProfile(profile: Profile, se
       .eq("profile_id", profile.id)
       .eq("event_type_id", row.id);
     if (eventUpdateError) throw eventUpdateError;
+
+    await syncMarketEventTypeSummaryEligibility(
+      profile.id,
+      row.id,
+      row.counts_toward_summary
+    );
   }
 
   return { items: savedRows.map(rowToItem).sort((a, b) => a.sortOrder - b.sortOrder) };
