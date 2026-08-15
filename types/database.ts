@@ -223,6 +223,59 @@ export type AcademyInstructor = {
   updated_at: string;
 };
 
+export type AcademyClass = {
+  id: string;
+  headquarters_id: string;
+  course_id: string;
+  program_id: string;
+  program_version_id: string | null;
+  instructor_id: string | null;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  capacity: number | null;
+  venue_name: string | null;
+  meeting_url: string | null;
+  schedule_mode: "fixed" | "arranged_after_application";
+  registration_status: "draft" | "open" | "closed";
+  format: "in_person" | "online";
+  status: "planned" | "active" | "completed" | "cancelled";
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  course?: Pick<AcademyCourse, "id" | "code" | "name"> | null;
+  instructor?: Pick<AcademyInstructor, "id" | "business_name" | "profile_id"> | null;
+};
+
+export type AcademyClassInstructorRequest = {
+  id: string;
+  headquarters_id: string;
+  class_id: string;
+  instructor_id: string;
+  status: "requested" | "accepted" | "declined" | "cancelled";
+  request_note: string | null;
+  response_note: string | null;
+  respond_by: string | null;
+  requested_by_user_id: string;
+  requested_at: string;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+  class?: (Pick<
+    AcademyClass,
+    | "id"
+    | "title"
+    | "starts_at"
+    | "ends_at"
+    | "format"
+    | "status"
+    | "course_id"
+    | "venue_name"
+    | "meeting_url"
+  > & { course?: Pick<AcademyCourse, "id" | "code" | "name"> | null }) | null;
+  instructor?: Pick<AcademyInstructor, "id" | "business_name" | "profile_id" | "user_id"> | null;
+};
+
 // Wave E (AC-E1): 講師の配送先住所帳（新規テーブル・複数登録可）。
 export type AcademyInstructorAddress = {
   id: string;

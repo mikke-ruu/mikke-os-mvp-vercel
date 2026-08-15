@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
+  CalendarCheck,
   ClipboardList,
   ExternalLink,
   GraduationCap,
@@ -26,6 +27,7 @@ import { supabase } from "@/lib/supabase/client";
 const honbuNav: MikkeShellNavItem[] = [
   { href: "/academy", label: "ダッシュボード", icon: LayoutDashboard, section: "本部" },
   { href: "/academy/courses", label: "講座管理", icon: BookOpen, section: "講座" },
+  { href: "/academy/classes", label: "クラス・担当講師", icon: CalendarCheck, section: "講座" },
   { href: "/academy/instructors", label: "講師管理", icon: Users, section: "講座" },
   { href: "/academy/applications", label: "申込管理", icon: ClipboardList, section: "講座" },
   { href: "/academy/front", label: "ホームページ編集", icon: Store, section: "公開" },
@@ -34,6 +36,7 @@ const honbuNav: MikkeShellNavItem[] = [
 
 const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal", label: "ダッシュボード", icon: LayoutDashboard, section: "講師ポータル" },
+  { href: "/academy/portal/class-requests", label: "クラス担当依頼", icon: CalendarCheck, section: "講師ポータル" },
   { href: "/academy/portal/study", label: "講師ページ", icon: GraduationCap, section: "講師ポータル" },
   { href: "/academy/portal/url", label: "営業用URL", icon: Link2, section: "募集" },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
