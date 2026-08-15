@@ -94,11 +94,30 @@ Verification:
 
 ### ACR-3: Classes and instructor requests
 
-- Review the two pending class migrations against the live schema.
-- Add explicit table/function grants together with RLS where required by the current Supabase Data API rules.
-- Audit every `SECURITY DEFINER` function, revoke default `PUBLIC` execution, and grant only the intended authenticated role.
-- Apply to the development project only after advisor review.
-- Migrate classes and instructor-request UI after the schema succeeds.
+Status: database foundation applied and verified in the development project; UI recovery remains pending.
+
+- Replaced the two unapplied legacy class migrations with the reconciled migration `20260815044544_academy_class_scheduling_and_instructor_requests.sql`.
+- Added six scheduling columns to `academy_classes` with constraints and indexes.
+- Added `academy_class_instructor_requests` with RLS enabled.
+- Limited direct table privileges to authenticated `SELECT` and `INSERT`; updates run only through checked RPCs.
+- Required `requested_by_user_id = auth.uid()` on insert to protect audit ownership.
+- Revalidated headquarters, class, course, and active-instructor scope when an instructor responds.
+- Revoked anonymous and default public execution on the helper and public RPCs.
+
+Development database verification:
+
+- Migration application: passed on `mikke-os-dev` (`nttqpprkqbynxyldbnjs`).
+- Six scheduling columns: present.
+- Request table RLS: enabled.
+- Policies: owner insert and owner-or-instructor select, both present.
+- Table grants: only authenticated `SELECT` and `INSERT` among API roles.
+- New anonymous `SECURITY DEFINER` advisor findings: none.
+- The two public RPCs produce expected authenticated `SECURITY DEFINER` warnings. Both require authentication and perform resource-level authorization internally; re-audit after future function changes.
+
+Remaining ACR-3 work:
+
+- Recover the classes and instructor-request UI against the new schema.
+- Test headquarters owner, requested instructor, unrelated authenticated user, and anonymous access separately.
 
 ### ACR-4: Program learning and approvals
 
@@ -120,4 +139,6 @@ Verification:
 
 ## Current release boundary
 
-ACR-1 is implementation-complete locally. It is not pushed, deployed, or production-verified. No Supabase mutation was performed during this recovery audit.
+ACR-1 and ACR-2 are implementation-complete locally. The ACR-3 database foundation is applied only to the development Supabase project. Nothing in this branch is pushed, deployed, or production-verified.
+
+The project-wide security advisor reports 17 pre-existing Academy-related findings, including five functions callable by `anon` and multiple authenticated `SECURITY DEFINER` functions. These findings remain a separate security gate. See the Supabase remediation references for [anonymous SECURITY DEFINER execution](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable) and [authenticated SECURITY DEFINER execution](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable).
