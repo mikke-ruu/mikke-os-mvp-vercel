@@ -20,6 +20,7 @@ export type ImplementationItem = {
   status: ImplementationItemStatus; priority: "low" | "normal" | "high" | "urgent";
   title: string; body: string; question: string; result: string; evidence_ref: string;
   task_ref: string; created_at: string; updated_at: string;
+  dispatcher_attempts?: number; dispatcher_claimed_at?: string | null; dispatcher_last_error?: string;
 };
 
 export async function loadImplementationCenter() {

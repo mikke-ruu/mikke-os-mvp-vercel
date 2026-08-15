@@ -9,6 +9,9 @@
     "test:mikkeos:safe-activity-log": "node scripts/mikkeos-safe-activity-log-test.mjs",
     "test:mikkeos:private-revenue-log": "node scripts/mikkeos-safe-activity-log-test.mjs private_revenue",
     "test:mikkeos:public-story-log": "node scripts/mikkeos-safe-activity-log-test.mjs public_story",
+    "dispatcher:setup": "node scripts/setup-mikkeos-consultation-dispatcher.mjs",
+    "dispatcher:once": "node scripts/mikkeos-consultation-dispatcher.mjs --once",
+    "dispatcher:watch": "node scripts/mikkeos-consultation-dispatcher.mjs --watch",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -21,6 +24,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@openai/codex-sdk": "^0.147.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^24.10.1",
     "@types/qrcode": "^1.5.6",
