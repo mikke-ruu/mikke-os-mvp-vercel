@@ -2,6 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getJapaneseAuthError } from "@/lib/mikkeos/auth-errors";
 import { markLoginDestinationAsOwned } from "@/lib/mikkeos/app-ownership";
@@ -304,7 +305,7 @@ function LoginPageContent() {
                   type={showPassword ? "text" : "password"}
                   autoComplete={mode === "login" ? "current-password" : "new-password"}
                   required
-                  minLength={6}
+                  minLength={8}
                   aria-describedby={mode === "signup" ? "password-help" : undefined}
                   className="w-full rounded-lg border border-[var(--mikke-line)] bg-white px-4 py-3 pr-12 outline-none focus:border-[var(--mikke-accent)]"
                 />
@@ -312,8 +313,16 @@ function LoginPageContent() {
                   {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
                 </button>
               </span>
-              {mode === "signup" ? <span id="password-help" className={`mt-2 block text-xs ${password.length >= 6 ? "text-[var(--mikke-green)]" : "text-[var(--mikke-muted)]"}`}>{password.length >= 6 ? "6文字以上になりました" : "6文字以上で入力してください"}</span> : null}
+              {mode === "signup" ? <span id="password-help" className={`mt-2 block text-xs ${password.length >= 8 ? "text-[var(--mikke-green)]" : "text-[var(--mikke-muted)]"}`}>{password.length >= 8 ? "8文字以上になりました" : "8文字以上で入力してください"}</span> : null}
             </label>
+
+            {mode === "login" ? (
+              <div className="text-right">
+                <Link href="/reset-password" className="text-sm font-bold text-[var(--mikke-primary)] underline underline-offset-4">
+                  パスワードを忘れた方
+                </Link>
+              </div>
+            ) : null}
 
             {mode === "signup" ? (
               <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
