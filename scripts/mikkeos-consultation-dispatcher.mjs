@@ -94,7 +94,7 @@ async function prepareWorktree(item) {
   return { worktreePath, branchName };
 }
 
-async function prepareConversationWorktree(item) {
+async function prepareConversationWorktree(item, { prepareForExecution = false } = {}) {
   const shortId = item.conversation_id.replaceAll("-", "").slice(0, 8);
   const appKey = (item.app_key || "mikkeos").replace(/[^a-z0-9-]/g, "-");
   const worktreePath = path.join(path.dirname(repoRoot), `mikke-os-chat-${appKey}-${shortId}`);
@@ -109,14 +109,16 @@ async function prepareConversationWorktree(item) {
     }
   }
 
-  const targetModules = path.join(worktreePath, "node_modules");
-  try {
-    await stat(targetModules);
-  } catch {
-    installDependencies(worktreePath);
+  if (prepareForExecution) {
+    const targetModules = path.join(worktreePath, "node_modules");
+    try {
+      await stat(targetModules);
+    } catch {
+      installDependencies(worktreePath);
+    }
+    const appEnv = path.join(runtimeDir, "app.env.local");
+    try { await copyFile(appEnv, path.join(worktreePath, ".env.local")); } catch { /* checks may report missing env */ }
   }
-  const appEnv = path.join(runtimeDir, "app.env.local");
-  try { await copyFile(appEnv, path.join(worktreePath, ".env.local")); } catch { /* checks may report missing env */ }
   return { worktreePath, branchName };
 }
 
@@ -230,9 +232,9 @@ async function processConversationMessage() {
   let threadId = item.codex_thread_id || "";
   let branchRef = "";
   try {
-    const prepared = await prepareConversationWorktree(item);
-    branchRef = prepared.branchName;
     const executionMode = item.message_mode === "execution";
+    const prepared = await prepareConversationWorktree(item, { prepareForExecution: executionMode });
+    branchRef = prepared.branchName;
     const threadOptions = {
       workingDirectory: prepared.worktreePath,
       sandboxMode: executionMode ? "workspace-write" : "read-only",
