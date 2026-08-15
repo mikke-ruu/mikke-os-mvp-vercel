@@ -50,6 +50,7 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
   const [displayNameNotice, setDisplayNameNotice] = useState<Notice>(null);
   const [savingDisplayName, setSavingDisplayName] = useState(false);
   const [mikkeId, setMikkeId] = useState(profile.handle ?? "");
+  const [mikkeIdConfirmationOpen, setMikkeIdConfirmationOpen] = useState(false);
   const [mikkeIdConfirmed, setMikkeIdConfirmed] = useState(false);
   const [mikkeIdNotice, setMikkeIdNotice] = useState<Notice>(null);
   const [savingMikkeId, setSavingMikkeId] = useState(false);
@@ -120,9 +121,33 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
     } else {
       await refreshProfile();
       setMikkeIdConfirmed(false);
+      setMikkeIdConfirmationOpen(false);
       setMikkeIdNotice({ type: "success", text: "mikke IDを変更しました。新しい公開URLをご確認ください。" });
     }
     setSavingMikkeId(false);
+  }
+
+  function openMikkeIdConfirmation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextMikkeId = mikkeId.trim();
+    setMikkeIdNotice(null);
+    if (!nextMikkeId) {
+      setMikkeIdNotice({ type: "error", text: "新しいmikke IDを入力してください。" });
+      return;
+    }
+    if (nextMikkeId === profile.handle) {
+      setMikkeIdNotice({ type: "error", text: "現在と異なるmikke IDを入力してください。" });
+      return;
+    }
+    setMikkeId(nextMikkeId);
+    setMikkeIdConfirmed(false);
+    setMikkeIdConfirmationOpen(true);
+  }
+
+  function closeMikkeIdConfirmation() {
+    setMikkeIdConfirmed(false);
+    setMikkeIdConfirmationOpen(false);
+    setMikkeIdNotice(null);
   }
 
   async function saveEmail(event: FormEvent<HTMLFormElement>) {
@@ -235,25 +260,42 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
             <p className="mt-4 max-w-xl rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm font-semibold text-[var(--mikke-muted)]">
               mikke IDの変更は準備中です。現在は表示とコピーのみ利用できます。
             </p>
-          ) : (
+          ) : mikkeIdConfirmationOpen ? (
             <form onSubmit={saveMikkeId} className="mt-5 max-w-xl">
               <div className="rounded-xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] p-4">
                 <p className="flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><AlertTriangle size={17} />変更前にご確認ください</p>
                 <p className="mt-2 text-sm leading-6 text-[var(--mikke-text)]">
-                  mikke IDを変えると、StoryとFundの公開ページURLも変わります。以前のURLは転送されず、名刺・QRコード・SNS・印刷物などの案内も更新が必要です。
+                  mikke IDを変更すると、StoryとFundの公開ページURLも同時に変わります。以前のURLは転送されません。名刺・QRコード・SNS・配布物などに掲載したURLは、変更後のURLへ差し替えてください。
                 </p>
               </div>
-              <label className="mt-4 grid gap-2">
+              <dl className="mt-4 grid gap-3 rounded-xl border border-[var(--mikke-line)] p-4 sm:grid-cols-2">
+                <div>
+                  <dt className="text-xs font-bold text-[var(--mikke-muted)]">変更前のmikke ID</dt>
+                  <dd className="mt-1 break-all text-sm font-bold text-[var(--mikke-text)]">{profile.handle ? `@${profile.handle}` : "未設定"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-bold text-[var(--mikke-muted)]">変更後のmikke ID</dt>
+                  <dd className="mt-1 break-all text-sm font-bold text-[var(--mikke-primary)]">@{mikkeId}</dd>
+                </div>
+              </dl>
+              <label className="mt-4 flex items-start gap-2 text-sm font-semibold text-[var(--mikke-text)]">
+                <input type="checkbox" checked={mikkeIdConfirmed} onChange={(event) => setMikkeIdConfirmed(event.target.checked)} className="mt-0.5 h-5 w-5 accent-[var(--mikke-accent)]" />
+                公開URLが変わることを確認しました
+              </label>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={closeMikkeIdConfirmation} disabled={savingMikkeId} className={secondaryButtonClassName}>入力へ戻る</button>
+                <button type="submit" disabled={savingMikkeId || !mikkeIdConfirmed} className={primaryButtonClassName}>
+                  {savingMikkeId ? "変更中…" : "mikke IDを変更"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <form onSubmit={openMikkeIdConfirmation} className="mt-5 max-w-xl">
+              <label className="grid gap-2">
                 <span className="text-sm font-bold">新しいmikke ID</span>
                 <input value={mikkeId} onChange={(event) => setMikkeId(event.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} className={inputClassName} />
               </label>
-              <label className="mt-3 flex items-start gap-2 text-sm font-semibold text-[var(--mikke-text)]">
-                <input type="checkbox" checked={mikkeIdConfirmed} onChange={(event) => setMikkeIdConfirmed(event.target.checked)} className="mt-0.5 h-5 w-5 accent-[var(--mikke-accent)]" />
-                StoryとFundの公開URLが変わることを確認しました
-              </label>
-              <button type="submit" disabled={savingMikkeId || !mikkeIdConfirmed} className={`${primaryButtonClassName} mt-4`}>
-                {savingMikkeId ? "変更中…" : "mikke IDを変更"}
-              </button>
+              <button type="submit" className={`${primaryButtonClassName} mt-4`}>変更内容を確認</button>
             </form>
           )}
           <StatusNotice notice={mikkeIdNotice} />
