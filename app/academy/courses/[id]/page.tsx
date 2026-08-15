@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse, updateCourse, type CourseInput } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
@@ -55,14 +56,16 @@ function EditCourseContent({ courseId }: { courseId: string }) {
   if (!hq || !course) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">講座が見つかりません。</p>;
 
   return (
-    <CourseForm
-      initial={toInput(course)}
-      submitLabel="変更を保存する"
-      onSubmit={async (input) => {
-        await updateCourse(profile, hq.id, course.id, input);
-        router.push("/academy/courses");
-      }}
-    />
+    <AcademyCourseWorkspace course={course} activeTab="settings">
+      <CourseForm
+        initial={toInput(course)}
+        submitLabel="変更を保存する"
+        onSubmit={async (input) => {
+          await updateCourse(profile, hq.id, course.id, input);
+          router.push("/academy/courses");
+        }}
+      />
+    </AcademyCourseWorkspace>
   );
 }
 
@@ -70,9 +73,7 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   return (
     <HonbuShell title="講座を編集">
-      <div className="mx-auto max-w-2xl">
-        <EditCourseContent courseId={id} />
-      </div>
+      <EditCourseContent courseId={id} />
     </HonbuShell>
   );
 }

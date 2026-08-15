@@ -74,11 +74,23 @@ Verification:
 
 ### ACR-2: Course workspace without new schema
 
-Next.
+Status: implemented and verified in this worktree.
 
 - Add the course-context workspace around existing course detail, LP, instructor page, and materials routes.
 - Do not expose classes, programs, credentials, billing, or procurement routes until their code and schema slice is merged.
 - Verify existing course edit and public preview behavior with real headquarters data.
+
+Implemented:
+
+- Added a shared course header with the course name, code, publication status, and public-page action.
+- Connected existing course settings, course-page builder, instructor-page builder, and course-filtered materials routes.
+- Kept schema-dependent classes, programs, credentials, billing, and procurement out of the navigation.
+
+Verification:
+
+- `git diff --check`: passed.
+- `npm.cmd run lint`: passed.
+- `npm.cmd run build`: passed, 124 static/dynamic route entries generated.
 
 ### ACR-3: Classes and instructor requests
 

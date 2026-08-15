@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
 import { LpBlocksEditor } from "@/components/academy/LpBlocksEditor";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
@@ -54,7 +55,8 @@ function LpBuilderContent({ courseId }: { courseId: string }) {
   if (!hq || !course) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">講座が見つかりません。</p>;
 
   return (
-    <div className="space-y-4">
+    <AcademyCourseWorkspace course={course} activeTab="page">
+      <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-xs text-[var(--mikke-muted)]">{course.code} {course.name}</p>
@@ -77,7 +79,8 @@ function LpBuilderContent({ courseId }: { courseId: string }) {
         </button>
         {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
       </div>
-    </div>
+      </div>
+    </AcademyCourseWorkspace>
   );
 }
 
@@ -85,9 +88,7 @@ export default function LpBuilderPage({ params }: { params: Promise<{ id: string
   const { id } = use(params);
   return (
     <HonbuShell title="LPビルダー">
-      <div className="mx-auto max-w-2xl">
-        <LpBuilderContent courseId={id} />
-      </div>
+      <LpBuilderContent courseId={id} />
     </HonbuShell>
   );
 }
