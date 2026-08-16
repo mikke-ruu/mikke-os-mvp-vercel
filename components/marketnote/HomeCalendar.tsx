@@ -60,7 +60,12 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   }, [events]);
 
   const weeks = useMemo(() => buildMonthMatrix(visibleMonth), [visibleMonth]);
-  const activeEvents = useMemo(() => [...events].sort((a, b) => a.event_date.localeCompare(b.event_date)), [events]);
+  const activeEvents = useMemo(
+    () => events
+      .filter((event) => event.status !== "completed" && event.status !== "cancelled")
+      .sort((a, b) => a.event_date.localeCompare(b.event_date)),
+    [events]
+  );
   const taskGroups = useMemo(() => {
     if (!reminderSettings.enabled || !reminderSettings.targets.checkItemDue) return { current: [], overdue: [] };
     const tasks: Array<{ event: MarketEvent; item: MarketCheckItem; effectiveDue: string }> = [];
