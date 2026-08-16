@@ -124,6 +124,13 @@ export const mikkeApps: MikkeAppDefinition[] = [
   }
 ];
 
+// Academy is available only through its direct, authenticated routes for now.
+// Keep it in the OS registry for Activity Log and app-internal lookups, but do
+// not advertise it in the public app catalog or shared app menus.
+const hiddenCatalogAppKeys = new Set<AppKey>(["academy"]);
+
+export const catalogMikkeApps = mikkeApps.filter((app) => !hiddenCatalogAppKeys.has(app.key));
+
 export const appByKey = mikkeApps.reduce<Record<AppKey, MikkeAppDefinition>>((acc, app) => {
   acc[app.key] = app;
   return acc;
