@@ -7,6 +7,7 @@ import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse, updateCourse, type CourseInput } from "@/lib/academy/courses";
+import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 import { CourseForm } from "../CourseForm";
 
@@ -31,7 +32,8 @@ function toInput(course: AcademyCourse): CourseInput {
     paymentUrl: course.payment_url ?? "",
     kitPrice: course.kit_price ?? 0,
     kitPaymentUrl: course.kit_payment_url ?? "",
-    requiresKit: course.requires_kit ?? true
+    requiresKit: course.requires_kit ?? true,
+    featureSettings: resolveAcademyCourseFeaturesForCourse(course)
   };
 }
 

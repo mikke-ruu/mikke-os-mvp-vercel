@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import type { AcademyCourse } from "@/types/database";
+import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 
 const courseTabs = [
   { id: "settings", label: "講座設定", href: (courseId: string) => `/academy/courses/${courseId}` },
+  { id: "program", label: "ステップ教材", href: (courseId: string) => `/academy/courses/${courseId}/program` },
   { id: "page", label: "講座ページ", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
   {
     id: "instructor",
@@ -26,6 +28,13 @@ export function AcademyCourseWorkspace({
   activeTab: AcademyCourseWorkspaceTab;
   children: React.ReactNode;
 }) {
+  const features = resolveAcademyCourseFeaturesForCourse(course);
+  const visibleTabs = courseTabs.filter((tab) => {
+    if (tab.id === "program") return features.stepLearning;
+    if (tab.id === "page") return features.publicCoursePage;
+    return true;
+  });
+
   return (
     <div className="space-y-5">
       <header className="border-b border-[var(--mikke-line)] pb-4">
@@ -69,7 +78,7 @@ export function AcademyCourseWorkspace({
       </header>
 
       <nav aria-label="講座内メニュー" className="flex flex-wrap gap-2">
-        {courseTabs.map((tab) => {
+        {visibleTabs.map((tab) => {
           const active = tab.id === activeTab;
           return (
             <Link

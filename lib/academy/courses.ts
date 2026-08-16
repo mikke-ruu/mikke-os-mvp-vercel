@@ -1,6 +1,13 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
-import type { AcademyCourse, AcademyFaqItem, AcademyFormField, Profile } from "@/types/database";
+import { resolveAcademyCourseFeatureSettings } from "@/lib/academy/course-feature-settings";
+import type {
+  AcademyCourse,
+  AcademyCourseFeatureSettings,
+  AcademyFaqItem,
+  AcademyFormField,
+  Profile
+} from "@/types/database";
 
 export type CourseInput = {
   code: string;
@@ -24,9 +31,11 @@ export type CourseInput = {
   kitPrice: number;
   kitPaymentUrl: string;
   requiresKit: boolean;
+  featureSettings: AcademyCourseFeatureSettings;
 };
 
 function toRow(hqId: string, input: CourseInput) {
+  const featureSettings = resolveAcademyCourseFeatureSettings(input.featureSettings);
   return {
     headquarters_id: hqId,
     code: input.code.trim(),
@@ -48,7 +57,8 @@ function toRow(hqId: string, input: CourseInput) {
     payment_url: input.paymentUrl || null,
     kit_price: input.kitPrice,
     kit_payment_url: input.kitPaymentUrl || null,
-    requires_kit: input.requiresKit
+    requires_kit: featureSettings.kits,
+    feature_settings: featureSettings
   };
 }
 

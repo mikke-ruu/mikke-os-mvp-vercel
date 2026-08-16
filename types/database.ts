@@ -201,6 +201,31 @@ export type AcademyInstructorPage = {
   updated_at: string;
 };
 
+export type AcademyCoursePortalFeatureSettings = {
+  learning: boolean;
+  applications: boolean;
+  classes: boolean;
+  approvals: boolean;
+  kits: boolean;
+  procurement: boolean;
+  credentials: boolean;
+  subscription: boolean;
+};
+
+export type AcademyCourseFeatureSettings = {
+  stepLearning: boolean;
+  materialLicenses: boolean;
+  materialAssignments: boolean;
+  applications: boolean;
+  classes: boolean;
+  kits: boolean;
+  certification: boolean;
+  renewal: boolean;
+  subscriptions: boolean;
+  publicCoursePage: boolean;
+  portal: AcademyCoursePortalFeatureSettings;
+};
+
 export type AcademyCourse = {
   id: string;
   headquarters_id: string;
@@ -231,7 +256,54 @@ export type AcademyCourse = {
   // キット関連UI（発注ボタン・CourseFormのキット欄・キット系ステータス選択肢）を隠す。
   // 既存データはundefined→true扱い（デフォルトON・破壊的変更ではない）。
   requires_kit: boolean;
+  feature_settings: Partial<AcademyCourseFeatureSettings> | null;
   sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyProgramStatus = "draft" | "published";
+
+export type AcademyProgram = {
+  id: string;
+  headquarters_id: string;
+  course_id: string | null;
+  title: string;
+  description: string | null;
+  status: AcademyProgramStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyProgramSection = {
+  id: string;
+  program_id: string;
+  title: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyProgramStepType =
+  | "text"
+  | "external_url"
+  | "download"
+  | "live_session"
+  | "submission"
+  | "test"
+  | "approval"
+  | "completion";
+
+export type AcademyProgramStep = {
+  id: string;
+  section_id: string;
+  step_type: AcademyProgramStepType;
+  title: string;
+  content: string | null;
+  external_url: string | null;
+  sort_order: number;
+  requires_previous: boolean;
+  self_completion_allowed: boolean;
   created_at: string;
   updated_at: string;
 };
