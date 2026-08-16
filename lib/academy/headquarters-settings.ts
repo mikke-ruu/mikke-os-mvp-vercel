@@ -112,4 +112,3 @@ export async function stopHeadquartersMember(memberId: string) {
   if (error) throw error;
   return data as AcademyHeadquartersMember;
 }
-
