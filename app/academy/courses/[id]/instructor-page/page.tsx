@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
 import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
@@ -234,7 +235,8 @@ function BuilderContent({ courseId }: { courseId: string }) {
   if (!hq || !course) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">講座が見つかりません。</p>;
 
   return (
-    <div className="space-y-4">
+    <AcademyCourseWorkspace course={course} activeTab="instructor">
+      <div className="space-y-4">
       <div>
         <p className="truncate text-xs text-[var(--mikke-muted)]">{course.code} {course.name}</p>
         <h2 className="text-base font-bold text-[var(--mikke-text)]">講師専用ページ</h2>
@@ -315,7 +317,8 @@ function BuilderContent({ courseId }: { courseId: string }) {
         </button>
         {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
       </div>
-    </div>
+      </div>
+    </AcademyCourseWorkspace>
   );
 }
 
@@ -323,9 +326,7 @@ export default function InstructorPageBuilder({ params }: { params: Promise<{ id
   const { id } = use(params);
   return (
     <HonbuShell title="講師専用ページ">
-      <div className="mx-auto max-w-2xl">
-        <BuilderContent courseId={id} />
-      </div>
+      <BuilderContent courseId={id} />
     </HonbuShell>
   );
 }

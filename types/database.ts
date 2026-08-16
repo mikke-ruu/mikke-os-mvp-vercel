@@ -107,6 +107,51 @@ export type AcademyHeadquarters = {
   updated_at: string;
 };
 
+export type AcademyHeadquartersRole = "owner" | "administrator" | "course_editor";
+export type AcademyHeadquartersMemberStatus = "active" | "stopped";
+export type AcademyHeadquartersInvitationStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "cancelled";
+
+export type AcademyHeadquartersSettings = {
+  headquarters_id: string;
+  feature_flags: Record<string, boolean>;
+  updated_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyHeadquartersMember = {
+  id: string;
+  headquarters_id: string;
+  member_profile_id: string;
+  role: Exclude<AcademyHeadquartersRole, "owner">;
+  status: AcademyHeadquartersMemberStatus;
+  invited_by_user_id: string;
+  accepted_at: string;
+  stopped_at: string | null;
+  created_at: string;
+  updated_at: string;
+  member?: Pick<Profile, "id" | "display_name" | "handle"> | null;
+};
+
+export type AcademyHeadquartersInvitation = {
+  id: string;
+  headquarters_id: string;
+  target_profile_id: string;
+  role: Exclude<AcademyHeadquartersRole, "owner">;
+  status: AcademyHeadquartersInvitationStatus;
+  invited_by_user_id: string;
+  responded_at: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+  headquarters?: Pick<AcademyHeadquarters, "id" | "name" | "handle"> | null;
+  target?: Pick<Profile, "id" | "display_name" | "handle"> | null;
+};
+
 export type AcademyFaqItem = { q: string; a: string };
 export type AcademyFormField = {
   key: string;
@@ -156,6 +201,31 @@ export type AcademyInstructorPage = {
   updated_at: string;
 };
 
+export type AcademyCoursePortalFeatureSettings = {
+  learning: boolean;
+  applications: boolean;
+  classes: boolean;
+  approvals: boolean;
+  kits: boolean;
+  procurement: boolean;
+  credentials: boolean;
+  subscription: boolean;
+};
+
+export type AcademyCourseFeatureSettings = {
+  stepLearning: boolean;
+  materialLicenses: boolean;
+  materialAssignments: boolean;
+  applications: boolean;
+  classes: boolean;
+  kits: boolean;
+  certification: boolean;
+  renewal: boolean;
+  subscriptions: boolean;
+  publicCoursePage: boolean;
+  portal: AcademyCoursePortalFeatureSettings;
+};
+
 export type AcademyCourse = {
   id: string;
   headquarters_id: string;
@@ -186,7 +256,54 @@ export type AcademyCourse = {
   // キット関連UI（発注ボタン・CourseFormのキット欄・キット系ステータス選択肢）を隠す。
   // 既存データはundefined→true扱い（デフォルトON・破壊的変更ではない）。
   requires_kit: boolean;
+  feature_settings: Partial<AcademyCourseFeatureSettings> | null;
   sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyProgramStatus = "draft" | "published";
+
+export type AcademyProgram = {
+  id: string;
+  headquarters_id: string;
+  course_id: string | null;
+  title: string;
+  description: string | null;
+  status: AcademyProgramStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyProgramSection = {
+  id: string;
+  program_id: string;
+  title: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyProgramStepType =
+  | "text"
+  | "external_url"
+  | "download"
+  | "live_session"
+  | "submission"
+  | "test"
+  | "approval"
+  | "completion";
+
+export type AcademyProgramStep = {
+  id: string;
+  section_id: string;
+  step_type: AcademyProgramStepType;
+  title: string;
+  content: string | null;
+  external_url: string | null;
+  sort_order: number;
+  requires_previous: boolean;
+  self_completion_allowed: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -221,6 +338,59 @@ export type AcademyInstructor = {
   payment_url: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type AcademyClass = {
+  id: string;
+  headquarters_id: string;
+  course_id: string;
+  program_id: string;
+  program_version_id: string | null;
+  instructor_id: string | null;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  capacity: number | null;
+  venue_name: string | null;
+  meeting_url: string | null;
+  schedule_mode: "fixed" | "arranged_after_application";
+  registration_status: "draft" | "open" | "closed";
+  format: "in_person" | "online";
+  status: "planned" | "active" | "completed" | "cancelled";
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  course?: Pick<AcademyCourse, "id" | "code" | "name"> | null;
+  instructor?: Pick<AcademyInstructor, "id" | "business_name" | "profile_id"> | null;
+};
+
+export type AcademyClassInstructorRequest = {
+  id: string;
+  headquarters_id: string;
+  class_id: string;
+  instructor_id: string;
+  status: "requested" | "accepted" | "declined" | "cancelled";
+  request_note: string | null;
+  response_note: string | null;
+  respond_by: string | null;
+  requested_by_user_id: string;
+  requested_at: string;
+  responded_at: string | null;
+  created_at: string;
+  updated_at: string;
+  class?: (Pick<
+    AcademyClass,
+    | "id"
+    | "title"
+    | "starts_at"
+    | "ends_at"
+    | "format"
+    | "status"
+    | "course_id"
+    | "venue_name"
+    | "meeting_url"
+  > & { course?: Pick<AcademyCourse, "id" | "code" | "name"> | null }) | null;
+  instructor?: Pick<AcademyInstructor, "id" | "business_name" | "profile_id" | "user_id"> | null;
 };
 
 // Wave E (AC-E1): 講師の配送先住所帳（新規テーブル・複数登録可）。

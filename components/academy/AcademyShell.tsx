@@ -1,91 +1,63 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   BookOpen,
+  CalendarCheck,
   ClipboardList,
   ExternalLink,
   GraduationCap,
   LayoutDashboard,
   Link2,
-  LogOut,
   Package,
   PenSquare,
+  Settings,
   Store,
-  Users,
-  type LucideIcon
+  Users
 } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 import { AuthGate, useAuth } from "@/components/AuthGate";
-import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
+import {
+  MikkeAppShell,
+  type MikkeShellBottomNavItem,
+  type MikkeShellNavItem
+} from "@/components/mikkeos/MikkeAppShell";
+import { useOwnedMikkeApps } from "@/components/mikkeos/useOwnedMikkeApps";
+import { supabase } from "@/lib/supabase/client";
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  exact?: boolean;
-  // 既定のprefixマッチ（pathname===href or startsWith(`${href}/`)）で足りない場合の個別判定。
-  // AC-3: 講師ページ編集(/academy/courses/[id]/instructor-page)は物理的にはcourses配下だが、
-  // 概念上は「講師ページ編集」タブの内容なので、講座管理タブ側では除外しこちら側で拾う。
-  matches?: (pathname: string) => boolean;
-};
-
-// 講師専用ページのビルド編集画面。URL上は /academy/courses/[id]/instructor-page だが、
-// ナビ上は「講師ページ編集」タブ（/academy/instructor-pages 一覧からたどる）の一部として扱う。
-const INSTRUCTOR_PAGE_ROUTE_RE = /^\/academy\/courses\/[^/]+\/instructor-page(\/|$)/;
-
-const honbuNav: NavItem[] = [
-  { href: "/academy", label: "ダッシュボード", icon: LayoutDashboard, exact: true },
-  {
-    href: "/academy/courses",
-    label: "講座管理",
-    icon: BookOpen,
-    matches: (pathname) =>
-      pathname === "/academy/courses" ||
-      (pathname.startsWith("/academy/courses/") && !INSTRUCTOR_PAGE_ROUTE_RE.test(pathname))
-  },
-  { href: "/academy/instructors", label: "講師管理", icon: Users },
-  // AC-F1: 「キット発送」独立タブは廃止し、申込管理内の「講師受付」タブへ統合した
-  // （/academy/kitsは/academy/applicationsへリダイレクト。lib/academy/kits.tsとデータは変更なし）。
-  { href: "/academy/applications", label: "申込管理", icon: ClipboardList },
-  // AC-C4: 「教材・資料」は独立ナビから外し、講師専用ページビルダー内の導線
-  // （/academy/materials?course=[id]）から編集する動線に統合した。
-  // ページ自体（app/academy/materials/page.tsx）とデータ(academy_materials)は削除していない。
-  { href: "/academy/front", label: "フロント編集", icon: Store },
-  {
-    href: "/academy/instructor-pages",
-    label: "講師ページ編集",
-    icon: PenSquare,
-    matches: (pathname) =>
-      pathname === "/academy/instructor-pages" ||
-      pathname.startsWith("/academy/instructor-pages/") ||
-      INSTRUCTOR_PAGE_ROUTE_RE.test(pathname)
-  }
+const honbuNav: MikkeShellNavItem[] = [
+  { href: "/academy", label: "ダッシュボード", icon: LayoutDashboard, section: "本部" },
+  { href: "/academy/courses", label: "講座管理", icon: BookOpen, section: "講座" },
+  { href: "/academy/classes", label: "クラス・担当講師", icon: CalendarCheck, section: "講座" },
+  { href: "/academy/instructors", label: "講師管理", icon: Users, section: "講座" },
+  { href: "/academy/applications", label: "申込管理", icon: ClipboardList, section: "講座" },
+  { href: "/academy/front", label: "ホームページ編集", icon: Store, section: "公開" },
+  { href: "/academy/instructor-pages", label: "講師ページ編集", icon: PenSquare, section: "公開" },
+  { href: "/academy/settings", label: "本部設定", icon: Settings, section: "設定" }
 ];
 
-const koushiNav: NavItem[] = [
-  { href: "/academy/portal", label: "ダッシュボード", icon: LayoutDashboard, exact: true },
-  { href: "/academy/portal/study", label: "講師ページ", icon: GraduationCap },
-  { href: "/academy/portal/url", label: "営業用URL", icon: Link2 },
-  { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList },
-  { href: "/academy/portal/kits", label: "キット発注", icon: Package }
+const koushiNav: MikkeShellNavItem[] = [
+  { href: "/academy/portal", label: "ダッシュボード", icon: LayoutDashboard, section: "講師ポータル" },
+  { href: "/academy/portal/class-requests", label: "クラス担当依頼", icon: CalendarCheck, section: "講師ポータル" },
+  { href: "/academy/portal/study", label: "講師ページ", icon: GraduationCap, section: "講師ポータル" },
+  { href: "/academy/portal/url", label: "営業用URL", icon: Link2, section: "募集" },
+  { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
+  { href: "/academy/portal/kits", label: "キット発注", icon: Package, section: "発注" }
 ];
 
-// AC-1: モバイル下部ナビの最優先4項目（残りは横スクロールタブ／ハンバーガーメニューから）。
-const HONBU_PRIORITY_HREFS = ["/academy", "/academy/courses", "/academy/instructors", "/academy/applications"];
-const KOUSHI_PRIORITY_HREFS = [
-  "/academy/portal",
-  "/academy/portal/study",
-  "/academy/portal/applications",
-  "/academy/portal/kits"
+const honbuBottomNav: MikkeShellBottomNavItem[] = [
+  { href: "/academy", label: "ホーム", icon: LayoutDashboard },
+  { href: "/academy/courses", label: "講座", icon: BookOpen },
+  { href: "/academy/instructors", label: "講師", icon: Users },
+  { href: "/academy/applications", label: "申込", icon: ClipboardList }
 ];
 
-function pickNav(list: NavItem[], hrefs: string[]): NavItem[] {
-  return hrefs
-    .map((href) => list.find((item) => item.href === href))
-    .filter((item): item is NavItem => Boolean(item));
-}
+const koushiBottomNav: MikkeShellBottomNavItem[] = [
+  { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard },
+  { href: "/academy/portal/study", label: "ページ", icon: GraduationCap },
+  { href: "/academy/portal/applications", label: "申込", icon: ClipboardList },
+  { href: "/academy/portal/kits", label: "発注", icon: Package }
+];
 
 function ShellInner({
   variant,
@@ -96,21 +68,16 @@ function ShellInner({
   title: string;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
   const router = useRouter();
-  const { profile } = useAuth();
-  const nav = variant === "honbu" ? honbuNav : koushiNav;
-  const bottomNav = pickNav(nav, variant === "honbu" ? HONBU_PRIORITY_HREFS : KOUSHI_PRIORITY_HREFS);
+  const { profile, user } = useAuth();
+  const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId: user.id });
+  const navItems = variant === "honbu" ? honbuNav : koushiNav;
+  const bottomNavItems = variant === "honbu" ? honbuBottomNav : koushiBottomNav;
   const switchHref = variant === "honbu" ? "/academy/portal" : "/academy";
 
-  async function logout() {
+  async function signOut() {
     await supabase.auth.signOut();
-    router.replace("/login");
-  }
-
-  function isActive(item: NavItem) {
-    if (item.matches) return item.matches(pathname);
-    return item.exact ? pathname === item.href : pathname.startsWith(item.href);
+    router.replace(`/login?next=${encodeURIComponent(variant === "honbu" ? "/academy" : "/academy/portal")}`);
   }
 
   return (
@@ -118,122 +85,47 @@ function ShellInner({
       appName="Academy"
       title={title}
       subtitle={variant === "honbu" ? "本部管理" : "講師ポータル"}
-      currentApp={{ label: "Academy", href: variant === "honbu" ? "/academy" : "/academy/portal", icon: GraduationCap }}
+      theme="blue"
+      currentApp={{
+        label: "Academy",
+        href: variant === "honbu" ? "/academy" : "/academy/portal",
+        icon: GraduationCap
+      }}
       menuDescription="講座、講師、申込、教材などAcademy内の管理をまとめています。"
-      menuEditItems={nav.map((item) => ({
-        title: item.label,
-        helper: item.href,
-        href: item.href,
-        icon: item.icon
-      }))}
+      menuEditItems={navItems.map((item) => ({ title: item.label, href: item.href, icon: item.icon }))}
+      ownedApps={ownedApps}
+      otherApps={[]}
+      suggestedApps={suggestedApps}
+      mikkeId={profile.handle}
+      onSignOut={() => void signOut()}
+      navItems={navItems}
+      bottomNavItems={bottomNavItems}
+      showSharedUtilities={variant === "koushi"}
       footerLabel="Academy by mikke"
     >
-      {/* AC-2: PC(md+)は左サイドバー固定リスト、モバイルは横スクロールタブのまま */}
-      <div className="md:flex md:items-start md:gap-6">
-        <aside className="hidden shrink-0 md:block md:w-56">
-          <nav className="sticky top-20 space-y-1 rounded-2xl border border-[var(--mikke-line)] bg-white p-2">
-            {nav.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold transition ${
-                    active
-                      ? "bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent-strong)]"
-                      : "text-[var(--mikke-text-soft)] hover:bg-[var(--mikke-surface-soft)]"
-                  }`}
-                >
-                  <Icon size={16} className="shrink-0" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
-
-        <div className="min-w-0 flex-1">
-          <div className="mb-5 space-y-3">
-            <nav className="flex gap-2 overflow-x-auto pb-1 md:hidden">
-              {nav.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-2 text-xs font-bold transition ${
-                      active
-                        ? "border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent-strong)]"
-                        : "border-[var(--mikke-line)] bg-[var(--mikke-surface)] text-[var(--mikke-text-soft)] hover:bg-[var(--mikke-surface-soft)]"
-                    }`}
-                  >
-                    <Icon size={14} className="shrink-0" />
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Link
-                href="/academy/site"
-                target="_blank"
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
-              >
-                <ExternalLink size={14} />
-                フロントを見る
-              </Link>
-              <Link
-                href={switchHref}
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
-              >
-                {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-                {variant === "honbu" ? "講師ポータルへ" : "本部画面へ"}
-              </Link>
-              <button
-                type="button"
-                onClick={logout}
-                className="inline-flex items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
-              >
-                <LogOut size={14} />
-                {profile.display_name} からログアウト
-              </button>
-            </div>
-          </div>
-
-          {children}
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-bold text-[var(--mikke-muted)]">
+          {variant === "honbu" ? "本部管理" : "講師ポータル"}
+        </p>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Link
+            href="/academy/site"
+            target="_blank"
+            className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+          >
+            <ExternalLink size={14} />
+            ホームページを見る
+          </Link>
+          <Link
+            href={switchHref}
+            className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+          >
+            {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
+            {variant === "honbu" ? "講師ポータルへ" : "本部画面へ"}
+          </Link>
         </div>
       </div>
-
-      {/*
-        AC-1: Academy専用モバイル下部ナビ。
-        MikkeAppShell側の共通フッター（Academy/Manager/Apps）はOS共通部品のため
-        components/academy配下からは変更できない。同じ fixed inset-x-0 bottom-0 の位置に
-        z-indexを上げて重ね、Academy自身の最優先4項目に差し替えて見せる
-        （OS共通ナビへの導線はハンバーガーメニュー側に残す）。
-      */}
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--mikke-line)] bg-white/95 px-2 pb-[calc(8px+env(safe-area-inset-bottom))] pt-2 backdrop-blur md:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
-          {bottomNav.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item);
-            return (
-              <Link
-                key={`bottom-${item.href}`}
-                href={item.href}
-                className={`flex min-h-14 flex-col items-center justify-center rounded-xl px-1 py-2 text-[10px] font-bold ${
-                  active ? "text-[var(--mikke-accent)]" : "text-[var(--mikke-muted)]"
-                }`}
-              >
-                <Icon size={20} strokeWidth={1.8} />
-                <span className="mt-1 truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {children}
     </MikkeAppShell>
   );
 }

@@ -1,7 +1,7 @@
 import { AppCard } from "@/components/mikkeos/AppCard";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { MetricCard } from "@/components/mikkeos/MetricCard";
-import { mikkeApps } from "@/lib/mikkeos/apps";
+import { catalogMikkeApps } from "@/lib/mikkeos/apps";
 
 export default function AppsPage() {
   return (
@@ -21,12 +21,12 @@ export default function AppsPage() {
         <h2 className="text-lg font-bold tracking-normal">今回の扱い</h2>
         <p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">
           ここでは各アプリを完成機能として作り込まず、どんな活動をActivity Logへ送るか、Storyで何が見えるか、
-          DESKで何を集計するかを確認します。AcademyとCommunityは別アプリとして扱い、SessionやFundは後続で検討します。
+          DESKで何を集計するかを確認します。Communityは別アプリとして扱い、SessionやFundは後続で検討します。
         </p>
       </section>
 
       <section className="mt-6 grid gap-3">
-        {mikkeApps.map((app) => (
+        {catalogMikkeApps.map((app) => (
           <AppCard key={app.key} app={app} />
         ))}
       </section>

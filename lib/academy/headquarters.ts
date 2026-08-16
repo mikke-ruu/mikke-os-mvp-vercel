@@ -12,7 +12,16 @@ export async function getOwnedHeadquarters(userId: string) {
     .maybeSingle();
 
   if (error) throw error;
-  return data as AcademyHeadquarters | null;
+  if (data) return data as AcademyHeadquarters;
+
+  const { data: manageable, error: manageableError } = await supabase.rpc(
+    "academy_get_my_manageable_headquarters"
+  );
+  if (manageableError) {
+    if (manageableError.code === "PGRST202" || manageableError.code === "42883") return null;
+    throw manageableError;
+  }
+  return ((manageable as AcademyHeadquarters[] | null) ?? [])[0] ?? null;
 }
 
 // 本部情報の更新（フロントページ編集用）
@@ -33,12 +42,10 @@ export async function updateHeadquarters(
     front_blocks: AcademyLpBlock[];
   }>
 ) {
-  const { data, error } = await supabase
-    .from("academy_headquarters")
-    .update(patch)
-    .eq("id", hqId)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("academy_update_headquarters_profile", {
+    p_headquarters_id: hqId,
+    p_patch: patch
+  });
 
   if (error) throw error;
   return data as AcademyHeadquarters;

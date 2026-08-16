@@ -1,6 +1,13 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
-import type { AcademyCourse, AcademyFaqItem, AcademyFormField, Profile } from "@/types/database";
+import { resolveAcademyCourseFeatureSettings } from "@/lib/academy/course-feature-settings";
+import type {
+  AcademyCourse,
+  AcademyCourseFeatureSettings,
+  AcademyFaqItem,
+  AcademyFormField,
+  Profile
+} from "@/types/database";
 
 export type CourseInput = {
   code: string;
@@ -24,12 +31,13 @@ export type CourseInput = {
   kitPrice: number;
   kitPaymentUrl: string;
   requiresKit: boolean;
+  featureSettings: AcademyCourseFeatureSettings;
 };
 
-function toRow(hqId: string, userId: string, input: CourseInput) {
+function toRow(hqId: string, input: CourseInput) {
+  const featureSettings = resolveAcademyCourseFeatureSettings(input.featureSettings);
   return {
     headquarters_id: hqId,
-    user_id: userId,
     code: input.code.trim(),
     name: input.name.trim(),
     subtitle: input.subtitle || null,
@@ -49,7 +57,8 @@ function toRow(hqId: string, userId: string, input: CourseInput) {
     payment_url: input.paymentUrl || null,
     kit_price: input.kitPrice,
     kit_payment_url: input.kitPaymentUrl || null,
-    requires_kit: input.requiresKit
+    requires_kit: featureSettings.kits,
+    feature_settings: featureSettings
   };
 }
 
@@ -80,7 +89,7 @@ export async function getCourse(headquartersId: string, id: string) {
 export async function createCourse(profile: Profile, headquartersId: string, input: CourseInput) {
   const { data, error } = await supabase
     .from("academy_courses")
-    .insert(toRow(headquartersId, profile.user_id, input))
+    .insert({ ...toRow(headquartersId, input), user_id: profile.user_id })
     .select("*")
     .single();
 
@@ -109,7 +118,7 @@ export async function updateCourse(
 ) {
   const { data, error } = await supabase
     .from("academy_courses")
-    .update(toRow(headquartersId, profile.user_id, input))
+    .update(toRow(headquartersId, input))
     .eq("id", courseId)
     .eq("headquarters_id", headquartersId)
     .select("*")
