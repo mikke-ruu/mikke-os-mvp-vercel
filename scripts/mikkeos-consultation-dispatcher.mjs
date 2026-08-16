@@ -23,6 +23,7 @@ for (const key of ["MIKKEOS_SUPABASE_URL", "MIKKEOS_SUPABASE_ANON_KEY", "MIKKEOS
   if (!settings[key]) throw new Error(`${key} が設定されていません。`);
 }
 const intervalMs = Math.max(15_000, Number(settings.MIKKEOS_POLL_INTERVAL_MS || 30_000));
+const conversationConcurrency = Math.min(4, Math.max(1, Number(settings.MIKKEOS_CONVERSATION_CONCURRENCY || 3) || 3));
 
 await mkdir(runtimeDir, { recursive: true });
 let lock;
@@ -523,10 +524,12 @@ async function processOne() {
   return true;
 }
 
-async function processConversationMessage() {
+async function claimConversationMessage() {
   const claimed = await rpc("mikkeos_claim_next_conversation_message", { p_worker_secret: settings.MIKKEOS_DISPATCHER_SECRET });
-  const item = claimed?.[0];
-  if (!item) return false;
+  return claimed?.[0] ?? null;
+}
+
+async function processConversationMessage(item) {
   await log("conversation_message_claimed", {
     messageId: item.message_id,
     conversationId: item.conversation_id,
@@ -659,6 +662,31 @@ async function processConversationMessage() {
   return true;
 }
 
+const activeConversationJobs = new Set();
+
+function startConversationJob(item) {
+  let job;
+  job = processConversationMessage(item)
+    .catch((error) => log("conversation_worker_unhandled", {
+      messageId: item.message_id,
+      conversationId: item.conversation_id,
+      error: error instanceof Error ? error.message : String(error),
+    }))
+    .finally(() => activeConversationJobs.delete(job));
+  activeConversationJobs.add(job);
+}
+
+async function fillConversationSlots() {
+  let started = 0;
+  while (activeConversationJobs.size < conversationConcurrency) {
+    const item = await claimConversationMessage();
+    if (!item) break;
+    startConversationJob(item);
+    started += 1;
+  }
+  return started;
+}
+
 try {
   let lastInventoryAt = 0;
   do {
@@ -670,10 +698,21 @@ try {
     }
     await refreshLocalPreviews();
     const handledPreview = await processLocalPreview();
-    const handledConversation = previewOnly ? false : await processConversationMessage();
+    const startedConversations = previewOnly ? 0 : await fillConversationSlots();
+    const handledConversation = startedConversations > 0;
     const handledConsultation = previewOnly ? false : await processOne();
-    if (mode === "once") break;
-    if (!handledConversation && !handledConsultation && !handledPreview) await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    if (mode === "once") {
+      await Promise.allSettled([...activeConversationJobs]);
+      break;
+    }
+    if (activeConversationJobs.size) {
+      await Promise.race([
+        Promise.allSettled([...activeConversationJobs]),
+        new Promise((resolve) => setTimeout(resolve, 1_000)),
+      ]);
+    } else if (!handledConversation && !handledConsultation && !handledPreview) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
   } while (true);
 } finally {
   await lock?.close().catch(() => undefined);
