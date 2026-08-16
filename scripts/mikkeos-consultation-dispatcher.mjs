@@ -313,6 +313,23 @@ function previewPort(itemId, registry) {
   throw new Error("ローカルプレビュー用ポートに空きがありません。");
 }
 
+function localPreviewUrl(port, appKey = "") {
+  const route = {
+    academy: "/academy",
+    community: "/community",
+    homepage: "/home",
+    "item-studio": "/item-studio",
+    library: "/library",
+    manager: "/manager",
+    marketnote: "/marketnote",
+    mikkeos: "/hq/implementation",
+    page: "/page",
+    story: "/story",
+    "team-works": "/team-works",
+  }[appKey] || "/";
+  return `http://localhost:${port}${route}`;
+}
+
 function stopPreviewProcess(pid) {
   if (!processAlive(pid)) return;
   if (process.platform === "win32") {
@@ -345,9 +362,10 @@ async function processLocalPreview() {
     if (!worktreePath) throw new Error("登録済みの専用worktreeを確認できませんでした。自動棚卸し後にもう一度お試しください。");
     if (current?.pid && processAlive(current.pid)) {
       const ready = await previewResponding(current.port);
+      const previewUrl = localPreviewUrl(current.port, current.appKey || item.app_key);
       await rpc("mikkeos_finish_local_preview", {
         p_worker_secret: settings.MIKKEOS_DISPATCHER_SECRET, p_item_id: item.item_id,
-        p_status: ready ? "ready" : "starting", p_url: `http://localhost:${current.port}`,
+        p_status: ready ? "ready" : "starting", p_url: previewUrl,
         p_port: current.port, p_note: ready ? "ローカルUIを確認できます。" : "ローカルUIを起動しています。", p_error: "",
       });
       return true;
@@ -360,11 +378,11 @@ async function processLocalPreview() {
       cwd: repoRoot, detached: true, windowsHide: true, stdio: "ignore", env: childEnvironment(),
     });
     child.unref();
-    registry[item.item_id] = { pid: child.pid, port, worktreePath, startedAt: Date.now(), ready: false };
+    registry[item.item_id] = { pid: child.pid, port, worktreePath, appKey: item.app_key, startedAt: Date.now(), ready: false };
     await writePreviewRegistry(registry);
     await rpc("mikkeos_finish_local_preview", {
       p_worker_secret: settings.MIKKEOS_DISPATCHER_SECRET, p_item_id: item.item_id,
-      p_status: "starting", p_url: `http://localhost:${port}`, p_port: port,
+      p_status: "starting", p_url: localPreviewUrl(port, item.app_key), p_port: port,
       p_note: "依存関係を確認し、ローカルUIを起動しています。通常は30秒〜2分ほどです。", p_error: "",
     });
     await log("local_preview_started", { itemId: item.item_id, worktreePath, port, pid: child.pid });
@@ -396,7 +414,7 @@ async function refreshLocalPreviews() {
       entry.ready = true; changed = true;
       await rpc("mikkeos_finish_local_preview", {
         p_worker_secret: settings.MIKKEOS_DISPATCHER_SECRET, p_item_id: itemId,
-        p_status: "ready", p_url: `http://localhost:${entry.port}`, p_port: entry.port,
+        p_status: "ready", p_url: localPreviewUrl(entry.port, entry.appKey), p_port: entry.port,
         p_note: "ローカルUIを確認できます。修正は再読み込みで反映されます。", p_error: "",
       });
       await log("local_preview_ready", { itemId, port: entry.port });
