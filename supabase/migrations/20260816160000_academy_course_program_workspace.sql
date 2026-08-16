@@ -18,6 +18,12 @@ begin
     raise exception 'academy_program_scope_is_immutable';
   end if;
 
+  if tg_op = 'UPDATE'
+    and new.status is distinct from old.status
+    and private.academy_headquarters_role(old.headquarters_id, (select auth.uid())) <> 'owner' then
+    raise exception 'academy_program_publish_owner_required';
+  end if;
+
   if new.course_id is not null and not exists (
     select 1
     from public.academy_courses course
@@ -35,10 +41,50 @@ create trigger academy_guard_program_course_scope
 before insert or update on public.academy_programs
 for each row execute function private.academy_guard_program_course_scope();
 
-grant delete on public.academy_programs, public.academy_program_sections, public.academy_program_steps to authenticated;
+create or replace function private.academy_guard_program_child_scope()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if tg_table_name = 'academy_program_sections'
+    and new.program_id is distinct from old.program_id then
+    raise exception 'academy_program_section_scope_is_immutable';
+  end if;
+  if tg_table_name = 'academy_program_steps'
+    and new.section_id is distinct from old.section_id then
+    raise exception 'academy_program_step_scope_is_immutable';
+  end if;
+  return new;
+end;
+$$;
 
-create policy "academy_programs_collaborator_all"
-on public.academy_programs for all to authenticated
+drop trigger if exists academy_guard_program_section_scope on public.academy_program_sections;
+create trigger academy_guard_program_section_scope
+before update on public.academy_program_sections
+for each row execute function private.academy_guard_program_child_scope();
+
+drop trigger if exists academy_guard_program_step_scope on public.academy_program_steps;
+create trigger academy_guard_program_step_scope
+before update on public.academy_program_steps
+for each row execute function private.academy_guard_program_child_scope();
+
+grant delete on public.academy_program_sections, public.academy_program_steps to authenticated;
+
+create policy "academy_programs_collaborator_select"
+on public.academy_programs for select to authenticated
+using (private.academy_can_edit_courses(headquarters_id));
+
+create policy "academy_programs_collaborator_insert"
+on public.academy_programs for insert to authenticated
+with check (
+  private.academy_can_edit_courses(headquarters_id)
+  and status = 'draft'
+  and course_id is not null
+);
+
+create policy "academy_programs_collaborator_update"
+on public.academy_programs for update to authenticated
 using (private.academy_can_edit_courses(headquarters_id))
 with check (private.academy_can_edit_courses(headquarters_id));
 
