@@ -58,6 +58,9 @@ create index academy_class_instructor_requests_hq_status_idx
 create index academy_class_instructor_requests_instructor_status_idx
   on public.academy_class_instructor_requests(instructor_id, status);
 
+create index academy_class_instructor_requests_requested_by_idx
+  on public.academy_class_instructor_requests(requested_by_user_id);
+
 alter table public.academy_class_instructor_requests enable row level security;
 
 revoke all on table public.academy_class_instructor_requests from public, anon, authenticated;
@@ -133,6 +136,7 @@ set search_path = public, pg_temp
 as $$
 declare
   v_actor_user_id uuid := (select auth.uid());
+  v_class_id uuid;
   v_request public.academy_class_instructor_requests%rowtype;
   v_next public.academy_class_instructor_requests%rowtype;
 begin
@@ -143,6 +147,23 @@ begin
   if p_status not in ('accepted', 'declined') then
     raise exception 'Unsupported response status';
   end if;
+
+  select class_id
+  into v_class_id
+  from public.academy_class_instructor_requests
+  where id = p_request_id;
+
+  if v_class_id is null then
+    raise exception 'Request not found';
+  end if;
+
+  -- All responses for the same class take this lock first. This prevents two
+  -- instructors from locking different request rows and deadlocking while
+  -- each tries to cancel the other request after accepting.
+  perform 1
+  from public.academy_classes
+  where id = v_class_id
+  for update;
 
   select *
   into v_request
