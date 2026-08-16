@@ -61,6 +61,7 @@ function emptyInput(): CourseInput {
     acceptAtHonbu: true,
     acceptAtKoushi: true,
     paymentUrl: "",
+    paymentProvider: "manual",
     kitPrice: 0,
     kitPaymentUrl: "",
     requiresKit: true,
@@ -243,10 +244,28 @@ export function CourseForm({
           <label className={labelClass}>教材内容</label>
           <textarea className={`${inputClass} min-h-16`} value={form.materialContents} onChange={(e) => set("materialContents", e.target.value)} />
         </div>
-        <div>
-          <label className={labelClass}>受講料 決済URL（外部）</label>
-          <input className={inputClass} value={form.paymentUrl} onChange={(e) => set("paymentUrl", e.target.value)} placeholder="https://…" />
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <label className={labelClass}>決済方式</label>
+            <select
+              className={inputClass}
+              value={form.paymentProvider}
+              onChange={(e) => set("paymentProvider", e.target.value as CourseInput["paymentProvider"])}
+            >
+              <option value="manual">手動（振込・現金など）</option>
+              <option value="stripe">Stripe</option>
+              <option value="square">Square</option>
+              <option value="paycas">PayCAS（端末確認）</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelClass}>受講料 決済URL（外部）</label>
+            <input className={inputClass} value={form.paymentUrl} onChange={(e) => set("paymentUrl", e.target.value)} placeholder="https://…" />
+          </div>
         </div>
+        <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">
+          Stripeは申込IDを決済リンクに連携します。Squareの自動入金確認はSandbox接続後、PayCASは当面本部の端末確認で運用します。
+        </p>
       </section>
 
       <section className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">

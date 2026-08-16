@@ -161,6 +161,8 @@ export type AcademyFormField = {
   options?: string[];
 };
 
+export type AcademyPaymentProvider = "manual" | "stripe" | "square" | "paycas";
+
 // 講座LP・講師専用ページ共通: 画像グリッドの1枚
 export type AcademyGalleryImage = { url: string; caption?: string };
 
@@ -249,6 +251,7 @@ export type AcademyCourse = {
   accept_at_koushi: boolean;
   is_published: boolean;
   payment_url: string | null;
+  payment_provider: AcademyPaymentProvider;
   // Wave F (AC-F5a): キット代金・決済URL。講師のキット発注(KitIntakeModal)へ自動で引き継ぐ。
   kit_price: number;
   kit_payment_url: string | null;
@@ -336,6 +339,7 @@ export type AcademyInstructor = {
   // 本部のcourse.payment_urlの代わりに使う。講師本人が営業用URL画面から編集する。
   payment_method_note: string | null;
   payment_url: string | null;
+  payment_provider: AcademyPaymentProvider;
   created_at: string;
   updated_at: string;
 };
@@ -421,7 +425,7 @@ export type AcademyApplication = {
   id: string;
   headquarters_id: string;
   course_id: string;
-  user_id: string;
+  user_id: string | null;
   intake_source: "honbu" | "koushi";
   instructor_id: string | null;
   applicant_name: string;
@@ -437,6 +441,10 @@ export type AcademyApplication = {
   instructor_revenue: number;
   status: AcademyApplicationStatus;
   payment_status: "unpaid" | "paid" | "not_required";
+  payment_provider: AcademyPaymentProvider;
+  provider_checkout_id: string | null;
+  provider_payment_id: string | null;
+  paid_at: string | null;
   certification_status: "not_yet" | "pending" | "certified";
   display_on_story: boolean;
   reflect_on_desk: boolean;

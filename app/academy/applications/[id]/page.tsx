@@ -11,10 +11,13 @@ import { getCourse } from "@/lib/academy/courses";
 import {
   APPLICATION_STATUS_LABELS,
   getApplication,
+  promoteCertifiedApplicationToInstructor,
   updateApplication,
   visibleStatusOptions
 } from "@/lib/academy/applications";
 import { KIT_STATUS_LABELS, listKitOrdersByApplication } from "@/lib/academy/kits";
+import { findProfileByHandle } from "@/lib/academy/instructors";
+import { ACADEMY_PAYMENT_PROVIDER_LABELS } from "@/lib/academy/payments";
 import { formatDate } from "@/lib/format";
 import type { AcademyApplication, AcademyCourse, AcademyHeadquarters, AcademyKitOrder } from "@/types/database";
 
@@ -40,6 +43,9 @@ function DetailContent({ appId }: { appId: string }) {
   const [kitOrders, setKitOrders] = useState<AcademyKitOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [instructorHandle, setInstructorHandle] = useState("");
+  const [promotionError, setPromotionError] = useState<string | null>(null);
+  const [promotionDone, setPromotionDone] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -67,6 +73,23 @@ function DetailContent({ appId }: { appId: string }) {
     }
   }
 
+  async function promoteToInstructor() {
+    if (!app || !instructorHandle.trim()) return;
+    setSaving(true);
+    setPromotionError(null);
+    try {
+      const target = await findProfileByHandle(instructorHandle);
+      if (!target) throw new Error("指定したmikke IDが見つかりません。");
+      await promoteCertifiedApplicationToInstructor(app.id, target.id);
+      setApp({ ...app, status: "instructor_added" });
+      setPromotionDone(true);
+    } catch (err) {
+      setPromotionError(err instanceof Error ? err.message : "講師登録に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
   if (!hq || !app) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">申込が見つかりません。</p>;
 
@@ -85,10 +108,44 @@ function DetailContent({ appId }: { appId: string }) {
           <Row label="受講料" value={`${app.price.toLocaleString()}円`} />
           <Row label="キット仕入れ" value={`${app.kit_cost.toLocaleString()}円`} />
           <Row label="本部売上 / 講師売上" value={`${app.honbu_revenue.toLocaleString()} / ${app.instructor_revenue.toLocaleString()}円`} />
+          <Row label="決済方式" value={ACADEMY_PAYMENT_PROVIDER_LABELS[app.payment_provider ?? "manual"]} />
+          <Row label="入金日" value={app.paid_at ? formatDate(app.paid_at) : ""} />
           <Row label="メール" value={app.applicant_email ?? ""} />
           <Row label="電話" value={app.applicant_phone ?? ""} />
         </div>
       </section>
+
+      {app.certification_status === "certified" ? (
+        <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          <div>
+            <p className="text-xs font-bold text-[var(--mikke-accent)]">認定済みから講師登録</p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">
+              本人のmikke IDを指定し、講師番号の採番と申込ステータス更新を一度に行います。初期状態は非掲載・受付OFFです。
+            </p>
+          </div>
+          {app.status === "instructor_added" || promotionDone ? (
+            <p className="text-sm font-bold text-[var(--mikke-success)]">講師登録済みです。</p>
+          ) : (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                className={inputClass}
+                value={instructorHandle}
+                onChange={(e) => setInstructorHandle(e.target.value)}
+                placeholder="mikke ID（例: neon）"
+              />
+              <button
+                type="button"
+                disabled={saving || !instructorHandle.trim()}
+                onClick={promoteToInstructor}
+                className="shrink-0 rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {saving ? "登録中…" : "講師にする"}
+              </button>
+            </div>
+          )}
+          {promotionError ? <p className="text-xs font-bold text-[var(--mikke-danger)]">{promotionError}</p> : null}
+        </section>
+      ) : null}
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <p className="text-xs font-bold text-[var(--mikke-accent)]">ステータス管理</p>

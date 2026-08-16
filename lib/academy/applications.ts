@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
-import type { AcademyApplication, AcademyApplicationStatus, Profile } from "@/types/database";
+import type { AcademyApplication, AcademyApplicationStatus, AcademyInstructor, Profile } from "@/types/database";
 
 export const APPLICATION_STATUS_LABELS: Record<AcademyApplicationStatus, string> = {
   received: "申込受付",
@@ -85,6 +85,15 @@ export async function getApplication(headquartersId: string, id: string) {
   return data as AcademyApplication;
 }
 
+export async function promoteCertifiedApplicationToInstructor(applicationId: string, profileId: string) {
+  const { data, error } = await supabase.rpc("academy_promote_certified_application", {
+    p_application_id: applicationId,
+    p_profile_id: profileId
+  });
+  if (error) throw error;
+  return data as AcademyInstructor;
+}
+
 export async function createApplication(profile: Profile, headquartersId: string, input: ApplicationInput) {
   const { data, error } = await supabase
     .from("academy_applications")
@@ -167,16 +176,14 @@ export async function updateApplication(
     applicationId: next.id
   };
 
-  // 入金確認 → DESK候補（金額ログ。private・Story非対象）
+  // 入金確認の事実だけを連携する。金額と決済識別子は
+  // Academyの決済台帳を正とし、Activity Logには保存しない。
   if (patch.payment_status === "paid" && prev.payment_status !== "paid") {
     await logAcademyEvent({
       ...base,
       eventType: "academy_payment_received",
       idempotencyKey: `academy:payment_received:${next.id}`,
       title: "受講料の入金を確認しました",
-      hasFinancialValue: true,
-      amount: next.honbu_revenue || next.price,
-      transactionType: "revenue",
       paymentStatus: "paid",
       visibility: "private"
     });

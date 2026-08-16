@@ -1,5 +1,11 @@
 import { supabase } from "@/lib/supabase/client";
-import type { AcademyApplication, AcademyCourse, AcademyInstructor, AcademyMaterial } from "@/types/database";
+import type {
+  AcademyApplication,
+  AcademyCourse,
+  AcademyInstructor,
+  AcademyMaterial,
+  AcademyPaymentProvider
+} from "@/types/database";
 
 // 講師側: 自分が担当講師になっている申込（RLSで担当分だけ読める）
 export async function listMyApplications(instructorIds: string[]) {
@@ -62,6 +68,7 @@ export type InstructorProfileEdit = {
   // Wave F (AC-F5b): 講師本人の決済設定。本部管理列保護トリガの対象外なので講師本人が書ける。
   payment_method_note: string | null;
   payment_url: string | null;
+  payment_provider: AcademyPaymentProvider;
 };
 
 export async function updateMyInstructorProfile(instructor: AcademyInstructor, patch: Partial<InstructorProfileEdit>) {
