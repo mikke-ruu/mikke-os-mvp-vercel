@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertCircle, ArrowRight, CalendarDays, Check, CheckCircle2, CircleDashed,
-  Copy, ExternalLink, FileCode2, FolderOpen, GitBranch, Lightbulb, ListTodo, Loader2, Map, MessageSquarePlus,
-  MonitorCog, MonitorPlay, PackageCheck, Rocket, RotateCw, ShieldCheck, Square, X,
+  Copy, ExternalLink, FileCode2, FolderOpen, GitBranch, Lightbulb, ListTodo, Loader2, Map as MapIcon, MessageSquarePlus,
+  MessageCircle, MonitorCog, MonitorPlay, PackageCheck, PlayCircle, Rocket, RotateCw, ShieldCheck, Square, X,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { ImplementationConversationPanel } from "@/components/hq/ImplementationConversationPanel";
@@ -36,6 +36,29 @@ function toneForProject(project: ImplementationProject) {
   if (project.roadmap_stage === "release_ready") return "border-violet-200 bg-violet-50 text-violet-800";
   if (["local_build", "local_ready"].includes(project.roadmap_stage)) return "border-blue-200 bg-blue-50 text-blue-800";
   return "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]";
+}
+
+type RoomActivity = {
+  kind: "executing" | "responding" | "execution_queued" | "discussion_queued";
+  label: string;
+  count: number;
+  active: boolean;
+  tone: string;
+};
+
+function roomActivityForProject(projectId: string, conversations: ImplementationConversation[], messages: ImplementationMessage[]): RoomActivity | null {
+  const conversationIds = new Set(conversations.filter((conversation) => conversation.project_id === projectId).map((conversation) => conversation.id));
+  const activeMessages = messages.filter((message) => message.role === "user" && conversationIds.has(message.conversation_id) && ["pending", "in_progress"].includes(message.status));
+  if (!activeMessages.length) return null;
+
+  const definitions: Array<Omit<RoomActivity, "count"> & { matches: (message: ImplementationMessage) => boolean }> = [
+    { kind: "executing", label: "実行中", active: true, tone: "border-violet-600 bg-violet-600 text-white shadow-sm", matches: (message) => message.mode === "execution" && message.status === "in_progress" },
+    { kind: "responding", label: "回答作成中", active: true, tone: "border-blue-600 bg-blue-600 text-white shadow-sm", matches: (message) => message.mode === "discussion" && message.status === "in_progress" },
+    { kind: "execution_queued", label: "実行待ち", active: false, tone: "border-amber-300 bg-amber-50 text-amber-950", matches: (message) => message.mode === "execution" && message.status === "pending" },
+    { kind: "discussion_queued", label: "回答待ち", active: false, tone: "border-sky-300 bg-sky-50 text-sky-950", matches: (message) => message.mode === "discussion" && message.status === "pending" },
+  ];
+  const definition = definitions.find((candidate) => activeMessages.some(candidate.matches));
+  return definition ? { ...definition, count: activeMessages.length } : null;
 }
 
 function GateProgress({ project, gates }: { project: ImplementationProject; gates: ImplementationGate[] }) {
@@ -104,6 +127,10 @@ export default function ImplementationCenterPage() {
   }, []);
 
   const selectedProject = projects.find((project) => project.app_key === selected) ?? null;
+  const activityByProject = useMemo(() => new Map(projects.flatMap((project) => {
+    const activity = roomActivityForProject(project.id, conversations, messages);
+    return activity ? [[project.id, activity] as const] : [];
+  })), [projects, conversations, messages]);
   const visibleProjects = selectedProject ? [selectedProject] : projects;
   const visibleItems = useMemo(() => selectedProject ? items.filter((item) => item.project_id === selectedProject.id) : items, [items, selectedProject]);
   const approvals = visibleItems.filter((item) => item.item_type === "approval" && item.status === "waiting_user");
@@ -138,7 +165,15 @@ export default function ImplementationCenterPage() {
 
     {error ? <p className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"><AlertCircle size={16} />{error}<button type="button" onClick={() => void load()} className="ml-auto"><RotateCw size={16} /></button></p> : null}
 
-    <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="アプリ別の進捗"><button type="button" onClick={() => setSelected("all")} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-bold ${selected === "all" ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>全体</button>{projects.map((project) => <button key={project.id} type="button" onClick={() => setSelected(project.app_key)} className={`shrink-0 rounded-full border px-4 py-2 text-sm font-bold ${selected === project.app_key ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>{project.app_name}</button>)}</nav>
+    <div className="space-y-2">
+      <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="アプリ別の進捗"><button type="button" onClick={() => setSelected("all")} className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold ${selected === "all" ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>全体{activityByProject.size ? <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px]">動作中・待ち {activityByProject.size}</span> : null}</button>{projects.map((project) => {
+        const activity = activityByProject.get(project.id);
+        const isSelected = selected === project.app_key;
+        const StatusIcon = activity?.kind === "executing" || activity?.kind === "execution_queued" ? PlayCircle : MessageCircle;
+        return <button key={project.id} type="button" onClick={() => setSelected(project.app_key)} className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-bold transition ${activity?.tone ?? (isSelected ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white")} ${isSelected ? "ring-2 ring-[var(--mikke-primary)]/25 ring-offset-2" : ""}`}><span>{project.app_name}</span>{activity ? <span className="inline-flex items-center gap-1 rounded-full bg-white/80 px-2 py-0.5 text-[9px] font-bold text-slate-800"><StatusIcon size={11} className={activity.active ? "animate-pulse" : ""} />{activity.label}{activity.count > 1 ? ` ${activity.count}` : ""}</span> : null}</button>;
+      })}</nav>
+      {activityByProject.size ? <p className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 animate-pulse rounded-full bg-violet-600" />紫・青は処理中</span><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-300" />黄・水色は受付済み</span><span>完了すると通常色に戻ります</span></p> : null}
+    </div>
 
     <section><div className="flex items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[0.12em] text-[var(--mikke-primary)]">PORTFOLIO ROADMAP</p><h2 className="mt-1 text-xl font-bold">全体とアプリの現在地</h2></div><span className="text-xs text-[var(--mikke-muted)]">{visibleProjects.length}アプリ</span></div>
       <div className="mt-3 grid gap-3 lg:grid-cols-2">{visibleProjects.map((project) => <article key={project.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm md:p-5">
@@ -150,7 +185,7 @@ export default function ImplementationCenterPage() {
       </article>)}</div>
     </section>
 
-    <section><div className="flex items-center gap-2"><Map size={19} className="text-[var(--mikke-primary)]" /><div><p className="text-xs font-bold tracking-[0.12em] text-[var(--mikke-primary)]">WORK MAP</p><h2 className="text-xl font-bold">何を直し、どこへ繋げるか</h2></div></div><div className="mt-3 grid gap-3 xl:grid-cols-2 2xl:grid-cols-4">{lanes.map((lane) => <WorkLane key={lane.key} definition={lane} items={visibleItems} projects={projects} previewSaving={previewSaving} onPreview={preview} />)}</div></section>
+    <section><div className="flex items-center gap-2"><MapIcon size={19} className="text-[var(--mikke-primary)]" /><div><p className="text-xs font-bold tracking-[0.12em] text-[var(--mikke-primary)]">WORK MAP</p><h2 className="text-xl font-bold">何を直し、どこへ繋げるか</h2></div></div><div className="mt-3 grid gap-3 xl:grid-cols-2 2xl:grid-cols-4">{lanes.map((lane) => <WorkLane key={lane.key} definition={lane} items={visibleItems} projects={projects} previewSaving={previewSaving} onPreview={preview} />)}</div></section>
 
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div id="app-consultation-room" className="scroll-mt-5"><ImplementationConversationPanel project={selectedProject} conversations={conversations} messages={messages} attachments={attachments} userId={user.id} onChanged={() => load(true)} /></div>
