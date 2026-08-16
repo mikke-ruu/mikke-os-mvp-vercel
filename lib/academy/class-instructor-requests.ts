@@ -41,20 +41,14 @@ export async function createClassInstructorRequest(input: {
   instructorId: string;
   requestNote: string;
   respondBy: string | null;
-  requestedByUserId: string;
 }) {
-  const { data, error } = await supabase
-    .from("academy_class_instructor_requests")
-    .insert({
-      headquarters_id: input.headquartersId,
-      class_id: input.classId,
-      instructor_id: input.instructorId,
-      request_note: input.requestNote.trim() || null,
-      respond_by: input.respondBy,
-      requested_by_user_id: input.requestedByUserId
-    })
-    .select(requestDetails)
-    .single();
+  const { data, error } = await supabase.rpc("academy_request_class_instructor", {
+    p_headquarters_id: input.headquartersId,
+    p_class_id: input.classId,
+    p_instructor_id: input.instructorId,
+    p_request_note: input.requestNote.trim() || null,
+    p_respond_by: input.respondBy
+  });
 
   if (error) throw error;
   return data as unknown as AcademyClassInstructorRequest;

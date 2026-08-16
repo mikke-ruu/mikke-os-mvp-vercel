@@ -10,7 +10,7 @@ create or replace function public.academy_respond_class_instructor_request(
 returns public.academy_class_instructor_requests
 language plpgsql
 security definer
-set search_path = public, pg_temp
+set search_path = ''
 as $$
 declare
   v_actor_user_id uuid := (select auth.uid());
@@ -102,4 +102,72 @@ $$;
 revoke all on function public.academy_respond_class_instructor_request(uuid, text, text)
   from public, anon;
 grant execute on function public.academy_respond_class_instructor_request(uuid, text, text)
+  to authenticated;
+
+revoke insert on table public.academy_class_instructor_requests from authenticated;
+drop policy if exists "academy_class_instructor_requests_owner_insert"
+  on public.academy_class_instructor_requests;
+drop policy if exists "academy_class_requests_administrator_insert"
+  on public.academy_class_instructor_requests;
+
+create or replace function public.academy_request_class_instructor(
+  p_headquarters_id uuid,
+  p_class_id uuid,
+  p_instructor_id uuid,
+  p_request_note text default null,
+  p_respond_by timestamptz default null
+)
+returns public.academy_class_instructor_requests
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := (select auth.uid());
+  v_request public.academy_class_instructor_requests%rowtype;
+begin
+  if v_actor is null or not public.academy_owns_hq(p_headquarters_id) then
+    raise exception 'academy_class_instructor_request_forbidden';
+  end if;
+  if not private.academy_class_instructor_request_scope_valid(
+    p_headquarters_id,
+    p_class_id,
+    p_instructor_id
+  ) then
+    raise exception 'academy_class_instructor_request_scope_invalid';
+  end if;
+
+  insert into public.academy_class_instructor_requests (
+    headquarters_id,
+    class_id,
+    instructor_id,
+    status,
+    request_note,
+    response_note,
+    respond_by,
+    requested_by_user_id,
+    requested_at,
+    responded_at,
+    updated_at
+  ) values (
+    p_headquarters_id,
+    p_class_id,
+    p_instructor_id,
+    'requested',
+    nullif(trim(p_request_note), ''),
+    null,
+    p_respond_by,
+    v_actor,
+    now(),
+    null,
+    now()
+  )
+  returning * into v_request;
+  return v_request;
+end;
+$$;
+
+revoke all on function public.academy_request_class_instructor(uuid, uuid, uuid, text, timestamptz)
+  from public, anon;
+grant execute on function public.academy_request_class_instructor(uuid, uuid, uuid, text, timestamptz)
   to authenticated;

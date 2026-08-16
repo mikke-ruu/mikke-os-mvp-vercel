@@ -133,6 +133,52 @@ revoke all on function private.academy_can_edit_courses(uuid) from public, anon;
 grant execute on function private.academy_can_manage_headquarters(uuid) to authenticated;
 grant execute on function private.academy_can_edit_courses(uuid) to authenticated;
 
+create or replace function public.academy_update_headquarters_profile(
+  p_headquarters_id uuid,
+  p_patch jsonb
+)
+returns public.academy_headquarters
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_headquarters public.academy_headquarters%rowtype;
+begin
+  if (select auth.uid()) is null
+    or not private.academy_can_manage_headquarters(p_headquarters_id) then
+    raise exception 'academy_headquarters_forbidden';
+  end if;
+  if jsonb_typeof(coalesce(p_patch, '{}'::jsonb)) <> 'object' then
+    raise exception 'academy_headquarters_invalid_patch';
+  end if;
+
+  update public.academy_headquarters h
+  set name = case when p_patch ? 'name' then coalesce(nullif(trim(p_patch ->> 'name'), ''), h.name) else h.name end,
+      tagline = case when p_patch ? 'tagline' then nullif(trim(p_patch ->> 'tagline'), '') else h.tagline end,
+      front_message = case when p_patch ? 'front_message' then nullif(trim(p_patch ->> 'front_message'), '') else h.front_message end,
+      hero_image_url = case when p_patch ? 'hero_image_url' then nullif(trim(p_patch ->> 'hero_image_url'), '') else h.hero_image_url end,
+      logo_url = case when p_patch ? 'logo_url' then nullif(trim(p_patch ->> 'logo_url'), '') else h.logo_url end,
+      contact_email = case when p_patch ? 'contact_email' then nullif(trim(p_patch ->> 'contact_email'), '') else h.contact_email end,
+      default_payment_note = case when p_patch ? 'default_payment_note' then nullif(trim(p_patch ->> 'default_payment_note'), '') else h.default_payment_note end,
+      main_color = case when p_patch ? 'main_color' then nullif(trim(p_patch ->> 'main_color'), '') else h.main_color end,
+      renewal_period_months = case when p_patch ? 'renewal_period_months' then (p_patch ->> 'renewal_period_months')::integer else h.renewal_period_months end,
+      next_instructor_number = case when p_patch ? 'next_instructor_number' then (p_patch ->> 'next_instructor_number')::integer else h.next_instructor_number end,
+      front_blocks = case when p_patch ? 'front_blocks' then coalesce(p_patch -> 'front_blocks', '[]'::jsonb) else h.front_blocks end,
+      updated_at = now()
+  where h.id = p_headquarters_id
+  returning * into v_headquarters;
+
+  if v_headquarters.id is null then
+    raise exception 'academy_headquarters_not_found';
+  end if;
+  return v_headquarters;
+end;
+$$;
+
+revoke all on function public.academy_update_headquarters_profile(uuid, jsonb) from public, anon;
+grant execute on function public.academy_update_headquarters_profile(uuid, jsonb) to authenticated;
+
 create policy "academy_hq_settings_manager_all"
 on public.academy_headquarters_settings
 for all to authenticated
@@ -168,12 +214,6 @@ create policy "academy_headquarters_member_select"
 on public.academy_headquarters
 for select to authenticated
 using (private.academy_headquarters_role(id, (select auth.uid())) is not null);
-
-create policy "academy_headquarters_administrator_update"
-on public.academy_headquarters
-for update to authenticated
-using (private.academy_can_manage_headquarters(id))
-with check (private.academy_can_manage_headquarters(id));
 
 create or replace function private.academy_guard_headquarters_ownership()
 returns trigger
@@ -353,18 +393,63 @@ on public.academy_class_instructor_requests
 for select to authenticated
 using (private.academy_can_manage_headquarters(headquarters_id));
 
-create policy "academy_class_requests_administrator_insert"
-on public.academy_class_instructor_requests
-for insert to authenticated
-with check (
-  private.academy_can_manage_headquarters(headquarters_id)
-  and requested_by_user_id = (select auth.uid())
-  and private.academy_class_instructor_request_scope_valid(
+create or replace function public.academy_request_class_instructor(
+  p_headquarters_id uuid,
+  p_class_id uuid,
+  p_instructor_id uuid,
+  p_request_note text default null,
+  p_respond_by timestamptz default null
+)
+returns public.academy_class_instructor_requests
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor uuid := (select auth.uid());
+  v_request public.academy_class_instructor_requests%rowtype;
+begin
+  if v_actor is null or not private.academy_can_manage_headquarters(p_headquarters_id) then
+    raise exception 'academy_class_instructor_request_forbidden';
+  end if;
+  if not private.academy_class_instructor_request_scope_valid(
+    p_headquarters_id,
+    p_class_id,
+    p_instructor_id
+  ) then
+    raise exception 'academy_class_instructor_request_scope_invalid';
+  end if;
+
+  insert into public.academy_class_instructor_requests (
     headquarters_id,
     class_id,
-    instructor_id
+    instructor_id,
+    status,
+    request_note,
+    response_note,
+    respond_by,
+    requested_by_user_id,
+    requested_at,
+    responded_at,
+    updated_at
+  ) values (
+    p_headquarters_id,
+    p_class_id,
+    p_instructor_id,
+    'requested',
+    nullif(trim(p_request_note), ''),
+    null,
+    p_respond_by,
+    v_actor,
+    now(),
+    null,
+    now()
   )
-);
+  returning * into v_request;
+
+  return v_request;
+end;
+$$;
 
 create or replace function public.academy_cancel_class_instructor_request(
   p_request_id uuid
@@ -468,6 +553,15 @@ begin
   if v_target.user_id = v_actor then
     raise exception 'academy_headquarters_cannot_invite_self';
   end if;
+  if exists (
+    select 1
+    from public.academy_headquarters_members member
+    where member.headquarters_id = p_headquarters_id
+      and member.member_profile_id = v_target.id
+      and member.status = 'active'
+  ) then
+    raise exception 'academy_headquarters_member_already_active';
+  end if;
 
   insert into public.academy_headquarters_invitations (
     headquarters_id,
@@ -531,6 +625,16 @@ begin
 
   if v_invitation.id is null then
     raise exception 'academy_headquarters_invitation_not_available';
+  end if;
+
+  if p_response = 'accepted' and exists (
+    select 1
+    from public.academy_headquarters_members member
+    where member.headquarters_id = v_invitation.headquarters_id
+      and member.member_profile_id = v_invitation.target_profile_id
+      and member.status = 'active'
+  ) then
+    raise exception 'academy_headquarters_member_already_active';
   end if;
 
   update public.academy_headquarters_invitations
@@ -601,18 +705,27 @@ begin
   set status = 'stopped', stopped_at = now(), updated_at = now()
   where id = p_member_id
   returning * into v_member;
+
+  update public.academy_headquarters_invitations
+  set status = 'cancelled', responded_at = now(), updated_at = now()
+  where headquarters_id = v_member.headquarters_id
+    and target_profile_id = v_member.member_profile_id
+    and status = 'pending';
+
   return v_member;
 end;
 $$;
 
 revoke all on function public.academy_get_my_manageable_headquarters() from public, anon;
 revoke all on function public.academy_get_my_headquarters_role(uuid) from public, anon;
+revoke all on function public.academy_request_class_instructor(uuid, uuid, uuid, text, timestamptz) from public, anon;
 revoke all on function public.academy_cancel_class_instructor_request(uuid) from public, anon;
 revoke all on function public.academy_invite_headquarters_member(uuid, text, text) from public, anon;
 revoke all on function public.academy_respond_headquarters_invitation(uuid, text) from public, anon;
 revoke all on function public.academy_stop_headquarters_member(uuid) from public, anon;
 grant execute on function public.academy_get_my_manageable_headquarters() to authenticated;
 grant execute on function public.academy_get_my_headquarters_role(uuid) to authenticated;
+grant execute on function public.academy_request_class_instructor(uuid, uuid, uuid, text, timestamptz) to authenticated;
 grant execute on function public.academy_cancel_class_instructor_request(uuid) to authenticated;
 grant execute on function public.academy_invite_headquarters_member(uuid, text, text) to authenticated;
 grant execute on function public.academy_respond_headquarters_invitation(uuid, text) to authenticated;

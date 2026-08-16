@@ -32,7 +32,7 @@ function formatDateTime(value: string | null) {
 }
 
 function ClassesContent() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const [headquarters, setHeadquarters] = useState<AcademyHeadquarters | null>(null);
   const [classes, setClasses] = useState<AcademyClass[]>([]);
   const [instructors, setInstructors] = useState<AcademyInstructor[]>([]);
@@ -97,8 +97,7 @@ function ClassesContent() {
         requestNote: noteByClass[classItem.id] ?? "",
         respondBy: respondByClass[classItem.id]
           ? new Date(respondByClass[classItem.id]).toISOString()
-          : null,
-        requestedByUserId: user.id
+          : null
       });
       setNoteByClass((current) => ({ ...current, [classItem.id]: "" }));
       setRespondByClass((current) => ({ ...current, [classItem.id]: "" }));

@@ -42,12 +42,10 @@ export async function updateHeadquarters(
     front_blocks: AcademyLpBlock[];
   }>
 ) {
-  const { data, error } = await supabase
-    .from("academy_headquarters")
-    .update(patch)
-    .eq("id", hqId)
-    .select("*")
-    .single();
+  const { data, error } = await supabase.rpc("academy_update_headquarters_profile", {
+    p_headquarters_id: hqId,
+    p_patch: patch
+  });
 
   if (error) throw error;
   return data as AcademyHeadquarters;
