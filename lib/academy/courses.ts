@@ -26,10 +26,9 @@ export type CourseInput = {
   requiresKit: boolean;
 };
 
-function toRow(hqId: string, userId: string, input: CourseInput) {
+function toRow(hqId: string, input: CourseInput) {
   return {
     headquarters_id: hqId,
-    user_id: userId,
     code: input.code.trim(),
     name: input.name.trim(),
     subtitle: input.subtitle || null,
@@ -80,7 +79,7 @@ export async function getCourse(headquartersId: string, id: string) {
 export async function createCourse(profile: Profile, headquartersId: string, input: CourseInput) {
   const { data, error } = await supabase
     .from("academy_courses")
-    .insert(toRow(headquartersId, profile.user_id, input))
+    .insert({ ...toRow(headquartersId, input), user_id: profile.user_id })
     .select("*")
     .single();
 
@@ -109,7 +108,7 @@ export async function updateCourse(
 ) {
   const { data, error } = await supabase
     .from("academy_courses")
-    .update(toRow(headquartersId, profile.user_id, input))
+    .update(toRow(headquartersId, input))
     .eq("id", courseId)
     .eq("headquarters_id", headquartersId)
     .select("*")

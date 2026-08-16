@@ -107,6 +107,51 @@ export type AcademyHeadquarters = {
   updated_at: string;
 };
 
+export type AcademyHeadquartersRole = "owner" | "administrator" | "course_editor";
+export type AcademyHeadquartersMemberStatus = "active" | "stopped";
+export type AcademyHeadquartersInvitationStatus =
+  | "pending"
+  | "accepted"
+  | "declined"
+  | "cancelled";
+
+export type AcademyHeadquartersSettings = {
+  headquarters_id: string;
+  feature_flags: Record<string, boolean>;
+  updated_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyHeadquartersMember = {
+  id: string;
+  headquarters_id: string;
+  member_profile_id: string;
+  role: Exclude<AcademyHeadquartersRole, "owner">;
+  status: AcademyHeadquartersMemberStatus;
+  invited_by_user_id: string;
+  accepted_at: string;
+  stopped_at: string | null;
+  created_at: string;
+  updated_at: string;
+  member?: Pick<Profile, "id" | "display_name" | "handle"> | null;
+};
+
+export type AcademyHeadquartersInvitation = {
+  id: string;
+  headquarters_id: string;
+  target_profile_id: string;
+  role: Exclude<AcademyHeadquartersRole, "owner">;
+  status: AcademyHeadquartersInvitationStatus;
+  invited_by_user_id: string;
+  responded_at: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+  headquarters?: Pick<AcademyHeadquarters, "id" | "name" | "handle"> | null;
+  target?: Pick<Profile, "id" | "display_name" | "handle"> | null;
+};
+
 export type AcademyFaqItem = { q: string; a: string };
 export type AcademyFormField = {
   key: string;

@@ -12,6 +12,7 @@ import {
   Link2,
   Package,
   PenSquare,
+  Settings,
   Store,
   Users
 } from "lucide-react";
@@ -31,7 +32,8 @@ const honbuNav: MikkeShellNavItem[] = [
   { href: "/academy/instructors", label: "講師管理", icon: Users, section: "講座" },
   { href: "/academy/applications", label: "申込管理", icon: ClipboardList, section: "講座" },
   { href: "/academy/front", label: "ホームページ編集", icon: Store, section: "公開" },
-  { href: "/academy/instructor-pages", label: "講師ページ編集", icon: PenSquare, section: "公開" }
+  { href: "/academy/instructor-pages", label: "講師ページ編集", icon: PenSquare, section: "公開" },
+  { href: "/academy/settings", label: "本部設定", icon: Settings, section: "設定" }
 ];
 
 const koushiNav: MikkeShellNavItem[] = [
