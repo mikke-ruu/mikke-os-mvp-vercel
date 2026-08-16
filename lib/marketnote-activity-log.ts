@@ -45,12 +45,51 @@ export function toMarketEventActivityLogPayload(
 export async function syncMarketEventActivityLog(
   profile: Profile,
   event: MarketEvent,
-  countsTowardSummary = false
+  countsTowardSummary?: boolean
 ) {
-  const payload = toMarketEventActivityLogPayload(profile, event, countsTowardSummary);
+  let shouldCount = countsTowardSummary;
+  if (shouldCount === undefined && event.event_type_id) {
+    const { data, error } = await supabase
+      .from("market_event_types")
+      .select("counts_toward_summary")
+      .eq("profile_id", profile.id)
+      .eq("id", event.event_type_id)
+      .maybeSingle();
+
+    if (error) throw error;
+    shouldCount = data?.counts_toward_summary === true;
+  }
+
+  const payload = toMarketEventActivityLogPayload(profile, event, shouldCount === true);
   const { error } = await supabase.from("activity_logs").upsert(payload, {
     onConflict: "profile_id,source_service,source_record_id"
   });
 
   if (error) throw error;
+}
+
+export async function syncMarketEventTypeSummaryEligibility(
+  profileId: string,
+  eventTypeId: string,
+  countsTowardSummary: boolean
+) {
+  const { error: resetError } = await supabase
+    .from("activity_logs")
+    .update({ counts_toward_summary: false })
+    .eq("profile_id", profileId)
+    .eq("source_service", "marketnote")
+    .eq("subject_type_key", eventTypeId);
+
+  if (resetError) throw resetError;
+  if (!countsTowardSummary) return;
+
+  const { error: enableError } = await supabase
+    .from("activity_logs")
+    .update({ counts_toward_summary: true })
+    .eq("profile_id", profileId)
+    .eq("source_service", "marketnote")
+    .eq("subject_type_key", eventTypeId)
+    .neq("status", "cancelled");
+
+  if (enableError) throw enableError;
 }

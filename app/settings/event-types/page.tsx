@@ -78,6 +78,7 @@ function EventTypesContent() {
             color: marketEventTypePalette[current.items.length % marketEventTypePalette.length],
             isDefault: false,
             isActive: true,
+            countsTowardSummary: false,
             sortOrder: Math.max(0, ...current.items.map((item) => item.sortOrder)) + 1
           }]
     }));
@@ -128,6 +129,19 @@ function EventTypesContent() {
                   <input type="color" value={normalizeMarketEventTypeColor(item.color)} onChange={(event) => updateItem(item.id, { color: event.target.value })} className="h-6 w-7 cursor-pointer border-0 bg-transparent p-0" aria-label={`${item.name}の自由カラー`} />
                 </label>
               </div>
+              <label className="mt-2 flex min-h-10 cursor-pointer items-center justify-between gap-3 rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2">
+                <span>
+                  <span className="block text-xs font-extrabold">実績数に加える</span>
+                  <span className="mt-0.5 block text-[10px] font-bold text-[var(--mikke-muted)]">キャンセル以外の記録を実績集計の対象にします</span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={item.countsTowardSummary}
+                  onChange={(event) => updateItem(item.id, { countsTowardSummary: event.target.checked })}
+                  className="h-5 w-5 shrink-0 accent-[var(--mikke-orange)]"
+                  aria-label={`${item.name}を実績数に加える`}
+                />
+              </label>
             </div>
           ))}
           <div className="grid grid-cols-[1fr_42px] gap-2 rounded-xl border border-dashed border-[var(--mikke-line)] p-2">
