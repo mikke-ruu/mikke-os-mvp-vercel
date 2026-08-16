@@ -30,6 +30,10 @@ export type ImplementationItem = {
   task_ref: string; created_at: string; updated_at: string;
   origin_project_id?: string | null; source_conversation_id?: string | null; source_message_id?: string | null;
   local_verify_url?: string; production_url?: string;
+  local_path: string; local_branch: string; local_head: string; changed_files: string[];
+  preview_status: "not_started" | "queued" | "preparing" | "starting" | "ready" | "stale" | "stopping" | "stopped" | "failed";
+  preview_requested_action: "" | "start" | "stop"; preview_url: string; preview_port: number | null;
+  preview_note: string; preview_error: string; preview_requested_at: string | null; preview_started_at: string | null;
   dispatcher_attempts?: number; dispatcher_claimed_at?: string | null; dispatcher_last_error?: string;
 };
 export type ImplementationConversation = {
@@ -44,6 +48,15 @@ export type ImplementationMessage = {
   mode: ImplementationMessageMode; status: "pending" | "in_progress" | "completed" | "failed";
   content: string; evidence_ref: string; created_at: string; updated_at: string;
   decision_question: string; recommended_execution: string;
+  response_summary: string;
+  response_detail: {
+    current_state?: string;
+    details?: string[];
+    options?: Array<{ title: string; description: string; recommended: boolean }>;
+    recommendation?: string;
+    next_steps?: string[];
+    caveats?: string[];
+  };
 };
 export type ImplementationAttachment = {
   id: string; conversation_id: string; message_id: string | null; storage_path: string;
@@ -168,5 +181,13 @@ export async function updateImplementationItemStatus(id: string, status: Impleme
     status, updated_by: userId, updated_at: new Date().toISOString(),
     completed_at: ["approved", "rejected", "completed"].includes(status) ? new Date().toISOString() : null
   }).eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function requestLocalPreview(itemId: string, action: "start" | "stop" = "start") {
+  const { error } = await supabase.rpc("mikkeos_request_local_preview", {
+    p_item_id: itemId,
+    p_action: action,
+  });
   if (error) throw new Error(error.message);
 }

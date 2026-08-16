@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type FormEvent } from "react";
-import { Bot, CheckCircle2, CircleDashed, Code2, ImageIcon, Loader2, MessageCircle, Paperclip, Play, Plus, Send, ShieldCheck, UserRound } from "lucide-react";
+import { Bot, CheckCircle2, CircleDashed, Code2, ImageIcon, Lightbulb, ListChecks, Loader2, MessageCircle, Paperclip, Play, Plus, Send, ShieldCheck, Sparkles, TriangleAlert, UserRound } from "lucide-react";
 import {
   createImplementationConversation,
   openImplementationAttachment,
@@ -28,6 +28,21 @@ function statusTone(status: ImplementationConversation["status"]) {
   if (status === "queued") return "border-slate-200 bg-slate-50 text-slate-600";
   if (status === "waiting_user") return "border-amber-200 bg-amber-50 text-amber-800";
   return "border-emerald-200 bg-emerald-50 text-emerald-700";
+}
+
+function AssistantDetail({ message }: { message: ImplementationMessage }) {
+  const detail = message.response_detail ?? {};
+  const hasDetail = Boolean(message.response_summary || detail.current_state || detail.details?.length || detail.options?.length || detail.recommendation || detail.next_steps?.length || detail.caveats?.length);
+  if (!hasDetail) return null;
+  return <div className="mt-3 space-y-3 border-t border-slate-200 pt-3 text-xs leading-5">
+    {message.response_summary ? <section><p className="flex items-center gap-1 font-bold text-blue-800"><Sparkles size={13} />要点</p><p className="mt-1 text-slate-700">{message.response_summary}</p></section> : null}
+    {detail.current_state ? <section className="rounded-xl border border-blue-100 bg-blue-50 p-3"><p className="font-bold text-blue-900">現在わかっていること</p><p className="mt-1 whitespace-pre-wrap text-blue-950">{detail.current_state}</p></section> : null}
+    {detail.details?.length ? <section><p className="font-bold text-slate-800">詳しい説明</p><ul className="mt-1 space-y-1.5 text-slate-700">{detail.details.map((entry, index) => <li key={index} className="flex gap-2"><span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />{entry}</li>)}</ul></section> : null}
+    {detail.options?.length ? <section><p className="flex items-center gap-1 font-bold text-slate-800"><Lightbulb size={13} />考えられる選択肢</p><div className="mt-1.5 grid gap-2">{detail.options.map((option, index) => <div key={`${option.title}-${index}`} className={`rounded-xl border p-3 ${option.recommended ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}><div className="flex items-center gap-2"><p className="font-bold">{option.title}</p>{option.recommended ? <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[9px] font-bold text-white">おすすめ</span> : null}</div><p className="mt-1 text-slate-600">{option.description}</p></div>)}</div></section> : null}
+    {detail.recommendation ? <section className="rounded-xl border border-violet-200 bg-violet-50 p-3"><p className="font-bold text-violet-900">Codexの提案</p><p className="mt-1 whitespace-pre-wrap text-violet-950">{detail.recommendation}</p></section> : null}
+    {detail.next_steps?.length ? <section><p className="flex items-center gap-1 font-bold text-slate-800"><ListChecks size={13} />次に進めること</p><ol className="mt-1 space-y-1 text-slate-700">{detail.next_steps.map((entry, index) => <li key={index}>{index + 1}. {entry}</li>)}</ol></section> : null}
+    {detail.caveats?.length ? <section className="rounded-xl border border-amber-200 bg-amber-50 p-3"><p className="flex items-center gap-1 font-bold text-amber-900"><TriangleAlert size={13} />未確認・注意点</p><ul className="mt-1 space-y-1 text-amber-950">{detail.caveats.map((entry, index) => <li key={index}>・{entry}</li>)}</ul></section> : null}
+  </div>;
 }
 
 export function ImplementationConversationPanel({
@@ -192,7 +207,8 @@ export function ImplementationConversationPanel({
           {message.role === "assistant" ? <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-blue-50 text-blue-700"><Bot size={16} /></span> : null}
           <div className={`max-w-[85%] break-words rounded-2xl px-3.5 py-3 text-sm leading-6 ${message.role === "user" ? "bg-[var(--mikke-primary)] text-white" : message.status === "failed" ? "border border-red-200 bg-red-50 text-red-800" : "bg-[var(--mikke-surface-soft)] text-[var(--mikke-ink)]"}`}>
             {message.mode === "execution" ? <p className={`mb-1.5 flex items-center gap-1 text-[10px] font-bold ${message.role === "user" ? "text-blue-100" : "text-blue-700"}`}><Code2 size={12} />実行依頼</p> : null}
-            <p className="whitespace-pre-wrap">{message.content}</p>
+             <p className="whitespace-pre-wrap">{message.content}</p>
+             {message.role === "assistant" ? <AssistantDetail message={message} /> : null}
             {messageAttachments.length ? <div className="mt-2 flex flex-wrap gap-2">{messageAttachments.map((attachment) => <button key={attachment.id} type="button" onClick={() => void openImplementationAttachment(attachment.storage_path).catch((cause) => setError(cause instanceof Error ? cause.message : "画像を開けませんでした。"))} className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-bold ${message.role === "user" ? "border-white/30 bg-white/10" : "border-blue-200 bg-blue-50 text-blue-800"}`}><ImageIcon size={12} />{attachment.file_name}</button>)}</div> : null}
             {message.evidence_ref ? <p className="mt-2 border-t border-current/10 pt-2 text-[10px] opacity-70">証拠: {message.evidence_ref}</p> : null}
             {message.role === "assistant" && message.decision_question && message.recommended_execution ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-950"><p className="text-xs font-bold">{message.decision_question}</p><div className="mt-2 flex flex-wrap gap-2"><button type="button" disabled={awaitingCodex || savingMode !== ""} onClick={() => void executeRecommendation(message)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"><Play size={13} />この内容で実行する</button><button type="button" onClick={() => document.getElementById("implementation-chat-input")?.focus()} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold">相談を続ける</button></div></div> : null}
