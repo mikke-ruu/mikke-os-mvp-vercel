@@ -7,6 +7,8 @@ import { listHqAuditLogs, type HqAuditLog } from "@/lib/hq";
 const entityLabels: Record<string, string> = {
   mikkeos_hq_inquiries: "お問い合わせ",
   mikkeos_hq_announcements: "お知らせ",
+  mikkeos_hq_article_categories: "記事カテゴリー",
+  mikkeos_hq_articles: "記事",
   mikkeos_hq_updates: "アップデート"
 };
 
