@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, BellRing, ClipboardList, History, Mail, PanelsTopLeft, Rocket } from "lucide-react";
+import { BarChart3, BellRing, ClipboardList, History, Mail, Newspaper, PanelsTopLeft, Rocket } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
@@ -37,6 +37,7 @@ function buildNav(role: HqRole): MikkeShellNavItem[] {
   if (canSeeInquiries(role)) items.push({ label: "お問い合わせ", href: "/hq/inquiries", icon: ClipboardList });
   if (canEditContent(role)) {
     items.push({ label: "お知らせ", href: "/hq/announcements", icon: BellRing, section: "発信" });
+    items.push({ label: "記事", href: "/hq/articles", icon: Newspaper });
     items.push({ label: "メール配信", href: "/hq/email", icon: Mail });
     items.push({ label: "アップデート", href: "/hq/updates", icon: Rocket });
   }

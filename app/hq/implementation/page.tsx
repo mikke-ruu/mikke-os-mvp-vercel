@@ -138,6 +138,11 @@ export default function ImplementationCenterPage() {
   const published = projects.filter((project) => project.public_state === "public");
   const unreleased = projects.filter((project) => project.public_state !== "public" && project.roadmap_stage !== "paused");
   const releaseReady = projects.filter((project) => project.roadmap_stage === "release_ready");
+  const lastUpdatedAt = [...projects, ...items, ...conversations]
+    .map((entry) => entry.updated_at)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
 
   async function decide(item: ImplementationItem, status: "approved" | "rejected") {
     setSaving(item.id); setError("");
@@ -155,17 +160,17 @@ export default function ImplementationCenterPage() {
 
   if (loading) return <div className="grid min-h-[55vh] place-items-center text-sm text-[var(--mikke-muted)]"><span className="flex items-center gap-2"><Loader2 className="animate-spin" size={18} />mikkeOS全体の現在地を整理中…</span></div>;
 
-  return <div className="mx-auto max-w-[1500px] space-y-6">
-    <header className="rounded-3xl border border-[var(--mikke-line)] bg-[linear-gradient(135deg,#132744_0%,#1d3b61_65%,#285377_100%)] p-5 text-white shadow-sm md:p-7">
-      <div className="flex flex-wrap items-start justify-between gap-5"><div className="max-w-3xl"><p className="text-xs font-bold tracking-[0.18em] text-blue-200">MIKKEOS DEVELOPMENT CONTROL ROOM</p><h1 className="mt-3 text-2xl font-bold md:text-3xl">mikkeOS 開発管制室</h1><p className="mt-3 text-sm leading-6 text-blue-100">全アプリの現在地、ローカル成果、本番成果、次の一手を一つに集約。相談から担当アプリへの連携と実行確認まで、この画面で進めます。</p></div><a href="#app-consultation-room" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#183353] shadow-sm"><MessageSquarePlus size={17} />相談する</a></div>
+  return <div className="mx-auto flex max-w-[1500px] flex-col gap-6">
+    <header className="order-1 rounded-3xl border border-[var(--mikke-line)] bg-[linear-gradient(135deg,#132744_0%,#1d3b61_65%,#285377_100%)] p-5 text-white shadow-sm md:p-7">
+      <div className="flex flex-wrap items-start justify-between gap-5"><div className="max-w-3xl"><p className="text-xs font-bold tracking-[0.18em] text-blue-200">MIKKEOS IMPLEMENTATION CENTER</p><h1 className="mt-3 text-2xl font-bold md:text-3xl">mikkeOS 実装センター</h1><p className="mt-3 text-sm leading-6 text-blue-100">ここは、全アプリの現在地を見る場所です。ローカル実装、本番公開、次にやること、確認待ちを分けて表示します。詳しい相談と実装は各Codexタスクで進め、その結果をここへ戻します。</p>{lastUpdatedAt ? <p className="mt-3 text-[11px] font-semibold text-blue-200">最終同期 {new Date(lastUpdatedAt).toLocaleString("ja-JP")}</p> : null}</div><a href="#app-consultation-room" className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-[#183353] shadow-sm"><MessageSquarePlus size={17} />この続きを相談</a></div>
       <div className="mt-6 grid grid-cols-2 gap-2 lg:grid-cols-5">{[
         ["本番公開中", published.length], ["未リリース", unreleased.length], ["リリース準備完了", releaseReady.length], ["あなたの確認", approvals.length], ["アプリ間連携", handoffs.length],
       ].map(([label, value]) => <div key={String(label)} className="rounded-xl bg-white/10 px-4 py-3"><p className="text-[11px] text-blue-200">{label}</p><p className="mt-1 text-xl font-bold">{value}</p></div>)}</div>
     </header>
 
-    {error ? <p className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"><AlertCircle size={16} />{error}<button type="button" onClick={() => void load()} className="ml-auto"><RotateCw size={16} /></button></p> : null}
+    {error ? <p className="order-2 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"><AlertCircle size={16} />{error}<button type="button" onClick={() => void load()} className="ml-auto"><RotateCw size={16} /></button></p> : null}
 
-    <div className="space-y-2">
+    <div className="order-3 space-y-2">
       <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="アプリ別の進捗"><button type="button" onClick={() => setSelected("all")} className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold ${selected === "all" ? "border-[var(--mikke-primary)] bg-[var(--mikke-primary)] text-white" : "border-[var(--mikke-line)] bg-white"}`}>全体{activityByProject.size ? <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px]">動作中・待ち {activityByProject.size}</span> : null}</button>{projects.map((project) => {
         const activity = activityByProject.get(project.id);
         const isSelected = selected === project.app_key;
@@ -175,7 +180,7 @@ export default function ImplementationCenterPage() {
       {activityByProject.size ? <p className="flex flex-wrap items-center gap-x-4 gap-y-1 px-1 text-[10px] font-semibold text-[var(--mikke-muted)]"><span className="inline-flex items-center gap-1"><span className="h-2 w-2 animate-pulse rounded-full bg-violet-600" />紫・青は処理中</span><span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-300" />黄・水色は受付済み</span><span>完了すると通常色に戻ります</span></p> : null}
     </div>
 
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="order-6 grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
       <div id="app-consultation-room" className="scroll-mt-5"><ImplementationConversationPanel project={selectedProject} conversations={conversations} messages={messages} attachments={attachments} userId={user.id} onChanged={() => load(true)} /></div>
       <aside className="space-y-4">
         <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><div className="flex items-center gap-2 text-amber-950"><ShieldCheck size={18} /><h2 className="font-bold">あなたの確認・承認</h2></div>{approvals.length ? <div className="mt-3 space-y-3">{approvals.map((item) => <article key={item.id} className="rounded-xl border border-amber-200 bg-white p-3"><h3 className="text-sm font-bold">{item.title}</h3><p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">{item.question || item.body}</p><div className="mt-3 flex gap-2"><button type="button" disabled={saving === item.id} onClick={() => void decide(item, "approved")} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white"><Check size={14} />承認</button><button type="button" disabled={saving === item.id} onClick={() => void decide(item, "rejected")} className="inline-flex items-center gap-1 rounded-lg border px-3 py-2 text-xs font-bold"><X size={14} />見送り</button></div></article>)}</div> : <p className="mt-3 text-sm text-amber-800">この範囲に判断待ちはありません。</p>}</section>
@@ -184,7 +189,7 @@ export default function ImplementationCenterPage() {
       </aside>
     </div>
 
-    <section><div className="flex items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[0.12em] text-[var(--mikke-primary)]">PORTFOLIO ROADMAP</p><h2 className="mt-1 text-xl font-bold">全体とアプリの現在地</h2></div><span className="text-xs text-[var(--mikke-muted)]">{visibleProjects.length}アプリ</span></div>
+    <section className="order-4"><div className="flex items-end justify-between gap-3"><div><p className="text-xs font-bold tracking-[0.12em] text-[var(--mikke-primary)]">PORTFOLIO ROADMAP</p><h2 className="mt-1 text-xl font-bold">全体とアプリの現在地</h2></div><span className="text-xs text-[var(--mikke-muted)]">{visibleProjects.length}アプリ</span></div>
       <div className="mt-3 grid gap-3 lg:grid-cols-2">{visibleProjects.map((project) => <article key={project.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-bold">{project.app_name}</h3><span className={`rounded-full border px-2 py-1 text-[10px] font-bold ${toneForProject(project)}`}>{roadmapLabel[project.roadmap_stage]}</span><span className="rounded-full border border-[var(--mikke-line)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-muted)]">{publicLabel[project.public_state]}</span></div><p className="mt-2 text-sm text-[var(--mikke-muted)]">{project.summary}</p></div><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-600">{statusLabel[project.status]}</span></div>
         <div className="mt-4 grid gap-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3 md:grid-cols-2"><div><p className="text-[10px] font-bold text-[var(--mikke-muted-light)]">現在地</p><p className="mt-1 text-sm font-semibold">{project.current_focus || project.phase}</p></div><div><p className="text-[10px] font-bold text-[var(--mikke-muted-light)]">次にやること</p><p className="mt-1 text-xs font-semibold leading-5 text-[var(--mikke-primary)]">{project.next_action || "次の棚卸しで登録します。"}</p></div></div>
@@ -194,7 +199,7 @@ export default function ImplementationCenterPage() {
       </article>)}</div>
     </section>
 
-    <section><div className="flex items-center gap-2"><MapIcon size={19} className="text-[var(--mikke-primary)]" /><div><p className="text-xs font-bold tracking-[0.12em] text-[var(--mikke-primary)]">WORK MAP</p><h2 className="text-xl font-bold">何を直し、どこへ繋げるか</h2></div></div><div className="mt-3 grid gap-3 xl:grid-cols-2 2xl:grid-cols-4">{lanes.map((lane) => <WorkLane key={lane.key} definition={lane} items={visibleItems} projects={projects} previewSaving={previewSaving} onPreview={preview} />)}</div></section>
+    <section className="order-5"><div className="flex items-center gap-2"><MapIcon size={19} className="text-[var(--mikke-primary)]" /><div><p className="text-xs font-bold tracking-[0.12em] text-[var(--mikke-primary)]">WORK MAP</p><h2 className="text-xl font-bold">何を直し、どこへ繋げるか</h2></div></div><div className="mt-3 grid gap-3 xl:grid-cols-2 2xl:grid-cols-4">{lanes.map((lane) => <WorkLane key={lane.key} definition={lane} items={visibleItems} projects={projects} previewSaving={previewSaving} onPreview={preview} />)}</div></section>
 
   </div>;
 }
