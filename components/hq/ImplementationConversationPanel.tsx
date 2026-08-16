@@ -156,6 +156,21 @@ export function ImplementationConversationPanel({
     } finally { setSavingMode(""); }
   }
 
+  async function executeConversationContext() {
+    if (!selectedConversation) return;
+    setSavingMode("execution"); setError("");
+    try {
+      await sendImplementationMessage({
+        conversationId: selectedConversation.id,
+        mode: "execution",
+        content: "この会話で合意済みの内容と直近の回答を基に、同じ調査や提案を繰り返さず、実装可能な部分から確認しながら進めてください。既存の差分を保護し、実装・検証・狭いローカルコミットまで進め、私の判断が本当に必要な点だけ質問してください。公開・課金・法務・本番DB操作など別承認が必要な作業は実行せず、残るゲートとして明示してください。",
+      });
+      await onChanged();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "実装依頼を送れませんでした。");
+    } finally { setSavingMode(""); }
+  }
+
   function collectPastedImages(event: ClipboardEvent<HTMLTextAreaElement>) {
     const pasted = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
     if (!pasted.length) return;
@@ -222,9 +237,11 @@ export function ImplementationConversationPanel({
         <textarea id="implementation-chat-input" aria-label={`${roomName}相談室へのメッセージ`} name="content" required maxLength={12000} rows={3} onPaste={collectPastedImages} disabled={awaitingCodex || savingMode !== ""} placeholder={awaitingCodex ? "Codexの返答を待っています。" : "質問や追加アイデアを書いてください。スクショは貼り付けもできます。"} className="w-full rounded-xl border border-[var(--mikke-line)] px-3 py-3 text-sm disabled:bg-slate-50" />
         <div className="mt-2"><AttachmentPicker /></div>
         <div className="mt-3 flex flex-wrap gap-2">
-          <button disabled={awaitingCodex || savingMode !== ""} className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{savingMode === "discussion" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}相談を続ける</button>
+          <button disabled={awaitingCodex || savingMode !== ""} className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{savingMode === "discussion" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}相談する</button>
+          <button type="button" disabled={awaitingCodex || savingMode !== ""} onClick={(event) => { const form = event.currentTarget.form; if (form?.reportValidity()) void sendMessage(form, "execution"); }} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white disabled:opacity-50">{savingMode === "execution" ? <Loader2 size={14} className="animate-spin" /> : <Code2 size={14} />}確認しながら実装</button>
         </div>
-        <p className="mt-2 flex items-start gap-1.5 text-[10px] leading-5 text-[var(--mikke-muted)]"><ShieldCheck size={14} className="mt-0.5 shrink-0" />相談が実行可能な内容まで固まると、Codexから実行確認を表示します。公開・課金・法務・本番DB操作は別の確認待ちで止まります。</p>
+        {!awaitingCodex && selectedConversation.status === "waiting_user" ? <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3"><p className="text-xs font-bold text-emerald-950">実行ボタンが回答に出ていない場合</p><p className="mt-1 text-[10px] leading-5 text-emerald-900">この会話で決まった内容を引き継ぎ、同じ説明を繰り返さず実装へ進めます。</p><button type="button" disabled={savingMode !== ""} onClick={() => void executeConversationContext()} className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-2 text-xs font-bold text-white disabled:opacity-50"><Play size={13} />この会話の内容で実装を進める</button></div> : null}
+        <p className="mt-2 flex items-start gap-1.5 text-[10px] leading-5 text-[var(--mikke-muted)]"><ShieldCheck size={14} className="mt-0.5 shrink-0" />「相談する」は回答だけ、「確認しながら実装」は進められる部分を実装し、判断が必要な時だけ確認します。公開・課金・法務・本番DB操作は別の確認待ちで止まります。</p>
       </form>
     </> : <div className="p-8 text-center text-sm text-[var(--mikke-muted)]"><CheckCircle2 className="mx-auto mb-2 text-emerald-600" />新しい話題から相談を始められます。</div>}
     {error ? <p className="border-t border-red-100 bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{error}</p> : null}

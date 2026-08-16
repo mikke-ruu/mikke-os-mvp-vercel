@@ -122,7 +122,8 @@ async function prepareConversationWorktree(item, { prepareForExecution = false }
     const appEnv = path.join(runtimeDir, "app.env.local");
     try { await copyFile(appEnv, path.join(worktreePath, ".env.local")); } catch { /* checks may report missing env */ }
   }
-  return { worktreePath, branchName };
+  const gitCommonDir = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], worktreePath);
+  return { worktreePath, branchName, gitCommonDir };
 }
 
 const outputSchema = {
@@ -555,14 +556,16 @@ async function processConversationMessage(item) {
       networkAccessEnabled: false,
       webSearchMode: "disabled",
       modelReasoningEffort: "medium",
+      additionalDirectories: executionMode ? [prepared.gitCommonDir] : [],
     };
     const codex = new Codex({ env: childEnvironment() });
     const thread = threadId ? codex.resumeThread(threadId, threadOptions) : codex.startThread(threadOptions);
     const modeInstructions = executionMode
       ? [
-          "The user explicitly chose the UI action 'この内容で実行'. Implement the accepted request in this dedicated worktree and run proportional checks.",
+          "The user explicitly chose an implementation action. Continue from the existing dedicated worktree and visible history; do not repeat an already-completed investigation, proposal, or request for another execution button.",
+          "Implement every safe, clearly agreed part now and run proportional checks. Ask the user only when a material product, privacy, payment, public-release, credential, production-data, or irreversible decision is genuinely missing.",
           "Make a narrow local commit when the implementation is coherent. Do not push, merge, deploy, apply database migrations, change billing or legal terms, publish externally, contact people, or perform destructive actions.",
-          "If implementation needs product, privacy, payment, public-release, credential, production-data, or irreversible decisions, stop and return waiting_user with one clear question.",
+          "The git common metadata directory is explicitly writable for this execution. If a prior turn reported Git metadata as read-only, retry the narrow status/stage/commit flow instead of returning the same blocker.",
         ]
       : [
           "This is a discussion turn. Inspect the repository, git refs/worktrees, supplied project snapshot, and visible history to answer status questions, explain options, or develop ideas at the same quality level as an ordinary Codex conversation.",
