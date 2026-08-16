@@ -69,7 +69,26 @@ create trigger academy_guard_program_step_scope
 before update on public.academy_program_steps
 for each row execute function private.academy_guard_program_child_scope();
 
-grant delete on public.academy_program_sections, public.academy_program_steps to authenticated;
+grant delete on public.academy_program_steps to authenticated;
+
+drop policy if exists "academy_program_steps_owner_all"
+  on public.academy_program_steps;
+create policy "academy_program_steps_owner_all"
+on public.academy_program_steps for all to authenticated
+using (exists (
+  select 1
+  from public.academy_program_sections section
+  join public.academy_programs program on program.id = section.program_id
+  where section.id = academy_program_steps.section_id
+    and public.academy_owns_hq(program.headquarters_id)
+))
+with check (exists (
+  select 1
+  from public.academy_program_sections section
+  join public.academy_programs program on program.id = section.program_id
+  where section.id = academy_program_steps.section_id
+    and public.academy_owns_hq(program.headquarters_id)
+));
 
 create policy "academy_programs_collaborator_select"
 on public.academy_programs for select to authenticated

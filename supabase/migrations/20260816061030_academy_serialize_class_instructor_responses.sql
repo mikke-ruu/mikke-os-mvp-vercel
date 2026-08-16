@@ -2,6 +2,38 @@
 -- also corrected for fresh databases; this migration updates databases where
 -- the original function has already been applied.
 
+create index if not exists academy_class_instructor_requests_requested_by_idx
+  on public.academy_class_instructor_requests(requested_by_user_id);
+
+create or replace function private.academy_class_instructor_request_scope_valid(
+  p_headquarters_id uuid,
+  p_class_id uuid,
+  p_instructor_id uuid
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.academy_classes class_record
+    join public.academy_instructors instructor
+      on instructor.id = p_instructor_id
+    where class_record.id = p_class_id
+      and class_record.headquarters_id = p_headquarters_id
+      and instructor.headquarters_id = p_headquarters_id
+      and instructor.course_id = class_record.course_id
+      and instructor.is_active = true
+  );
+$$;
+
+revoke all on function private.academy_class_instructor_request_scope_valid(uuid, uuid, uuid)
+  from public, anon;
+grant execute on function private.academy_class_instructor_request_scope_valid(uuid, uuid, uuid)
+  to authenticated;
+
 create or replace function public.academy_respond_class_instructor_request(
   p_request_id uuid,
   p_status text,

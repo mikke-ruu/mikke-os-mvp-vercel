@@ -535,11 +535,20 @@ declare
   v_target public.profiles%rowtype;
   v_invitation public.academy_headquarters_invitations%rowtype;
 begin
-  if v_actor is null or not private.academy_can_manage_headquarters(p_headquarters_id) then
+  if v_actor is null then
     raise exception 'academy_headquarters_forbidden';
   end if;
   if p_role not in ('administrator', 'course_editor') then
     raise exception 'academy_headquarters_invalid_role';
+  end if;
+
+  perform 1
+  from public.academy_headquarters
+  where id = p_headquarters_id
+  for update;
+
+  if not found or not private.academy_can_manage_headquarters(p_headquarters_id) then
+    raise exception 'academy_headquarters_forbidden';
   end if;
 
   select p.* into v_target
@@ -608,11 +617,27 @@ set search_path = ''
 as $$
 declare
   v_actor uuid := (select auth.uid());
+  v_headquarters_id uuid;
   v_invitation public.academy_headquarters_invitations%rowtype;
 begin
   if v_actor is null or p_response not in ('accepted', 'declined') then
     raise exception 'academy_headquarters_invalid_response';
   end if;
+
+  select i.headquarters_id into v_headquarters_id
+  from public.academy_headquarters_invitations i
+  join public.profiles p on p.id = i.target_profile_id
+  where i.id = p_invitation_id
+    and p.user_id = v_actor;
+
+  if v_headquarters_id is null then
+    raise exception 'academy_headquarters_invitation_not_available';
+  end if;
+
+  perform 1
+  from public.academy_headquarters
+  where id = v_headquarters_id
+  for update;
 
   select i.* into v_invitation
   from public.academy_headquarters_invitations i
@@ -686,8 +711,22 @@ as $$
 declare
   v_actor uuid := (select auth.uid());
   v_actor_role text;
+  v_headquarters_id uuid;
   v_member public.academy_headquarters_members%rowtype;
 begin
+  select headquarters_id into v_headquarters_id
+  from public.academy_headquarters_members
+  where id = p_member_id;
+
+  if v_headquarters_id is null then
+    raise exception 'academy_headquarters_forbidden';
+  end if;
+
+  perform 1
+  from public.academy_headquarters
+  where id = v_headquarters_id
+  for update;
+
   select * into v_member
   from public.academy_headquarters_members
   where id = p_member_id
