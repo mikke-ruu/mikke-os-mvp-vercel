@@ -48,7 +48,20 @@ export type MarketNoteImportResult = {
 // DBのstatus列は create経路で planned/preparing のみ許容のため、
 // 「申込済み」は private_note の「入力ステータス:」行が正となる（DB変更は別フェーズ）。
 export function hasAppliedEntryStatus(privateNote: string | null | undefined) {
-  return Boolean(privateNote && privateNote.includes("入力ステータス: 申込済み"));
+  return Boolean(privateNote && (privateNote.includes("入力ステータス: 申込済み") || privateNote.includes("入力ステータス: 調整中")));
+}
+
+export type MarketEventWorkflowStatus = "considering" | "intermediate" | "confirmed";
+
+export function getMarketEventWorkflowStatus(event: Pick<MarketEvent, "status" | "private_note">): MarketEventWorkflowStatus {
+  if (event.status === "preparing" || event.status === "completed" || event.status === "cancelled") return "confirmed";
+  return hasAppliedEntryStatus(event.private_note) ? "intermediate" : "considering";
+}
+
+export function marketEventWorkflowLabel(workflow: MarketEventWorkflowStatus, eventType: string | null | undefined) {
+  if (workflow === "confirmed") return "確定";
+  if (workflow === "intermediate") return eventType?.trim() === "出店" ? "申込済み" : "調整中";
+  return "検討中";
 }
 
 export function getGuestMarketNoteImportStats() {
@@ -737,6 +750,55 @@ export async function updateMarketEventStatus(
   const updated = data as MarketEvent;
   await syncMarketEventActivityLog(profile, updated);
   return updated;
+}
+
+export async function updateMarketEventWorkflowStatus(
+  profile: Profile,
+  event: MarketEvent,
+  workflow: MarketEventWorkflowStatus
+) {
+  const status: MarketEvent["status"] = workflow === "confirmed" ? "preparing" : "planned";
+  const privateNote = replacePrivateNoteLine(
+    event.private_note,
+    "入力ステータス",
+    marketEventWorkflowLabel(workflow, event.genre)
+  );
+
+  if (isMarketNoteGuestProfile(profile)) {
+    return updateGuestMarketEventDetails(event.id, {
+      title: event.title,
+      eventDate: event.event_date,
+      venueName: event.venue_name ?? "",
+      area: event.area ?? "",
+      genre: event.genre ?? "出店",
+      status,
+      publicNote: event.public_note ?? "",
+      privateNote
+    });
+  }
+
+  const { data, error } = await supabase
+    .from("market_events")
+    .update({ status, private_note: privateNote || null })
+    .eq("id", event.id)
+    .eq("profile_id", profile.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  const updated = data as MarketEvent;
+  await syncMarketEventActivityLog(profile, updated);
+  return updated;
+}
+
+function replacePrivateNoteLine(note: string | null, label: string, value: string) {
+  const lines = (note ?? "").split("\n").filter(Boolean);
+  const prefix = `${label}:`;
+  const nextLine = `${label}: ${value}`;
+  const index = lines.findIndex((line) => line.startsWith(prefix));
+  if (index >= 0) lines[index] = nextLine;
+  else lines.unshift(nextLine);
+  return lines.join("\n");
 }
 
 export async function listActivityLogs(profileId: string, storyOnly = false) {

@@ -14,7 +14,11 @@ import {
   importGuestMarketNoteRecords,
   listCheckItems,
   listFinancialRecords,
-  listMarketEvents
+  listMarketEvents,
+  saveEventPaymentRecord,
+  toggleCheckItem,
+  updateMarketEventWorkflowStatus,
+  type MarketEventWorkflowStatus
 } from "@/lib/marketnote";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord } from "@/types/database";
 
@@ -83,6 +87,39 @@ function MarketNoteContent() {
         : b.event.event_date.localeCompare(a.event.event_date));
   }, [activeTab, summaries]);
 
+  async function changeCalendarStatus(event: MarketEvent, workflow: MarketEventWorkflowStatus) {
+    const updated = await updateMarketEventWorkflowStatus(profile, event, workflow);
+    setEvents((current) => current.map((item) => item.id === updated.id ? updated : item));
+  }
+
+  async function changeCalendarCheck(item: MarketCheckItem, nextValue: boolean) {
+    await toggleCheckItem(profile, item, nextValue);
+    setChecksByEvent((current) => ({
+      ...current,
+      [item.market_event_id]: (current[item.market_event_id] ?? []).map((check) => check.id === item.id ? { ...check, is_done: nextValue } : check)
+    }));
+  }
+
+  async function changeCalendarPayment(event: MarketEvent, paymentStatus: "unpaid" | "paid") {
+    const records = financesByEvent[event.id] ?? [];
+    const paymentRecord = records.find((record) => record.record_type === "expense" && record.entry_kind === "advance_expense")
+      ?? records.find((record) => record.record_type === "expense" && (record.category === "出店料" || record.title.includes("出店")));
+    if (!paymentRecord) throw new Error("変更できる事前経費がありません");
+
+    const saved = await saveEventPaymentRecord(profile, {
+      marketEventId: event.id,
+      eventDate: event.event_date,
+      amount: Number(paymentRecord.amount),
+      method: paymentRecord.payment_method ?? "",
+      paymentStatus
+    });
+    if (!saved) return;
+    setFinancesByEvent((current) => ({
+      ...current,
+      [event.id]: (current[event.id] ?? []).map((record) => record.id === saved.id ? saved : record)
+    }));
+  }
+
   return (
     <MarketNoteShell isGuest={isGuest}>
       <div className="-mx-1 pb-2">
@@ -91,22 +128,32 @@ function MarketNoteContent() {
           <CloudImportNotice stats={guestStats} profile={profile} onImported={loadMarketNoteData} />
         ) : null}
 
-        <div className="mb-4 px-1">
+        {homeTab === "list" ? <div className="mb-3 px-1">
           <div className="inline-flex rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-1">
-            <SegmentButton active={homeTab === "calendar"} onClick={() => setHomeTab("calendar")}>
+            <SegmentButton active={false} onClick={() => setHomeTab("calendar")}>
               カレンダー
             </SegmentButton>
-            <SegmentButton active={homeTab === "list"} onClick={() => setHomeTab("list")}>
+            <SegmentButton active onClick={() => setHomeTab("list")}>
               一覧
             </SegmentButton>
           </div>
-        </div>
+        </div> : null}
 
         {homeTab === "calendar" ? (
           <HomeCalendar
+            profile={profile}
             events={events}
             checksByEvent={checksByEvent}
             financesByEvent={financesByEvent}
+            viewToggle={(
+              <div className="inline-flex shrink-0 rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-0.5">
+                <SegmentButton compact active onClick={() => setHomeTab("calendar")}>カレンダー</SegmentButton>
+                <SegmentButton compact active={false} onClick={() => setHomeTab("list")}>一覧</SegmentButton>
+              </div>
+            )}
+            onStatusChange={changeCalendarStatus}
+            onPaymentStatusChange={changeCalendarPayment}
+            onToggleCheck={changeCalendarCheck}
           />
         ) : (
           <div>
@@ -244,12 +291,12 @@ function groupByEventId(records: MarketFinancialRecord[]) {
   return map;
 }
 
-function SegmentButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function SegmentButton({ active, onClick, children, compact = false }: { active: boolean; onClick: () => void; children: React.ReactNode; compact?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`min-h-10 rounded-full px-3.5 text-xs font-bold transition ${
+      className={`${compact ? "min-h-8 px-2.5 text-[10px]" : "min-h-10 px-3.5 text-xs"} rounded-full font-bold transition ${
         active ? "bg-[var(--mikke-blue)] text-white" : "text-[var(--mikke-text-soft)]"
       }`}
     >
@@ -283,7 +330,7 @@ function EventListCard({ summary }: { summary: EventSummary }) {
       className="block rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 transition hover:border-[var(--mikke-blue)]"
     >
       <div className="flex items-start justify-between gap-3">
-        <StatusChip status={event.status} applied={hasAppliedEntryStatus(event.private_note)} />
+        <StatusChip status={event.status} applied={hasAppliedEntryStatus(event.private_note)} eventType={event.genre} />
         <Edit3 size={17} strokeWidth={1.6} className="mt-1 shrink-0 text-[var(--mikke-muted)]" />
       </div>
 
@@ -312,20 +359,16 @@ function EventListCard({ summary }: { summary: EventSummary }) {
   );
 }
 
-function StatusChip({ status, applied = false }: { status: MarketEvent["status"]; applied?: boolean }) {
+function StatusChip({ status, applied = false, eventType }: { status: MarketEvent["status"]; applied?: boolean; eventType?: string | null }) {
   const showApplied = applied && status === "planned";
   const toneClass = showApplied
     ? "bg-[var(--mikke-yellow)] text-[var(--mikke-text)]"
-    : status === "preparing"
+    : status !== "planned"
       ? "bg-[var(--mikke-orange)] text-white"
-      : status === "completed"
-        ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]"
-        : status === "planned"
-          ? "bg-[var(--mikke-blue)] text-white"
-          : "border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]";
+      : "bg-[var(--mikke-blue)] text-white";
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${toneClass}`}>
-      {showApplied ? "申込済み" : statusLabel(status)}
+      {showApplied ? (eventType === "出店" ? "申込済み" : "調整中") : statusLabel(status)}
     </span>
   );
 }
@@ -347,9 +390,7 @@ function getPaymentState(finances: MarketFinancialRecord[]): PaymentState {
 }
 
 function statusLabel(status: MarketEvent["status"]) {
-  if (status === "completed") return "終了";
-  if (status === "preparing") return "確定";
-  if (status === "cancelled") return "中止";
+  if (status !== "planned") return "確定";
   return "検討中";
 }
 
