@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
-import { listMyManagerActivityLogs, type ManagerActivityLog } from "@/lib/manager/activity-logs";
+import {
+  isManagerAchievement,
+  listMyManagerActivityLogs,
+  type ManagerActivityLog
+} from "@/lib/manager/activity-logs";
 import { ManagerShell } from "./ManagerShell";
 
 const sourceServiceLabels: Record<string, string> = {
@@ -55,9 +59,32 @@ export function ManagerHistoryList() {
     };
   }, [user.id]);
 
+  const achievements = logs.filter((log) => isManagerAchievement(log));
+
   return (
-    <ManagerShell title="最近の動き" subtitle="各アプリで起きたことを、見返しやすい履歴として確認します。">
+    <ManagerShell title="履歴" subtitle="過去の実績と、各アプリで起きた最近の動きを確認します。">
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
+        <div className="mb-3">
+          <h2 className="text-sm font-bold text-[var(--mikke-text)]">過去の実績</h2>
+          <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">終了日が昨日以前になったMarketNoteの確定予定です。</p>
+        </div>
+        {loading ? (
+          <p className="py-6 text-center text-sm font-semibold text-[var(--mikke-muted)]">実績を読み込んでいます…</p>
+        ) : loadError ? (
+          <MikkeEmptyState title="実績を読み込めませんでした" helper="通信状態を確認して、画面を読み込み直してください。" />
+        ) : achievements.length === 0 ? (
+          <MikkeEmptyState title="実績はまだありません" helper="確定した予定の終了日を過ぎると、ここに表示されます。" />
+        ) : (
+          <div className="grid gap-2">
+            {achievements.map((log, index) => (
+              <HistoryRow key={`achievement:${log.occurredAt}:${log.title}:${index}`} log={log} achievement />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
+        <h2 className="mb-3 text-sm font-bold text-[var(--mikke-text)]">最近の動き</h2>
         {loading ? (
           <p className="py-8 text-center text-sm font-semibold text-[var(--mikke-muted)]">履歴を読み込んでいます…</p>
         ) : loadError ? (
@@ -67,24 +94,34 @@ export function ManagerHistoryList() {
         ) : (
           <div className="grid gap-2">
             {logs.map((log, index) => (
-              <article
-                key={`${log.occurredAt}:${log.sourceService}:${log.title}:${index}`}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-bold text-[var(--mikke-text)]">{log.title}</span>
-                  <span className="mt-1 block truncate text-xs font-semibold text-[var(--mikke-muted)]">
-                    {new Date(log.occurredAt).toLocaleDateString("ja-JP")} / {log.description || "活動を記録しました"}
-                  </span>
-                </span>
-                <MikkeStatusBadge tone="primary" className="shrink-0 px-2 py-1 text-[10px]">
-                  {getSourceServiceLabel(log.sourceService)}
-                </MikkeStatusBadge>
-              </article>
+              <HistoryRow key={`${log.occurredAt}:${log.sourceService}:${log.title}:${index}`} log={log} />
             ))}
           </div>
         )}
       </section>
     </ManagerShell>
+  );
+}
+
+function HistoryRow({ log, achievement = false }: { log: ManagerActivityLog; achievement?: boolean }) {
+  return (
+    <article className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-bold text-[var(--mikke-text)]">{log.title}</span>
+        <span className="mt-1 block truncate text-xs font-semibold text-[var(--mikke-muted)]">
+          {new Date(log.occurredAt).toLocaleDateString("ja-JP")} / {log.description || "活動を記録しました"}
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        {achievement ? (
+          <MikkeStatusBadge tone="success" withDot className="px-2 py-1 text-[10px]">
+            実績
+          </MikkeStatusBadge>
+        ) : null}
+        <MikkeStatusBadge tone="primary" className="px-2 py-1 text-[10px]">
+          {getSourceServiceLabel(log.sourceService)}
+        </MikkeStatusBadge>
+      </span>
+    </article>
   );
 }
