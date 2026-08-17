@@ -443,6 +443,7 @@ export type AcademyApplication = {
   payment_status: "unpaid" | "paid" | "not_required";
   payment_provider: AcademyPaymentProvider;
   provider_checkout_id: string | null;
+  provider_checkout_url: string | null;
   provider_payment_id: string | null;
   paid_at: string | null;
   certification_status: "not_yet" | "pending" | "certified";
@@ -454,6 +455,14 @@ export type AcademyApplication = {
   // Wave E (AC-E7): 受講後の任意community参加の意思表示。DBデフォルトfalse想定。
   community_interest: boolean;
   created_at: string;
+  updated_at: string;
+};
+
+export type AcademyApplicationNotification = {
+  recipient_kind: "applicant" | "headquarters";
+  status: "sending" | "sent" | "failed";
+  last_error: string | null;
+  sent_at: string | null;
   updated_at: string;
 };
 

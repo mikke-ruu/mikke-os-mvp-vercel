@@ -18,3 +18,27 @@ create table public.academy_application_notifications (
 alter table public.academy_application_notifications enable row level security;
 revoke all on table public.academy_application_notifications from public, anon, authenticated;
 grant select, insert, update on table public.academy_application_notifications to service_role;
+
+create or replace function public.academy_list_application_notifications(p_application_id uuid)
+returns table (
+  recipient_kind text,
+  status text,
+  last_error text,
+  sent_at timestamptz,
+  updated_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select n.recipient_kind, n.status, n.last_error, n.sent_at, n.updated_at
+  from public.academy_application_notifications n
+  join public.academy_applications a on a.id = n.application_id
+  where n.application_id = p_application_id
+    and private.academy_can_manage_headquarters(a.headquarters_id)
+  order by n.recipient_kind;
+$$;
+
+revoke all on function public.academy_list_application_notifications(uuid) from public, anon;
+grant execute on function public.academy_list_application_notifications(uuid) to authenticated;

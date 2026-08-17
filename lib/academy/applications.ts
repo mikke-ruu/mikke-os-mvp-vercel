@@ -1,6 +1,12 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
-import type { AcademyApplication, AcademyApplicationStatus, AcademyInstructor, Profile } from "@/types/database";
+import type {
+  AcademyApplication,
+  AcademyApplicationNotification,
+  AcademyApplicationStatus,
+  AcademyInstructor,
+  Profile
+} from "@/types/database";
 
 export const APPLICATION_STATUS_LABELS: Record<AcademyApplicationStatus, string> = {
   received: "申込受付",
@@ -83,6 +89,23 @@ export async function getApplication(headquartersId: string, id: string) {
 
   if (error) throw error;
   return data as AcademyApplication;
+}
+
+export async function listApplicationNotifications(applicationId: string) {
+  const { data, error } = await supabase.rpc("academy_list_application_notifications", {
+    p_application_id: applicationId
+  });
+  if (error) throw error;
+  return (data ?? []) as AcademyApplicationNotification[];
+}
+
+export async function retryApplicationNotifications(applicationId: string) {
+  const { data, error } = await supabase.functions.invoke("academy-application-email-retry", {
+    body: { application_id: applicationId }
+  });
+  if (error) throw error;
+  if (data?.sent !== true) throw new Error(data?.error ?? "再送できなかったメールがあります。");
+  return data as { sent: true; sent_count: number; attempted_count?: number };
 }
 
 export async function promoteCertifiedApplicationToInstructor(applicationId: string, profileId: string) {

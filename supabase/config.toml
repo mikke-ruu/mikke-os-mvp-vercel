@@ -389,6 +389,9 @@ deno_version = 2
 [functions.academy-application-intake]
 verify_jwt = false
 
+[functions.academy-application-email-retry]
+verify_jwt = true
+
 [functions.academy-stripe-webhook]
 verify_jwt = false
 

@@ -21,6 +21,7 @@ alter table public.academy_instructors
 alter table public.academy_applications
   add column if not exists payment_provider text not null default 'manual',
   add column if not exists provider_checkout_id text,
+  add column if not exists provider_checkout_url text,
   add column if not exists provider_payment_id text,
   add column if not exists paid_at timestamptz;
 
@@ -248,6 +249,7 @@ begin
   new.payment_status := old.payment_status;
   new.payment_provider := old.payment_provider;
   new.provider_checkout_id := old.provider_checkout_id;
+  new.provider_checkout_url := old.provider_checkout_url;
   new.provider_payment_id := old.provider_payment_id;
   new.paid_at := old.paid_at;
   new.certification_status := old.certification_status;

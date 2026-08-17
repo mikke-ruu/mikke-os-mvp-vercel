@@ -182,7 +182,10 @@ Deno.serve(async (request) => {
         });
         if (checkout) {
           paymentUrl = checkout.url;
-          await admin.from("academy_applications").update({ provider_checkout_id: checkout.orderId }).eq("id", applicationId);
+          await admin.from("academy_applications").update({
+            provider_checkout_id: checkout.orderId,
+            provider_checkout_url: checkout.url
+          }).eq("id", applicationId);
         }
       } catch {
         // The application remains accepted. HQ can send a manual payment link,
