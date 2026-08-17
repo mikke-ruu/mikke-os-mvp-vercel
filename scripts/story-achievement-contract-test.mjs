@@ -129,7 +129,7 @@ function functionBlock(name) {
 }
 
 function assertNarrowOwnerResult(block, label) {
-  const returns = block.match(/returns table \(([\s\S]*?)\)\n(?:language|$)/)?.[1] ?? "";
+  const returns = block.match(/returns table \(([\s\S]*?)\)\r?\n(?:language|$)/)?.[1] ?? "";
   assert.match(returns, /achievement_id uuid/);
   assert.match(returns, /display_mode text/);
   assert.match(returns, /publication_status text/);
