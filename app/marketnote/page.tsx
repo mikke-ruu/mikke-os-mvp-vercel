@@ -35,6 +35,7 @@ type GuestImportStats = ReturnType<typeof getGuestMarketNoteImportStats>;
 function MarketNoteContent() {
   const { profile, isGuest } = useAuth();
   const [homeTab, setHomeTab] = useState<HomeTab>("calendar");
+  const [selectedDateForAdd, setSelectedDateForAdd] = useState(() => toDateKey(new Date()));
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [checksByEvent, setChecksByEvent] = useState<Record<string, MarketCheckItem[]>>({});
   const [financesByEvent, setFinancesByEvent] = useState<Record<string, MarketFinancialRecord[]>>({});
@@ -121,7 +122,7 @@ function MarketNoteContent() {
   }
 
   return (
-    <MarketNoteShell isGuest={isGuest}>
+    <MarketNoteShell isGuest={isGuest} addHref={`/marketnote/new?startDate=${selectedDateForAdd}`}>
       <div className="-mx-1 pb-2">
         {isGuest ? <GuestNotice /> : null}
         {!isGuest && guestStats && guestStats.events > 0 ? (
@@ -154,6 +155,7 @@ function MarketNoteContent() {
             onStatusChange={changeCalendarStatus}
             onPaymentStatusChange={changeCalendarPayment}
             onToggleCheck={changeCalendarCheck}
+            onSelectedDateChange={setSelectedDateForAdd}
           />
         ) : (
           <div>

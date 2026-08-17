@@ -21,11 +21,12 @@ type Props = {
   onStatusChange: (event: MarketEvent, workflow: MarketEventWorkflowStatus) => Promise<void>;
   onPaymentStatusChange: (event: MarketEvent, paymentStatus: "unpaid" | "paid") => Promise<void>;
   onToggleCheck: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
+  onSelectedDateChange?: (dateKey: string) => void;
 };
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
-export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, viewToggle, onStatusChange, onPaymentStatusChange, onToggleCheck }: Props) {
+export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, viewToggle, onStatusChange, onPaymentStatusChange, onToggleCheck, onSelectedDateChange }: Props) {
   const todayKey = toDateKey(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
@@ -104,7 +105,12 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   function goToToday() {
     const now = new Date();
     setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedDate(todayKey);
+    selectDate(todayKey);
+  }
+
+  function selectDate(dateKey: string) {
+    setSelectedDate(dateKey);
+    onSelectedDateChange?.(dateKey);
   }
 
   async function changeStatus(event: MarketEvent, workflow: MarketEventWorkflowStatus) {
@@ -196,7 +202,7 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
             <button
               type="button"
               key={key}
-              onClick={() => setSelectedDate(key)}
+              onClick={() => selectDate(key)}
               aria-label={calendarDayLabel(date, dayEvents)}
               aria-pressed={selectedDate === key}
               className={`flex h-[68px] min-w-0 flex-col items-stretch rounded-lg border p-0.5 text-center hover:border-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)] sm:h-[74px] ${selectedDate === key ? "border-[var(--mikke-blue)] bg-[var(--mikke-surface-soft)]" : "border-transparent"} ${inMonth ? "" : "opacity-40"}`}
