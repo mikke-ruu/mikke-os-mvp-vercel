@@ -96,6 +96,32 @@ export type PublicApplicationInput = {
 };
 
 export async function submitPublicApplication(input: PublicApplicationInput) {
+  if (!input.instructorId) {
+    const { data, error } = await supabase.functions.invoke("academy-application-intake", {
+      body: {
+        course_id: input.course.id,
+        instructor_id: null,
+        applicant_name: input.applicantName,
+        applicant_email: input.applicantEmail,
+        applicant_phone: input.applicantPhone,
+        applicant_note: input.applicantNote,
+        form_answers: input.formAnswers,
+        event_date: input.eventDate,
+        format: input.format,
+        diploma_name_en: input.diplomaNameEn,
+        applicant_shipping_address: input.applicantShippingAddress
+      }
+    });
+    if (error) throw error;
+    if (!data?.application_id) throw new Error(data?.error ?? "申込の受付結果を確認できませんでした。");
+    return data as {
+      application_id: string;
+      payment_provider: AcademyPaymentProvider;
+      payment_url: string | null;
+      email_sent: boolean;
+    };
+  }
+
   const { data, error } = await supabase.rpc("academy_submit_public_application", {
     p_course_id: input.course.id,
     p_instructor_id: input.instructorId,

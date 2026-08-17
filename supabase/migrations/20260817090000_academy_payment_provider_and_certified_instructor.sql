@@ -219,7 +219,7 @@ revoke all on function public.academy_submit_public_application(
 ) from public;
 grant execute on function public.academy_submit_public_application(
   uuid, uuid, text, text, text, text, jsonb, text, text, text, text
-) to anon, authenticated;
+) to anon, authenticated, service_role;
 
 -- Keep applicant self-service limited to community_interest. The existing
 -- trigger predates provider fields, so replace it before those fields can be
