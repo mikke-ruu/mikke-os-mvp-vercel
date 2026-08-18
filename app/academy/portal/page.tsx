@@ -83,6 +83,7 @@ function PortalDashboard() {
       <div className="grid gap-3 md:grid-cols-2">
         {records.map((rec) => {
           const course = courseMap[rec.course_id];
+          const activityLabel = rec.is_active ? INSTRUCTOR_STATUS_LABELS[rec.status] : "活動なし";
           return (
             <div key={rec.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
               <div className="flex items-center gap-2">
@@ -90,8 +91,7 @@ function PortalDashboard() {
                 <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{course?.name}</p>
               </div>
               <p className="mt-1.5 text-[11px] text-[var(--mikke-muted)]">
-                {rec.is_certified ? "認定済み" : "未認定"} ・ {rec.is_active ? "活動中" : "活動なし"} ・{" "}
-                {INSTRUCTOR_STATUS_LABELS[rec.status]}
+                {rec.is_certified ? "認定済み" : "未認定"} ・ {activityLabel}
                 {rec.instructor_number ? ` ・ No.${rec.instructor_number}` : ""}
               </p>
             </div>

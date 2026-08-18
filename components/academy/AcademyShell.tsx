@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import {
   BookOpen,
   CalendarCheck,
@@ -23,6 +24,9 @@ import {
   type MikkeShellNavItem
 } from "@/components/mikkeos/MikkeAppShell";
 import { useOwnedMikkeApps } from "@/components/mikkeos/useOwnedMikkeApps";
+import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
+import { getMyInstructorRecords } from "@/lib/academy/instructor-portal";
+import { listPublicHeadquartersByIds } from "@/lib/academy/lp";
 import { supabase } from "@/lib/supabase/client";
 
 const honbuNav: MikkeShellNavItem[] = [
@@ -74,6 +78,40 @@ function ShellInner({
   const navItems = variant === "honbu" ? honbuNav : koushiNav;
   const bottomNavItems = variant === "honbu" ? honbuBottomNav : koushiBottomNav;
   const switchHref = variant === "honbu" ? "/academy/portal" : "/academy";
+  const [homepageHref, setHomepageHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function resolveHomepage() {
+      try {
+        if (variant === "honbu") {
+          const headquarters = await getOwnedHeadquarters(user.id);
+          if (active) {
+            setHomepageHref(headquarters?.is_active ? `/academy/site/${encodeURIComponent(headquarters.handle)}` : null);
+          }
+          return;
+        }
+
+        const instructorRecords = await getMyInstructorRecords(user.id);
+        const headquartersIds = [...new Set(instructorRecords.map((record) => record.headquarters_id))];
+        const headquarters = await listPublicHeadquartersByIds(headquartersIds);
+        // 複数本部に所属する講師は、共通ヘッダーから本部を一意に決められないため表示しない。
+        if (active) {
+          setHomepageHref(
+            headquarters.length === 1 ? `/academy/site/${encodeURIComponent(headquarters[0].handle)}` : null
+          );
+        }
+      } catch {
+        if (active) setHomepageHref(null);
+      }
+    }
+
+    void resolveHomepage();
+    return () => {
+      active = false;
+    };
+  }, [user.id, variant]);
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -108,14 +146,16 @@ function ShellInner({
           {variant === "honbu" ? "本部管理" : "講師ポータル"}
         </p>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <Link
-            href="/academy/site"
-            target="_blank"
-            className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
-          >
-            <ExternalLink size={14} />
-            ホームページを見る
-          </Link>
+          {homepageHref ? (
+            <Link
+              href={homepageHref}
+              target="_blank"
+              className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+            >
+              <ExternalLink size={14} />
+              ホームページを見る
+            </Link>
+          ) : null}
           <Link
             href={switchHref}
             className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"

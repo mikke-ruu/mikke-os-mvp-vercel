@@ -7,17 +7,34 @@ import type {
   AcademyPaymentProvider
 } from "@/types/database";
 
-// 公開フロント: 本部（MVPは1件想定。将来はhandleで切替）
-export async function getPublicHeadquarters() {
+// 公開フロント: URLで指定された本部だけを取得する。
+// 本部を指定せず「最古の1件」を返すとテナント混線になるため、handleは必須。
+export async function getPublicHeadquarters(handle: string) {
+  const normalizedHandle = handle.trim().toLowerCase();
+  if (!normalizedHandle) return null;
+
   const { data, error } = await supabase
     .from("academy_headquarters")
     .select("*")
+    .eq("handle", normalizedHandle)
     .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
     .maybeSingle();
   if (error) throw error;
   return (data ?? null) as AcademyHeadquarters | null;
+}
+
+// 管理画面・講師ポータルから、所属本部の公開URLを組み立てるための取得。
+export async function listPublicHeadquartersByIds(headquartersIds: string[]) {
+  const ids = [...new Set(headquartersIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("academy_headquarters")
+    .select("*")
+    .in("id", ids)
+    .eq("is_active", true);
+  if (error) throw error;
+  return (data ?? []) as AcademyHeadquarters[];
 }
 
 // 公開フロント: 公開中の講座一覧

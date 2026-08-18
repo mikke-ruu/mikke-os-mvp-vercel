@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 import { ArrowRight, CalendarCheck, ClipboardPen, GraduationCap, Search } from "lucide-react";
 import { PageBlocks } from "@/components/academy/PageBlocks";
 import { getPublicHeadquarters, listListedInstructors, listPublishedCourses } from "@/lib/academy/lp";
@@ -18,6 +19,8 @@ const steps = [
 ];
 
 function SitePage() {
+  const params = useParams<{ handle?: string | string[] }>();
+  const handle = Array.isArray(params.handle) ? params.handle[0] : params.handle;
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
   const [instructors, setInstructors] = useState<AcademyInstructor[]>([]);
@@ -25,7 +28,11 @@ function SitePage() {
 
   useEffect(() => {
     async function load() {
-      const foundHq = await getPublicHeadquarters();
+      if (!handle) {
+        setLoading(false);
+        return;
+      }
+      const foundHq = await getPublicHeadquarters(handle);
       setHq(foundHq);
       if (foundHq) {
         const [c, i] = await Promise.all([listPublishedCourses(foundHq.id), listListedInstructors(foundHq.id)]);
@@ -35,10 +42,10 @@ function SitePage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [handle]);
 
   if (loading) return <p className="py-24 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
-  if (!hq) return <p className="py-24 text-center text-sm text-[var(--mikke-muted)]">準備中です。</p>;
+  if (!hq) return <p className="py-24 text-center text-sm text-[var(--mikke-muted)]">本部ホームページが見つかりません。</p>;
 
   return (
     <div>
