@@ -3,20 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import type { MikkeOwnerMenuItem, MikkeOwnerMenuSuggestedApp } from "./MikkeOwnerMenu";
 import { getGuestMarketNoteStats } from "@/lib/marketnote-guest";
-import { communityApp, marketNoteApp, storyApp } from "@/lib/mikkeos/released-apps";
+import { communityApp, marketNoteApp, ninteiKozaApp, storyApp } from "@/lib/mikkeos/released-apps";
 import { supabase } from "@/lib/supabase/client";
 
-export type MikkeOwnedAppKey = "marketnote" | "story" | "community";
+export type MikkeOwnedAppKey = "marketnote" | "story" | "community" | "ninteikoza";
 
 const appByKey: Record<MikkeOwnedAppKey, MikkeOwnerMenuItem> = {
   marketnote: marketNoteApp,
   story: storyApp,
-  community: communityApp
+  community: communityApp,
+  ninteikoza: ninteiKozaApp
 };
 
-const appOrder: MikkeOwnedAppKey[] = ["marketnote", "story", "community"];
+const appOrder: MikkeOwnedAppKey[] = ["marketnote", "story", "community", "ninteikoza"];
 
-const connectableApps: Record<Exclude<MikkeOwnedAppKey, "community">, MikkeOwnerMenuSuggestedApp> = {
+// Community と認定講座サイト管理は一般公開していないため「つなげる候補」には出さない。
+const connectableApps: Record<Exclude<MikkeOwnedAppKey, "community" | "ninteikoza">, MikkeOwnerMenuSuggestedApp> = {
   marketnote: { name: "MarketNote", helper: "出店予定や会計を記録できます", href: "/marketnote" },
   story: { name: "Story", helper: "プロフィールと活動の名刺をつくれます", href: "/story" }
 };
@@ -99,5 +101,5 @@ export function useOwnedMikkeApps({
 }
 
 function isOwnedAppKey(value: string): value is MikkeOwnedAppKey {
-  return value === "marketnote" || value === "story" || value === "community";
+  return value === "marketnote" || value === "story" || value === "community" || value === "ninteikoza";
 }
