@@ -1,17 +1,40 @@
 import { supabase } from "@/lib/supabase/client";
-import type { AcademyCourse, AcademyHeadquarters, AcademyInstructor, AcademyLpBlock } from "@/types/database";
+import type {
+  AcademyCourse,
+  AcademyHeadquarters,
+  AcademyInstructor,
+  AcademyLpBlock,
+  AcademyPaymentProvider
+} from "@/types/database";
 
-// 公開フロント: 本部（MVPは1件想定。将来はhandleで切替）
-export async function getPublicHeadquarters() {
+// 公開フロント: URLで指定された本部だけを取得する。
+// 本部を指定せず「最古の1件」を返すとテナント混線になるため、handleは必須。
+export async function getPublicHeadquarters(handle: string) {
+  const normalizedHandle = handle.trim().toLowerCase();
+  if (!normalizedHandle) return null;
+
   const { data, error } = await supabase
     .from("academy_headquarters")
     .select("*")
+    .eq("handle", normalizedHandle)
     .eq("is_active", true)
-    .order("created_at", { ascending: true })
-    .limit(1)
     .maybeSingle();
   if (error) throw error;
   return (data ?? null) as AcademyHeadquarters | null;
+}
+
+// 管理画面・講師ポータルから、所属本部の公開URLを組み立てるための取得。
+export async function listPublicHeadquartersByIds(headquartersIds: string[]) {
+  const ids = [...new Set(headquartersIds.filter(Boolean))];
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("academy_headquarters")
+    .select("*")
+    .in("id", ids)
+    .eq("is_active", true);
+  if (error) throw error;
+  return (data ?? []) as AcademyHeadquarters[];
 }
 
 // 公開フロント: 公開中の講座一覧
@@ -90,32 +113,51 @@ export type PublicApplicationInput = {
 };
 
 export async function submitPublicApplication(input: PublicApplicationInput) {
-  const intakeSource = input.instructorId ? "koushi" : "honbu";
-  const { error } = await supabase.from("academy_applications").insert({
-    headquarters_id: input.course.headquarters_id,
-    course_id: input.course.id,
-    user_id: null,
-    intake_source: intakeSource,
-    instructor_id: input.instructorId,
-    applicant_name: input.applicantName.trim(),
-    applicant_email: input.applicantEmail || null,
-    applicant_phone: input.applicantPhone || null,
-    applicant_note: input.applicantNote || null,
-    form_answers: input.formAnswers,
-    event_date: input.eventDate || null,
-    format: input.format || null,
-    diploma_name_en: input.diplomaNameEn.trim() || null,
-    applicant_shipping_address: input.applicantShippingAddress || null,
-    price: input.course.price,
-    kit_cost: 0,
-    honbu_revenue: 0,
-    instructor_revenue: 0,
-    status: "received",
-    payment_status: "unpaid",
-    certification_status: "not_yet",
-    display_on_story: false,
-    reflect_on_desk: false
-  });
+  if (!input.instructorId) {
+    const { data, error } = await supabase.functions.invoke("academy-application-intake", {
+      body: {
+        course_id: input.course.id,
+        instructor_id: null,
+        applicant_name: input.applicantName,
+        applicant_email: input.applicantEmail,
+        applicant_phone: input.applicantPhone,
+        applicant_note: input.applicantNote,
+        form_answers: input.formAnswers,
+        event_date: input.eventDate,
+        format: input.format,
+        diploma_name_en: input.diplomaNameEn,
+        applicant_shipping_address: input.applicantShippingAddress
+      }
+    });
+    if (error) throw error;
+    if (!data?.application_id) throw new Error(data?.error ?? "申込の受付結果を確認できませんでした。");
+    return data as {
+      application_id: string;
+      payment_provider: AcademyPaymentProvider;
+      payment_url: string | null;
+      email_sent: boolean;
+    };
+  }
 
+  const { data, error } = await supabase.rpc("academy_submit_public_application", {
+    p_course_id: input.course.id,
+    p_instructor_id: input.instructorId,
+    p_applicant_name: input.applicantName,
+    p_applicant_email: input.applicantEmail,
+    p_applicant_phone: input.applicantPhone,
+    p_applicant_note: input.applicantNote,
+    p_form_answers: input.formAnswers,
+    p_event_date: input.eventDate,
+    p_format: input.format,
+    p_diploma_name_en: input.diplomaNameEn,
+    p_applicant_shipping_address: input.applicantShippingAddress
+  });
   if (error) throw error;
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result?.application_id) throw new Error("申込の受付結果を確認できませんでした。");
+  return result as {
+    application_id: string;
+    payment_provider: AcademyPaymentProvider;
+    payment_url: string | null;
+  };
 }

@@ -32,7 +32,8 @@ function ProfileEditor({ instructor }: { instructor: AcademyInstructor }) {
     is_listed: instructor.is_listed,
     display_on_story: instructor.display_on_story,
     payment_method_note: instructor.payment_method_note,
-    payment_url: instructor.payment_url
+    payment_url: instructor.payment_url,
+    payment_provider: instructor.payment_provider ?? "manual"
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -89,14 +90,29 @@ function ProfileEditor({ instructor }: { instructor: AcademyInstructor }) {
           placeholder="例: 銀行振込のみ対応。振込先は別途ご案内します。"
         />
       </div>
-      <div>
-        <label className={labelClass}>決済URL</label>
-        <input
-          className={inputClass}
-          value={form.payment_url ?? ""}
-          onChange={(e) => set("payment_url", e.target.value)}
-          placeholder="https://…（受講者への決済案内に使われます）"
-        />
+      <div className="grid gap-2 sm:grid-cols-2">
+        <div>
+          <label className={labelClass}>決済方式</label>
+          <select
+            className={inputClass}
+            value={form.payment_provider}
+            onChange={(e) => set("payment_provider", e.target.value as InstructorProfileEdit["payment_provider"])}
+          >
+            <option value="manual">手動（振込・現金など）</option>
+            <option value="stripe">Stripe</option>
+            <option value="square">Square</option>
+            <option value="paycas">PayCAS（端末確認）</option>
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>決済URL</label>
+          <input
+            className={inputClass}
+            value={form.payment_url ?? ""}
+            onChange={(e) => set("payment_url", e.target.value)}
+            placeholder="https://…（受講者への決済案内に使われます）"
+          />
+        </div>
       </div>
       <label className="flex items-center gap-2 text-sm text-[var(--mikke-text)]">
         <input type="checkbox" checked={form.online_available} onChange={(e) => set("online_available", e.target.checked)} />

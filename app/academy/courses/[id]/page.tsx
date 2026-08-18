@@ -30,6 +30,7 @@ function toInput(course: AcademyCourse): CourseInput {
     acceptAtHonbu: course.accept_at_honbu,
     acceptAtKoushi: course.accept_at_koushi,
     paymentUrl: course.payment_url ?? "",
+    paymentProvider: course.payment_provider ?? "manual",
     kitPrice: course.kit_price ?? 0,
     kitPaymentUrl: course.kit_payment_url ?? "",
     requiresKit: course.requires_kit ?? true,

@@ -65,6 +65,14 @@ function NewInstructorContent() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function setHandle(value: string) {
+    set("handle", value);
+    setError(null);
+    setNumberLookup("idle");
+    setExistingProfileName(null);
+    setConsumesAutoNumber(false);
+  }
+
   // 認定日を入れたとき、更新期限が未入力で本部の更新周期が設定されていれば自動計算する。
   // あくまで下書きなので、後から自由に上書きできる。
   function setCertifiedAt(value: string) {
@@ -158,7 +166,7 @@ function NewInstructorContent() {
           <input
             className={inputClass}
             value={form.handle}
-            onChange={(e) => set("handle", e.target.value)}
+            onChange={(e) => setHandle(e.target.value)}
             onBlur={handleHandleBlur}
             placeholder="例: arisa_hattori"
           />

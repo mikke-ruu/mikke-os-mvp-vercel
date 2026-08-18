@@ -1,19 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Building2, Check, Settings2, ShieldCheck, UserPlus } from "lucide-react";
+import { Building2, Check, ShieldCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import {
-  getHeadquartersSettings,
   getMyHeadquartersRole,
   inviteHeadquartersMember,
   listHeadquartersInvitations,
   listHeadquartersMembers,
   listMyHeadquartersInvitations,
   respondHeadquartersInvitation,
-  saveHeadquartersSettings,
   stopHeadquartersMember
 } from "@/lib/academy/headquarters-settings";
 import type {
@@ -26,13 +24,6 @@ import type {
 const inputClass =
   "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
 const cardClass = "rounded-2xl border border-[var(--mikke-line)] bg-white p-5";
-
-const featureDefinitions = [
-  { key: "course_pages", label: "講座ページ", description: "講座の公開ページと申込導線を使います。" },
-  { key: "materials", label: "教材・資料", description: "講師・受講者向けの教材管理を使います。" },
-  { key: "class_scheduling", label: "クラス日程", description: "開催日時、会場、募集状態を管理します。" },
-  { key: "instructor_requests", label: "講師担当依頼", description: "本部から講師へ担当を依頼します。" }
-] as const;
 
 const roleLabels: Record<AcademyHeadquartersRole, string> = {
   owner: "Owner",
@@ -47,13 +38,12 @@ const roleDetails = [
 ];
 
 function SettingsContent() {
-  const { profile, user } = useAuth();
+  const { profile } = useAuth();
   const [headquarters, setHeadquarters] = useState<AcademyHeadquarters | null>(null);
   const [role, setRole] = useState<AcademyHeadquartersRole | null>(null);
   const [members, setMembers] = useState<AcademyHeadquartersMember[]>([]);
   const [invitations, setInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [myInvitations, setMyInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
-  const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
   const [form, setForm] = useState({
     name: "",
     logo_url: "",
@@ -99,12 +89,10 @@ function SettingsContent() {
       });
 
       if (nextRole === "owner" || nextRole === "administrator") {
-        const [settings, nextMembers, nextInvitations] = await Promise.all([
-          getHeadquartersSettings(hq.id),
+        const [nextMembers, nextInvitations] = await Promise.all([
           listHeadquartersMembers(hq.id),
           listHeadquartersInvitations(hq.id)
         ]);
-        setFeatureFlags(settings?.feature_flags ?? {});
         setMembers(nextMembers);
         setInvitations(nextInvitations);
       }
@@ -145,22 +133,6 @@ function SettingsContent() {
       setMessage("本部情報を保存しました。");
     } catch {
       setMessage("本部情報を保存できませんでした。");
-    } finally {
-      setBusy("");
-    }
-  }
-
-  async function toggleFeature(key: string) {
-    if (!headquarters || !canManage) return;
-    const next = { ...featureFlags, [key]: !featureFlags[key] };
-    setBusy(`feature:${key}`);
-    setMessage("");
-    try {
-      const saved = await saveHeadquartersSettings(headquarters.id, next, user.id);
-      setFeatureFlags(saved.feature_flags);
-      setMessage("機能設定を保存しました。");
-    } catch {
-      setMessage("機能設定を保存できませんでした。");
     } finally {
       setBusy("");
     }
@@ -294,26 +266,6 @@ function SettingsContent() {
             ) : (
               <p className="mt-4 text-sm text-[var(--mikke-muted)]">Course Editorは本部情報を変更できません。</p>
             )}
-          </section>
-
-          <section className={cardClass}>
-            <h2 className="flex items-center gap-2 text-base font-bold"><Settings2 size={18} /> 機能設定</h2>
-            <div className="mt-4 divide-y divide-[var(--mikke-line)] rounded-xl border border-[var(--mikke-line)]">
-              {featureDefinitions.map((feature) => {
-                const enabled = Boolean(featureFlags[feature.key]);
-                return (
-                  <div key={feature.key} className="flex items-center gap-4 px-4 py-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold">{feature.label}</p>
-                      <p className="text-xs text-[var(--mikke-muted)]">{feature.description}</p>
-                    </div>
-                    <button type="button" role="switch" aria-checked={enabled} disabled={!canManage || Boolean(busy)} onClick={() => void toggleFeature(feature.key)} className={`rounded-full px-3 py-1.5 text-xs font-bold ${enabled ? "bg-[var(--mikke-accent)] text-white" : "bg-[var(--mikke-surface-soft)]"}`}>
-                      {enabled ? "ON" : "OFF"}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
           </section>
 
           <section className={cardClass}>

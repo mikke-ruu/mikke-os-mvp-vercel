@@ -8,21 +8,27 @@ import QRCode from "qrcode";
 // 名刺・チラシ用に印刷しやすいよう、余白ありの大きめPNGを生成する。
 export function QrCode({ url, filename }: { url: string; filename: string }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
+    setDataUrl(null);
+    setFailed(false);
     QRCode.toDataURL(url, {
       width: 480,
       margin: 2,
-      color: { dark: "rgb(37, 33, 31)", light: "white" }
+      color: { dark: "#25211fff", light: "#ffffffff" }
     }).then((d) => {
       if (active) setDataUrl(d);
+    }).catch(() => {
+      if (active) setFailed(true);
     });
     return () => {
       active = false;
     };
   }, [url]);
 
+  if (failed) return <p className="w-32 text-center text-[10px] text-[var(--mikke-danger)]">QRコードを生成できませんでした。</p>;
   if (!dataUrl) return <div className="h-32 w-32 animate-pulse rounded-xl bg-[var(--mikke-surface-soft)]" />;
 
   return (

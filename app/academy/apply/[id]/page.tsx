@@ -4,22 +4,12 @@ import { Suspense, use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getListedInstructor, getPublicCourse, submitPublicApplication } from "@/lib/academy/lp";
+import { buildAcademyPaymentUrl } from "@/lib/academy/payments";
 import type { AcademyCourse, AcademyInstructor } from "@/types/database";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
-
-// AC-D6: 外部決済URLへメールを事前入力できる場合だけ付与する（努力目標。対応可否はサービス次第）
-function buildPaymentUrl(url: string, email: string): string {
-  try {
-    const u = new URL(url);
-    if (email.trim()) u.searchParams.set("prefilled_email", email.trim());
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
 
 function ApplyInner({ courseId }: { courseId: string }) {
   const searchParams = useSearchParams();
@@ -29,6 +19,7 @@ function ApplyInner({ courseId }: { courseId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -57,11 +48,12 @@ function ApplyInner({ courseId }: { courseId: string }) {
     setError(null);
     if (!course) return;
     if (!name.trim()) return setError("お名前を入力してください。");
+    if (!instructor && !email.trim()) return setError("本部受付ではメールアドレスを入力してください。");
     if (!diplomaNameEn.trim()) return setError("ディプロマに入れるお名前（英語表記）を入力してください。");
     if (format === "online" && !shippingAddress.trim()) return setError("オンライン受講の場合は配送先情報を入力してください。");
     setSaving(true);
     try {
-      await submitPublicApplication({
+      const submitted = await submitPublicApplication({
         course,
         instructorId: instructor ? instructor.id : null,
         applicantName: name,
@@ -74,6 +66,14 @@ function ApplyInner({ courseId }: { courseId: string }) {
         diplomaNameEn,
         applicantShippingAddress: format === "online" ? shippingAddress : ""
       });
+      if (submitted.payment_url) {
+        setPaymentUrl(buildAcademyPaymentUrl({
+          url: submitted.payment_url,
+          provider: submitted.payment_provider,
+          applicationId: submitted.application_id,
+          email
+        }));
+      }
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "送信に失敗しました。時間をおいて再度お試しください。");
@@ -96,9 +96,9 @@ function ApplyInner({ courseId }: { courseId: string }) {
         {/* Wave F (AC-F5d): 講師受付(instructorあり)の場合は本部のcourse.payment_urlではなく
             担当講師のpayment_urlを使う。講師が未設定なら案内文言のみでボタンは出さない。 */}
         {instructor ? (
-          instructor.payment_url ? (
+          paymentUrl ? (
             <a
-              href={buildPaymentUrl(instructor.payment_url, email)}
+              href={paymentUrl}
               target="_blank"
               rel="noreferrer"
               className="mt-5 inline-block rounded-2xl bg-[var(--mikke-accent)] px-5 py-3 text-sm font-bold text-white"
@@ -108,9 +108,9 @@ function ApplyInner({ courseId }: { courseId: string }) {
           ) : (
             <p className="mt-5 text-xs text-[var(--mikke-muted)]">お支払い方法は担当講師からご案内します。</p>
           )
-        ) : course.payment_url ? (
+        ) : paymentUrl ? (
           <a
-            href={buildPaymentUrl(course.payment_url, email)}
+            href={paymentUrl}
             target="_blank"
             rel="noreferrer"
             className="mt-5 inline-block rounded-2xl bg-[var(--mikke-accent)] px-5 py-3 text-sm font-bold text-white"
@@ -140,8 +140,8 @@ function ApplyInner({ courseId }: { courseId: string }) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className={labelClass}>メール</label>
-            <input type="email" className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label className={labelClass}>メール{instructor ? "" : "*"}</label>
+            <input type="email" required={!instructor} className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div>
             <label className={labelClass}>電話</label>

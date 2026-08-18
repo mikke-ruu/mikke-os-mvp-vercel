@@ -4,6 +4,7 @@ import { resolveAcademyCourseFeatureSettings } from "@/lib/academy/course-featur
 import type {
   AcademyCourse,
   AcademyCourseFeatureSettings,
+  AcademyPaymentProvider,
   AcademyFaqItem,
   AcademyFormField,
   Profile
@@ -27,6 +28,7 @@ export type CourseInput = {
   acceptAtHonbu: boolean;
   acceptAtKoushi: boolean;
   paymentUrl: string;
+  paymentProvider: AcademyPaymentProvider;
   // Wave F (AC-F5a/c)
   kitPrice: number;
   kitPaymentUrl: string;
@@ -55,6 +57,7 @@ function toRow(hqId: string, input: CourseInput) {
     accept_at_honbu: input.acceptAtHonbu,
     accept_at_koushi: input.acceptAtKoushi,
     payment_url: input.paymentUrl || null,
+    payment_provider: input.paymentProvider,
     kit_price: input.kitPrice,
     kit_payment_url: input.kitPaymentUrl || null,
     requires_kit: featureSettings.kits,

@@ -14,6 +14,12 @@ export function pageBlocksHasMaterialsList(blocks: AcademyPageBlock[] | undefine
   return (blocks ?? []).some((b) => b.type === "materials-list");
 }
 
+export function normalizeAcademyLinkHref(value: string) {
+  const trimmed = value.trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return `mailto:${trimmed}`;
+  return trimmed;
+}
+
 // 講師専用ページのビルド式ブロックを表示する共通ビュー。
 // materials: materials-list ブロックがある場合にそこへ差し込む、この講座の公開教材一覧
 // （呼び出し側が listMaterialsForInstructor 等で取得済みのものを渡す）。
@@ -106,12 +112,18 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
             {b.title ? <p className="mb-1 text-sm font-bold text-[var(--mikke-accent-strong)]">{b.title}</p> : null}
             <ul className="space-y-1">
               {b.items.filter((it) => it.url).map((it, j) => (
-                <li key={j}>
-                  <a href={it.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm text-[var(--mikke-text)]">
-                    <span className="min-w-0 flex-1 truncate">{it.label || it.url}</span>
-                    <ExternalLink size={12} className="shrink-0 text-[var(--mikke-muted)]" />
-                  </a>
-                </li>
+                (() => {
+                  const href = normalizeAcademyLinkHref(it.url);
+                  const opensNewTab = !href.toLowerCase().startsWith("mailto:");
+                  return (
+                    <li key={j}>
+                      <a href={href} target={opensNewTab ? "_blank" : undefined} rel={opensNewTab ? "noreferrer" : undefined} className="flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm text-[var(--mikke-text)]">
+                        <span className="min-w-0 flex-1 truncate">{it.label || it.url}</span>
+                        <ExternalLink size={12} className="shrink-0 text-[var(--mikke-muted)]" />
+                      </a>
+                    </li>
+                  );
+                })()
               ))}
             </ul>
           </div>

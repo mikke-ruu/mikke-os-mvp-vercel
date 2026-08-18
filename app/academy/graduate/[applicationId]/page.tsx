@@ -1,7 +1,6 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
-import Link from "next/link";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { getPublicCourse } from "@/lib/academy/lp";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
@@ -9,7 +8,6 @@ import { PageBlocks } from "@/components/academy/PageBlocks";
 import {
   findMyApplicationsByEmail,
   getMyApplicationById,
-  registerAsInstructorFromGraduation,
   setCommunityInterest
 } from "@/lib/academy/graduate";
 import type { AcademyApplication, AcademyCourse, AcademyInstructorPage } from "@/types/database";
@@ -22,7 +20,7 @@ const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 // 申込時メールでログイン済み前提（RLSは user_id=auth.uid() の行だけを返す）。
 // メールが一致しない場合のフォールバック検索も、常にRLSの範囲＝自分の行だけで完結する。
 function GraduateContent({ applicationId }: { applicationId: string }) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [application, setApplication] = useState<AcademyApplication | null>(null);
   const [course, setCourse] = useState<AcademyCourse | null>(null);
@@ -33,10 +31,6 @@ function GraduateContent({ applicationId }: { applicationId: string }) {
   const [fallbackError, setFallbackError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false);
 
-  const [instructorChecked, setInstructorChecked] = useState(false);
-  const [instructorSaving, setInstructorSaving] = useState(false);
-  const [instructorDone, setInstructorDone] = useState(false);
-  const [instructorError, setInstructorError] = useState<string | null>(null);
   const [communitySaving, setCommunitySaving] = useState(false);
 
   useEffect(() => {
@@ -86,20 +80,6 @@ function GraduateContent({ applicationId }: { applicationId: string }) {
       setNotFound(false);
     } finally {
       setFallbackSearching(false);
-    }
-  }
-
-  async function handleRegisterInstructor() {
-    if (!application) return;
-    setInstructorSaving(true);
-    setInstructorError(null);
-    try {
-      await registerAsInstructorFromGraduation(profile, application);
-      setInstructorDone(true);
-    } catch (err) {
-      setInstructorError(err instanceof Error ? err.message : "登録に失敗しました。すでに登録済みの可能性があります。");
-    } finally {
-      setInstructorSaving(false);
     }
   }
 
@@ -168,39 +148,13 @@ function GraduateContent({ applicationId }: { applicationId: string }) {
       </section>
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
-        <h2 className="text-sm font-bold text-[var(--mikke-text)]">受講後の任意フロー（どちらも任意です）</h2>
+        <h2 className="text-sm font-bold text-[var(--mikke-text)]">受講後のご案内</h2>
 
         <div className="rounded-xl border border-[var(--mikke-line)] p-3">
-          <label className="flex items-center gap-2 text-sm font-bold text-[var(--mikke-text)]">
-            <input
-              type="checkbox"
-              checked={instructorChecked || instructorDone}
-              disabled={instructorDone}
-              onChange={(e) => setInstructorChecked(e.target.checked)}
-            />
-            認定講師登録する
-          </label>
+          <p className="text-sm font-bold text-[var(--mikke-text)]">認定講師登録</p>
           <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">
-            チェックして登録すると、営業用URLが発行され、本部の認定講師一覧・講座の営業ページに掲載されます。
+            認定完了後、本部が認定状況とmikke IDを確認して登録します。登録後に講師ポータルをご案内します。
           </p>
-          {instructorDone ? (
-            <p className="mt-2 text-xs font-bold text-[var(--mikke-success)]">
-              講師登録が完了しました。
-              <Link href="/academy/portal" className="ml-1 underline">
-                講師ポータルへ
-              </Link>
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={handleRegisterInstructor}
-              disabled={!instructorChecked || instructorSaving}
-              className="mt-2 rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
-            >
-              {instructorSaving ? "登録中…" : "この内容で認定講師登録する"}
-            </button>
-          )}
-          {instructorError ? <p className="mt-1 text-xs font-bold text-[var(--mikke-danger)]">{instructorError}</p> : null}
         </div>
 
         <div className="rounded-xl border border-[var(--mikke-line)] p-3">

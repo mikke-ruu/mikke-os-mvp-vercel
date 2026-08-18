@@ -11,6 +11,10 @@ export const INSTRUCTOR_STATUS_LABELS: Record<AcademyInstructor["status"], strin
 
 export type InstructorProfileLite = Pick<Profile, "id" | "user_id" | "display_name" | "handle">;
 
+export function normalizeMikkeHandle(handle: string) {
+  return handle.trim().replace(/^@+/, "");
+}
+
 // 更新期限アラート（§22 更新管理）: renewal_due が「過ぎている」か「30日以内」の講師を拾う。
 // 活動中(is_active)の講師だけを対象にする（休眠・停止は対象外）。
 const RENEWAL_WARNING_DAYS = 30;
@@ -63,10 +67,13 @@ export async function findExistingInstructorNumber(headquartersId: string, profi
 
 // 講師に紐づけるMikke IDをハンドルで探す（profilesは公開読み取り可）
 export async function findProfileByHandle(handle: string) {
+  const normalizedHandle = normalizeMikkeHandle(handle);
+  if (!normalizedHandle) return null;
+
   const { data, error } = await supabase
     .from("profiles")
     .select("id, user_id, display_name, handle")
-    .eq("handle", handle.trim())
+    .eq("handle", normalizedHandle)
     .maybeSingle();
 
   if (error) throw error;
