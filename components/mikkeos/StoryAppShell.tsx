@@ -18,7 +18,7 @@ const storyBottomNavItems: MikkeShellBottomNavItem[] = [
   { label: "名刺", href: "/story", icon: BookOpenText },
   { label: "編集", href: "/story/edit", icon: Pencil },
   { label: "コレクション", href: "/story/collection", icon: ContactRound },
-  { label: "自分のSTORYを共有（QR）", href: "/story/share", icon: QrCode }
+  { label: "共有QR", href: "/story/share", icon: QrCode }
 ];
 
 export function StoryAppShell({ children, title = "STORY", subtitle }: { children: React.ReactNode; title?: string; subtitle?: string }) {
