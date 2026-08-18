@@ -44,6 +44,8 @@ export type MikkeOwnerMenuProps = {
   ownedApps?: MikkeOwnerMenuItem[];
   otherApps?: MikkeOwnerMenuItem[];
   suggestedApps?: MikkeOwnerMenuSuggestedApp[];
+  /** アプリ固有の共有入口がある場合、共通の「シェア・QR」だけを隠す。 */
+  showShareUtility?: boolean;
   mikkeId?: string;
   isGuest?: boolean;
   onSignOut?: () => void;
@@ -125,6 +127,7 @@ export function MikkeOwnerMenu({
   ownedApps = defaultOwnedApps,
   otherApps = [],
   suggestedApps = defaultSuggestedApps,
+  showShareUtility = true,
   mikkeId,
   isGuest = false,
   onSignOut,
@@ -179,19 +182,21 @@ export function MikkeOwnerMenu({
         </div>
       ) : null}
 
-      <Link
-        href={shareHref}
-        className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 text-sm font-bold text-[var(--mikke-primary)]"
-      >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: themeStyle.background }}>
-          <Share2 size={16} color={themeStyle.foreground} />
-        </span>
-        シェア・QR
-      </Link>
+      {showShareUtility ? (
+        <Link
+          href={shareHref}
+          className="flex min-h-12 items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 text-sm font-bold text-[var(--mikke-primary)]"
+        >
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: themeStyle.background }}>
+            <Share2 size={16} color={themeStyle.foreground} />
+          </span>
+          シェア・QR
+        </Link>
+      ) : null}
 
       <a
         href={getExternalBrowserShareUrl(mikkeInstallGuideUrl)}
-        className="-mt-3 flex min-h-12 items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-sm font-bold text-[var(--mikke-primary)]"
+        className={`${showShareUtility ? "-mt-3" : ""} flex min-h-12 items-center gap-3 rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-sm font-bold text-[var(--mikke-primary)]`}
       >
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[var(--mikke-accent-soft)]">
           <HousePlus size={16} />
