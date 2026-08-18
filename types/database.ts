@@ -612,8 +612,12 @@ export type NinteiKozaReferrer = {
   active: boolean;
   reward_textbook: boolean;
   reward_kobetsu: boolean;
+  // 紹介者ごとのお礼金額（円）。0 は未設定として扱う。
+  reward_textbook_amount: number;
+  reward_kobetsu_amount: number;
   created_at: string;
   note: string | null;
+  owner_user_id: string | null;
 };
 
 export type NinteiKozaProduct = "textbook" | "kobetsu" | "academy" | "community";
@@ -627,6 +631,9 @@ export type NinteiKozaConversion = {
   referral: string | null;
   reward_due: boolean;
   reward_done: boolean;
+  // 成約1件ごとの実支払額。登録時に紹介者の設定額から入り、手で上書きできる。
+  reward_amount: number | null;
   reward_note: string | null;
   note: string | null;
+  owner_user_id: string | null;
 };
