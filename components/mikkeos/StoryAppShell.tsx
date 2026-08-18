@@ -11,14 +11,14 @@ const storyNavItems: MikkeShellNavItem[] = [
   { label: "マイSTORY", href: "/story", icon: BookOpenText, section: "STORY" },
   { label: "編集", href: "/story/edit", icon: Pencil, section: "STORY" },
   { label: "コレクション", href: "/story/collection", icon: ContactRound, section: "名刺帳" },
-  { label: "私のSTORYを共有", href: "/story/share", icon: QrCode, section: "名刺帳" }
+  { label: "自分のSTORYを共有（QR）", href: "/story/share", icon: QrCode, section: "名刺帳" }
 ];
 
 const storyBottomNavItems: MikkeShellBottomNavItem[] = [
   { label: "名刺", href: "/story", icon: BookOpenText },
   { label: "編集", href: "/story/edit", icon: Pencil },
-  { label: "名刺帳", href: "/story/collection", icon: ContactRound },
-  { label: "共有", href: "/story/share", icon: QrCode }
+  { label: "コレクション", href: "/story/collection", icon: ContactRound },
+  { label: "自分のSTORYを共有（QR）", href: "/story/share", icon: QrCode }
 ];
 
 export function StoryAppShell({ children, title = "STORY", subtitle }: { children: React.ReactNode; title?: string; subtitle?: string }) {

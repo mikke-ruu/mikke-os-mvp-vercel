@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, Copy, ExternalLink, QrCode, Share2, X } from "lucide-react";
+import { Check, Copy, ExternalLink, QrCode, ScanLine, Share2, X } from "lucide-react";
+import Link from "next/link";
 import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 import { getMyStoryProfile } from "@/lib/mikkeos/story-profile-db";
@@ -44,12 +45,15 @@ export function StorySharePage() {
 
   return (
     <section className="mx-auto max-w-md rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm sm:p-6">
-      <p className="text-xs font-bold text-[var(--mikke-primary)]">私のSTORYを共有</p>
-      <h1 className="mt-2 text-xl font-bold tracking-normal">私のSTORYを見てもらう</h1>
+      <p className="text-xs font-bold text-[var(--mikke-primary)]">自分のSTORYを共有（QR）</p>
+      <h1 className="mt-2 text-xl font-bold tracking-normal">自分のSTORYを共有（QR）</h1>
       <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">公開中のプロフィールを、名刺のように渡せます。</p>
       <div className="mx-auto mt-5 aspect-square w-full max-w-56 rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
-        {qrDataUrl ? <img src={qrDataUrl} alt="私のSTORY共有用QRコード" className="h-full w-full" /> : null}
+        {qrDataUrl ? <img src={qrDataUrl} alt="自分のSTORY共有用QRコード" className="h-full w-full" /> : null}
       </div>
+      <p className="mt-4 rounded-xl bg-[var(--mikke-primary-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-primary)]">
+        このQRは、あなたの公開STORYを相手が見るためのものです。相手のコレクションへ追加するときは、相手が自分のSTORYで「QRを読み取る」を操作します。
+      </p>
       <p className="mt-4 break-all rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs leading-5 text-[var(--mikke-muted)]">{shareUrl}</p>
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button type="button" onClick={() => void copy()} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-sm font-bold">
@@ -62,6 +66,13 @@ export function StorySharePage() {
       <button type="button" onClick={() => setPreviewOpen(true)} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[var(--mikke-accent-soft)] px-4 text-sm font-bold text-[var(--mikke-primary)]">
         相手に見える画面を確認 <ExternalLink size={15} />
       </button>
+      <div className="mt-5 border-t border-[var(--mikke-line)] pt-5">
+        <p className="text-sm font-bold">相手のSTORYをコレクションに追加</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">相手の共有画面に表示されたQRコードを読み取ります。</p>
+        <Link href="/story/collection#story-qr-reader" className="mt-3 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 text-sm font-bold text-[var(--mikke-primary)]">
+          <ScanLine size={18} /> 相手のQRコードを読む
+        </Link>
+      </div>
       <p className="mt-4 text-xs leading-5 text-[var(--mikke-muted)]">LINEで受け取った場合も、コピーせず通常のブラウザで開けるURLを共有します。</p>
       {previewOpen && previewPath ? (
         <div className="fixed inset-0 z-[80] flex flex-col bg-white" role="dialog" aria-modal="true" aria-label="相手に見えるSTORY画面">

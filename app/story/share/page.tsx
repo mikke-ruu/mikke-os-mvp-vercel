@@ -5,5 +5,5 @@ import { StoryAppShell } from "@/components/mikkeos/StoryAppShell";
 import { StorySharePage } from "@/components/mikkeos/StorySharePage";
 
 export default function StoryShareRoute() {
-  return <AuthGate><StoryAppShell title="私のSTORYを共有" subtitle="公開中のSTORYを名刺として渡す"><StorySharePage /></StoryAppShell></AuthGate>;
+  return <AuthGate><StoryAppShell title="自分のSTORYを共有（QR）" subtitle="公開中のSTORYを名刺として渡す"><StorySharePage /></StoryAppShell></AuthGate>;
 }

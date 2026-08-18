@@ -9,6 +9,7 @@ import { normalizeStoryHandle, type StoryProfileView } from "@/lib/mikkeos/story
 import { supabase } from "@/lib/supabase/client";
 
 type AddMode = "closed" | "camera" | "input";
+type InspectSource = "camera" | "image" | "manual";
 
 export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
   const [mode, setMode] = useState<AddMode>("closed");
@@ -18,6 +19,14 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
   const [busy, setBusy] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (window.location.hash !== "#story-qr-reader") return;
+    setMode("camera");
+    setMessage("相手のSTORY共有画面に表示されたQRコードを、枠内に映してください。");
+    const frameId = requestAnimationFrame(() => document.getElementById("story-qr-reader")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    return () => cancelAnimationFrame(frameId);
+  }, []);
 
   useEffect(() => {
     if (mode !== "camera") return;
@@ -47,7 +56,7 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
           const result = image ? jsQR(image.data, image.width, image.height, { inversionAttempts: "dontInvert" }) : null;
           if (result?.data) {
             stop();
-            void inspectTarget(result.data, true);
+            void inspectTarget(result.data, "camera", true);
             return;
           }
         }
@@ -78,11 +87,15 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
     return stop;
   }, [mode]);
 
-  async function inspectTarget(value: string, addAfterLookup = false) {
+  async function inspectTarget(value: string, source: InspectSource, addAfterLookup = false) {
     const handle = parseStoryHandle(value);
     if (!handle) {
       setPreview(null);
-      setMessage("mikkeOSのSTORY用QR、mikke ID、またはSTORYのURLを入力してください。");
+      setMessage(
+        source === "manual"
+          ? "STORYの公開URLまたはmikke IDを入力してください。"
+          : "このQRはSTORYの公開URLではありません。相手のSTORY共有画面に表示されたQRコードを読み取ってください。"
+      );
       setMode("input");
       return;
     }
@@ -94,7 +107,11 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
       const story = await getPublishedStoryProfile(supabase, handle);
       if (!story) {
         setPreview(null);
-        setMessage("公開中のSTORYが見つかりませんでした。mikke IDを確認してください。");
+        setMessage(
+          source === "manual"
+            ? "公開中のSTORYが見つかりませんでした。mikke IDを確認してください。"
+            : "このQRから公開中のSTORYを確認できませんでした。相手がSTORYを公開しているか確認してください。"
+        );
       } else {
         setPreview(story);
         setMode("input");
@@ -102,7 +119,11 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
       }
     } catch {
       setPreview(null);
-      setMessage("STORYを確認できませんでした。通信状態を確認して、もう一度お試しください。");
+      setMessage(
+        source === "manual"
+          ? "STORYを確認できませんでした。通信状態を確認して、もう一度お試しください。"
+          : "QRのSTORYを確認できませんでした。通信状態を確認して、もう一度お試しください。"
+      );
     } finally {
       setBusy(false);
     }
@@ -155,7 +176,7 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
         setMessage("画像からQRを読み取れませんでした。QRが大きく写った画像でお試しください。");
         return;
       }
-      await inspectTarget(result.data, true);
+      await inspectTarget(result.data, "image", true);
     } catch {
       setMessage("画像を読み込めませんでした。別の画像でお試しください。");
     } finally {
@@ -164,7 +185,7 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <div className="mb-5 rounded-xl border border-[var(--mikke-line)] bg-white p-4">
+    <div id="story-qr-reader" className="mb-5 scroll-mt-5 rounded-xl border border-[var(--mikke-line)] bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium">STORYをコレクションに追加</p>
@@ -198,7 +219,7 @@ export function StoryCollectionAdd({ onSaved }: { onSaved: () => void }) {
       ) : null}
 
       {mode === "input" ? (
-        <form className="mt-4" onSubmit={(event) => { event.preventDefault(); void inspectTarget(input, true); }}>
+        <form className="mt-4" onSubmit={(event) => { event.preventDefault(); void inspectTarget(input, "manual", true); }}>
           <label className="block text-xs font-medium text-[var(--mikke-muted)]" htmlFor="story-collection-id">mikke ID または STORYのURL</label>
           <div className="mt-2 flex gap-2">
             <input id="story-collection-id" value={input} onChange={(event) => { setInput(event.target.value); setPreview(null); setMessage(""); }} placeholder="@ayumi" autoCapitalize="none" autoCorrect="off" className="min-w-0 flex-1 rounded-xl border border-[var(--mikke-line)] px-4 py-3 text-base outline-none focus:border-[var(--mikke-blue)]" />
