@@ -398,6 +398,11 @@ verify_jwt = false
 [functions.academy-square-webhook]
 verify_jwt = false
 
+# 認定講座サイトの購入コード照合。教科書サイト（GitHub Pages）から未ログインで呼ぶため JWT は不要。
+# 認証は購入コードそのもので行う。
+[functions.nk-content]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
