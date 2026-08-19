@@ -645,7 +645,13 @@ export type NinteiKozaChapter = {
   owner_user_id: string;
 };
 
-export type NinteiKozaProduct = "textbook" | "kobetsu" | "academy" | "community";
+export type NinteiKozaProduct =
+  | "textbook"
+  | "course"
+  | "upgrade"
+  | "kobetsu"
+  | "academy"
+  | "community";
 
 export type NinteiKozaConversion = {
   id: string;

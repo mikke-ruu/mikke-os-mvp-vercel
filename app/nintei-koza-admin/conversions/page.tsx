@@ -8,7 +8,7 @@ import { listReferrers } from "@/lib/nintei-koza/referrers";
 import { calcRewardDue, createConversion, listConversions, PRODUCT_LABELS } from "@/lib/nintei-koza/conversions";
 import type { NinteiKozaConversion, NinteiKozaInquiry, NinteiKozaProduct, NinteiKozaReferrer } from "@/types/database";
 
-const PRODUCTS: NinteiKozaProduct[] = ["textbook", "kobetsu", "academy", "community"];
+const PRODUCTS: NinteiKozaProduct[] = ["textbook", "course", "upgrade", "kobetsu", "academy", "community"];
 
 function ConversionsContent() {
   const searchParams = useSearchParams();
