@@ -620,6 +620,31 @@ export type NinteiKozaReferrer = {
   owner_user_id: string | null;
 };
 
+export type NinteiKozaPurchaseRole = "textbook" | "mentoring";
+
+// 教科書サイトの購入コード。1コード＝1人。メールアドレスを紐づけて使い回しを防ぐ。
+export type NinteiKozaPurchase = {
+  code: string;
+  email: string | null;
+  role: NinteiKozaPurchaseRole;
+  active: boolean;
+  // どの経路で発行したか（'site' / 'supporter:neon' / 'manual' など）
+  issued_for: string | null;
+  note: string | null;
+  created_at: string;
+  last_used_at: string | null;
+  owner_user_id: string;
+};
+
+// 有料章の本文。匿名からは読めず、Edge Function `nk-content` だけが service role で読む。
+export type NinteiKozaChapter = {
+  chapter_id: string;
+  title: string | null;
+  body: string;
+  updated_at: string;
+  owner_user_id: string;
+};
+
 export type NinteiKozaProduct = "textbook" | "kobetsu" | "academy" | "community";
 
 export type NinteiKozaConversion = {

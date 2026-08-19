@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { BarChart3, ClipboardList, Gift, GraduationCap, UserPlus, type LucideIcon } from "lucide-react";
+import { BarChart3, ClipboardList, Gift, GraduationCap, KeyRound, UserPlus, type LucideIcon } from "lucide-react";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { AuthGate } from "@/components/AuthGate";
 
@@ -13,7 +13,8 @@ const nav: NavItem[] = [
   { href: "/nintei-koza-admin/conversions", label: "成約登録", icon: GraduationCap },
   { href: "/nintei-koza-admin/rewards", label: "お礼リスト", icon: Gift },
   { href: "/nintei-koza-admin/summary", label: "売れ行きサマリー", icon: BarChart3 },
-  { href: "/nintei-koza-admin/referrers", label: "紹介者管理", icon: UserPlus }
+  { href: "/nintei-koza-admin/referrers", label: "紹介者管理", icon: UserPlus },
+  { href: "/nintei-koza-admin/codes", label: "購入コード", icon: KeyRound }
 ];
 
 export function NinteiKozaShell({ title, children }: { title: string; children: React.ReactNode }) {
