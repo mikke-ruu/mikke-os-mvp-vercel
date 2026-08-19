@@ -2,8 +2,10 @@ import { supabase } from "@/lib/supabase/client";
 import type { NinteiKozaConversion, NinteiKozaProduct, NinteiKozaReferrer } from "@/types/database";
 
 export const PRODUCT_LABELS: Record<NinteiKozaProduct, string> = {
-  textbook: "完全版",
-  kobetsu: "個別構築コース",
+  textbook: "教科書",
+  course: "構築コース",
+  upgrade: "構築コース(差額)",
+  kobetsu: "個別構築",
   academy: "Academy",
   community: "Community"
 };
