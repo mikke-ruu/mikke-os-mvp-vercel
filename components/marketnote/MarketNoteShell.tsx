@@ -18,7 +18,7 @@ import { supabase } from "@/lib/supabase/client";
 
 const marketNoteNavItems: MikkeShellNavItem[] = [
   { label: "カレンダー", href: "/marketnote", icon: CalendarDays, section: "MarketNote" },
-  { label: "出店予定を追加", href: "/marketnote/new", icon: Plus, section: "MarketNote" },
+  { label: "予定を追加", href: "/marketnote/new", icon: Plus, section: "MarketNote" },
   { label: "会計", href: "/marketnote/finance", icon: ReceiptText, section: "MarketNote" },
   { label: "設定", href: "/marketnote/settings", icon: Settings, section: "Settings" }
 ];
@@ -32,7 +32,7 @@ const marketNoteBottomNavItems: MikkeShellBottomNavItem[] = [
 
 const marketNoteEditItems: MikkeOwnerMenuItem[] = [
   { title: "カレンダー", href: "/marketnote", icon: CalendarDays },
-  { title: "出店予定を追加", href: "/marketnote/new", icon: Plus },
+  { title: "予定を追加", href: "/marketnote/new", icon: Plus },
   { title: "会計", href: "/marketnote/finance", icon: ReceiptText },
   { title: "MarketNote設定", href: "/marketnote/settings", icon: Settings }
 ];
@@ -62,6 +62,12 @@ export function MarketNoteShell({
   const contextualBottomNavItems = marketNoteBottomNavItems.map((item) => (
     item.primary ? { ...item, href: addHref } : item
   ));
+  const contextualNavItems = marketNoteNavItems.map((item) => (
+    item.href === "/marketnote/new" ? { ...item, href: addHref } : item
+  ));
+  const contextualEditItems = marketNoteEditItems.map((item) => (
+    item.href === "/marketnote/new" ? { ...item, href: addHref } : item
+  ));
 
   async function signOut() {
     await supabase.auth.signOut();
@@ -77,14 +83,14 @@ export function MarketNoteShell({
       theme="blue"
       primaryActionTone="orange"
       showBottomNavLabels
-      menuEditItems={marketNoteEditItems}
+      menuEditItems={contextualEditItems}
       ownedApps={ownedApps}
       otherApps={[]}
       suggestedApps={isGuest ? guestSuggestedApps : suggestedApps}
       mikkeId={isGuest ? undefined : profile.handle}
       isGuest={isGuest}
       onSignOut={isGuest ? undefined : () => void signOut()}
-      navItems={marketNoteNavItems}
+      navItems={contextualNavItems}
       bottomNavItems={hideBottomNav ? undefined : contextualBottomNavItems}
       footerLabel="MarketNote by mikke"
     >
