@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import { MATERIAL_KIND_LABELS, createMaterial, type MaterialInput } from "@/lib/academy/materials";
@@ -14,6 +15,7 @@ const inputClass =
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 
 function NewMaterialContent() {
+  const searchParams = useSearchParams();
   const { profile } = useAuth();
   const router = useRouter();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
@@ -23,7 +25,7 @@ function NewMaterialContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState<MaterialInput>({
-    courseId: "",
+    courseId: searchParams.get("course") ?? "",
     kind: "pdf",
     title: "",
     url: "",
@@ -54,7 +56,7 @@ function NewMaterialContent() {
     setSaving(true);
     try {
       await createMaterial(profile, hq!.id, form);
-      router.push("/academy/materials");
+      router.push(toCurrentAcademyContextHref("/academy/materials"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
       setSaving(false);
@@ -136,7 +138,9 @@ export default function NewMaterialPage() {
   return (
     <HonbuShell title="教材を追加">
       <div className="mx-auto max-w-2xl">
-        <NewMaterialContent />
+        <Suspense fallback={<p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>}>
+          <NewMaterialContent />
+        </Suspense>
       </div>
     </HonbuShell>
   );

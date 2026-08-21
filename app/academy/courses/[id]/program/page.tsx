@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useCallback, useEffect, useState } from "react";
-import { Plus, Save, Trash2 } from "lucide-react";
+import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
@@ -14,6 +14,7 @@ import {
   deleteProgramStep,
   getCourseProgram,
   listProgramSections,
+  publishCourseProgram,
   updateProgramStep,
   type AcademyProgramSectionWithSteps
 } from "@/lib/academy/programs";
@@ -176,6 +177,20 @@ function ProgramContent({ courseId }: { courseId: string }) {
     }
   }
 
+  async function publishCurrentProgram() {
+    if (!program || steps.length === 0) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await publishCourseProgram(program.id);
+      setProgram({ ...program, status: "published" });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "現在の内容を確定できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const steps = sections.flatMap((section) => section.steps);
 
   return (
@@ -223,6 +238,26 @@ function ProgramContent({ courseId }: { courseId: string }) {
               <button type="button" disabled={saving || !title.trim()} onClick={addStep} className="inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
                 <Plus size={16} /> {saving ? "追加中…" : "ステップを追加"}
               </button>
+            </section>
+
+            <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-[var(--mikke-primary)]">クラスで使う内容を確定</h3>
+                  <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">
+                    現在のステップを版として保存します。クラス作成前に1回以上確定してください。確定後に編集した場合は、もう一度確定すると新しい版になります。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={saving || steps.length === 0}
+                  onClick={publishCurrentProgram}
+                  className="inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                >
+                  <CheckCircle2 size={16} /> {saving ? "確定中…" : "現在の内容を確定する"}
+                </button>
+              </div>
+              {program.status === "published" ? <p className="mt-2 text-xs font-bold text-[var(--mikke-success)]">確定済みの版があります。</p> : null}
             </section>
           </>
         ) : null}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { getListedInstructor, getPublicCourse, submitPublicApplication } from "@/lib/academy/lp";
 import { buildAcademyPaymentUrl } from "@/lib/academy/payments";
+import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import type { AcademyCourse, AcademyInstructor } from "@/types/database";
 
 const inputClass =
@@ -26,7 +27,6 @@ function ApplyInner({ courseId }: { courseId: string }) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
-  const [eventDate, setEventDate] = useState("");
   const [format, setFormat] = useState<"in_person" | "online" | "">("");
   const [answers, setAnswers] = useState<Record<string, string>>({});
   // Wave E (AC-E2): ディプロマ用の英語表記名（必須）・オンライン受講時のみの配送先。
@@ -48,9 +48,14 @@ function ApplyInner({ courseId }: { courseId: string }) {
     setError(null);
     if (!course) return;
     if (!name.trim()) return setError("お名前を入力してください。");
-    if (!instructor && !email.trim()) return setError("本部受付ではメールアドレスを入力してください。");
-    if (!diplomaNameEn.trim()) return setError("ディプロマに入れるお名前（英語表記）を入力してください。");
-    if (format === "online" && !shippingAddress.trim()) return setError("オンライン受講の場合は配送先情報を入力してください。");
+    if (!email.trim()) return setError("日程のご連絡に使うメールアドレスを入力してください。");
+    const features = resolveAcademyCourseFeaturesForCourse(course);
+    if (features.certification && !diplomaNameEn.trim()) {
+      return setError("ディプロマに入れるお名前（英語表記）を入力してください。");
+    }
+    if (features.kits && format === "online" && !shippingAddress.trim()) {
+      return setError("現物教材のお届け先を入力してください。");
+    }
     setSaving(true);
     try {
       const submitted = await submitPublicApplication({
@@ -60,11 +65,11 @@ function ApplyInner({ courseId }: { courseId: string }) {
         applicantEmail: email,
         applicantPhone: phone,
         applicantNote: note,
-        eventDate,
+        eventDate: "",
         format,
         formAnswers: answers,
-        diplomaNameEn,
-        applicantShippingAddress: format === "online" ? shippingAddress : ""
+        diplomaNameEn: features.certification ? diplomaNameEn : "",
+        applicantShippingAddress: features.kits && format === "online" ? shippingAddress : ""
       });
       if (submitted.payment_url) {
         setPaymentUrl(buildAcademyPaymentUrl({
@@ -85,6 +90,8 @@ function ApplyInner({ courseId }: { courseId: string }) {
   if (!course || !course.is_published) {
     return <p className="py-20 text-center text-sm text-[var(--mikke-muted)]">この講座は現在申込を受け付けていません。</p>;
   }
+
+  const features = resolveAcademyCourseFeaturesForCourse(course);
 
   if (done) {
     return (
@@ -140,8 +147,8 @@ function ApplyInner({ courseId }: { courseId: string }) {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className={labelClass}>メール{instructor ? "" : "*"}</label>
-            <input type="email" required={!instructor} className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} />
+            <label className={labelClass}>メール*</label>
+            <input type="email" required className={inputClass} value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div>
             <label className={labelClass}>電話</label>
@@ -151,20 +158,23 @@ function ApplyInner({ courseId }: { courseId: string }) {
         <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">
           既にmikkeIDをお持ちの方は、そのログインメールアドレスでお申込みください。受講後、このメールアドレスで講師ページにログインできます。
         </p>
-        <div>
-          <label className={labelClass}>ディプロマに入れるお名前（英語表記）*</label>
-          <input
-            className={inputClass}
-            value={diplomaNameEn}
-            onChange={(e) => setDiplomaNameEn(e.target.value)}
-            placeholder="例: Taro Yamada"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
+        {features.certification ? (
           <div>
-            <label className={labelClass}>受講希望日</label>
-            <input type="date" className={inputClass} value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            <label className={labelClass}>ディプロマに入れるお名前（英語表記）*</label>
+            <input
+              className={inputClass}
+              value={diplomaNameEn}
+              onChange={(e) => setDiplomaNameEn(e.target.value)}
+              placeholder="例: Taro Yamada"
+            />
           </div>
+        ) : null}
+        <div>
+          <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs leading-5 text-[var(--mikke-text-soft)]">
+            受講日は、お申込み後に担当者からメールでご案内し、ご相談のうえ決定します。ご希望がある場合は下の「ご質問・ご要望」にご記入ください。
+          </p>
+        </div>
+        <div>
           <div>
             <label className={labelClass}>受講形式</label>
             <select className={inputClass} value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
@@ -175,14 +185,14 @@ function ApplyInner({ courseId }: { courseId: string }) {
           </div>
         </div>
 
-        {format === "online" ? (
+        {features.kits && format === "online" ? (
           <div>
-            <label className={labelClass}>配送先情報*</label>
+            <label className={labelClass}>現物教材のお届け先*</label>
             <textarea
               className={`${inputClass} min-h-16`}
               value={shippingAddress}
               onChange={(e) => setShippingAddress(e.target.value)}
-              placeholder="キットのお届け先（郵便番号・ご住所・お名前）"
+              placeholder="郵便番号・ご住所・お名前"
             />
           </div>
         ) : null}

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { getAcademyRouteContext } from "@/lib/academy/access-context";
 import type {
   AcademyApplication,
   AcademyCourse,
@@ -28,12 +29,16 @@ export async function getCoursesByIds(courseIds: string[]) {
 }
 
 // 講師側: 自分の講師レコード（複数講座を持てる）
-export async function getMyInstructorRecords(userId: string) {
-  const { data, error } = await supabase
+export async function getMyInstructorRecords(userId: string, academyId?: string) {
+  const explicitAcademyId = academyId ?? getAcademyRouteContext()?.academyId;
+  let query = supabase
     .from("academy_instructors")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
+
+  if (explicitAcademyId) query = query.eq("headquarters_id", explicitAcademyId);
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []) as AcademyInstructor[];

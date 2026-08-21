@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ExternalLink, Eye, EyeOff, GraduationCap, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import { MATERIAL_KIND_LABELS, deleteMaterial, listMaterials, setMaterialPublished } from "@/lib/academy/materials";
@@ -41,6 +42,9 @@ function MaterialsContent() {
 
   const courseMap = Object.fromEntries(courses.map((c) => [c.id, c]));
   const shown = courseFilter ? materials.filter((m) => m.course_id === courseFilter) : materials;
+  const createHref = toCurrentAcademyContextHref(
+    `/academy/materials/new${courseFilter ? `?course=${encodeURIComponent(courseFilter)}` : ""}`
+  );
 
   async function togglePublish(m: AcademyMaterial) {
     if (!hq) return;
@@ -74,7 +78,7 @@ function MaterialsContent() {
           <p className="text-xs text-[var(--mikke-muted)]">{hq.name}</p>
           <h2 className="text-base font-bold text-[var(--mikke-text)]">教材・資料</h2>
         </div>
-        <Link href="/academy/materials/new" className="flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
+        <Link href={createHref} className="flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
           <Plus size={16} /> 教材を追加
         </Link>
       </div>
@@ -98,7 +102,7 @@ function MaterialsContent() {
         <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-8 text-center">
           <GraduationCap size={28} className="mx-auto text-[var(--mikke-accent)]" />
           <p className="mt-2 text-sm text-[var(--mikke-text-soft)]">まだ教材がありません。</p>
-          <Link href="/academy/materials/new" className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
+          <Link href={createHref} className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
             教材を追加する
           </Link>
         </div>

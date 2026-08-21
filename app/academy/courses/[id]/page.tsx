@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse, updateCourse, type CourseInput } from "@/lib/academy/courses";
@@ -65,7 +66,7 @@ function EditCourseContent({ courseId }: { courseId: string }) {
         submitLabel="変更を保存する"
         onSubmit={async (input) => {
           await updateCourse(profile, hq.id, course.id, input);
-          router.push("/academy/courses");
+          router.push(toCurrentAcademyContextHref("/academy/courses"));
         }}
       />
     </AcademyCourseWorkspace>

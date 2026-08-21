@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BookOpen, ClipboardList, Heart, JapaneseYen, Package, Users } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, ArrowRight, BookOpen, ClipboardList, Heart, JapaneseYen, Package, Sparkles, Users } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
-import { ensureHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
+import { canCreateAcademyHeadquarters, toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
+import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
+import { createHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
+import { listMaterials } from "@/lib/academy/materials";
 import { getRenewalAlerts, listInstructors } from "@/lib/academy/instructors";
 import { APPLICATION_STATUS_LABELS, listApplications } from "@/lib/academy/applications";
 import { listKitOrders } from "@/lib/academy/kits";
@@ -15,7 +19,8 @@ import type {
   AcademyCourse,
   AcademyHeadquarters,
   AcademyInstructor,
-  AcademyKitOrder
+  AcademyKitOrder,
+  AcademyMaterial
 } from "@/types/database";
 
 function StatCard({
@@ -51,29 +56,70 @@ function StatCard({
 }
 
 function DashboardContent() {
+  const router = useRouter();
   const { profile } = useAuth();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
   const [instructors, setInstructors] = useState<AcademyInstructor[]>([]);
   const [apps, setApps] = useState<AcademyApplication[]>([]);
   const [kits, setKits] = useState<AcademyKitOrder[]>([]);
+  const [materials, setMaterials] = useState<AcademyMaterial[]>([]);
   const [loading, setLoading] = useState(true);
+  const [canCreate, setCanCreate] = useState(false);
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const [localPreview, setLocalPreview] = useState(false);
 
   useEffect(() => {
     async function load() {
-      const foundHq = await getOwnedHeadquarters(profile.user_id);
+      const previewRequested =
+        process.env.NODE_ENV === "development" &&
+        new URLSearchParams(window.location.search).get("preview") === "dashboard";
+      if (previewRequested) {
+        setLocalPreview(true);
+        setHq({
+          id: "00000000-0000-4000-8000-000000000001",
+          owner_user_id: profile.user_id,
+          owner_profile_id: profile.id,
+          name: "ローカル確認用Academy",
+          handle: "local-preview",
+          tagline: null,
+          logo_url: null,
+          hero_image_url: null,
+          front_message: null,
+          main_color: null,
+          contact_email: null,
+          renewal_period_months: 12,
+          next_instructor_number: 1,
+          plan: "small",
+          plan_started_at: null,
+          default_payment_note: null,
+          is_active: true,
+          front_blocks: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        setLoading(false);
+        return;
+      }
+      const [foundHq, creationAllowed] = await Promise.all([
+        getOwnedHeadquarters(profile.user_id),
+        canCreateAcademyHeadquarters()
+      ]);
       setHq(foundHq);
+      setCanCreate(creationAllowed);
       if (foundHq) {
-        const [c, i, a, k] = await Promise.all([
+        const [c, i, a, k, m] = await Promise.all([
           listCourses(foundHq.id),
           listInstructors(foundHq.id),
           listApplications(foundHq.id),
-          listKitOrders(foundHq.id)
+          listKitOrders(foundHq.id),
+          listMaterials(foundHq.id)
         ]);
         setCourses(c);
         setInstructors(i);
         setApps(a);
         setKits(k);
+        setMaterials(m);
       }
       setLoading(false);
     }
@@ -82,9 +128,17 @@ function DashboardContent() {
 
   async function initHq() {
     setLoading(true);
-    const created = await ensureHeadquarters(profile, `${profile.display_name}アカデミー`);
-    setHq(created);
-    setLoading(false);
+    setCreationError(null);
+    try {
+      const created = await createHeadquarters(`${profile.display_name}アカデミー`);
+      setHq(created);
+      setCanCreate(false);
+      router.replace(toAcademyContextHref("/academy", created.id, "manage"));
+    } catch {
+      setCreationError("本部を作成できませんでした。契約確認の状態を管理者へお問い合わせください。");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
@@ -92,11 +146,20 @@ function DashboardContent() {
   if (!hq) {
     return (
       <div className="mx-auto max-w-md space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
-        <p className="text-sm font-bold text-[var(--mikke-text)]">本部がまだありません</p>
-        <p className="text-xs text-[var(--mikke-muted)]">認定講座を管理する本部を作成します。</p>
-        <button onClick={initHq} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white">
-          本部を作成する
-        </button>
+        <p className="text-sm font-bold text-[var(--mikke-text)]">
+          {canCreate ? "本部を作成できます" : "Academyの契約確認が必要です"}
+        </p>
+        <p className="text-xs leading-5 text-[var(--mikke-muted)]">
+          {canCreate
+            ? "契約確認済みの作成権を使って、認定講座を管理する本部を作成します。"
+            : "契約確認後に本部作成が有効になります。ここから無料で本部が作られることはありません。"}
+        </p>
+        {canCreate ? (
+          <button onClick={initHq} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white">
+            契約確認済みの本部を作成する
+          </button>
+        ) : null}
+        {creationError ? <p className="text-xs font-bold text-red-600">{creationError}</p> : null}
       </div>
     );
   }
@@ -110,6 +173,43 @@ function DashboardContent() {
   const renewalAlerts = getRenewalAlerts(instructors);
 
   const publishedCourses = courses.filter((c) => c.is_published).length;
+  const firstCourse = courses[0];
+  const firstPublishedCourse = courses.find((course) => course.is_published);
+  const courseNeedingMaterial = courses.find((course) => {
+    const features = resolveAcademyCourseFeaturesForCourse(course);
+    return course.is_published && features.materialLicenses && !materials.some((material) => material.course_id === course.id);
+  });
+  const gettingStarted = courses.length === 0
+    ? {
+        step: 1,
+        question: "最初に、募集する認定講座を作りますか？",
+        description: "講座名・料金・開催方法など、募集ページの土台を順番に登録します。",
+        href: "/academy/courses/new",
+        action: "講座を作りはじめる"
+      }
+    : publishedCourses === 0
+      ? {
+          step: 2,
+          question: "次に、講座ページを整えて公開準備をしますか？",
+          description: `「${firstCourse.name}」の内容と申込方法を確認します。公開は確認後の明示操作です。`,
+          href: `/academy/courses/${firstCourse.id}`,
+          action: "講座の設定を確認する"
+        }
+      : courseNeedingMaterial
+        ? {
+            step: 3,
+            question: "受講者や講師へ渡す教材を登録しますか？",
+            description: `「${courseNeedingMaterial.name}」のPDF・動画・リンクを登録し、誰が見られるかを設定できます。`,
+            href: `/academy/materials/new?course=${encodeURIComponent(courseNeedingMaterial.id)}`,
+            action: "教材を登録する"
+          }
+        : {
+            step: 4,
+            question: "最後に、申込者からどう見えるか確認しますか？",
+            description: "公開中の講座ページを申込者と同じ画面で確認します。",
+            href: `/academy/c/${firstPublishedCourse!.id}`,
+            action: "公開ページを確認する"
+          };
   const activeInstructors = instructors.filter((i) => i.is_active).length;
   const honbuIntake = monthApps.filter((a) => a.intake_source !== "koushi").length;
   const koushiIntake = monthApps.filter((a) => a.intake_source === "koushi").length;
@@ -139,6 +239,31 @@ function DashboardContent() {
           {hq.name} — こんにちは、{profile.display_name}さん
         </p>
       </div>
+
+      <section className="rounded-2xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] p-4 md:p-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[var(--mikke-accent)]">
+            <Sparkles size={18} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold text-[var(--mikke-accent-strong)]">はじめるガイド {gettingStarted.step}/4</p>
+            <h2 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{gettingStarted.question}</h2>
+            <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{gettingStarted.description}</p>
+            <Link
+              href={toCurrentAcademyContextHref(gettingStarted.href)}
+              className="mt-3 inline-flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white"
+            >
+              {gettingStarted.action} <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {localPreview ? (
+        <p className="text-center text-[11px] text-[var(--mikke-muted)]">
+          このサンプルでは未設定のAcademyを想定しているため、最初の質問を表示しています。
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">
         <StatCard icon={BookOpen} label="講座数" value={courses.length} sub="件" detail={`公開中 ${publishedCourses}件`} />

@@ -9,6 +9,11 @@ export const INSTRUCTOR_STATUS_LABELS: Record<AcademyInstructor["status"], strin
   reapplying: "再開申請中"
 };
 
+export const INSTRUCTOR_REGISTRATION_STATUS_LABELS: Record<AcademyInstructor["registration_status"], string> = {
+  registered: "登録中",
+  withdrawn: "登録解除"
+};
+
 export type InstructorProfileLite = Pick<Profile, "id" | "user_id" | "display_name" | "handle">;
 
 export function normalizeMikkeHandle(handle: string) {
@@ -190,6 +195,15 @@ export async function updateInstructor(
     .eq("headquarters_id", headquartersId)
     .select("*")
     .single();
+
+  if (error) throw error;
+  return data as AcademyInstructor;
+}
+
+export async function withdrawInstructor(instructorId: string) {
+  const { data, error } = await supabase.rpc("academy_withdraw_instructor", {
+    p_instructor_id: instructorId
+  });
 
   if (error) throw error;
   return data as AcademyInstructor;

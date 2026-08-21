@@ -98,3 +98,11 @@ export async function deleteProgramStep(stepId: string) {
   const { error } = await supabase.from("academy_program_steps").delete().eq("id", stepId);
   if (error) throw error;
 }
+
+export async function publishCourseProgram(programId: string) {
+  const { data, error } = await supabase.rpc("academy_publish_program_version", {
+    p_program_id: programId
+  });
+  if (error) throw error;
+  return data as string;
+}

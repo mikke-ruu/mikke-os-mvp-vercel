@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarCheck } from "lucide-react";
+import Link from "next/link";
+import { CalendarCheck, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import {
@@ -11,6 +12,7 @@ import {
   listClassInstructorRequests
 } from "@/lib/academy/class-instructor-requests";
 import { listAcademyClasses } from "@/lib/academy/classes";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listInstructors } from "@/lib/academy/instructors";
 import type {
@@ -143,12 +145,18 @@ function ClassesContent() {
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]">
             <CalendarCheck size={19} />
           </span>
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold text-[var(--mikke-text)]">クラスと担当講師</h2>
             <p className="mt-1 text-sm text-[var(--mikke-muted)]">
               既存クラスの日程を確認し、同じ講座の有効な講師へ担当を依頼できます。
             </p>
           </div>
+          <Link
+            href={toCurrentAcademyContextHref("/academy/classes/new")}
+            className="inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white"
+          >
+            <Plus size={16} /> クラスを作成
+          </Link>
         </div>
         {message ? <p className="mt-4 text-sm font-bold text-[var(--mikke-accent-strong)]">{message}</p> : null}
       </section>
@@ -257,9 +265,16 @@ function ClassesContent() {
           );
         })
       ) : (
-        <p className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-sm text-[var(--mikke-muted)]">
-          管理できるクラスはまだありません。
-        </p>
+        <section className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-6 text-center">
+          <p className="text-sm font-bold text-[var(--mikke-text)]">クラスはまだありません</p>
+          <p className="mt-1 text-xs text-[var(--mikke-muted)]">講座を選び、日程・形式・定員を登録すると担当講師へ依頼できます。</p>
+          <Link
+            href={toCurrentAcademyContextHref("/academy/classes/new")}
+            className="mt-4 inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white"
+          >
+            <Plus size={16} /> 最初のクラスを作成
+          </Link>
+        </section>
       )}
     </div>
   );

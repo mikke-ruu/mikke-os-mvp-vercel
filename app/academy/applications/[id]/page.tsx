@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Package } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import {
@@ -56,21 +57,28 @@ function DetailContent({ appId }: { appId: string }) {
   const [promotionError, setPromotionError] = useState<string | null>(null);
   const [promotionDone, setPromotionDone] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const foundHq = await getOwnedHeadquarters(profile.user_id);
-      setHq(foundHq);
-      if (foundHq) {
-        const found = await getApplication(foundHq.id, appId);
-        setApp(found);
-        setCourse(await getCourse(foundHq.id, found.course_id).catch(() => null as unknown as AcademyCourse));
-        setKitOrders(await listKitOrdersByApplication(foundHq.id, appId));
-        if (found.intake_source === "honbu") {
-          setNotifications(await listApplicationNotifications(appId).catch(() => []));
+      setLoadError(null);
+      try {
+        const foundHq = await getOwnedHeadquarters(profile.user_id);
+        setHq(foundHq);
+        if (foundHq) {
+          const found = await getApplication(foundHq.id, appId);
+          setApp(found);
+          setCourse(await getCourse(foundHq.id, found.course_id).catch(() => null as unknown as AcademyCourse));
+          setKitOrders(await listKitOrdersByApplication(foundHq.id, appId));
+          if (found.intake_source === "honbu") {
+            setNotifications(await listApplicationNotifications(appId).catch(() => []));
+          }
         }
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : "申込詳細を読み込めませんでした。");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     load();
   }, [profile.user_id, appId]);
@@ -118,6 +126,19 @@ function DetailContent({ appId }: { appId: string }) {
   }
 
   if (loading) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (loadError) {
+    return (
+      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
+        <p className="text-sm font-bold text-[var(--mikke-text)]">申込詳細を開けませんでした</p>
+        <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">
+          権限または通信状態を確認し、もう一度お試しください。{loadError}
+        </p>
+        <button type="button" onClick={() => window.location.reload()} className="mt-3 rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white">
+          もう一度読み込む
+        </button>
+      </div>
+    );
+  }
   if (!hq || !app) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">申込が見つかりません。</p>;
 
   return (
@@ -299,7 +320,7 @@ function DetailContent({ appId }: { appId: string }) {
 
       <button
         type="button"
-        onClick={() => router.push("/academy/applications")}
+        onClick={() => router.push(toCurrentAcademyContextHref("/academy/applications"))}
         className="w-full rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-3 text-sm font-bold text-[var(--mikke-text-soft)]"
       >
         一覧に戻る

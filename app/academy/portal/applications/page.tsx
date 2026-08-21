@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ClipboardList, Package, X } from "lucide-react";
+import { ClipboardList, Mail, Package, Phone, X } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { APPLICATION_STATUS_LABELS } from "@/lib/academy/applications";
@@ -122,10 +122,17 @@ function KitIntakeModal({
           </button>
         </div>
         <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">
-          {application.applicant_name}さんの申込です。受講者の氏名・電話番号・申込備考は本部には送られません。
+          先に{application.applicant_name}さんへ連絡し、受講日を決めてから登録してください。連絡先は申込カードで確認できます。
         </p>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <div className="rounded-xl bg-[var(--mikke-accent-soft)] px-3 py-2">
+            <p className="text-[11px] font-bold text-[var(--mikke-accent-strong)]">教材仕入れ金額</p>
+            <p className="mt-0.5 text-lg font-bold text-[var(--mikke-text)]">
+              {(course?.kit_price ?? 0).toLocaleString()}円
+            </p>
+            <p className="text-[10px] text-[var(--mikke-muted)]">金額と日程・送り先を確認してから確定してください。</p>
+          </div>
           <div>
             <label className={labelClass}>受講日*</label>
             <input
@@ -195,20 +202,27 @@ function MyApplicationsContent() {
   const [kitOrders, setKitOrders] = useState<AcademyKitOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalApp, setModalApp] = useState<AcademyApplication | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const myRecords = await getMyInstructorRecords(profile.user_id);
-    setRecords(myRecords);
-    const [myApps, courses, myKits] = await Promise.all([
-      listMyApplications(myRecords.map((r) => r.id)),
-      getCoursesByIds(myRecords.map((r) => r.course_id)),
-      listMyKitOrders(myRecords.map((r) => r.id))
-    ]);
-    setApps(myApps);
-    setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
-    setKitOrders(myKits);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const myRecords = await getMyInstructorRecords(profile.user_id);
+      setRecords(myRecords);
+      const [myApps, courses, myKits] = await Promise.all([
+        listMyApplications(myRecords.map((r) => r.id)),
+        getCoursesByIds(myRecords.map((r) => r.course_id)),
+        listMyKitOrders(myRecords.map((r) => r.id))
+      ]);
+      setApps(myApps);
+      setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
+      setKitOrders(myKits);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "申込を読み込めませんでした。");
+    } finally {
+      setLoading(false);
+    }
   }, [profile.user_id]);
 
   useEffect(() => {
@@ -220,6 +234,17 @@ function MyApplicationsContent() {
   }
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (loadError) {
+    return (
+      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
+        <p className="text-sm font-bold text-[var(--mikke-text)]">申込を読み込めませんでした</p>
+        <p className="mt-2 text-xs text-[var(--mikke-muted)]">{loadError}</p>
+        <button type="button" onClick={() => void load()} className="mt-3 rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white">
+          もう一度読み込む
+        </button>
+      </div>
+    );
+  }
   if (records.length === 0) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">まだ講師登録されていません。</p>;
 
   const modalInstructor = modalApp ? instructorForApp(modalApp) : null;
@@ -256,6 +281,24 @@ function MyApplicationsContent() {
                   <span className="shrink-0 rounded-full bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">
                     {APPLICATION_STATUS_LABELS[a.status]}
                   </span>
+                </div>
+                <div className="mt-3 space-y-2 border-t border-[var(--mikke-line-soft)] pt-3">
+                  {a.applicant_email ? (
+                    <a
+                      href={`mailto:${a.applicant_email}?subject=${encodeURIComponent(`【${courseMap[a.course_id]?.name ?? "Academy"}】受講日程のご連絡`)}`}
+                      className="flex items-center gap-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
+                    >
+                      <Mail size={13} /> メールで連絡する
+                    </a>
+                  ) : (
+                    <p className="text-[11px] text-[var(--mikke-muted)]">メールアドレスは未登録です。</p>
+                  )}
+                  {a.applicant_phone ? (
+                    <a href={`tel:${a.applicant_phone}`} className="flex items-center gap-2 text-xs text-[var(--mikke-text-soft)]">
+                      <Phone size={13} /> {a.applicant_phone}
+                    </a>
+                  ) : null}
+                  {a.applicant_note ? <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">備考: {a.applicant_note}</p> : null}
                 </div>
                 {!requiresKit ? null : existingOrder ? (
                   <p className="mt-2 text-[11px] font-bold text-[var(--mikke-accent-strong)]">

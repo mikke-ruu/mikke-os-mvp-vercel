@@ -7,7 +7,12 @@ import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
-import { INSTRUCTOR_STATUS_LABELS, getRenewalAlerts, listInstructors } from "@/lib/academy/instructors";
+import {
+  INSTRUCTOR_REGISTRATION_STATUS_LABELS,
+  INSTRUCTOR_STATUS_LABELS,
+  getRenewalAlerts,
+  listInstructors
+} from "@/lib/academy/instructors";
 import type { AcademyCourse, AcademyHeadquarters, AcademyInstructor } from "@/types/database";
 
 const RENEWAL_PRESETS = [
@@ -214,12 +219,18 @@ function InstructorsContent() {
                       <p className="mt-0.5 truncate text-xs text-[var(--mikke-muted)]">
                         {course ? `${course.code} ` : ""}
                         {ins.instructor_number ? `No.${ins.instructor_number} ・ ` : ""}
-                        {INSTRUCTOR_STATUS_LABELS[ins.status]}
+                        {ins.registration_status === "withdrawn"
+                          ? INSTRUCTOR_REGISTRATION_STATUS_LABELS.withdrawn
+                          : INSTRUCTOR_STATUS_LABELS[ins.status]}
                       </p>
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge on={ins.is_certified} label={ins.is_certified ? "認定済み" : "未認定"} />
+                    <Badge
+                      on={ins.registration_status === "registered"}
+                      label={INSTRUCTOR_REGISTRATION_STATUS_LABELS[ins.registration_status]}
+                    />
                     <Badge on={ins.is_active} label={ins.is_active ? "活動中" : "活動なし"} />
                     <Badge on={ins.is_listed} label={ins.is_listed ? "掲載中" : "非掲載"} />
                     {renewalDueIds.has(ins.id) ? (

@@ -89,7 +89,7 @@ function FrontContent() {
       <div className="flex items-center justify-between">
         <p className="text-xs text-[var(--mikke-muted)]">フロントページ（一般公開の講座紹介サイト）の内容を編集します。</p>
         <Link
-          href="/academy/site"
+          href={`/academy/site/${encodeURIComponent(hq.handle)}`}
           target="_blank"
           className="flex shrink-0 items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent)]"
         >

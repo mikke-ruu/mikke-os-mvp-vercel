@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import { createApplication, type ApplicationInput } from "@/lib/academy/applications";
@@ -75,7 +76,7 @@ function NewApplicationContent() {
     setSaving(true);
     try {
       await createApplication(profile, hq!.id, form);
-      router.push("/academy/applications");
+      router.push(toCurrentAcademyContextHref("/academy/applications"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
       setSaving(false);

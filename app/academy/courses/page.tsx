@@ -5,7 +5,7 @@ import Link from "next/link";
 import { BookOpen, Eye, EyeOff, GraduationCap, LayoutTemplate, PenSquare, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
-import { ensureHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
+import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses, setCoursePublished } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 
@@ -28,14 +28,6 @@ function CoursesContent() {
     load();
   }, [load]);
 
-  async function initHq() {
-    setLoading(true);
-    const created = await ensureHeadquarters(profile, `${profile.display_name}アカデミー`);
-    setHq(created);
-    setCourses(await listCourses(created.id));
-    setLoading(false);
-  }
-
   async function togglePublish(course: AcademyCourse) {
     if (!hq) return;
     setBusyId(course.id);
@@ -53,10 +45,7 @@ function CoursesContent() {
     return (
       <div className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 text-center">
         <p className="text-sm font-bold text-[var(--mikke-text)]">本部がまだありません</p>
-        <p className="text-xs text-[var(--mikke-muted)]">認定講座を管理する本部を作成します。</p>
-        <button onClick={initHq} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white">
-          本部を作成する
-        </button>
+        <p className="text-xs text-[var(--mikke-muted)]">契約確認後、Academyのホームから本部を作成してください。</p>
       </div>
     );
   }

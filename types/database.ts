@@ -108,6 +108,16 @@ export type AcademyHeadquarters = {
 };
 
 export type AcademyHeadquartersRole = "owner" | "administrator" | "course_editor";
+export type AcademyAccessRole = AcademyHeadquartersRole | "instructor";
+export type AcademyPortal = "manage" | "teach";
+export type AcademyAccessContext = {
+  academy_id: string;
+  academy_name: string;
+  academy_handle: string;
+  roles: AcademyAccessRole[];
+  portals: AcademyPortal[];
+  capabilities: string[];
+};
 export type AcademyHeadquartersMemberStatus = "active" | "stopped";
 export type AcademyHeadquartersInvitationStatus =
   | "pending"
@@ -322,6 +332,10 @@ export type AcademyInstructor = {
   renewal_due: string | null;
   is_certified: boolean;
   is_active: boolean;
+  registration_status: "registered" | "withdrawn";
+  registered_at: string;
+  withdrawn_at: string | null;
+  withdrawn_by_user_id: string | null;
   status: "active" | "dormant" | "suspended" | "reapplying";
   memo: string | null;
   photo_url: string | null;

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import {
@@ -136,7 +137,7 @@ function NewInstructorContent() {
       if (consumesAutoNumber && hq!.next_instructor_number != null) {
         await updateHeadquarters(hq!.id, { next_instructor_number: hq!.next_instructor_number + 1 });
       }
-      router.push("/academy/instructors");
+      router.push(toCurrentAcademyContextHref("/academy/instructors"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "登録に失敗しました。");
       setSaving(false);
