@@ -19,9 +19,18 @@ import {
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { getActiveCheckItems, getInitiallySelectedCheckItems, loadCheckTemplate, resolveDueDate } from "@/lib/check-templates";
-import { toDateKey } from "@/lib/format";
-import { addCheckItem, addFinancialRecord, createMarketEvent } from "@/lib/marketnote";
+import { formatMonthDayWeekday, toDateKey } from "@/lib/format";
+import { addCheckItem, addFinancialRecord, createMarketEvent, createMarketEvents } from "@/lib/marketnote";
 import { getMarketEventTypeNames, loadMarketEventTypeSettingsForProfile } from "@/lib/marketnote-event-types";
+import {
+  addDaysToDateKey,
+  buildRecurringEventDates,
+  daysBetweenDateKeys,
+  marketEventRecurrenceOptions,
+  MAX_RECURRING_EVENTS,
+  recurringEventDatesExceedLimit,
+  type MarketEventRecurrence
+} from "@/lib/marketnote-recurrence";
 import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import type { MarketEvent } from "@/types/database";
 
@@ -51,6 +60,10 @@ function NewMarketEventContent() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [multiDay, setMultiDay] = useState(false);
+  const [recurrence, setRecurrence] = useState<MarketEventRecurrence>("none");
+  const [repeatUntil, setRepeatUntil] = useState("");
+  const [copyPaymentsToRecurring, setCopyPaymentsToRecurring] = useState(false);
+  const [copyChecksToRecurring, setCopyChecksToRecurring] = useState(false);
   const [status, setStatus] = useState<EntryStatus>("preparing");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -98,12 +111,24 @@ function NewMarketEventContent() {
     { label: "確定", value: "preparing" }
   ], [eventType]);
 
-  const privateNote = useMemo(() => {
+  const recurringDates = useMemo(
+    () => buildRecurringEventDates(startDate, repeatUntil, recurrence),
+    [recurrence, repeatUntil, startDate]
+  );
+  const recurrenceTooLong = useMemo(
+    () => recurringEventDatesExceedLimit(startDate, repeatUntil, recurrence),
+    [recurrence, repeatUntil, startDate]
+  );
+
+  function buildPrivateNote(occurrenceStartDate: string, occurrenceEndDate: string, recurrenceId: string | null) {
     return [
       `入力ステータス: ${statusLabel(status, eventType)}`,
-      startDate ? `start_date: ${startDate}` : "",
-      normalizedEndDate ? `end_date: ${normalizedEndDate}` : "",
+      occurrenceStartDate ? `start_date: ${occurrenceStartDate}` : "",
+      occurrenceEndDate ? `end_date: ${occurrenceEndDate}` : "",
       `複数日イベント: ${multiDay ? "true" : "false"}`,
+      recurrenceId ? "繰り返し予定: true" : "",
+      recurrenceId ? `繰り返しID: ${recurrenceId}` : "",
+      recurrenceId ? `繰り返しルール: ${recurrence}` : "",
       startTime ? `開始時間: ${startTime}` : "",
       endTime ? `終了時間: ${endTime}` : "",
       meetTime ? `集合時間: ${meetTime}` : "",
@@ -112,7 +137,7 @@ function NewMarketEventContent() {
         ? `事前経費: ${payment.title || "経費"} / ${paymentLabel(payment.status)} / ${payment.method} / ${payment.amount || 0}円`
         : `事前経費: ${payment.title || "経費"} / 不要`)
     ].filter(Boolean).join("\n");
-  }, [endTime, eventType, meetTime, multiDay, normalizedEndDate, packUpTime, payments, startDate, startTime, status]);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,33 +147,56 @@ function NewMarketEventContent() {
       setError("終了日は開始日以降にしてください。");
       return;
     }
+    if (recurrence !== "none" && (!repeatUntil || repeatUntil < startDate)) {
+      setError("繰り返しの終了日は予定日以降にしてください。");
+      return;
+    }
+    if (recurrenceTooLong) {
+      setError(`繰り返し予定は一度に${MAX_RECURRING_EVENTS}件まで作成できます。終了日を短くしてください。`);
+      return;
+    }
 
     setSaving(true);
     setError("");
 
     try {
-      const created = await createMarketEvent(profile, {
-        title: title.trim(),
-        eventDate: startDate,
-        venueName: venueName.trim(),
-        area: address.trim(),
-        genre: eventType,
-        status: status === "preparing" ? "preparing" : "planned",
-        publicNote: memo.trim(),
-        privateNote
+      const dates = recurrence === "none" ? [startDate] : recurringDates;
+      const recurrenceId = dates.length > 1 ? createRecurrenceId() : null;
+      const durationDays = multiDay ? daysBetweenDateKeys(startDate, normalizedEndDate) : 0;
+      const eventInputs = dates.map((occurrenceStartDate) => {
+        const occurrenceEndDate = addDaysToDateKey(occurrenceStartDate, durationDays);
+        return {
+          title: title.trim(),
+          eventDate: occurrenceStartDate,
+          venueName: venueName.trim(),
+          area: address.trim(),
+          genre: eventType,
+          status: status === "preparing" ? "preparing" : "planned",
+          publicNote: memo.trim(),
+          privateNote: buildPrivateNote(occurrenceStartDate, occurrenceEndDate, recurrenceId)
+        } as const;
       });
+      const createdEvents = dates.length === 1
+        ? [await createMarketEvent(profile, eventInputs[0])]
+        : await createMarketEvents(profile, eventInputs);
 
-      await savePayment(created);
-      await saveChecks(created);
+      for (let offset = 0; offset < createdEvents.length; offset += 4) {
+        const batch = createdEvents.slice(offset, offset + 4);
+        await Promise.all(batch.map((created) => Promise.all([
+          recurrence === "none" || copyPaymentsToRecurring ? savePayment(created, created.event_date) : Promise.resolve(),
+          recurrence === "none" || copyChecksToRecurring ? saveChecks(created, created.event_date) : Promise.resolve()
+        ])));
+      }
 
-      router.replace(`/marketnote/${created.id}`);
+      if (createdEvents.length === 1) router.replace(`/marketnote/${createdEvents[0].id}`);
+      else router.replace("/marketnote");
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
       setSaving(false);
     }
   }
 
-  async function savePayment(created: MarketEvent) {
+  async function savePayment(created: MarketEvent, occurrenceDate: string) {
     const requiredPayments = payments.filter((payment) => payment.status !== "not_required" && Number(payment.amount || 0) > 0);
     if (requiredPayments.length === 0) return;
 
@@ -160,7 +208,7 @@ function NewMarketEventContent() {
         recordType: "expense",
         title: payment.title.trim() || "事前経費",
         amount,
-        occurredAt: payment.status === "paid" ? toDateKey(new Date()) : startDate,
+        occurredAt: payment.status === "paid" ? toDateKey(new Date()) : occurrenceDate,
         category: payment.title.trim() || "事前経費",
         memo: "",
         paymentStatus: payment.status,
@@ -190,7 +238,7 @@ function NewMarketEventContent() {
     ]);
   }
 
-  async function saveChecks(created: MarketEvent) {
+  async function saveChecks(created: MarketEvent, occurrenceDate: string) {
     const items = Array.from(new Set([
       ...selectedChecks,
       customCheck.trim()
@@ -198,7 +246,7 @@ function NewMarketEventContent() {
 
     await Promise.all(items.map((item) => {
       const rule = templateDueRules[item];
-      const dueDate = rule ? resolveDueDate(rule as Parameters<typeof resolveDueDate>[0], startDate) : null;
+      const dueDate = rule ? resolveDueDate(rule as Parameters<typeof resolveDueDate>[0], occurrenceDate) : null;
       return addCheckItem(profile, created.id, item, dueDate);
     }));
   }
@@ -300,6 +348,70 @@ function NewMarketEventContent() {
               </span>
               複数日の予定
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRecurrence((current) => {
+                  const next = current === "none" ? "weekly" : "none";
+                  if (next !== "none" && (!repeatUntil || repeatUntil < startDate)) {
+                    setRepeatUntil(addDaysToDateKey(startDate, 28));
+                  }
+                  return next;
+                });
+              }}
+              className="inline-flex min-h-10 items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]"
+            >
+              <span className={`grid h-4 w-4 place-items-center rounded border ${recurrence !== "none" ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white text-transparent"}`}>
+                <Check size={11} strokeWidth={2} />
+              </span>
+              繰り返し予定
+            </button>
+
+            {recurrence !== "none" ? (
+              <div className="rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-3">
+                <div className="flex flex-wrap gap-2">
+                  {marketEventRecurrenceOptions.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setRecurrence(option.value)}
+                      className={`rounded-full border px-3 py-2 text-xs font-bold ${recurrence === option.value ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"}`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-[1fr_auto] min-[360px]:items-end">
+                  <Field label="繰り返しの終了日" required compact>
+                    <TextInput value={repeatUntil} onChange={setRepeatUntil} type="date" required icon={<CalendarDays size={15} />} />
+                  </Field>
+                  <p className={`pb-2 text-xs font-bold ${recurrenceTooLong ? "text-[var(--mikke-orange)]" : "text-[var(--mikke-blue)]"}`}>
+                    {recurrenceTooLong ? `${MAX_RECURRING_EVENTS}件を超えます` : `${recurringDates.length}件の予定を作成`}
+                  </p>
+                </div>
+                {recurringDates.length > 0 && !recurrenceTooLong ? (
+                  <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-[var(--mikke-line-soft)] bg-white p-2" aria-label="作成される日付">
+                    <div className="flex flex-wrap gap-1.5">
+                      {recurringDates.map((date) => <span key={date} className="rounded-full bg-[var(--mikke-surface-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-text-soft)]">{formatMonthDayWeekday(date)}</span>)}
+                    </div>
+                  </div>
+                ) : null}
+                <div className="mt-2 space-y-1">
+                  <RecurrenceCopyOption
+                    checked={copyPaymentsToRecurring}
+                    onChange={setCopyPaymentsToRecurring}
+                    label="入力した事前経費も各予定に追加"
+                  />
+                  <RecurrenceCopyOption
+                    checked={copyChecksToRecurring}
+                    onChange={setCopyChecksToRecurring}
+                    label="選んだチェック項目も各予定に追加"
+                  />
+                </div>
+                <p className="mt-1 text-[11px] font-semibold leading-5 text-[var(--mikke-muted)]">各日付を独立した予定として保存します。あとから1件ずつ編集できます。</p>
+              </div>
+            ) : null}
           </FormCard>
 
           <FormCard title="ステータス" tone="orange" icon={<Check size={16} strokeWidth={1.8} />}>
@@ -680,6 +792,22 @@ function paymentLabel(status: PaymentStatus) {
 function getPaymentMethodOptions(options: string[], selected: string) {
   const values = Array.from(new Set([...options, selected].filter(Boolean)));
   return values.map((method) => ({ label: method, value: method }));
+}
+
+function RecurrenceCopyOption({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) {
+  return (
+    <button type="button" onClick={() => onChange(!checked)} className="flex min-h-9 w-full items-center gap-2 rounded-lg px-1 text-left text-[11px] font-bold text-[var(--mikke-muted)]">
+      <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${checked ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] bg-white text-transparent"}`}>
+        <Check size={11} strokeWidth={2} />
+      </span>
+      {label}
+    </button>
+  );
+}
+
+function createRecurrenceId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `recurrence-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 export default function NewMarketEventPage() {

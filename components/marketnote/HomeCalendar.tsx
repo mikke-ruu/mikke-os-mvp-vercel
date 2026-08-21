@@ -2,10 +2,11 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, MapPin } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, MapPin, X } from "lucide-react";
 import { formatMonthDayWeekday, toDateKey } from "@/lib/format";
 import { getMarketEventWorkflowStatus, marketEventWorkflowLabel, type MarketEventWorkflowStatus } from "@/lib/marketnote";
 import { defaultMarketEventTypeSettings, getMarketEventType, getMarketEventTypeColor, loadMarketEventTypeSettingsForProfile, readableTextColor, type MarketEventTypeSettings } from "@/lib/marketnote-event-types";
+import { getMarketNoteStoryAchievement, hasMyStory, stageMarketNoteStoryAchievement, withdrawMarketNoteStoryAchievement, type MarketNoteStoryAchievement, type StoryAchievementDisplayMode } from "@/lib/marketnote-story";
 import { defaultReminderSettings, loadReminderSettings } from "@/lib/reminders";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, Profile } from "@/types/database";
 
@@ -20,11 +21,12 @@ type Props = {
   onStatusChange: (event: MarketEvent, workflow: MarketEventWorkflowStatus) => Promise<void>;
   onPaymentStatusChange: (event: MarketEvent, paymentStatus: "unpaid" | "paid") => Promise<void>;
   onToggleCheck: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
+  onSelectedDateChange?: (dateKey: string) => void;
 };
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
-export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, viewToggle, onStatusChange, onPaymentStatusChange, onToggleCheck }: Props) {
+export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, viewToggle, onStatusChange, onPaymentStatusChange, onToggleCheck, onSelectedDateChange }: Props) {
   const todayKey = toDateKey(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
@@ -36,6 +38,7 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   const [busyKey, setBusyKey] = useState("");
   const [message, setMessage] = useState("");
   const [overdueOpen, setOverdueOpen] = useState(false);
+  const [storyEvent, setStoryEvent] = useState<MarketEvent | null>(null);
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
 
@@ -102,7 +105,12 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   function goToToday() {
     const now = new Date();
     setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedDate(todayKey);
+    selectDate(todayKey);
+  }
+
+  function selectDate(dateKey: string) {
+    setSelectedDate(dateKey);
+    onSelectedDateChange?.(dateKey);
   }
 
   async function changeStatus(event: MarketEvent, workflow: MarketEventWorkflowStatus) {
@@ -189,17 +197,19 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
           const inMonth = date.getMonth() === visibleMonth.getMonth();
           const dayEvents = eventsByDate[key] ?? [];
           const today = key === todayKey;
+          const hasStoryCandidate = dayEvents.some((event) => isStoryEligible(event, todayKey));
           return (
             <button
               type="button"
               key={key}
-              onClick={() => setSelectedDate(key)}
+              onClick={() => selectDate(key)}
               aria-label={calendarDayLabel(date, dayEvents)}
               aria-pressed={selectedDate === key}
               className={`flex h-[68px] min-w-0 flex-col items-stretch rounded-lg border p-0.5 text-center hover:border-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)] sm:h-[74px] ${selectedDate === key ? "border-[var(--mikke-blue)] bg-[var(--mikke-surface-soft)]" : "border-transparent"} ${inMonth ? "" : "opacity-40"}`}
             >
-              <span className={`mx-auto grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${today ? "border border-[var(--mikke-blue)] text-[var(--mikke-blue)]" : "text-[var(--mikke-text)]"}`}>
-                {date.getDate()}
+              <span className="mx-auto flex h-6 items-center justify-center gap-0.5">
+                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${today ? "border border-[var(--mikke-blue)] text-[var(--mikke-blue)]" : "text-[var(--mikke-text)]"}`}>{date.getDate()}</span>
+                {hasStoryCandidate ? <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--mikke-yellow)]" title="+STORYに追加できます" /> : null}
               </span>
               <CalendarCellBody events={dayEvents} settings={eventTypeSettings} />
             </button>
@@ -218,7 +228,9 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
         onStatusChange={changeStatus}
         onPaymentStatusChange={changePayment}
         onToggleCheck={changeCheck}
+        onStory={setStoryEvent}
       />
+      {storyEvent ? <StoryAchievementDialog profile={profile} event={storyEvent} onClose={() => setStoryEvent(null)} /> : null}
       {message ? <p className="mt-2 rounded-lg bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-text)]">{message}</p> : null}
 
       {currentTasks.length > 0 || overdueTasks.length > 0 ? (
@@ -276,7 +288,8 @@ function SelectedDayEvents({
   busyKey,
   onStatusChange,
   onPaymentStatusChange,
-  onToggleCheck
+  onToggleCheck,
+  onStory
 }: {
   dateKey: string;
   todayKey: string;
@@ -288,6 +301,7 @@ function SelectedDayEvents({
   onStatusChange: (event: MarketEvent, workflow: MarketEventWorkflowStatus) => Promise<void>;
   onPaymentStatusChange: (event: MarketEvent, paymentStatus: "unpaid" | "paid") => Promise<void>;
   onToggleCheck: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
+  onStory: (event: MarketEvent) => void;
 }) {
   return (
     <section className="mt-3 border-t border-[var(--mikke-line)] pt-3">
@@ -354,7 +368,12 @@ function SelectedDayEvents({
                     </div>
                   ) : null}
 
-                  <Link href={`/marketnote/${event.id}`} className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-[var(--mikke-line)] text-xs font-bold text-[var(--mikke-blue)]">詳細編集</Link>
+                  <div className={`mt-2 grid gap-2 ${isStoryEligible(event, todayKey) ? "grid-cols-[auto_1fr]" : "grid-cols-1"}`}>
+                    {isStoryEligible(event, todayKey) ? (
+                      <button type="button" onClick={() => onStory(event)} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)] px-3 text-xs font-extrabold text-[var(--mikke-text)]">+STORY</button>
+                    ) : null}
+                    <Link href={`/marketnote/${event.id}`} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[var(--mikke-line)] px-3 text-xs font-bold text-[var(--mikke-blue)]">詳細編集</Link>
+                  </div>
                 </div>
               </article>
             );
@@ -363,6 +382,152 @@ function SelectedDayEvents({
       )}
     </section>
   );
+}
+
+function StoryAchievementDialog({ profile, event, onClose }: { profile: Profile; event: MarketEvent; onClose: () => void }) {
+  const defaultDate = marketEventEndDate(event);
+  const defaultLocation = [event.venue_name, event.area].filter(Boolean).join(" / ");
+  const [displayMode, setDisplayMode] = useState<StoryAchievementDisplayMode>("card_and_count");
+  const [title, setTitle] = useState(event.title);
+  const [typeLabel, setTypeLabel] = useState(getMarketEventType(event));
+  const [occurredOn, setOccurredOn] = useState(defaultDate);
+  const [includeLocation, setIncludeLocation] = useState(false);
+  const [location, setLocation] = useState(defaultLocation);
+  const [storyExists, setStoryExists] = useState<boolean | null>(null);
+  const [achievement, setAchievement] = useState<MarketNoteStoryAchievement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    void hasMyStory(profile).then(async (exists) => {
+      if (!active) return;
+      setStoryExists(exists);
+      if (!exists) return;
+      const current = await getMarketNoteStoryAchievement(profile, event.id);
+      if (!active || !current) return;
+      setAchievement(current);
+      setDisplayMode(current.display_mode);
+      setTitle(current.public_title || event.title);
+      setTypeLabel(current.public_type_label || getMarketEventType(event));
+      setOccurredOn(current.occurred_on || defaultDate);
+      setIncludeLocation(Boolean(current.public_location));
+      setLocation(current.public_location || defaultLocation);
+    }).catch((error) => {
+      if (active) setMessage(error instanceof Error ? error.message : "STORYへ接続できませんでした。");
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [defaultDate, defaultLocation, event, profile]);
+
+  async function save() {
+    setSaving(true);
+    setMessage("");
+    try {
+      const saved = await stageMarketNoteStoryAchievement(profile, event.id, {
+        displayMode,
+        publicTitle: title,
+        publicTypeLabel: typeLabel,
+        occurredOn,
+        publicLocation: includeLocation ? location : null
+      });
+      setAchievement(saved);
+      setMessage("STORYの実績管理へ下書き保存しました。公開はSTORY側で行います。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "STORYへ追加できませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function withdraw() {
+    setSaving(true);
+    setMessage("");
+    try {
+      await withdrawMarketNoteStoryAchievement(profile, event.id);
+      setAchievement((current) => current ? { ...current, publication_status: "withdrawn" } : current);
+      setMessage("STORYへの掲載を取り下げました。記録は重複防止のため残ります。");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "掲載を取り下げられませんでした。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const cardEnabled = displayMode !== "count_only";
+  const saveDisabled = saving || loading || !storyExists || (cardEnabled && (!title.trim() || !typeLabel.trim() || !occurredOn || (includeLocation && !location.trim())));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/35 p-2 sm:items-center" role="presentation" onMouseDown={(input) => { if (input.target === input.currentTarget) onClose(); }}>
+      <section role="dialog" aria-modal="true" aria-labelledby="story-achievement-title" className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-4 shadow-xl">
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--mikke-blue)]">STORY</p><h2 id="story-achievement-title" className="mt-1 text-lg font-extrabold text-[var(--mikke-text)]">+STORY</h2></div>
+          <button type="button" onClick={onClose} aria-label="閉じる" className="grid h-10 w-10 place-items-center rounded-full text-[var(--mikke-text)]"><X size={19} /></button>
+        </div>
+
+        {loading ? <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4 text-sm font-bold text-[var(--mikke-muted)]">STORYを確認しています...</p> : null}
+        {!loading && storyExists === false ? (
+          <div className="mt-4 space-y-3">
+            <p className="rounded-xl bg-[var(--mikke-surface-soft)] p-4 text-sm font-bold leading-6 text-[var(--mikke-text)]">活動実績を保存するSTORYがまだありません。先にSTORYを作りますか？</p>
+            <Link href="/story/start" className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--mikke-orange)] text-sm font-extrabold text-white">STORYを作る</Link>
+            <button type="button" onClick={onClose} className="min-h-11 w-full rounded-xl border border-[var(--mikke-line)] text-sm font-bold text-[var(--mikke-muted)]">今回はやめる</button>
+          </div>
+        ) : null}
+
+        {!loading && storyExists ? (
+          <div className="mt-4 space-y-4">
+            <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
+              <p>ここではSTORY用の下書きを作ります。公開はSTORY側で確認してから行います。</p>
+              {achievement ? <p className="mt-1 font-extrabold text-[var(--mikke-blue)]">現在：{publicationLabel(achievement.publication_status)}</p> : null}
+            </div>
+
+            <label className="block text-xs font-extrabold text-[var(--mikke-text)]">STORYへの表示方法
+              <select value={displayMode} onChange={(input) => setDisplayMode(input.target.value as StoryAchievementDisplayMode)} className="mt-1 min-h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-sm font-bold outline-none">
+                <option value="count_only">実績数だけ</option>
+                <option value="card_only">活動実績カードだけ</option>
+                <option value="card_and_count">実績数と活動実績カード</option>
+              </select>
+            </label>
+
+            {cardEnabled ? (
+              <div className="space-y-3">
+                <StoryTextField label="実績名" value={title} onChange={setTitle} />
+                <StoryTextField label="実績の種類" value={typeLabel} onChange={setTypeLabel} />
+                <label className="block text-xs font-extrabold text-[var(--mikke-text)]">日付
+                  <input type="date" value={occurredOn} onChange={(input) => setOccurredOn(input.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-sm font-semibold outline-none" />
+                </label>
+                <button type="button" onClick={() => setIncludeLocation((current) => !current)} className="flex min-h-10 w-full items-center gap-2 text-left text-xs font-bold text-[var(--mikke-text)]">
+                  <span className={`grid h-5 w-5 place-items-center rounded border ${includeLocation ? "border-[var(--mikke-blue)] bg-[var(--mikke-blue)] text-white" : "border-[var(--mikke-line)] text-transparent"}`}><Check size={13} /></span>
+                  場所を活動実績カードに掲載する
+                </button>
+                {includeLocation ? <StoryTextField label="公開する場所" value={location} onChange={setLocation} /> : null}
+              </div>
+            ) : <p className="rounded-xl border border-[var(--mikke-line-soft)] p-3 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">実績数だけを加え、予定名・日付・場所などの個別情報は公開しません。</p>}
+
+            <p className="text-[11px] font-semibold leading-5 text-[var(--mikke-muted)]">MarketNoteのメモ・写真・収支・支払い情報はSTORYへ渡しません。公開用の一言メモと写真はSTORY側で入力します。</p>
+            {message ? <p className="rounded-xl bg-[var(--mikke-accent-soft)] p-3 text-xs font-bold leading-5 text-[var(--mikke-text)]">{message}</p> : null}
+            <button type="button" onClick={() => void save()} disabled={saveDisabled} className="min-h-12 w-full rounded-xl bg-[var(--mikke-orange)] px-4 text-sm font-extrabold text-white disabled:opacity-50">{saving ? "保存中..." : "STORYへ下書き保存"}</button>
+            {achievement ? <Link href="/story/achievements" className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-[var(--mikke-blue)] text-sm font-extrabold text-[var(--mikke-blue)]">STORYで確認する</Link> : null}
+            {achievement && achievement.publication_status !== "withdrawn" ? <button type="button" onClick={() => void withdraw()} disabled={saving} className="min-h-10 w-full text-xs font-bold text-[var(--mikke-muted)] disabled:opacity-50">掲載を取り下げる</button> : null}
+          </div>
+        ) : null}
+        {!loading && message && !storyExists ? <p className="mt-3 rounded-xl bg-[var(--mikke-accent-soft)] p-3 text-xs font-bold leading-5 text-[var(--mikke-text)]">{message}</p> : null}
+      </section>
+    </div>
+  );
+}
+
+function StoryTextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="block text-xs font-extrabold text-[var(--mikke-text)]">{label}<input value={value} onChange={(input) => onChange(input.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 text-sm font-semibold outline-none" /></label>;
+}
+
+function publicationLabel(status: MarketNoteStoryAchievement["publication_status"]) {
+  if (status === "published") return "STORYで公開中";
+  if (status === "withdrawn") return "取り下げ済み";
+  return "STORYで確認待ち";
 }
 
 function TaskList({
@@ -442,6 +607,15 @@ function getPaymentState(finances: MarketFinancialRecord[]): PaymentState {
 function statusLabel(status: MarketEvent["status"]) {
   if (status !== "planned") return "確定";
   return "検討中";
+}
+
+function isStoryEligible(event: MarketEvent, todayKey: string) {
+  return getMarketEventWorkflowStatus(event) === "confirmed" && marketEventEndDate(event) < todayKey;
+}
+
+function marketEventEndDate(event: MarketEvent) {
+  const matched = (event.private_note ?? "").match(/(?:^|\n)end_date:\s*(\d{4}-\d{2}-\d{2})(?:\n|$)/);
+  return matched?.[1] || event.event_date;
 }
 
 function eventTimeLabel(event: MarketEvent) {
