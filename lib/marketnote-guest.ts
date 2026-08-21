@@ -153,6 +153,22 @@ export function updateGuestMarketEventDetails(eventId: string, input: {
   return updated;
 }
 
+export function deleteGuestMarketEvent(eventId: string) {
+  const store = readStore();
+  if (!store.events.some((event) => event.id === eventId)) {
+    throw new Error("MarketNoteの記録が見つかりません。");
+  }
+
+  writeStore((current) => ({
+    events: current.events.filter((event) => event.id !== eventId),
+    checks: current.checks.filter((item) => item.market_event_id !== eventId),
+    reflections: current.reflections.filter((item) => item.market_event_id !== eventId),
+    finances: current.finances.map((record) => record.market_event_id === eventId
+      ? { ...record, market_event_id: null, updated_at: timestamp() }
+      : record)
+  }));
+}
+
 export function listGuestCheckItems(marketEventId: string) {
   return readStore().checks
     .filter((item) => item.market_event_id === marketEventId)

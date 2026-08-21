@@ -6,8 +6,10 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, MapPin } from "l
 import { formatMonthDayWeekday, toDateKey } from "@/lib/format";
 import { getMarketEventWorkflowStatus, marketEventWorkflowLabel, type MarketEventWorkflowStatus } from "@/lib/marketnote";
 import { defaultMarketEventTypeSettings, getMarketEventType, getMarketEventTypeColor, loadMarketEventTypeSettingsForProfile, readableTextColor, type MarketEventTypeSettings } from "@/lib/marketnote-event-types";
+import type { MarketNotePhotoPreviewMap } from "@/lib/marketnote-photos";
+import { mergeMarketNoteReflectionText } from "@/lib/marketnote-reflection-text";
 import { defaultReminderSettings, loadReminderSettings } from "@/lib/reminders";
-import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, Profile } from "@/types/database";
+import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection, Profile } from "@/types/database";
 
 type PaymentState = "paid" | "unpaid" | "not_required";
 
@@ -16,15 +18,18 @@ type Props = {
   events: MarketEvent[];
   checksByEvent: Record<string, MarketCheckItem[]>;
   financesByEvent: Record<string, MarketFinancialRecord[]>;
+  reflectionsByEvent: Record<string, MarketReflection>;
+  photoPreviewsByEvent: MarketNotePhotoPreviewMap;
   viewToggle: ReactNode;
   onStatusChange: (event: MarketEvent, workflow: MarketEventWorkflowStatus) => Promise<void>;
   onPaymentStatusChange: (event: MarketEvent, paymentStatus: "unpaid" | "paid") => Promise<void>;
   onToggleCheck: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
+  onSelectedDateChange: (dateKey: string) => void;
 };
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
-export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, viewToggle, onStatusChange, onPaymentStatusChange, onToggleCheck }: Props) {
+export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, reflectionsByEvent, photoPreviewsByEvent, viewToggle, onStatusChange, onPaymentStatusChange, onToggleCheck, onSelectedDateChange }: Props) {
   const todayKey = toDateKey(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
@@ -62,9 +67,9 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   const weeks = useMemo(() => buildMonthMatrix(visibleMonth), [visibleMonth]);
   const activeEvents = useMemo(
     () => events
-      .filter((event) => event.status !== "completed" && event.status !== "cancelled")
+      .filter((event) => event.event_date >= todayKey && event.status !== "completed" && event.status !== "cancelled")
       .sort((a, b) => a.event_date.localeCompare(b.event_date)),
-    [events]
+    [events, todayKey]
   );
   const taskGroups = useMemo(() => {
     if (!reminderSettings.enabled || !reminderSettings.targets.checkItemDue) return { current: [], overdue: [] };
@@ -102,7 +107,12 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   function goToToday() {
     const now = new Date();
     setVisibleMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-    setSelectedDate(todayKey);
+    selectDate(todayKey);
+  }
+
+  function selectDate(dateKey: string) {
+    setSelectedDate(dateKey);
+    onSelectedDateChange(dateKey);
   }
 
   async function changeStatus(event: MarketEvent, workflow: MarketEventWorkflowStatus) {
@@ -193,15 +203,21 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
             <button
               type="button"
               key={key}
-              onClick={() => setSelectedDate(key)}
+              onClick={() => selectDate(key)}
               aria-label={calendarDayLabel(date, dayEvents)}
               aria-pressed={selectedDate === key}
               className={`flex h-[68px] min-w-0 flex-col items-stretch rounded-lg border p-0.5 text-center hover:border-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)] sm:h-[74px] ${selectedDate === key ? "border-[var(--mikke-blue)] bg-[var(--mikke-surface-soft)]" : "border-transparent"} ${inMonth ? "" : "opacity-40"}`}
             >
-              <span className={`mx-auto grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${today ? "border border-[var(--mikke-blue)] text-[var(--mikke-blue)]" : "text-[var(--mikke-text)]"}`}>
-                {date.getDate()}
+              <span className="mx-auto flex h-6 items-center justify-center">
+                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${today ? "border border-[var(--mikke-blue)] text-[var(--mikke-blue)]" : "text-[var(--mikke-text)]"}`}>{date.getDate()}</span>
               </span>
-              <CalendarCellBody events={dayEvents} settings={eventTypeSettings} />
+              <CalendarCellBody
+                events={dayEvents}
+                settings={eventTypeSettings}
+                isPastDate={key < todayKey}
+                reflectionsByEvent={reflectionsByEvent}
+                photoPreviewsByEvent={photoPreviewsByEvent}
+              />
             </button>
           );
         })}
@@ -213,6 +229,8 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
         events={selectedEvents}
         checksByEvent={checksByEvent}
         financesByEvent={financesByEvent}
+        reflectionsByEvent={reflectionsByEvent}
+        photoPreviewsByEvent={photoPreviewsByEvent}
         settings={eventTypeSettings}
         busyKey={busyKey}
         onStatusChange={changeStatus}
@@ -251,8 +269,33 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   );
 }
 
-function CalendarCellBody({ events, settings }: { events: MarketEvent[]; settings: MarketEventTypeSettings }) {
+function CalendarCellBody({
+  events,
+  settings,
+  isPastDate,
+  reflectionsByEvent,
+  photoPreviewsByEvent
+}: {
+  events: MarketEvent[];
+  settings: MarketEventTypeSettings;
+  isPastDate: boolean;
+  reflectionsByEvent: Record<string, MarketReflection>;
+  photoPreviewsByEvent: MarketNotePhotoPreviewMap;
+}) {
   if (events.length === 0) return null;
+  const singlePastEvent = isPastDate && events.length === 1 ? events[0] : null;
+  const reflectionText = singlePastEvent ? getReflectionExcerpt(reflectionsByEvent[singlePastEvent.id]) : "";
+  const photo = singlePastEvent ? photoPreviewsByEvent[singlePastEvent.id] : null;
+
+  if (singlePastEvent && photo) {
+    const hoverText = reflectionText ? `${singlePastEvent.title}：${reflectionText}` : singlePastEvent.title;
+    return (
+      <span className="mt-0.5 block min-h-0 flex-1 overflow-hidden" title={hoverText} aria-hidden="true">
+        <img src={photo.imageUrl} alt="" className="h-9 w-full rounded-[5px] object-cover" />
+      </span>
+    );
+  }
+
   return (
     <div className="mt-0.5 min-w-0 space-y-0.5" aria-hidden="true">
       {events.slice(0, 2).map((event) => {
@@ -262,6 +305,9 @@ function CalendarCellBody({ events, settings }: { events: MarketEvent[]; setting
         </span>;
       })}
       {events.length > 2 ? <span className="block truncate text-right text-[8px] font-bold leading-none text-[var(--mikke-muted)]">＋残り{events.length - 2}件</span> : null}
+      {singlePastEvent && reflectionText ? (
+        <span className="block h-3 truncate rounded-[3px] bg-[var(--mikke-green)] px-0.5 text-left text-[8px] font-bold leading-3 text-[var(--mikke-text)]">{reflectionText}</span>
+      ) : null}
     </div>
   );
 }
@@ -272,6 +318,8 @@ function SelectedDayEvents({
   events,
   checksByEvent,
   financesByEvent,
+  reflectionsByEvent,
+  photoPreviewsByEvent,
   settings,
   busyKey,
   onStatusChange,
@@ -283,6 +331,8 @@ function SelectedDayEvents({
   events: MarketEvent[];
   checksByEvent: Record<string, MarketCheckItem[]>;
   financesByEvent: Record<string, MarketFinancialRecord[]>;
+  reflectionsByEvent: Record<string, MarketReflection>;
+  photoPreviewsByEvent: MarketNotePhotoPreviewMap;
   settings: MarketEventTypeSettings;
   busyKey: string;
   onStatusChange: (event: MarketEvent, workflow: MarketEventWorkflowStatus) => Promise<void>;
@@ -311,6 +361,10 @@ function SelectedDayEvents({
             const color = getMarketEventTypeColor(eventType, settings);
             const workflow = getMarketEventWorkflowStatus(event);
             const paymentState = getPaymentState(financesByEvent[event.id] ?? []);
+            const isEnded = event.event_date < todayKey || event.status === "completed" || event.status === "cancelled";
+            const reflection = reflectionsByEvent[event.id];
+            const reflectionText = getReflectionExcerpt(reflection);
+            const photo = photoPreviewsByEvent[event.id];
             return (
               <article key={event.id} className="overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-white">
                 <div className="h-1.5" style={{ backgroundColor: color }} />
@@ -332,8 +386,8 @@ function SelectedDayEvents({
                     <span className="flex items-center gap-1.5 truncate"><MapPin size={13} className="shrink-0" /><span className="truncate">{[event.venue_name, event.area].filter(Boolean).join(" / ") || "場所未設定"}</span></span>
                   </Link>
 
-                  <div className="mt-3 flex items-center justify-between gap-3 text-[11px] font-bold text-[var(--mikke-text-soft)]">
-                    <span>タスク {done}/{checks.length}</span>
+                  <div className="mt-3 flex items-center justify-end gap-3 text-[11px] font-bold text-[var(--mikke-text-soft)]">
+                    {!isEnded ? <span className="mr-auto">タスク {done}/{checks.length}</span> : null}
                     {paymentState !== "not_required" ? (
                       <select value={paymentState} onChange={(input) => onPaymentStatusChange(event, input.target.value as "unpaid" | "paid")} disabled={busyKey === `payment:${event.id}`} aria-label={`${event.title}の支払ステータス`} className={`min-h-8 rounded-full border px-2 text-[10px] font-extrabold outline-none disabled:opacity-50 ${paymentState === "unpaid" ? "border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)] text-[var(--mikke-text)]" : "border-[var(--mikke-green)] bg-[var(--mikke-green)] text-[var(--mikke-text)]"}`}>
                         <option value="unpaid">未払い</option>
@@ -341,9 +395,9 @@ function SelectedDayEvents({
                       </select>
                     ) : null}
                   </div>
-                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--mikke-line-soft)]"><div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: color }} /></div>
+                  {!isEnded ? <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--mikke-line-soft)]"><div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: color }} /></div> : null}
 
-                  {checks.length ? (
+                  {!isEnded && checks.length ? (
                     <div className="mt-2 space-y-1 border-t border-[var(--mikke-line-soft)] pt-2">
                       {checks.map((item) => (
                         <button key={item.id} type="button" onClick={() => onToggleCheck(item, !item.is_done)} disabled={busyKey === `check:${item.id}`} className="flex min-h-9 w-full items-center gap-2 rounded-lg px-1 text-left text-xs font-semibold text-[var(--mikke-text-soft)] hover:bg-[var(--mikke-surface-soft)] disabled:opacity-50">
@@ -354,7 +408,21 @@ function SelectedDayEvents({
                     </div>
                   ) : null}
 
-                  <Link href={`/marketnote/${event.id}`} className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-[var(--mikke-line)] text-xs font-bold text-[var(--mikke-blue)]">詳細編集</Link>
+                  {isEnded && (photo || reflectionText) ? (
+                    <Link href={`/marketnote/${event.id}`} className="mt-3 grid grid-cols-[56px_1fr] gap-2.5 rounded-lg border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-2.5">
+                      {photo ? <img src={photo.imageUrl} alt="振り返り写真" className="h-14 w-14 rounded-lg object-cover" /> : <span className="grid h-14 w-14 place-items-center rounded-lg bg-[var(--mikke-green)] text-[10px] font-extrabold text-[var(--mikke-text)]">記録</span>}
+                      <span className="min-w-0 self-center">
+                        <span className="block text-[10px] font-extrabold uppercase tracking-[0.12em] text-[var(--mikke-blue)]">振り返り</span>
+                        {reflectionText ? <span className="mt-1 block overflow-hidden text-xs font-semibold leading-5 text-[var(--mikke-text-soft)] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">{reflectionText}</span> : null}
+                      </span>
+                    </Link>
+                  ) : isEnded ? (
+                    <Link href={`/marketnote/${event.id}`} className="mt-3 block rounded-lg border border-dashed border-[var(--mikke-line)] px-3 py-2 text-center text-[11px] font-bold text-[var(--mikke-muted)]">振り返りを記録</Link>
+                  ) : null}
+
+                  <div className="mt-2 grid grid-cols-1 gap-2">
+                    <Link href={`/marketnote/${event.id}`} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-[var(--mikke-line)] px-3 text-xs font-bold text-[var(--mikke-blue)]">詳細編集</Link>
+                  </div>
                 </div>
               </article>
             );
@@ -363,6 +431,10 @@ function SelectedDayEvents({
       )}
     </section>
   );
+}
+
+function getReflectionExcerpt(reflection: MarketReflection | undefined) {
+  return mergeMarketNoteReflectionText(reflection ?? null);
 }
 
 function TaskList({

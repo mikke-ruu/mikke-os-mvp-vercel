@@ -6,6 +6,7 @@ import {
   createGuestMarketEvent,
   deleteGuestCheckItem,
   deleteGuestFinancialRecord,
+  deleteGuestMarketEvent,
   getGuestMarketEvent,
   getGuestMarketEventBundle,
   getGuestMarketNoteStats,
@@ -377,6 +378,27 @@ export async function updateMarketEventDetails(
   const event = data as MarketEvent;
   await syncMarketEventActivityLog(profile, event);
   return event;
+}
+
+export async function deleteMarketEvent(profile: Profile, event: MarketEvent) {
+  if (isMarketNoteGuestProfile(profile)) {
+    deleteGuestMarketEvent(event.id);
+    return;
+  }
+
+  await syncMarketEventActivityLog(profile, { ...event, status: "cancelled" }, false);
+  const { data, error } = await supabase
+    .from("market_events")
+    .delete()
+    .eq("id", event.id)
+    .eq("profile_id", profile.id)
+    .select("id");
+
+  if (error || data?.length !== 1) {
+    await syncMarketEventActivityLog(profile, event).catch(() => undefined);
+    if (error) throw error;
+    throw new Error("予定を削除できませんでした。本人の予定か確認してください。");
+  }
 }
 
 export async function listCheckItems(profileId: string, marketEventId: string) {

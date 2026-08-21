@@ -17,6 +17,15 @@ export type MarketNotePhoto = {
   guest: boolean;
 };
 
+export type MarketNotePhotoPreviewMap = Record<string, MarketNotePhoto>;
+
+export type MarketNotePhotoDeletionPlan = {
+  id: string;
+  ownerKey: string;
+  guestPhotoIds: string[];
+  storagePaths: string[];
+};
+
 type GuestPhotoRecord = {
   id: string;
   marketEventId: string;
@@ -68,6 +77,63 @@ export async function listMarketNotePhotos(profile: Profile, marketEventId: stri
   }));
 }
 
+export async function listMarketNotePhotoPreviews(
+  profile: Profile,
+  marketEventIds: string[]
+): Promise<MarketNotePhotoPreviewMap> {
+  const eventIds = Array.from(new Set(marketEventIds.filter(Boolean)));
+  if (eventIds.length === 0) return {};
+
+  if (isMarketNoteGuestProfile(profile)) {
+    const wanted = new Set(eventIds);
+    const records = (await listAllGuestPhotoRecords())
+      .filter((record) => wanted.has(record.marketEventId))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const previews: MarketNotePhotoPreviewMap = {};
+    for (const record of records) {
+      if (previews[record.marketEventId]) continue;
+      previews[record.marketEventId] = {
+        id: record.id,
+        marketEventId: record.marketEventId,
+        storagePath: null,
+        imageUrl: await blobToDataUrl(record.blob),
+        createdAt: record.createdAt,
+        guest: true
+      };
+    }
+    return previews;
+  }
+
+  const { data, error } = await supabase
+    .from("market_reflection_photos")
+    .select("id, market_event_id, storage_path, created_at")
+    .eq("profile_id", profile.id)
+    .in("market_event_id", eventIds)
+    .order("sort_order")
+    .order("created_at");
+  if (error) throw error;
+
+  const firstRows = new Map<string, PhotoRow>();
+  for (const row of (data as PhotoRow[] ?? [])) {
+    if (!firstRows.has(row.market_event_id)) firstRows.set(row.market_event_id, row);
+  }
+
+  const previews: MarketNotePhotoPreviewMap = {};
+  await Promise.all(Array.from(firstRows.values()).map(async (row) => {
+    const { data: signed, error: signedError } = await supabase.storage.from(bucket).createSignedUrl(row.storage_path, 60 * 60);
+    if (signedError) throw signedError;
+    previews[row.market_event_id] = {
+      id: row.id,
+      marketEventId: row.market_event_id,
+      storagePath: row.storage_path,
+      imageUrl: signed.signedUrl,
+      createdAt: row.created_at,
+      guest: false
+    };
+  }));
+  return previews;
+}
+
 export async function addMarketNotePhoto(profile: Profile, marketEventId: string, file: File) {
   const blob = await compressPhoto(file);
   const id = crypto.randomUUID();
@@ -114,6 +180,92 @@ export async function deleteMarketNotePhoto(photo: MarketNotePhoto) {
 
   const { error: storageError } = await supabase.storage.from(bucket).remove([photo.storagePath]);
   if (storageError) throw storageError;
+}
+
+const pendingCleanupKey = "mikke-marketnote-photo-cleanup-v1";
+
+export async function prepareMarketNotePhotoDeletion(profile: Profile, marketEventId: string): Promise<MarketNotePhotoDeletionPlan> {
+  if (isMarketNoteGuestProfile(profile)) {
+    const records = await listGuestPhotoRecords(marketEventId);
+    return {
+      id: `${profile.user_id}:${marketEventId}`,
+      ownerKey: profile.user_id,
+      guestPhotoIds: records.map((record) => record.id),
+      storagePaths: []
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("market_reflection_photos")
+    .select("storage_path")
+    .eq("profile_id", profile.id)
+    .eq("market_event_id", marketEventId);
+  if (error) throw error;
+
+  return {
+    id: `${profile.user_id}:${marketEventId}`,
+    ownerKey: profile.user_id,
+    guestPhotoIds: [],
+    storagePaths: (data ?? [])
+      .map((row) => String(row.storage_path ?? ""))
+      .filter(Boolean)
+  };
+}
+
+export async function completeMarketNotePhotoDeletion(plan: MarketNotePhotoDeletionPlan) {
+  try {
+    await Promise.all(plan.guestPhotoIds.map((id) => deleteGuestPhotoRecord(id)));
+    if (plan.storagePaths.length > 0) {
+      const { error } = await supabase.storage.from(bucket).remove(plan.storagePaths);
+      if (error) throw error;
+    }
+    removePendingCleanup(plan.id);
+    return true;
+  } catch {
+    savePendingCleanup(plan);
+    return false;
+  }
+}
+
+export async function retryPendingMarketNotePhotoCleanup(profile: Profile) {
+  const plans = readPendingCleanups().filter((plan) => plan.ownerKey === profile.user_id);
+  if (plans.length === 0) return false;
+
+  for (const plan of plans) {
+    await completeMarketNotePhotoDeletion(plan);
+  }
+  return readPendingCleanups().some((plan) => plan.ownerKey === profile.user_id);
+}
+
+function readPendingCleanups(): MarketNotePhotoDeletionPlan[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(pendingCleanupKey) ?? "[]") as MarketNotePhotoDeletionPlan[];
+    return Array.isArray(parsed) ? parsed.filter((plan) => plan && typeof plan.id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function savePendingCleanup(plan: MarketNotePhotoDeletionPlan) {
+  if (typeof window === "undefined") return;
+  try {
+    const plans = readPendingCleanups().filter((current) => current.id !== plan.id);
+    window.localStorage.setItem(pendingCleanupKey, JSON.stringify([...plans, plan]));
+  } catch {
+    // The deleted event remains private even if the browser refuses the retry queue.
+  }
+}
+
+function removePendingCleanup(planId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const plans = readPendingCleanups().filter((plan) => plan.id !== planId);
+    if (plans.length === 0) window.localStorage.removeItem(pendingCleanupKey);
+    else window.localStorage.setItem(pendingCleanupKey, JSON.stringify(plans));
+  } catch {
+    // A stale retry marker is harmless and will be retried on the next visit.
+  }
 }
 
 export async function importGuestMarketNotePhotos(profile: Profile, eventIdMap: Map<string, string>) {

@@ -15,12 +15,14 @@ import {
   listCheckItems,
   listFinancialRecords,
   listMarketEvents,
+  listReflections,
   saveEventPaymentRecord,
   toggleCheckItem,
   updateMarketEventWorkflowStatus,
   type MarketEventWorkflowStatus
 } from "@/lib/marketnote";
-import type { MarketCheckItem, MarketEvent, MarketFinancialRecord } from "@/types/database";
+import { listMarketNotePhotoPreviews, retryPendingMarketNotePhotoCleanup, type MarketNotePhotoPreviewMap } from "@/lib/marketnote-photos";
+import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
 type HomeTab = "calendar" | "list";
 type ListTab = "upcoming" | "past";
@@ -35,16 +37,22 @@ type GuestImportStats = ReturnType<typeof getGuestMarketNoteImportStats>;
 function MarketNoteContent() {
   const { profile, isGuest } = useAuth();
   const [homeTab, setHomeTab] = useState<HomeTab>("calendar");
+  const [selectedDateForAdd, setSelectedDateForAdd] = useState(() => toDateKey(new Date()));
   const [events, setEvents] = useState<MarketEvent[]>([]);
   const [checksByEvent, setChecksByEvent] = useState<Record<string, MarketCheckItem[]>>({});
   const [financesByEvent, setFinancesByEvent] = useState<Record<string, MarketFinancialRecord[]>>({});
+  const [reflectionsByEvent, setReflectionsByEvent] = useState<Record<string, MarketReflection>>({});
+  const [photoPreviewsByEvent, setPhotoPreviewsByEvent] = useState<MarketNotePhotoPreviewMap>({});
   const [activeTab, setActiveTab] = useState<ListTab>("upcoming");
   const [guestStats, setGuestStats] = useState<GuestImportStats | null>(null);
+  const [photoCleanupPending, setPhotoCleanupPending] = useState(false);
+  const [photoCleanupBusy, setPhotoCleanupBusy] = useState(false);
 
   const loadMarketNoteData = useCallback(async () => {
-    const [nextEvents, allFinances] = await Promise.all([
+    const [nextEvents, allFinances, reflections] = await Promise.all([
       listMarketEvents(profile.id),
-      listFinancialRecords(profile.id)
+      listFinancialRecords(profile.id),
+      listReflections(profile.id)
     ]);
     const checkPairs = await Promise.all(
       nextEvents.map(async (event) => [event.id, await listCheckItems(profile.id, event.id)] as const)
@@ -53,8 +61,18 @@ function MarketNoteContent() {
     setEvents(nextEvents);
     setChecksByEvent(Object.fromEntries(checkPairs));
     setFinancesByEvent(groupByEventId(allFinances));
+    setReflectionsByEvent(Object.fromEntries(reflections.map((reflection) => [reflection.market_event_id, reflection])));
     setGuestStats(getGuestMarketNoteImportStats());
-  }, [profile.id]);
+
+    try {
+      const todayKey = toDateKey(new Date());
+      const pastEventIds = nextEvents.filter((event) => event.event_date < todayKey).map((event) => event.id);
+      setPhotoPreviewsByEvent(await listMarketNotePhotoPreviews(profile, pastEventIds));
+    } catch {
+      // The schedule remains usable if a signed photo preview cannot be loaded.
+      setPhotoPreviewsByEvent({});
+    }
+  }, [profile]);
 
   useEffect(() => {
     let active = true;
@@ -69,6 +87,19 @@ function MarketNoteContent() {
       active = false;
     };
   }, [loadMarketNoteData]);
+
+  const retryPhotoCleanup = useCallback(async () => {
+    setPhotoCleanupBusy(true);
+    try {
+      setPhotoCleanupPending(await retryPendingMarketNotePhotoCleanup(profile));
+    } finally {
+      setPhotoCleanupBusy(false);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    void retryPhotoCleanup();
+  }, [retryPhotoCleanup]);
 
   const summaries = useMemo<EventSummary[]>(() => {
     return events.map((event) => ({
@@ -121,11 +152,17 @@ function MarketNoteContent() {
   }
 
   return (
-    <MarketNoteShell isGuest={isGuest}>
+    <MarketNoteShell isGuest={isGuest} addHref={`/marketnote/new?startDate=${selectedDateForAdd}`}>
       <div className="-mx-1 pb-2">
         {isGuest ? <GuestNotice /> : null}
         {!isGuest && guestStats && guestStats.events > 0 ? (
           <CloudImportNotice stats={guestStats} profile={profile} onImported={loadMarketNoteData} />
+        ) : null}
+        {photoCleanupPending ? (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)] px-3 py-2.5 text-xs font-bold text-[var(--mikke-text)]">
+            <span>予定は削除済みです。写真の整理だけ完了していないため、オンライン時に再試行します。</span>
+            <button type="button" onClick={() => void retryPhotoCleanup()} disabled={photoCleanupBusy} className="shrink-0 rounded-full border border-[var(--mikke-text)] px-3 py-1.5 disabled:opacity-50">{photoCleanupBusy ? "再試行中" : "今すぐ再試行"}</button>
+          </div>
         ) : null}
 
         {homeTab === "list" ? <div className="mb-3 px-1">
@@ -145,6 +182,8 @@ function MarketNoteContent() {
             events={events}
             checksByEvent={checksByEvent}
             financesByEvent={financesByEvent}
+            reflectionsByEvent={reflectionsByEvent}
+            photoPreviewsByEvent={photoPreviewsByEvent}
             viewToggle={(
               <div className="inline-flex shrink-0 rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-0.5">
                 <SegmentButton compact active onClick={() => setHomeTab("calendar")}>カレンダー</SegmentButton>
@@ -154,6 +193,7 @@ function MarketNoteContent() {
             onStatusChange={changeCalendarStatus}
             onPaymentStatusChange={changeCalendarPayment}
             onToggleCheck={changeCalendarCheck}
+            onSelectedDateChange={setSelectedDateForAdd}
           />
         ) : (
           <div>

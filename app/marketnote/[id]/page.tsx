@@ -29,6 +29,7 @@ import {
   addCheckItem,
   addFinancialRecord,
   deleteCheckItem,
+  deleteMarketEvent,
   getMarketEventBundle,
   saveEventPaymentRecord,
   saveReflection,
@@ -37,11 +38,14 @@ import {
 } from "@/lib/marketnote";
 import {
   addMarketNotePhoto,
+  completeMarketNotePhotoDeletion,
   deleteMarketNotePhoto,
   listMarketNotePhotos,
   maxMarketNotePhotos,
+  prepareMarketNotePhotoDeletion,
   type MarketNotePhoto
 } from "@/lib/marketnote-photos";
+import { mergeMarketNoteReflectionText } from "@/lib/marketnote-reflection-text";
 import { fixedPaymentMethodNames } from "@/lib/payment-methods";
 import { getMarketEventType, getMarketEventTypeNames, loadMarketEventTypeSettingsForProfile } from "@/lib/marketnote-event-types";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
@@ -79,7 +83,6 @@ function MarketDetailContent() {
   const [event, setEvent] = useState<MarketEvent | null>(null);
   const [checks, setChecks] = useState<MarketCheckItem[]>([]);
   const [finances, setFinances] = useState<MarketFinancialRecord[]>([]);
-  const [reflection, setReflection] = useState<MarketReflection | null>(null);
   const [photos, setPhotos] = useState<MarketNotePhoto[]>([]);
   const [photoBusy, setPhotoBusy] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -103,8 +106,8 @@ function MarketDetailContent() {
   const [memo, setMemo] = useState("");
   const [customCheck, setCustomCheck] = useState("");
   const [goodPoints, setGoodPoints] = useState("");
-  const [nextActions, setNextActions] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [editOpen, setEditOpen] = useState(false);
@@ -126,7 +129,6 @@ function MarketDetailContent() {
     setEvent(nextEvent);
     setChecks(nextChecks);
     setFinances(nextFinances);
-    setReflection(nextReflection);
     setTitle(nextEvent.title);
     setEventType(getMarketEventType(nextEvent));
     setEventDate(nextEvent.event_date);
@@ -144,8 +146,7 @@ function MarketDetailContent() {
     setPaymentMethod(payment.method);
     setPaymentAmount(payment.amount > 0 ? String(payment.amount) : "");
     setMemo(nextEvent.public_note ?? "");
-    setGoodPoints(nextReflection?.good_points ?? "");
-    setNextActions(nextReflection?.next_actions ?? "");
+    setGoodPoints(mergeMarketNoteReflectionText(nextReflection));
   }
 
   useEffect(() => {
@@ -222,7 +223,7 @@ function MarketDetailContent() {
         publicSummary: goodPoints,
         privateNote: "",
         goodPoints,
-        nextActions
+        nextActions: ""
       });
 
       await load();
@@ -280,6 +281,27 @@ function MarketDetailContent() {
       setMessage(error instanceof Error ? error.message : "写真を削除できませんでした。");
     } finally {
       setPhotoBusy(false);
+    }
+  }
+
+  async function removeEvent() {
+    if (!event || deleting) return;
+    const confirmed = window.confirm(
+      `「${event.title}」を削除しますか？\n\nチェック項目・振り返り・写真も削除されます。収支記録は会計履歴として残ります。この操作は元に戻せません。`
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setMessage("");
+    try {
+      const photoDeletion = await prepareMarketNotePhotoDeletion(profile, event.id);
+      await deleteMarketEvent(profile, event);
+      await completeMarketNotePhotoDeletion(photoDeletion);
+      router.replace("/marketnote");
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "予定を削除できませんでした。");
+      setDeleting(false);
     }
   }
 
@@ -470,16 +492,6 @@ function MarketDetailContent() {
 
           <FormCard title="振り返り" icon={<ReceiptText size={16} strokeWidth={1.8} />}>
             <textarea value={goodPoints} onChange={(inputEvent) => setGoodPoints(inputEvent.target.value)} rows={4} placeholder="今日の反応、気づいたこと、次回やることなど" className="scroll-mb-28 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-base leading-6 outline-none focus:border-[var(--mikke-accent)] sm:text-sm" />
-            <label className="mt-3 block text-xs font-bold text-[var(--mikke-text-soft)]">
-              次回やること
-              <textarea
-                value={nextActions}
-                onChange={(inputEvent) => setNextActions(inputEvent.target.value)}
-                rows={3}
-                placeholder="次回に改善すること、準備しておくこと"
-                className="mt-1.5 scroll-mb-28 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] px-3 py-2.5 text-base font-medium leading-6 outline-none focus:border-[var(--mikke-accent)] sm:text-sm"
-              />
-            </label>
           </FormCard>
 
           <FormCard title="写真" icon={<ImageIcon size={16} strokeWidth={1.8} />}>
@@ -521,6 +533,9 @@ function MarketDetailContent() {
             <Link href="/marketnote" className="block w-full rounded-xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-surface)] px-4 py-3 text-center text-sm font-extrabold text-[var(--mikke-accent)]">
               閉じる
             </Link>
+            <button type="button" onClick={() => void removeEvent()} disabled={deleting || saving} className="min-h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-4 text-sm font-bold text-[var(--mikke-muted)] disabled:opacity-50">
+              {deleting ? "削除中..." : "予定を削除"}
+            </button>
           </div>
         </div>
       </form>
@@ -531,7 +546,7 @@ function MarketDetailContent() {
 function GuestNotice() {
   return (
     <div className="mb-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs font-bold leading-5 text-[var(--mikke-text-soft)]">
-      この記録はこのブラウザに保存されています。同じアイコン・同じブラウザから続きが見られます。STORY掲載や他アプリ連携は、まだ自動では行いません。
+      この記録はこのブラウザに保存されています。同じアイコン・同じブラウザから続きが見られます。
     </div>
   );
 }
