@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
   CircleChevronRight,
+  CreditCard,
   DoorOpen,
   FileDown,
   Flame,
@@ -101,8 +102,9 @@ import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
 import { ensureProfile } from "@/lib/profile";
+import { COMMUNITY_PLATFORM_PLANS, getCommunityPlatformPlan } from "@/lib/community/platform-plans";
 
-type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "search" | "bookmarks" | "rules" | "help" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content" | "owner-safety" | "owner-moderation";
+type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "search" | "bookmarks" | "rules" | "help" | "owner" | "owner-settings" | "owner-billing" | "owner-rooms" | "owner-members" | "owner-content" | "owner-safety" | "owner-moderation";
 
 type SessionUser = {
   id: string;
@@ -317,6 +319,7 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
       {view === "help" ? <CommunityHelpView data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner" ? <OwnerView base={base} data={data} ownerLike={ownerLike} /> : null}
       {view === "owner-settings" ? <OwnerSettingsView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
+      {view === "owner-billing" ? <OwnerBillingView data={data} ownerLike={ownerLike} /> : null}
       {view === "owner-rooms" ? <OwnerRoomsView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-members" ? <OwnerMembersView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-content" ? <OwnerContentView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
@@ -1388,6 +1391,7 @@ function OwnerView({ base, data, ownerLike }: { base: string; data: CommunityDas
       {ownerLike ? (
         <div className="grid gap-3 md:grid-cols-4">
           <OwnerLink href={`${base}/owner/settings`} icon={Settings} title="基本設定" helper="名前・説明・参加方式" />
+          <OwnerLink href={`${base}/owner/billing`} icon={CreditCard} title="契約・料金" helper="利用プランと人数上限" />
           <OwnerLink href={`${base}/owner/rooms`} icon={MessagesSquare} title="Room設定" helper="無料・限定・運営Room" />
           <OwnerLink href={`${base}/owner/members`} icon={KeyRound} title="参加者と権限" helper="手動で利用権限を付与" />
           <OwnerLink href={`${base}/owner/content`} icon={BookOpen} title="コンテンツ管理" helper="告知・イベント・資料" />
@@ -1396,6 +1400,70 @@ function OwnerView({ base, data, ownerLike }: { base: string; data: CommunityDas
         </div>
       ) : null}
       {!ownerLike ? <MikkeEmptyState title="運営操作は owner / moderator のみです" helper="最初の参加者、またはDB上でroleを付与されたユーザーが運営画面を操作できます。" /> : null}
+    </section>
+  );
+}
+
+function OwnerBillingView({ data, ownerLike }: { data: CommunityDashboard; ownerLike: boolean }) {
+  if (!ownerLike) return <MikkeEmptyState title="運営権限が必要です" helper="契約・料金はownerまたはmoderatorが確認できます。" />;
+
+  const subscription = data.platformSubscription;
+  const currentPlan = getCommunityPlatformPlan(subscription?.planKey);
+  const activeMembers = data.ownerMembers.filter((member) => member.membership.status === "active").length;
+  const remainingMembers = currentPlan.memberLimit === null ? null : Math.max(0, currentPlan.memberLimit - activeMembers);
+  const usagePercent = currentPlan.memberLimit === null ? 0 : Math.min(100, Math.round((activeMembers / currentPlan.memberLimit) * 100));
+  const statusLabels = {
+    trialing: "トライアル中",
+    active: "契約中",
+    past_due: "支払い確認が必要",
+    cancelled: "解約済み",
+    suspended: "利用停止中"
+  } as const;
+  const periodEndLabel = subscription?.currentPeriodEndsAt
+    ? new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "long", day: "numeric" }).format(new Date(subscription.currentPeriodEndsAt))
+    : null;
+
+  return (
+    <section className="space-y-6 border-t border-[var(--mikke-line)] pt-5">
+      <div>
+        <p className="text-xs font-bold tracking-[0.18em] text-[var(--mikke-muted-light)]">COMMUNITY PLAN</p>
+        <h2 className="mt-2 text-2xl font-bold tracking-normal">契約・料金</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--mikke-muted)]">Communityを運営する本部がmikkeへ支払うアプリ利用料です。参加者から受け取る会費とは別で、参加者会費へのmikkeの売上手数料はありません。</p>
+      </div>
+
+      <section className="grid gap-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 md:grid-cols-[1fr_1.4fr]">
+        <div>
+          <MikkeStatusBadge tone={subscription?.status === "past_due" || subscription?.status === "suspended" ? "muted" : "success"}>{statusLabels[subscription?.status ?? "trialing"]}</MikkeStatusBadge>
+          <p className="mt-3 text-3xl font-bold text-[var(--mikke-primary)]">{currentPlan.name}</p>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">{currentPlan.monthlyAmountYen === null ? "個別見積" : currentPlan.monthlyAmountYen === 0 ? "0円 / 30日" : `月額 ${currentPlan.monthlyAmountYen.toLocaleString()}円（税込）`}</p>
+          {periodEndLabel ? <p className="mt-2 text-xs text-[var(--mikke-muted-light)]">現在の期間：{periodEndLabel}まで</p> : null}
+        </div>
+        <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+          <div className="flex items-end justify-between gap-3">
+            <div><p className="text-xs font-bold text-[var(--mikke-muted)]">参加人数</p><p className="mt-1 text-2xl font-bold">{activeMembers}名 <span className="text-sm font-normal text-[var(--mikke-muted)]">/ {currentPlan.memberLimit === null ? "上限個別設定" : `${currentPlan.memberLimit}名`}</span></p></div>
+            {remainingMembers !== null ? <p className="text-xs font-bold text-[var(--mikke-primary)]">あと{remainingMembers}名</p> : null}
+          </div>
+          {currentPlan.memberLimit !== null ? <div className="mt-3 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-[var(--mikke-accent)] transition-[width]" style={{ width: `${usagePercent}%` }} /></div> : null}
+          {remainingMembers === 0 ? <p className="mt-3 text-xs font-bold text-[var(--mikke-danger)]">上限に達しています。新しい参加者の承認には上位プランが必要です。</p> : null}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-lg font-bold">料金プラン</h3>
+        <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {COMMUNITY_PLATFORM_PLANS.map((plan) => {
+            const selected = plan.key === currentPlan.key;
+            return <article key={plan.key} className={`rounded-xl border bg-white p-4 ${selected ? "border-[var(--mikke-primary)]" : "border-[var(--mikke-line)]"}`}>
+              <div className="flex items-center justify-between gap-2"><p className="font-bold">{plan.name}</p>{selected ? <MikkeStatusBadge tone="primary">現在</MikkeStatusBadge> : null}</div>
+              <p className="mt-3 text-xl font-bold text-[var(--mikke-primary)]">{plan.monthlyAmountYen === null ? "個別見積" : plan.monthlyAmountYen === 0 ? "0円" : `${plan.monthlyAmountYen.toLocaleString()}円`}</p>
+              <p className="mt-1 text-xs text-[var(--mikke-muted)]">{plan.key === "trial" ? "30日間" : plan.monthlyAmountYen === null ? "1,001名以上" : `月額・${plan.memberLimit?.toLocaleString()}名まで`}</p>
+              <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">{plan.helper}</p>
+              <p className={`mt-4 rounded-lg px-3 py-2 text-center text-xs font-bold ${selected ? "bg-[var(--mikke-primary)] text-white" : "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]"}`}>{selected ? "利用中" : "オンライン申込準備中"}</p>
+            </article>;
+          })}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">プラン変更とオンライン決済はStripe Billing接続後に利用できます。現時点では契約状況と人数上限の確認画面です。</p>
+      </section>
     </section>
   );
 }
