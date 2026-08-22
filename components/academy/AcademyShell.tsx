@@ -115,12 +115,13 @@ function ShellInner({
   const [canSwitchPortal, setCanSwitchPortal] = useState(false);
   const [contextCount, setContextCount] = useState(0);
   const [selectedContext, setSelectedContext] = useState<AcademyAccessContext | null>(null);
-  const [previewMode, setPreviewMode] = useState<"checking" | "dashboard" | "readonly" | "off">("checking");
+  const [previewMode, setPreviewMode] = useState<"checking" | "dashboard" | "walkthrough" | "readonly" | "off">("checking");
 
   useEffect(() => {
     const requestedPreview = new URLSearchParams(window.location.search).get("preview");
     setPreviewMode(
-      process.env.NODE_ENV === "development" && (requestedPreview === "dashboard" || requestedPreview === "readonly")
+      process.env.NODE_ENV === "development" &&
+        (requestedPreview === "dashboard" || requestedPreview === "walkthrough" || requestedPreview === "readonly")
         ? requestedPreview
         : "off"
     );
@@ -131,7 +132,7 @@ function ShellInner({
     let active = true;
 
     async function resolveAccess() {
-      if (previewMode === "dashboard") {
+      if (previewMode === "dashboard" || previewMode === "walkthrough") {
         const previewContext: AcademyAccessContext = {
           academy_id: "00000000-0000-4000-8000-000000000001",
           academy_name: "ローカル確認用Academy",
@@ -198,7 +199,14 @@ function ShellInner({
   }, [hasContextPathPrefix, pathname, previewMode, routeContext?.academyId, routeContext?.portal, user.id, variant]);
 
   useEffect(() => {
-    if (previewMode === "dashboard" || accessLoading || hasContextPathPrefix || !selectedContext || !hasPortalAccess) return;
+    if (
+      previewMode === "dashboard" ||
+      previewMode === "walkthrough" ||
+      accessLoading ||
+      hasContextPathPrefix ||
+      !selectedContext ||
+      !hasPortalAccess
+    ) return;
     const canonicalHref = toAcademyContextHref(
       pathname,
       selectedContext.academy_id,
@@ -211,7 +219,7 @@ function ShellInner({
     let active = true;
 
     async function resolveHomepage() {
-      if (previewMode === "dashboard") {
+      if (previewMode === "dashboard" || previewMode === "walkthrough") {
         setHomepageHref(null);
         return;
       }
@@ -249,25 +257,26 @@ function ShellInner({
     router.replace(`/login?next=${encodeURIComponent(pathname)}`);
   }
 
-  function contextHref(href: string) {
+  function contextHref(href: string, portalOverride?: "manage" | "teach") {
     if (!selectedContext) return href;
     const contextualHref = toAcademyContextHref(
       href,
       selectedContext.academy_id,
-      variant === "honbu" ? "manage" : "teach"
+      portalOverride ?? (variant === "honbu" ? "manage" : "teach")
     );
     if (
-      previewMode === "readonly" &&
+      (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough") &&
       contextualHref.startsWith("/academy") &&
-      !contextualHref.includes("preview=readonly")
+      !contextualHref.includes("preview=")
     ) {
-      return `${contextualHref}${contextualHref.includes("?") ? "&" : "?"}preview=readonly`;
+      const preview = previewMode === "dashboard" ? "walkthrough" : previewMode;
+      return `${contextualHref}${contextualHref.includes("?") ? "&" : "?"}preview=${preview}`;
     }
     return contextualHref;
   }
 
   function captureAcademyLink(event: React.MouseEvent<HTMLDivElement>) {
-    if (previewMode === "readonly") {
+    if (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough") {
       const target = event.target as Element;
       const toggle = target.closest('input[type="checkbox"], input[type="radio"]');
       const button = target.closest("button");
@@ -293,7 +302,7 @@ function ShellInner({
   }
 
   function blockReadonlySubmit(event: React.FormEvent<HTMLDivElement>) {
-    if (previewMode !== "readonly") return;
+    if (previewMode !== "readonly" && previewMode !== "dashboard" && previewMode !== "walkthrough") return;
     event.preventDefault();
     event.stopPropagation();
     window.alert("ローカル確認中は保存できません。本番データは変更されていません。");
@@ -305,7 +314,12 @@ function ShellInner({
   const bottomNavItems = (variant === "honbu" ? honbuBottomNav : koushiBottomNav)
     .filter((item) => variant === "koushi" || canShowManageHref(selectedContext, item.href))
     .map((item) => ({ ...item, href: contextHref(item.href) }));
-  const redirectingToCanonical = previewMode !== "dashboard" && !hasContextPathPrefix && selectedContext && hasPortalAccess;
+  const redirectingToCanonical =
+    previewMode !== "dashboard" &&
+    previewMode !== "walkthrough" &&
+    !hasContextPathPrefix &&
+    selectedContext &&
+    hasPortalAccess;
 
   if (profile.user_id !== user.id || accessLoading || redirectingToCanonical) {
     return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">権限を確認中…</p>;
@@ -387,9 +401,9 @@ function ShellInner({
       footerLabel="Academy by mikke"
     >
       <div onClickCapture={captureAcademyLink}>
-      {previewMode === "dashboard" ? (
+      {previewMode === "dashboard" || previewMode === "walkthrough" ? (
         <div className="mb-4 rounded-xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] px-4 py-3 text-xs font-bold text-[var(--mikke-accent-strong)]">
-          ローカル確認用のサンプル表示です。実データの保存や本番DBの変更は行いません。
+          ローカル確認用のサンプル表示です。画面移動はできますが、実データの保存や本番DBの変更は行いません。
         </div>
       ) : null}
       {previewMode === "readonly" ? (
@@ -415,7 +429,10 @@ function ShellInner({
           ) : null}
           {canSwitchPortal ? (
             <Link
-              href={contextHref(variant === "honbu" ? "/academy/portal" : "/academy")}
+              href={contextHref(
+                variant === "honbu" ? "/academy/portal" : "/academy",
+                variant === "honbu" ? "teach" : "manage"
+              )}
               className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
             >
               {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}

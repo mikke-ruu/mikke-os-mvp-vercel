@@ -1,5 +1,11 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
+import {
+  academyPreviewApplications,
+  academyPreviewNotifications,
+  assertAcademyWritable,
+  isAcademyLocalReview
+} from "@/lib/academy/preview";
 import type {
   AcademyApplication,
   AcademyApplicationNotification,
@@ -69,6 +75,7 @@ export type ApplicationInput = {
 };
 
 export async function listApplications(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewApplications;
   const { data, error } = await supabase
     .from("academy_applications")
     .select("*")
@@ -80,6 +87,7 @@ export async function listApplications(headquartersId: string) {
 }
 
 export async function getApplication(headquartersId: string, id: string) {
+  if (isAcademyLocalReview()) return academyPreviewApplications.find((item) => item.id === id) ?? academyPreviewApplications[0];
   const { data, error } = await supabase
     .from("academy_applications")
     .select("*")
@@ -92,6 +100,7 @@ export async function getApplication(headquartersId: string, id: string) {
 }
 
 export async function listApplicationNotifications(applicationId: string) {
+  if (isAcademyLocalReview()) return academyPreviewNotifications;
   const { data, error } = await supabase.rpc("academy_list_application_notifications", {
     p_application_id: applicationId
   });
@@ -100,6 +109,7 @@ export async function listApplicationNotifications(applicationId: string) {
 }
 
 export async function retryApplicationNotifications(applicationId: string) {
+  assertAcademyWritable();
   const { data, error } = await supabase.functions.invoke("academy-application-email-retry", {
     body: { application_id: applicationId }
   });
@@ -109,6 +119,7 @@ export async function retryApplicationNotifications(applicationId: string) {
 }
 
 export async function promoteCertifiedApplicationToInstructor(applicationId: string, profileId: string) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_promote_certified_application", {
     p_application_id: applicationId,
     p_profile_id: profileId
@@ -118,6 +129,7 @@ export async function promoteCertifiedApplicationToInstructor(applicationId: str
 }
 
 export async function createApplication(profile: Profile, headquartersId: string, input: ApplicationInput) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_applications")
     .insert({
@@ -179,6 +191,7 @@ export async function updateApplication(
     applicant_note: string | null;
   }>
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_applications")
     .update(patch)

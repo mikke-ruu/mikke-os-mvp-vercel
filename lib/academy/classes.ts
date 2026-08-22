@@ -1,11 +1,13 @@
 import { supabase } from "@/lib/supabase/client";
 import { getCourseProgram } from "@/lib/academy/programs";
+import { academyPreviewClasses, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyClass, AcademyCourse, Profile } from "@/types/database";
 
 const classDetails =
   "*, course:academy_courses(id,code,name), instructor:academy_instructors(id,business_name,profile_id)";
 
 export async function listAcademyClasses(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewClasses;
   const { data, error } = await supabase
     .from("academy_classes")
     .select(classDetails)
@@ -35,6 +37,7 @@ export async function createAcademyClass(
   course: AcademyCourse,
   input: AcademyClassInput
 ) {
+  assertAcademyWritable();
   let program = await getCourseProgram(headquartersId, course.id);
   if (!program) {
     throw new Error("先に講座のステップ教材を作成し、現在の内容を確定してください。");

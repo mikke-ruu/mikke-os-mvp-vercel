@@ -12,6 +12,14 @@ import { createHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquar
 import { listCourses } from "@/lib/academy/courses";
 import { listMaterials } from "@/lib/academy/materials";
 import { getRenewalAlerts, listInstructors } from "@/lib/academy/instructors";
+import {
+  academyPreviewApplications,
+  academyPreviewCourses,
+  academyPreviewHeadquarters,
+  academyPreviewInstructors,
+  academyPreviewKitOrders,
+  academyPreviewMaterials
+} from "@/lib/academy/preview";
 import { APPLICATION_STATUS_LABELS, listApplications } from "@/lib/academy/applications";
 import { listKitOrders } from "@/lib/academy/kits";
 import type {
@@ -73,31 +81,15 @@ function DashboardContent() {
     async function load() {
       const previewRequested =
         process.env.NODE_ENV === "development" &&
-        new URLSearchParams(window.location.search).get("preview") === "dashboard";
+        ["dashboard", "walkthrough"].includes(new URLSearchParams(window.location.search).get("preview") ?? "");
       if (previewRequested) {
         setLocalPreview(true);
-        setHq({
-          id: "00000000-0000-4000-8000-000000000001",
-          owner_user_id: profile.user_id,
-          owner_profile_id: profile.id,
-          name: "ローカル確認用Academy",
-          handle: "local-preview",
-          tagline: null,
-          logo_url: null,
-          hero_image_url: null,
-          front_message: null,
-          main_color: null,
-          contact_email: null,
-          renewal_period_months: 12,
-          next_instructor_number: 1,
-          plan: "small",
-          plan_started_at: null,
-          default_payment_note: null,
-          is_active: true,
-          front_blocks: [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+        setHq(academyPreviewHeadquarters);
+        setCourses(academyPreviewCourses);
+        setInstructors(academyPreviewInstructors);
+        setApps(academyPreviewApplications);
+        setKits(academyPreviewKitOrders);
+        setMaterials(academyPreviewMaterials);
         setLoading(false);
         return;
       }

@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
 import { resolveAcademyCourseFeatureSettings } from "@/lib/academy/course-feature-settings";
+import { academyPreviewCourses, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type {
   AcademyCourse,
   AcademyCourseFeatureSettings,
@@ -66,6 +67,7 @@ function toRow(hqId: string, input: CourseInput) {
 }
 
 export async function listCourses(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewCourses;
   const { data, error } = await supabase
     .from("academy_courses")
     .select("*")
@@ -78,6 +80,10 @@ export async function listCourses(headquartersId: string) {
 }
 
 export async function getCourse(headquartersId: string, id: string) {
+  if (isAcademyLocalReview()) {
+    const course = academyPreviewCourses.find((item) => item.id === id) ?? academyPreviewCourses[0];
+    return course;
+  }
   const { data, error } = await supabase
     .from("academy_courses")
     .select("*")
@@ -90,6 +96,7 @@ export async function getCourse(headquartersId: string, id: string) {
 }
 
 export async function createCourse(profile: Profile, headquartersId: string, input: CourseInput) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_courses")
     .insert({ ...toRow(headquartersId, input), user_id: profile.user_id })
@@ -119,6 +126,7 @@ export async function updateCourse(
   courseId: string,
   input: CourseInput
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_courses")
     .update(toRow(headquartersId, input))
@@ -138,6 +146,7 @@ export async function setCoursePublished(
   course: AcademyCourse,
   isPublished: boolean
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_courses")
     .update({ is_published: isPublished })

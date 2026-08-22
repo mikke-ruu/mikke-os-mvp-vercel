@@ -1,8 +1,10 @@
 import { supabase } from "@/lib/supabase/client";
+import { academyPreviewInstructorPage, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyInstructorPage, AcademyPageBlock, Profile } from "@/types/database";
 
 // 本部: 講座の講師専用ページを取得（未作成なら null）
 export async function getInstructorPage(headquartersId: string, courseId: string) {
+  if (isAcademyLocalReview()) return academyPreviewInstructorPage;
   const { data, error } = await supabase
     .from("academy_instructor_pages")
     .select("*")
@@ -16,6 +18,7 @@ export async function getInstructorPage(headquartersId: string, courseId: string
 
 // 講師: 取得講座の講師専用ページを取得（RLSで活動中講師 or 本部だけ読める）
 export async function getInstructorPageForViewer(courseId: string) {
+  if (isAcademyLocalReview()) return academyPreviewInstructorPage;
   const { data, error } = await supabase
     .from("academy_instructor_pages")
     .select("*")
@@ -33,6 +36,7 @@ export async function saveInstructorPageBlocks(
   courseId: string,
   blocks: AcademyPageBlock[]
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_instructor_pages")
     .upsert(

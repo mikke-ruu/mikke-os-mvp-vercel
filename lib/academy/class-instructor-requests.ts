@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { academyPreviewClassRequests, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyClassInstructorRequest } from "@/types/database";
 
 const requestDetails =
@@ -15,6 +16,7 @@ export const CLASS_INSTRUCTOR_REQUEST_STATUS_LABELS: Record<
 };
 
 export async function listClassInstructorRequests(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewClassRequests;
   const { data, error } = await supabase
     .from("academy_class_instructor_requests")
     .select(requestDetails)
@@ -26,6 +28,7 @@ export async function listClassInstructorRequests(headquartersId: string) {
 }
 
 export async function listMyClassInstructorRequests() {
+  if (isAcademyLocalReview()) return academyPreviewClassRequests;
   const { data, error } = await supabase
     .from("academy_class_instructor_requests")
     .select(requestDetails)
@@ -42,6 +45,7 @@ export async function createClassInstructorRequest(input: {
   requestNote: string;
   respondBy: string | null;
 }) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_request_class_instructor", {
     p_headquarters_id: input.headquartersId,
     p_class_id: input.classId,
@@ -59,6 +63,7 @@ export async function respondClassInstructorRequest(
   status: Extract<AcademyClassInstructorRequest["status"], "accepted" | "declined">,
   responseNote: string
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_respond_class_instructor_request", {
     p_request_id: requestId,
     p_status: status,
@@ -70,6 +75,7 @@ export async function respondClassInstructorRequest(
 }
 
 export async function cancelClassInstructorRequest(requestId: string) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_cancel_class_instructor_request", {
     p_request_id: requestId
   });

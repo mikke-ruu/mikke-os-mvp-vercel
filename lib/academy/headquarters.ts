@@ -1,9 +1,11 @@
 import { supabase } from "@/lib/supabase/client";
 import { getAcademyRouteContext, listMyAcademyContexts } from "@/lib/academy/access-context";
+import { academyPreviewHeadquarters, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyHeadquarters, AcademyLpBlock } from "@/types/database";
 
 // 現在のユーザーがオーナーの本部（MVPは1件想定）。
 export async function getOwnedHeadquarters(userId: string, academyId?: string) {
+  if (isAcademyLocalReview()) return academyPreviewHeadquarters;
   const explicitAcademyId = academyId ?? getAcademyRouteContext()?.academyId;
   if (explicitAcademyId) {
     const contexts = await listMyAcademyContexts();
@@ -58,6 +60,7 @@ export async function updateHeadquarters(
     front_blocks: AcademyLpBlock[];
   }>
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_update_headquarters_profile", {
     p_headquarters_id: hqId,
     p_patch: patch
@@ -69,6 +72,7 @@ export async function updateHeadquarters(
 
 // 契約確認済みの作成権を1件消費して本部を作る。直接INSERTはDB側で禁止する。
 export async function createHeadquarters(name: string) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_create_headquarters", {
     p_name: name
   });

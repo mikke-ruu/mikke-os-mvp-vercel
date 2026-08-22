@@ -1,4 +1,11 @@
 import { supabase } from "@/lib/supabase/client";
+import {
+  academyPreviewCourses,
+  academyPreviewHeadquarters,
+  academyPreviewInstructors,
+  assertAcademyWritable,
+  isAcademyLocalReview
+} from "@/lib/academy/preview";
 import type {
   AcademyCourse,
   AcademyHeadquarters,
@@ -10,6 +17,7 @@ import type {
 // 公開フロント: URLで指定された本部だけを取得する。
 // 本部を指定せず「最古の1件」を返すとテナント混線になるため、handleは必須。
 export async function getPublicHeadquarters(handle: string) {
+  if (isAcademyLocalReview()) return handle === academyPreviewHeadquarters.handle ? academyPreviewHeadquarters : null;
   const normalizedHandle = handle.trim().toLowerCase();
   if (!normalizedHandle) return null;
 
@@ -25,6 +33,7 @@ export async function getPublicHeadquarters(handle: string) {
 
 // 管理画面・講師ポータルから、所属本部の公開URLを組み立てるための取得。
 export async function listPublicHeadquartersByIds(headquartersIds: string[]) {
+  if (isAcademyLocalReview()) return headquartersIds.includes(academyPreviewHeadquarters.id) ? [academyPreviewHeadquarters] : [];
   const ids = [...new Set(headquartersIds.filter(Boolean))];
   if (ids.length === 0) return [];
 
@@ -39,6 +48,7 @@ export async function listPublicHeadquartersByIds(headquartersIds: string[]) {
 
 // 公開フロント: 公開中の講座一覧
 export async function listPublishedCourses(headquartersId?: string) {
+  if (isAcademyLocalReview()) return academyPreviewCourses.filter((item) => item.is_published && (!headquartersId || item.headquarters_id === headquartersId));
   let query = supabase
     .from("academy_courses")
     .select("*")
@@ -53,6 +63,7 @@ export async function listPublishedCourses(headquartersId?: string) {
 
 // 公開フロント: 掲載中の講師一覧（RLSで is_listed=true のみ匿名でも読める）
 export async function listListedInstructors(headquartersId?: string) {
+  if (isAcademyLocalReview()) return academyPreviewInstructors.filter((item) => item.is_listed && (!headquartersId || item.headquarters_id === headquartersId));
   let query = supabase
     .from("academy_instructors")
     .select("*")
@@ -66,6 +77,7 @@ export async function listListedInstructors(headquartersId?: string) {
 
 // 公開LP: 講座を取得（RLSで公開中のみ匿名でも読める）
 export async function getPublicCourse(courseId: string) {
+  if (isAcademyLocalReview()) return academyPreviewCourses.find((item) => item.id === courseId && item.is_published) ?? null;
   const { data, error } = await supabase.from("academy_courses").select("*").eq("id", courseId).maybeSingle();
   if (error) throw error;
   return (data ?? null) as AcademyCourse | null;
@@ -73,6 +85,7 @@ export async function getPublicCourse(courseId: string) {
 
 // 公開LP: 担当講師（掲載中のみ匿名でも読める）
 export async function getListedInstructor(instructorId: string) {
+  if (isAcademyLocalReview()) return academyPreviewInstructors.find((item) => item.id === instructorId && item.is_listed) ?? null;
   const { data, error } = await supabase
     .from("academy_instructors")
     .select("*")
@@ -84,6 +97,7 @@ export async function getListedInstructor(instructorId: string) {
 
 // 本部: LPブロックを保存
 export async function saveLpBlocks(headquartersId: string, courseId: string, blocks: AcademyLpBlock[]) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_courses")
     .update({ lp_blocks: blocks })
@@ -113,6 +127,7 @@ export type PublicApplicationInput = {
 };
 
 export async function submitPublicApplication(input: PublicApplicationInput) {
+  assertAcademyWritable();
   if (!input.instructorId) {
     const { data, error } = await supabase.functions.invoke("academy-application-intake", {
       body: {

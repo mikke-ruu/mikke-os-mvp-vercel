@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { ACADEMY_PREVIEW_IDS, academyPreviewHeadquarters, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyAccessContext } from "@/types/database";
 
 export type AcademyRoutePortal = "manage" | "teach";
@@ -145,6 +146,23 @@ async function listLegacyReadonlyContexts() {
 }
 
 export async function listMyAcademyContexts() {
+  if (isAcademyLocalReview()) {
+    return [{
+      academy_id: ACADEMY_PREVIEW_IDS.headquarters,
+      academy_name: academyPreviewHeadquarters.name,
+      academy_handle: academyPreviewHeadquarters.handle,
+      roles: ["owner", "instructor"],
+      portals: ["manage", "teach"],
+      capabilities: [
+        "academy:headquarters:view",
+        "academy:headquarters:manage",
+        "academy:courses:manage",
+        "academy:instructors:manage",
+        "academy:applications:manage",
+        "academy:settings:manage"
+      ]
+    }] satisfies AcademyAccessContext[];
+  }
   const { data, error } = await supabase.rpc("academy_list_my_contexts");
   if (error) {
     if (isReadonlyLocalPreview() && (error.code === "PGRST202" || error.code === "42883")) {
@@ -156,6 +174,7 @@ export async function listMyAcademyContexts() {
 }
 
 export async function canCreateAcademyHeadquarters() {
+  if (isAcademyLocalReview()) return false;
   const { data, error } = await supabase.rpc("academy_can_create_headquarters");
   if (error) {
     if (isReadonlyLocalPreview() && (error.code === "PGRST202" || error.code === "42883")) return false;

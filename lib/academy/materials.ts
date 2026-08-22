@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
+import { academyPreviewMaterials, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyMaterial, Profile } from "@/types/database";
 
 export const MATERIAL_KIND_LABELS: Record<AcademyMaterial["kind"], string> = {
@@ -20,6 +21,9 @@ export type MaterialInput = {
 
 // 本部管理: 自本部の全教材（講座で絞り込み可）
 export async function listMaterials(headquartersId: string, courseId?: string) {
+  if (isAcademyLocalReview()) {
+    return courseId ? academyPreviewMaterials.filter((item) => item.course_id === courseId) : academyPreviewMaterials;
+  }
   let query = supabase
     .from("academy_materials")
     .select("*")
@@ -35,6 +39,7 @@ export async function listMaterials(headquartersId: string, courseId?: string) {
 }
 
 export async function createMaterial(profile: Profile, headquartersId: string, input: MaterialInput) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_materials")
     .insert({
@@ -71,6 +76,7 @@ export async function createMaterial(profile: Profile, headquartersId: string, i
 }
 
 export async function setMaterialPublished(headquartersId: string, material: AcademyMaterial, isPublished: boolean) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_materials")
     .update({ is_published: isPublished })
@@ -84,6 +90,7 @@ export async function setMaterialPublished(headquartersId: string, material: Aca
 }
 
 export async function deleteMaterial(headquartersId: string, materialId: string) {
+  assertAcademyWritable();
   const { error } = await supabase
     .from("academy_materials")
     .delete()

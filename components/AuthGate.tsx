@@ -63,12 +63,41 @@ const marketNoteGuestUser = {
   created_at: marketNoteGuestProfile.created_at
 } as User;
 
+const academyLocalReviewUser = {
+  id: "00000000-0000-4000-8000-000000009001",
+  aud: "authenticated",
+  role: "authenticated",
+  app_metadata: {},
+  user_metadata: {},
+  created_at: "2026-08-22T00:00:00.000Z"
+} as User;
+
+const academyLocalReviewProfile: Profile = {
+  id: "00000000-0000-4000-8000-000000009002",
+  user_id: academyLocalReviewUser.id,
+  display_name: "Academy確認用",
+  handle: "academy_preview",
+  bio: null,
+  area: null,
+  avatar_url: null,
+  website_url: null,
+  instagram_url: null,
+  member_number: null,
+  joined_at: "2026-08-22T00:00:00.000Z",
+  created_at: "2026-08-22T00:00:00.000Z",
+  updated_at: "2026-08-22T00:00:00.000Z"
+};
+
 function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; allowGuest: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams.toString();
   const nextPath = search ? `${pathname}?${search}` : pathname;
+  const localAcademyReview =
+    process.env.NODE_ENV === "development" &&
+    pathname.startsWith("/academy") &&
+    ["dashboard", "walkthrough"].includes(searchParams.get("preview") ?? "");
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,12 +109,23 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
   }
 
   async function refreshProfile() {
+    if (localAcademyReview) return;
     if (!user) return;
     await loadProfile(user);
   }
 
   useEffect(() => {
     let mounted = true;
+
+    if (localAcademyReview) {
+      setUser(academyLocalReviewUser);
+      setProfile(academyLocalReviewProfile);
+      setAuthUnavailable(false);
+      setLoading(false);
+      return () => {
+        mounted = false;
+      };
+    }
 
     getSessionWithRetry().then(async ({ data, error }) => {
       if (!mounted) return;
@@ -146,7 +186,7 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
       mounted = false;
       listener.subscription.unsubscribe();
     };
-  }, [allowGuest, nextPath, pathname, router]);
+  }, [allowGuest, localAcademyReview, nextPath, pathname, router]);
 
   const value = useMemo(() => {
     if (!user || !profile) return null;

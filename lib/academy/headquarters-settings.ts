@@ -1,4 +1,11 @@
 import { supabase } from "@/lib/supabase/client";
+import {
+  academyPreviewInvitations,
+  academyPreviewMembers,
+  academyPreviewSettings,
+  assertAcademyWritable,
+  isAcademyLocalReview
+} from "@/lib/academy/preview";
 import type {
   AcademyHeadquartersInvitation,
   AcademyHeadquartersMember,
@@ -12,6 +19,7 @@ const invitationSelect =
   "*, headquarters:academy_headquarters(id,name,handle), target:profiles!academy_headquarters_invitations_target_profile_id_fkey(id,display_name,handle)";
 
 export async function getHeadquartersSettings(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewSettings;
   const { data, error } = await supabase
     .from("academy_headquarters_settings")
     .select("*")
@@ -26,6 +34,7 @@ export async function saveHeadquartersSettings(
   featureFlags: Record<string, boolean>,
   userId: string
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_headquarters_settings")
     .upsert({
@@ -41,6 +50,7 @@ export async function saveHeadquartersSettings(
 }
 
 export async function getMyHeadquartersRole(headquartersId: string) {
+  if (isAcademyLocalReview()) return "owner" as const;
   const { data, error } = await supabase.rpc("academy_get_my_headquarters_role", {
     p_headquarters_id: headquartersId
   });
@@ -49,6 +59,7 @@ export async function getMyHeadquartersRole(headquartersId: string) {
 }
 
 export async function listHeadquartersMembers(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewMembers;
   const { data, error } = await supabase
     .from("academy_headquarters_members")
     .select(memberSelect)
@@ -59,6 +70,7 @@ export async function listHeadquartersMembers(headquartersId: string) {
 }
 
 export async function listHeadquartersInvitations(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewInvitations;
   const { data, error } = await supabase
     .from("academy_headquarters_invitations")
     .select(invitationSelect)
@@ -69,6 +81,7 @@ export async function listHeadquartersInvitations(headquartersId: string) {
 }
 
 export async function listMyHeadquartersInvitations(profileId: string) {
+  if (isAcademyLocalReview()) return academyPreviewInvitations;
   const { data, error } = await supabase
     .from("academy_headquarters_invitations")
     .select(invitationSelect)
@@ -84,6 +97,7 @@ export async function inviteHeadquartersMember(
   mikkeId: string,
   role: Exclude<AcademyHeadquartersRole, "owner">
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_invite_headquarters_member", {
     p_headquarters_id: headquartersId,
     p_mikke_id: mikkeId.trim().replace(/^@/, ""),
@@ -97,6 +111,7 @@ export async function respondHeadquartersInvitation(
   invitationId: string,
   response: "accepted" | "declined"
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_respond_headquarters_invitation", {
     p_invitation_id: invitationId,
     p_response: response
@@ -106,6 +121,7 @@ export async function respondHeadquartersInvitation(
 }
 
 export async function stopHeadquartersMember(memberId: string) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_stop_headquarters_member", {
     p_member_id: memberId
   });
