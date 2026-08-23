@@ -134,6 +134,12 @@ function CoursesContent() {
                   >
                     <GraduationCap size={14} /> 講師用資料ページ編集
                   </Link>
+                  <Link
+                    href={`/academy/courses/${course.id}/instructor-page?audience=learner`}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+                  >
+                    <GraduationCap size={14} /> 復習ページ編集
+                  </Link>
                 </div>
               </div>
             </li>

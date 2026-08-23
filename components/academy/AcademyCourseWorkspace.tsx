@@ -10,6 +10,11 @@ const courseTabs = [
   { id: "program", label: "ステップ教材", href: (courseId: string) => `/academy/courses/${courseId}/program` },
   { id: "page", label: "公開講座ページ", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
   {
+    id: "learner",
+    label: "復習ページ",
+    href: (courseId: string) => `/academy/courses/${courseId}/instructor-page?audience=learner`
+  },
+  {
     id: "instructor",
     label: "講師用資料ページ",
     href: (courseId: string) => `/academy/courses/${courseId}/instructor-page`

@@ -46,6 +46,8 @@ export async function getMyInstructorRecords(userId: string, academyId?: string)
     .from("academy_instructors")
     .select("*")
     .eq("user_id", userId)
+    .eq("registration_status", "registered")
+    .eq("is_certified", true)
     .order("created_at", { ascending: true });
 
   if (explicitAcademyId) query = query.eq("headquarters_id", explicitAcademyId);

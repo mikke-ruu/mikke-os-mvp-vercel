@@ -108,7 +108,7 @@ export type AcademyHeadquarters = {
 };
 
 export type AcademyHeadquartersRole = "owner" | "administrator" | "course_editor";
-export type AcademyAccessRole = AcademyHeadquartersRole | "instructor";
+export type AcademyAccessRole = AcademyHeadquartersRole | "instructor" | "learner";
 export type AcademyPortal = "manage" | "teach";
 export type AcademyAccessContext = {
   academy_id: string;
@@ -209,6 +209,17 @@ export type AcademyInstructorPage = {
   course_id: string;
   user_id: string;
   blocks: AcademyPageBlock[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyLearnerPage = {
+  id: string;
+  headquarters_id: string;
+  course_id: string;
+  user_id: string;
+  blocks: AcademyPageBlock[];
+  is_published: boolean;
   created_at: string;
   updated_at: string;
 };

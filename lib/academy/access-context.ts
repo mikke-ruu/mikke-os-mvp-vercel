@@ -113,9 +113,10 @@ async function listLegacyReadonlyContexts() {
 
   const { data: instructorRows, error: instructorError } = await supabase
     .from("academy_instructors")
-    .select("headquarters_id")
+    .select("headquarters_id,is_active,status")
     .eq("user_id", userData.user.id)
-    .eq("is_active", true);
+    .eq("registration_status", "registered")
+    .eq("is_certified", true);
   if (instructorError) throw instructorError;
   const instructorHeadquartersIds = [...new Set((instructorRows ?? []).map((row) => row.headquarters_id))];
   if (instructorHeadquartersIds.length > 0) {
@@ -129,6 +130,8 @@ async function listLegacyReadonlyContexts() {
       if (current) {
         if (!current.roles.includes("instructor")) current.roles.push("instructor");
         if (!current.portals.includes("teach")) current.portals.push("teach");
+        if (!current.capabilities.includes("academy:instructor_portal:view")) current.capabilities.push("academy:instructor_portal:view");
+        if (!current.capabilities.includes("academy:instructor_materials:view")) current.capabilities.push("academy:instructor_materials:view");
       } else {
         contexts.set(headquarters.id, {
           academy_id: headquarters.id,
@@ -136,7 +139,45 @@ async function listLegacyReadonlyContexts() {
           academy_handle: headquarters.handle,
           roles: ["instructor"],
           portals: ["teach"],
-          capabilities: ["academy:instructor:use"]
+          capabilities: ["academy:instructor_portal:view", "academy:instructor_materials:view"]
+        });
+      }
+      const canOperate = instructorRows?.some((row) => row.headquarters_id === headquarters.id && row.is_active && row.status === "active");
+      const resolved = contexts.get(headquarters.id);
+      if (canOperate && resolved && !resolved.capabilities.includes("academy:instructor:operate")) {
+        resolved.capabilities.push("academy:instructor:operate");
+      }
+    }
+  }
+
+  const learnerStatuses = ["paid", "kit_pending", "kit_preparing", "kit_shipped", "scheduled", "completed", "cert_pending", "certified", "instructor_added"];
+  const { data: learnerRows, error: learnerError } = await supabase
+    .from("academy_applications")
+    .select("headquarters_id")
+    .eq("user_id", userData.user.id)
+    .in("status", learnerStatuses);
+  if (learnerError) throw learnerError;
+  const learnerHeadquartersIds = [...new Set((learnerRows ?? []).map((row) => row.headquarters_id))];
+  if (learnerHeadquartersIds.length > 0) {
+    const { data: learnerHeadquarters, error: headquartersError } = await supabase
+      .from("academy_headquarters")
+      .select("id,name,handle")
+      .in("id", learnerHeadquartersIds);
+    if (headquartersError) throw headquartersError;
+    for (const headquarters of learnerHeadquarters ?? []) {
+      const current = contexts.get(headquarters.id);
+      if (current) {
+        if (!current.roles.includes("learner")) current.roles.push("learner");
+        if (!current.portals.includes("teach")) current.portals.push("teach");
+        if (!current.capabilities.includes("academy:learner_portal:view")) current.capabilities.push("academy:learner_portal:view");
+      } else {
+        contexts.set(headquarters.id, {
+          academy_id: headquarters.id,
+          academy_name: headquarters.name,
+          academy_handle: headquarters.handle,
+          roles: ["learner"],
+          portals: ["teach"],
+          capabilities: ["academy:learner_portal:view"]
         });
       }
     }
@@ -151,7 +192,7 @@ export async function listMyAcademyContexts() {
       academy_id: ACADEMY_PREVIEW_IDS.headquarters,
       academy_name: academyPreviewHeadquarters.name,
       academy_handle: academyPreviewHeadquarters.handle,
-      roles: ["owner", "instructor"],
+      roles: ["owner", "instructor", "learner"],
       portals: ["manage", "teach"],
       capabilities: [
         "academy:headquarters:view",
@@ -159,7 +200,11 @@ export async function listMyAcademyContexts() {
         "academy:courses:manage",
         "academy:instructors:manage",
         "academy:applications:manage",
-        "academy:settings:manage"
+        "academy:settings:manage",
+        "academy:learner_portal:view",
+        "academy:instructor_portal:view",
+        "academy:instructor_materials:view",
+        "academy:instructor:operate"
       ]
     }] satisfies AcademyAccessContext[];
   }

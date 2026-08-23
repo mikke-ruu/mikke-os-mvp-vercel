@@ -12,6 +12,7 @@ import type {
   AcademyInstructorAddress,
   AcademyInstructorPage,
   AcademyKitOrder,
+  AcademyLearnerPage,
   AcademyMaterial,
   AcademyProgram,
   AcademyProgramSection,
@@ -548,6 +549,21 @@ export const academyPreviewInstructorPage: AcademyInstructorPage = {
     { type: "text", text: "講座の振り返りと、初回開催までの準備を確認します。" },
     { type: "materials-list" }
   ],
+  created_at: now,
+  updated_at: now
+};
+
+export const academyPreviewLearnerPage: AcademyLearnerPage = {
+  id: "00000000-0000-4000-8000-000000001202",
+  headquarters_id: ACADEMY_PREVIEW_IDS.headquarters,
+  course_id: ACADEMY_PREVIEW_IDS.course,
+  user_id: academyPreviewHeadquarters.owner_user_id,
+  blocks: [
+    { type: "heading", text: "講座の振り返り" },
+    { type: "text", text: "当日のポイントと、自宅で練習する内容を確認しましょう。" },
+    { type: "links", title: "復習用リンク", items: [{ label: "動画で確認する", url: "https://example.com/academy-review" }] }
+  ],
+  is_published: true,
   created_at: now,
   updated_at: now
 };

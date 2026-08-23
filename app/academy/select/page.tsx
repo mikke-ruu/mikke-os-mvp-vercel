@@ -11,7 +11,8 @@ const ROLE_LABELS = {
   owner: "オーナー",
   administrator: "本部スタッフ",
   course_editor: "講座編集",
-  instructor: "講師"
+  instructor: "認定講師",
+  learner: "受講者"
 } as const;
 
 function AcademySelector() {
@@ -56,7 +57,7 @@ function AcademySelector() {
         <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
           <p className="text-sm font-bold text-[var(--mikke-text)]">利用できるAcademyはありません</p>
           <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">
-            本部契約の確認、スタッフ招待、または講師登録が完了すると、ここに表示されます。
+            受講の確定、本部契約、スタッフ招待、または認定講師登録が完了すると、ここに表示されます。
           </p>
         </div>
       ) : (
@@ -78,7 +79,7 @@ function AcademySelector() {
                   ) : null}
                   {context.portals.includes("teach") ? (
                     <Link href={toAcademyContextHref("/academy/portal", context.academy_id, "teach")} className="inline-flex items-center gap-1 rounded-xl border border-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]">
-                      <GraduationCap size={14} /> 講師ポータル
+                      <GraduationCap size={14} /> マイポータル
                     </Link>
                   ) : null}
                 </div>

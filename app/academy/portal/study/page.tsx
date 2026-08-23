@@ -6,9 +6,12 @@ import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { getCoursesByIds, getMyInstructorRecords, listMaterialsForInstructor } from "@/lib/academy/instructor-portal";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
+import { getLearnerPageForViewer } from "@/lib/academy/learner-page";
+import { listMyLearnerApplications } from "@/lib/academy/learner-portal";
+import { getAcademyRouteContext } from "@/lib/academy/access-context";
 import { PageBlocks } from "@/components/academy/PageBlocks";
 import { isAcademyLocalReview, academyPreviewCourses } from "@/lib/academy/preview";
-import type { AcademyCourse, AcademyInstructor, AcademyInstructorPage, AcademyMaterial } from "@/types/database";
+import type { AcademyApplication, AcademyCourse, AcademyInstructor, AcademyInstructorPage, AcademyLearnerPage, AcademyMaterial } from "@/types/database";
 
 function kindIcon(kind: AcademyMaterial["kind"]) {
   if (kind === "video") return <Video size={14} className="shrink-0 text-[var(--mikke-accent-strong)]" />;
@@ -19,51 +22,66 @@ function kindIcon(kind: AcademyMaterial["kind"]) {
 function StudyContent() {
   const { profile } = useAuth();
   const [records, setRecords] = useState<AcademyInstructor[]>([]);
+  const [learnerApps, setLearnerApps] = useState<AcademyApplication[]>([]);
   const [courseMap, setCourseMap] = useState<Record<string, AcademyCourse>>({});
   const [materials, setMaterials] = useState<AcademyMaterial[]>([]);
   const [pageMap, setPageMap] = useState<Record<string, AcademyInstructorPage>>({});
+  const [learnerPageMap, setLearnerPageMap] = useState<Record<string, AcademyLearnerPage>>({});
   const [loading, setLoading] = useState(true);
-  const [learnerSample, setLearnerSample] = useState(false);
+  const [view, setView] = useState<"learner" | "instructor">("learner");
 
   useEffect(() => {
-    setLearnerSample(
-      isAcademyLocalReview() && new URLSearchParams(window.location.search).get("sample") === "learner"
-    );
+    const params = new URLSearchParams(window.location.search);
+    const requestedView = params.get("view") ?? params.get("sample");
+    if (requestedView) setView(requestedView === "instructor" ? "instructor" : "learner");
     async function load() {
-      const myRecords = await getMyInstructorRecords(profile.user_id);
+      const academyId = getAcademyRouteContext()?.academyId;
+      const [myRecords, myLearnerApps] = await Promise.all([
+        getMyInstructorRecords(profile.user_id, academyId),
+        listMyLearnerApplications(profile.user_id, academyId)
+      ]);
       setRecords(myRecords);
-      const courseIds = myRecords.map((r) => r.course_id);
-      const activeCourseIds = myRecords.filter((r) => r.is_active).map((r) => r.course_id);
-      const [courses, mats, pages] = await Promise.all([
+      setLearnerApps(myLearnerApps);
+      if (!requestedView) setView(myLearnerApps.length > 0 ? "learner" : "instructor");
+      const instructorCourseIds = myRecords.map((record) => record.course_id);
+      const learnerCourseIds = [...new Set(myLearnerApps.map((application) => application.course_id))];
+      const courseIds = [...new Set([...instructorCourseIds, ...learnerCourseIds])];
+      const [courses, mats, pages, learnerPages] = await Promise.all([
         getCoursesByIds(courseIds),
-        listMaterialsForInstructor(courseIds),
-        Promise.all(activeCourseIds.map((cid) => getInstructorPageForViewer(cid).catch(() => null)))
+        listMaterialsForInstructor(instructorCourseIds),
+        Promise.all(instructorCourseIds.map((courseId) => getInstructorPageForViewer(courseId).catch(() => null))),
+        Promise.all(learnerCourseIds.map((courseId) => getLearnerPageForViewer(courseId).catch(() => null)))
       ]);
       setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
       setMaterials(mats);
       setPageMap(Object.fromEntries(pages.filter((p): p is AcademyInstructorPage => !!p).map((p) => [p.course_id, p])));
+      setLearnerPageMap(Object.fromEntries(learnerPages.filter((page): page is AcademyLearnerPage => !!page).map((page) => [page.course_id, page])));
       setLoading(false);
     }
     load();
   }, [profile.user_id]);
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
-  if (learnerSample) {
-    const course = academyPreviewCourses[0];
+  if (view === "learner") {
+    const learnerCourseIds = [...new Set(learnerApps.map((application) => application.course_id))];
+    if (learnerCourseIds.length === 0) {
+      return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">受講中・修了した講座はありません。</p>;
+    }
     return (
       <div className="mx-auto max-w-3xl space-y-4">
-        <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
+        {learnerCourseIds.map((courseId) => {
+          const course = courseMap[courseId] ?? (isAcademyLocalReview() ? academyPreviewCourses.find((item) => item.id === courseId) : undefined);
+          const page = learnerPageMap[courseId];
+          return <section key={courseId} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course.code}</span>
-            <h2 className="text-base font-bold text-[var(--mikke-text)]">{course.name}</h2>
+            <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
+            <h2 className="text-base font-bold text-[var(--mikke-text)]">{course?.name}</h2>
           </div>
-          <p className="mt-4 text-sm font-bold text-[var(--mikke-text)]">受講者用の復習ページ</p>
-          <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">講座の振り返り、受講者に配布する資料、本部からのお知らせをここで確認できます。</p>
-          <div className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4">
-            <p className="text-sm font-bold text-[var(--mikke-text)]">講座の振り返り</p>
-            <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">当日のポイントと、自宅で練習する内容を確認しましょう。</p>
+          <div className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4 md:p-5">
+            {page?.blocks.length ? <PageBlocks blocks={page.blocks} /> : <p className="text-sm text-[var(--mikke-muted)]">本部が復習ページを準備中です。</p>}
           </div>
-        </section>
+        </section>;
+        })}
       </div>
     );
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   BookOpen,
@@ -86,6 +86,16 @@ function canShowManageHref(context: AcademyAccessContext | null, href: string) {
   return context.capabilities.includes("academy:settings:manage");
 }
 
+function canShowPersonalHref(context: AcademyAccessContext | null, href: string, personalView: "learner" | "instructor") {
+  if (!context) return true;
+  if (href === "/academy/portal" || href.startsWith("/academy/portal/study")) {
+    return context.capabilities.includes("academy:learner_portal:view") ||
+      context.capabilities.includes("academy:instructor_portal:view");
+  }
+  if (personalView === "learner") return false;
+  return context.capabilities.includes("academy:instructor:operate");
+}
+
 function manageHrefForCapabilityCheck(pathname: string) {
   const canonical = pathname.match(/^\/academy\/h\/[0-9a-f-]{36}\/manage(\/.*)?$/i);
   return canonical ? `/academy${canonical[1] ?? ""}` : pathname;
@@ -102,6 +112,7 @@ function ShellInner({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const routeContext = parseAcademyContextPath(pathname);
   const hasContextPathPrefix = pathname.startsWith("/academy/h/");
   const { profile, user } = useAuth();
@@ -135,7 +146,7 @@ function ShellInner({
           academy_id: "00000000-0000-4000-8000-000000000001",
           academy_name: "ローカル確認用Academy",
           academy_handle: "local-preview",
-          roles: ["owner", "instructor"],
+          roles: ["owner", "instructor", "learner"],
           portals: ["manage", "teach"],
           capabilities: [
             "academy:headquarters:view",
@@ -143,7 +154,11 @@ function ShellInner({
             "academy:courses:manage",
             "academy:instructors:manage",
             "academy:applications:manage",
-            "academy:settings:manage"
+            "academy:settings:manage",
+            "academy:learner_portal:view",
+            "academy:instructor_portal:view",
+            "academy:instructor_materials:view",
+            "academy:instructor:operate"
           ]
         };
         setContextCount(1);
@@ -306,12 +321,41 @@ function ShellInner({
     window.alert("ローカル確認中は保存できません。本番データは変更されていません。");
   }
 
+  const requestedPersonalView = searchParams.get("view") ?? searchParams.get("sample");
+  const canUseLearnerView = selectedContext?.capabilities.includes("academy:learner_portal:view") ?? false;
+  const canUseInstructorView = selectedContext?.capabilities.includes("academy:instructor_portal:view") ?? false;
+  const personalView: "learner" | "instructor" =
+    requestedPersonalView === "instructor" && canUseInstructorView
+      ? "instructor"
+      : canUseLearnerView
+        ? "learner"
+        : "instructor";
   const navItems = (variant === "honbu" ? honbuNav : koushiNav)
-    .filter((item) => variant === "koushi" || canShowManageHref(selectedContext, item.href))
-    .map((item) => ({ ...item, href: contextHref(item.href) }));
+    .filter((item) => variant === "honbu" ? canShowManageHref(selectedContext, item.href) : canShowPersonalHref(selectedContext, item.href, personalView))
+    .map((item) => ({
+      ...item,
+      label: variant === "koushi" && item.href.startsWith("/academy/portal/study")
+        ? personalView === "learner" ? "復習ページ" : "講師用資料"
+        : item.label,
+      href: contextHref(
+        variant === "koushi" && (item.href === "/academy/portal" || item.href.startsWith("/academy/portal/study"))
+          ? `${item.href}?view=${personalView}`
+          : item.href
+      )
+    }));
   const bottomNavItems = (variant === "honbu" ? honbuBottomNav : koushiBottomNav)
-    .filter((item) => variant === "koushi" || canShowManageHref(selectedContext, item.href))
-    .map((item) => ({ ...item, href: contextHref(item.href) }));
+    .filter((item) => variant === "honbu" ? canShowManageHref(selectedContext, item.href) : canShowPersonalHref(selectedContext, item.href, personalView))
+    .map((item) => ({
+      ...item,
+      label: variant === "koushi" && item.href.startsWith("/academy/portal/study")
+        ? personalView === "learner" ? "復習" : "講師資料"
+        : item.label,
+      href: contextHref(
+        variant === "koushi" && (item.href === "/academy/portal" || item.href.startsWith("/academy/portal/study"))
+          ? `${item.href}?view=${personalView}`
+          : item.href
+      )
+    }));
   const redirectingToCanonical =
     previewMode !== "dashboard" &&
     previewMode !== "walkthrough" &&
@@ -344,12 +388,12 @@ function ShellInner({
       <main className="mx-auto max-w-lg px-4 py-16">
         <div className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
           <p className="text-sm font-bold text-[var(--mikke-text)]">
-            {variant === "honbu" ? "本部画面を利用できません" : "マイポータルの講師機能を利用できません"}
+            {variant === "honbu" ? "本部画面を利用できません" : "このAcademyのマイポータルを利用できません"}
           </p>
           <p className="text-xs leading-5 text-[var(--mikke-muted)]">
             {variant === "honbu"
               ? "本部画面は、有効なAcademy契約または本部から付与された運営権限がある場合だけ表示されます。"
-              : "講師用の申込・開催・発注機能は、本人が承諾し、登録中の認定講師として紐づいている場合だけ表示されます。"}
+              : "受講者または認定講師として登録されている場合だけ表示されます。講師用の申込・開催・発注機能は、活動中の認定講師だけが利用できます。"}
           </p>
           <Link href="/academy/select" className="inline-flex rounded-xl border border-[var(--mikke-line)] px-4 py-2 text-xs font-bold text-[var(--mikke-text-soft)]">
             利用できるAcademyを確認する
