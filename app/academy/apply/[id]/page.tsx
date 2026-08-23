@@ -3,10 +3,10 @@
 import { Suspense, use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { getListedInstructor, getPublicCourse, submitPublicApplication } from "@/lib/academy/lp";
+import { getListedInstructor, getPublicCourse, listPublicClasses, submitPublicApplication } from "@/lib/academy/lp";
 import { buildAcademyPaymentUrl } from "@/lib/academy/payments";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
-import type { AcademyCourse, AcademyInstructor } from "@/types/database";
+import type { AcademyCourse, AcademyInstructor, AcademyPublicClass } from "@/types/database";
 
 const inputClass =
   "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
@@ -15,8 +15,12 @@ const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 function ApplyInner({ courseId }: { courseId: string }) {
   const searchParams = useSearchParams();
   const instructorId = searchParams.get("k");
+  const requestedClassId = searchParams.get("class");
+  const preview = searchParams.get("preview");
   const [course, setCourse] = useState<AcademyCourse | null>(null);
   const [instructor, setInstructor] = useState<AcademyInstructor | null>(null);
+  const [classes, setClasses] = useState<AcademyPublicClass[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
@@ -37,7 +41,19 @@ function ApplyInner({ courseId }: { courseId: string }) {
     async function load() {
       const c = await getPublicCourse(courseId);
       setCourse(c);
-      if (c && instructorId) setInstructor(await getListedInstructor(instructorId).catch(() => null));
+      if (c) {
+        const [listedInstructor, publicClasses] = await Promise.all([
+          instructorId ? getListedInstructor(instructorId).catch(() => null) : Promise.resolve(null),
+          listPublicClasses(c.id, instructorId).catch(() => [])
+        ]);
+        setInstructor(listedInstructor);
+        setClasses(publicClasses);
+        const requestedClass = publicClasses.find((item) => item.id === requestedClassId);
+        if (requestedClass) {
+          setSelectedClassId(requestedClass.id);
+          setFormat(requestedClass.format);
+        }
+      }
       setLoading(false);
     }
     load();
@@ -49,6 +65,8 @@ function ApplyInner({ courseId }: { courseId: string }) {
     if (!course) return;
     if (!name.trim()) return setError("お名前を入力してください。");
     if (!email.trim()) return setError("日程のご連絡に使うメールアドレスを入力してください。");
+    const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
+    if (classes.length > 0 && !selectedClass) return setError("希望する開催日程を選んでください。");
     const features = resolveAcademyCourseFeaturesForCourse(course);
     if (features.certification && !diplomaNameEn.trim()) {
       return setError("ディプロマに入れるお名前（英語表記）を入力してください。");
@@ -60,13 +78,14 @@ function ApplyInner({ courseId }: { courseId: string }) {
     try {
       const submitted = await submitPublicApplication({
         course,
+        classId: selectedClass?.id ?? null,
         instructorId: instructor ? instructor.id : null,
         applicantName: name,
         applicantEmail: email,
         applicantPhone: phone,
         applicantNote: note,
-        eventDate: "",
-        format,
+        eventDate: selectedClass?.schedule_mode === "fixed" ? selectedClass.starts_at.slice(0, 10) : "",
+        format: selectedClass?.format ?? format,
         formAnswers: answers,
         diplomaNameEn: features.certification ? diplomaNameEn : "",
         applicantShippingAddress: features.kits && format === "online" ? shippingAddress : ""
@@ -92,6 +111,11 @@ function ApplyInner({ courseId }: { courseId: string }) {
   }
 
   const features = resolveAcademyCourseFeaturesForCourse(course);
+  const selectedClass = classes.find((item) => item.id === selectedClassId) ?? null;
+  const backParams = new URLSearchParams();
+  if (instructorId) backParams.set("k", instructorId);
+  if (preview) backParams.set("preview", preview);
+  const backQuery = backParams.toString();
 
   if (done) {
     return (
@@ -125,7 +149,7 @@ function ApplyInner({ courseId }: { courseId: string }) {
             お支払い手続きへ進む
           </a>
         ) : null}
-        <Link href={`/academy/c/${course.id}${instructorId ? `?k=${instructorId}` : ""}`} className="mt-6 block text-sm font-bold text-[var(--mikke-accent-strong)]">
+        <Link href={`/academy/c/${course.id}${backQuery ? `?${backQuery}` : ""}`} className="mt-6 block text-sm font-bold text-[var(--mikke-accent-strong)]">
           公開講座ページに戻る
         </Link>
       </div>
@@ -169,23 +193,67 @@ function ApplyInner({ courseId }: { courseId: string }) {
             />
           </div>
         ) : null}
-        <div>
-          <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs leading-5 text-[var(--mikke-text-soft)]">
-            受講日は、お申込み後に担当者からメールでご案内し、ご相談のうえ決定します。ご希望がある場合は下の「ご質問・ご要望」にご記入ください。
-          </p>
-        </div>
-        <div>
+        {classes.length ? (
+          <fieldset>
+            <legend className={labelClass}>開催日程*</legend>
+            <div className="mt-2 space-y-2">
+              {classes.map((academyClass) => {
+                const fixed = academyClass.schedule_mode === "fixed";
+                const startsAt = new Intl.DateTimeFormat("ja-JP", {
+                  timeZone: "Asia/Tokyo",
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+                  weekday: "short",
+                  hour: "2-digit",
+                  minute: "2-digit"
+                }).format(new Date(academyClass.starts_at));
+                const checked = selectedClassId === academyClass.id;
+                return (
+                  <label
+                    key={academyClass.id}
+                    className={`block cursor-pointer rounded-xl border p-3 ${checked ? "border-[#3f4eb5] bg-[#eef0ff]" : "border-[var(--mikke-line)] bg-white"}`}
+                  >
+                    <span className="flex gap-2">
+                      <input
+                        type="radio"
+                        name="academy-class"
+                        value={academyClass.id}
+                        checked={checked}
+                        onChange={() => {
+                          setSelectedClassId(academyClass.id);
+                          setFormat(academyClass.format);
+                        }}
+                      />
+                      <span>
+                        <span className="block text-sm font-bold text-[var(--mikke-text)]">{academyClass.title}</span>
+                        <span className="mt-0.5 block text-xs leading-5 text-[var(--mikke-muted)]">
+                          {fixed ? startsAt : "お申し込み後に日程をご相談"}
+                          {` ・ ${academyClass.format === "in_person" ? "対面" : "オンライン"}`}
+                          {academyClass.remaining_capacity !== null ? ` ・ 残り${academyClass.remaining_capacity}名` : ""}
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        ) : (
           <div>
-            <label className={labelClass}>受講形式</label>
+            <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs leading-5 text-[var(--mikke-text-soft)]">
+              受講日は、お申込み後に担当者からメールでご案内し、ご相談のうえ決定します。
+            </p>
+            <label className={`${labelClass} mt-3`}>受講形式</label>
             <select className={inputClass} value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>
               <option value="">希望なし</option>
               {course.formats.includes("in_person") ? <option value="in_person">対面</option> : null}
               {course.formats.includes("online") ? <option value="online">オンライン</option> : null}
             </select>
           </div>
-        </div>
+        )}
 
-        {features.kits && format === "online" ? (
+        {features.kits && (selectedClass?.format ?? format) === "online" ? (
           <div>
             <label className={labelClass}>現物教材のお届け先*</label>
             <textarea

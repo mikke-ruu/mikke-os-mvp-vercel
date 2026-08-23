@@ -30,6 +30,7 @@ export const ACADEMY_PREVIEW_IDS = {
   application: "00000000-0000-4000-8000-000000000301",
   applicationPaid: "00000000-0000-4000-8000-000000000302",
   class: "00000000-0000-4000-8000-000000000401",
+  classArranged: "00000000-0000-4000-8000-000000000402",
   classRequest: "00000000-0000-4000-8000-000000000501",
   program: "00000000-0000-4000-8000-000000000601",
   section: "00000000-0000-4000-8000-000000000701",
@@ -323,6 +324,7 @@ export const academyPreviewApplications: AcademyApplication[] = [
     id: ACADEMY_PREVIEW_IDS.application,
     headquarters_id: ACADEMY_PREVIEW_IDS.headquarters,
     course_id: ACADEMY_PREVIEW_IDS.course,
+    class_id: null,
     user_id: null,
     intake_source: "koushi",
     instructor_id: ACADEMY_PREVIEW_IDS.instructor,
@@ -357,6 +359,7 @@ export const academyPreviewApplications: AcademyApplication[] = [
     id: ACADEMY_PREVIEW_IDS.applicationPaid,
     headquarters_id: ACADEMY_PREVIEW_IDS.headquarters,
     course_id: ACADEMY_PREVIEW_IDS.course,
+    class_id: ACADEMY_PREVIEW_IDS.class,
     user_id: null,
     intake_source: "honbu",
     instructor_id: null,
@@ -458,6 +461,29 @@ export const academyPreviewClasses: AcademyClass[] = [
       business_name: "みっけ学び教室",
       profile_id: academyPreviewInstructors[0].profile_id
     }
+  },
+  {
+    id: ACADEMY_PREVIEW_IDS.classArranged,
+    headquarters_id: ACADEMY_PREVIEW_IDS.headquarters,
+    course_id: ACADEMY_PREVIEW_IDS.course,
+    program_id: ACADEMY_PREVIEW_IDS.program,
+    program_version_id: "00000000-0000-4000-8000-000000000602",
+    instructor_id: null,
+    title: "日程相談で受講",
+    starts_at: "2026-12-01T01:00:00.000Z",
+    ends_at: null,
+    capacity: null,
+    venue_name: null,
+    meeting_url: null,
+    schedule_mode: "arranged_after_application",
+    registration_status: "open",
+    format: "online",
+    status: "planned",
+    created_by_user_id: academyPreviewHeadquarters.owner_user_id,
+    created_at: now,
+    updated_at: now,
+    course: { id: ACADEMY_PREVIEW_IDS.course, code: "BASIC-01", name: "はじめての認定講座" },
+    instructor: null
   }
 ];
 

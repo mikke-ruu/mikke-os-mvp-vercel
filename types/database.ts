@@ -393,6 +393,22 @@ export type AcademyClass = {
   instructor?: Pick<AcademyInstructor, "id" | "business_name" | "profile_id"> | null;
 };
 
+export type AcademyPublicClass = Pick<
+  AcademyClass,
+  | "id"
+  | "course_id"
+  | "instructor_id"
+  | "title"
+  | "starts_at"
+  | "ends_at"
+  | "capacity"
+  | "venue_name"
+  | "schedule_mode"
+  | "format"
+> & {
+  remaining_capacity: number | null;
+};
+
 export type AcademyClassInstructorRequest = {
   id: string;
   headquarters_id: string;
@@ -450,6 +466,7 @@ export type AcademyApplication = {
   id: string;
   headquarters_id: string;
   course_id: string;
+  class_id: string | null;
   user_id: string | null;
   intake_source: "honbu" | "koushi";
   instructor_id: string | null;

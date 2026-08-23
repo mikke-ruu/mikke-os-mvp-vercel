@@ -3,8 +3,8 @@
 import { Suspense, use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { getListedInstructor, getPublicCourse } from "@/lib/academy/lp";
-import type { AcademyCourse, AcademyInstructor } from "@/types/database";
+import { getListedInstructor, getPublicCourse, listPublicClasses } from "@/lib/academy/lp";
+import type { AcademyCourse, AcademyInstructor, AcademyPublicClass } from "@/types/database";
 
 function formatLabel(f: string) {
   return f === "in_person" ? "対面" : f === "online" ? "オンライン" : f;
@@ -23,13 +23,13 @@ function Section({ title, body }: { title: string; body: string | null }) {
   );
 }
 
-function ApplyButton({ href }: { href: string }) {
+function ApplyButton({ href, label = "この講座に申し込む" }: { href: string; label?: string }) {
   return (
     <Link
       href={href}
       className="mx-auto block w-full max-w-xs rounded-full bg-[var(--mikke-accent)] py-3.5 text-center text-sm font-bold tracking-wider text-white transition hover:opacity-90"
     >
-      この講座に申し込む
+      {label}
     </Link>
   );
 }
@@ -37,15 +37,24 @@ function ApplyButton({ href }: { href: string }) {
 function PublicLpInner({ courseId }: { courseId: string }) {
   const searchParams = useSearchParams();
   const instructorId = searchParams.get("k");
+  const preview = searchParams.get("preview");
   const [course, setCourse] = useState<AcademyCourse | null>(null);
   const [instructor, setInstructor] = useState<AcademyInstructor | null>(null);
+  const [classes, setClasses] = useState<AcademyPublicClass[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       const c = await getPublicCourse(courseId);
       setCourse(c);
-      if (c && instructorId) setInstructor(await getListedInstructor(instructorId).catch(() => null));
+      if (c) {
+        const [listedInstructor, publicClasses] = await Promise.all([
+          instructorId ? getListedInstructor(instructorId).catch(() => null) : Promise.resolve(null),
+          listPublicClasses(c.id, instructorId).catch(() => [])
+        ]);
+        setInstructor(listedInstructor);
+        setClasses(publicClasses);
+      }
       setLoading(false);
     }
     load();
@@ -56,7 +65,16 @@ function PublicLpInner({ courseId }: { courseId: string }) {
     return <p className="py-20 text-center text-sm text-[var(--mikke-muted)]">この講座は公開されていません。</p>;
   }
 
-  const applyHref = instructorId ? `/academy/apply/${course.id}?k=${instructorId}` : `/academy/apply/${course.id}`;
+  function buildApplyHref(classId?: string) {
+    const params = new URLSearchParams();
+    if (instructorId) params.set("k", instructorId);
+    if (classId) params.set("class", classId);
+    if (preview) params.set("preview", preview);
+    const query = params.toString();
+    return `/academy/apply/${course!.id}${query ? `?${query}` : ""}`;
+  }
+
+  const applyHref = buildApplyHref();
 
   return (
     <div className="mx-auto md:max-w-4xl md:px-6 md:py-10">
@@ -113,9 +131,54 @@ function PublicLpInner({ courseId }: { courseId: string }) {
           ) : null}
 
           <div className="mt-8">
-            <ApplyButton href={applyHref} />
+            <ApplyButton
+              href={classes.length ? "#academy-schedules" : applyHref}
+              label={classes.length ? "開催日程を見る" : undefined}
+            />
           </div>
         </div>
+
+        {classes.length ? (
+          <section id="academy-schedules" className="scroll-mt-6 border-t border-[var(--mikke-line)] px-5 py-8 md:px-12 md:py-12">
+            <div className="mx-auto max-w-2xl">
+              <h2 className="text-center text-sm font-bold tracking-[0.2em] text-[var(--mikke-accent-strong)] md:text-base">開催日程</h2>
+              <p className="mt-2 text-center text-sm leading-6 text-[var(--mikke-muted)]">希望する日程を選んでお申し込みください。</p>
+              <div className="mt-5 space-y-3">
+                {classes.map((academyClass) => {
+                  const fixed = academyClass.schedule_mode === "fixed";
+                  const startsAt = new Intl.DateTimeFormat("ja-JP", {
+                    timeZone: "Asia/Tokyo",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                    weekday: "short",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                  }).format(new Date(academyClass.starts_at));
+                  return (
+                    <article key={academyClass.id} className="rounded-2xl border border-[var(--mikke-line)] p-4 md:p-5">
+                      <p className="text-base font-bold text-[var(--mikke-text)]">{academyClass.title}</p>
+                      <p className="mt-1 text-sm font-bold text-[var(--mikke-accent-strong)]">
+                        {fixed ? startsAt : "お申し込み後に日程をご相談"}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">
+                        {formatLabel(academyClass.format)}
+                        {academyClass.format === "in_person" && academyClass.venue_name ? ` ・ ${academyClass.venue_name}` : ""}
+                        {academyClass.remaining_capacity !== null ? ` ・ 残り${academyClass.remaining_capacity}名` : ""}
+                      </p>
+                      <Link
+                        href={buildApplyHref(academyClass.id)}
+                        className="mt-4 inline-flex rounded-full bg-[var(--mikke-accent)] px-5 py-2.5 text-sm font-bold text-white"
+                      >
+                        この日程で申し込む
+                      </Link>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         <Section title="講座について" body={course.description} />
         <Section title="受講後にできること" body={course.can_do_after} />
@@ -206,7 +269,10 @@ function PublicLpInner({ courseId }: { courseId: string }) {
         ) : null}
 
         <div className="border-t border-[var(--mikke-line)] px-5 py-10 md:px-12">
-          <ApplyButton href={applyHref} />
+          <ApplyButton
+            href={classes.length ? "#academy-schedules" : applyHref}
+            label={classes.length ? "開催日程を選ぶ" : undefined}
+          />
         </div>
       </div>
     </div>

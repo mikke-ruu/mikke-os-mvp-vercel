@@ -8,8 +8,9 @@ for (const expected of [
   "日程のご連絡に使うメールアドレスを入力してください。",
   "お申込み後に担当者からメールでご案内",
   "features.certification ?",
-  "features.kits && format === \"online\"",
-  'eventDate: ""'
+  "features.kits && (selectedClass?.format ?? format) === \"online\"",
+  "classId: selectedClass?.id ?? null",
+  "希望する開催日程を選んでください。"
 ]) {
   if (!page.includes(expected)) throw new Error(`missing public application contract: ${expected}`);
 }

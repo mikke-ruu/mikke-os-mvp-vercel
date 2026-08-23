@@ -111,6 +111,7 @@ function buildStripePaymentUrl(url: string, applicationId: string, email: string
 
 type IntakeBody = {
   course_id?: string;
+  class_id?: string | null;
   instructor_id?: string | null;
   applicant_name?: string;
   applicant_email?: string;
@@ -139,19 +140,36 @@ Deno.serve(async (request) => {
       auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const { data, error } = await admin.rpc("academy_submit_public_application", {
-      p_course_id: body.course_id,
-      p_instructor_id: null,
-      p_applicant_name: body.applicant_name ?? "",
-      p_applicant_email: body.applicant_email ?? "",
-      p_applicant_phone: body.applicant_phone ?? "",
-      p_applicant_note: body.applicant_note ?? "",
-      p_form_answers: body.form_answers ?? {},
-      p_event_date: body.event_date ?? "",
-      p_format: body.format ?? "",
-      p_diploma_name_en: body.diploma_name_en ?? "",
-      p_applicant_shipping_address: body.applicant_shipping_address ?? ""
-    });
+    const rpcName = body.class_id
+      ? "academy_submit_public_class_application"
+      : "academy_submit_public_application";
+    const rpcArgs = body.class_id
+      ? {
+          p_course_id: body.course_id,
+          p_class_id: body.class_id,
+          p_instructor_id: null,
+          p_applicant_name: body.applicant_name ?? "",
+          p_applicant_email: body.applicant_email ?? "",
+          p_applicant_phone: body.applicant_phone ?? "",
+          p_applicant_note: body.applicant_note ?? "",
+          p_form_answers: body.form_answers ?? {},
+          p_diploma_name_en: body.diploma_name_en ?? "",
+          p_applicant_shipping_address: body.applicant_shipping_address ?? ""
+        }
+      : {
+          p_course_id: body.course_id,
+          p_instructor_id: null,
+          p_applicant_name: body.applicant_name ?? "",
+          p_applicant_email: body.applicant_email ?? "",
+          p_applicant_phone: body.applicant_phone ?? "",
+          p_applicant_note: body.applicant_note ?? "",
+          p_form_answers: body.form_answers ?? {},
+          p_event_date: body.event_date ?? "",
+          p_format: body.format ?? "",
+          p_diploma_name_en: body.diploma_name_en ?? "",
+          p_applicant_shipping_address: body.applicant_shipping_address ?? ""
+        };
+    const { data, error } = await admin.rpc(rpcName, rpcArgs);
     if (error) throw error;
     const submitted = Array.isArray(data) ? data[0] : data;
     if (!submitted?.application_id) throw new Error("application result missing");
