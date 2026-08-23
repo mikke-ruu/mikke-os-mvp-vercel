@@ -34,7 +34,7 @@ const roleLabels: Record<AcademyHeadquartersRole, string> = {
 const roleDetails = [
   { role: "Owner", permissions: "本部情報、メンバー、講座、公開を含むすべての管理" },
   { role: "Administrator", permissions: "本部情報、メンバー招待、講座運営（所有権の変更を除く）" },
-  { role: "Course Editor", permissions: "講座、講座ページ、教材の編集" }
+  { role: "Course Editor", permissions: "講座、公開講座ページ、教材の編集" }
 ];
 
 function SettingsContent() {

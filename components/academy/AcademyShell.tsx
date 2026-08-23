@@ -12,7 +12,6 @@ import {
   LayoutDashboard,
   Link2,
   Package,
-  PenSquare,
   Settings,
   Store,
   Users
@@ -39,18 +38,17 @@ import type { AcademyAccessContext } from "@/types/database";
 const honbuNav: MikkeShellNavItem[] = [
   { href: "/academy", label: "ダッシュボード", icon: LayoutDashboard, section: "本部" },
   { href: "/academy/courses", label: "講座管理", icon: BookOpen, section: "講座" },
-  { href: "/academy/classes", label: "クラス・担当講師", icon: CalendarCheck, section: "講座" },
+  { href: "/academy/classes", label: "開催日程・担当講師", icon: CalendarCheck, section: "講座" },
   { href: "/academy/instructors", label: "講師管理", icon: Users, section: "講座" },
   { href: "/academy/applications", label: "申込管理", icon: ClipboardList, section: "講座" },
   { href: "/academy/front", label: "ホームページ編集", icon: Store, section: "公開" },
-  { href: "/academy/instructor-pages", label: "講師ページ編集", icon: PenSquare, section: "公開" },
   { href: "/academy/settings", label: "本部設定", icon: Settings, section: "設定" }
 ];
 
 const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard, section: "マイポータル" },
   { href: "/academy/portal/class-requests", label: "担当する開催日", icon: CalendarCheck, section: "マイポータル" },
-  { href: "/academy/portal/study", label: "教材・復習", icon: GraduationCap, section: "マイポータル" },
+  { href: "/academy/portal/study", label: "復習・共有ページ", icon: GraduationCap, section: "マイポータル" },
   { href: "/academy/portal/url", label: "営業用URL", icon: Link2, section: "募集" },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
   { href: "/academy/portal/kits", label: "キット発注", icon: Package, section: "発注" }
@@ -65,7 +63,7 @@ const honbuBottomNav: MikkeShellBottomNavItem[] = [
 
 const koushiBottomNav: MikkeShellBottomNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard },
-  { href: "/academy/portal/study", label: "ページ", icon: GraduationCap },
+  { href: "/academy/portal/study", label: "復習・共有", icon: GraduationCap },
   { href: "/academy/portal/applications", label: "申込", icon: ClipboardList },
   { href: "/academy/portal/kits", label: "発注", icon: Package }
 ];
@@ -402,8 +400,8 @@ function ShellInner({
     >
       <div onClickCapture={captureAcademyLink}>
       {previewMode === "dashboard" || previewMode === "walkthrough" ? (
-        <div className="mb-4 rounded-xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] px-4 py-3 text-xs font-bold text-[var(--mikke-accent-strong)]">
-          ローカル確認用のサンプル表示です。画面移動はできますが、実データの保存や本番DBの変更は行いません。
+        <div className="mb-4 rounded-xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
+          ローカル確認用のサンプル表示です。本部運営者が認定講師も兼ねる例のため、本部画面とマイポータルの両方を確認できます。実データの保存や本番DBの変更は行いません。
         </div>
       ) : null}
       {previewMode === "readonly" ? (
@@ -436,7 +434,7 @@ function ShellInner({
               className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
             >
               {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-              {variant === "honbu" ? "マイポータルへ" : "本部画面へ"}
+              {variant === "honbu" ? "認定講師としてマイポータルへ" : "本部運営に戻る"}
             </Link>
           ) : null}
         </div>

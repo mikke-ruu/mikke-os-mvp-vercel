@@ -154,7 +154,7 @@ function DetailContent({ appId }: { appId: string }) {
           <Row label="開催日" value={app.event_date ? formatDate(app.event_date) : ""} />
           <Row label="受講形式" value={app.format === "in_person" ? "対面" : app.format === "online" ? "オンライン" : ""} />
           <Row label="受講料" value={`${app.price.toLocaleString()}円`} />
-          <Row label="キット仕入れ" value={`${app.kit_cost.toLocaleString()}円`} />
+          <Row label="講師の講座仕入代" value={`${app.kit_cost.toLocaleString()}円（税込）`} />
           <Row label="本部売上 / 講師売上" value={`${app.honbu_revenue.toLocaleString()} / ${app.instructor_revenue.toLocaleString()}円`} />
           <Row label="決済方式" value={ACADEMY_PAYMENT_PROVIDER_LABELS[app.payment_provider ?? "manual"]} />
           <Row label="入金日" value={app.paid_at ? formatDate(app.paid_at) : ""} />

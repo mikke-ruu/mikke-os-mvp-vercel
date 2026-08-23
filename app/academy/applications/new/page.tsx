@@ -182,7 +182,7 @@ function NewApplicationContent() {
             <input type="number" min={0} className={inputClass} value={form.price} onChange={(e) => set("price", Number(e.target.value) || 0)} />
           </div>
           <div>
-            <label className={labelClass}>キット仕入れ額（円）</label>
+            <label className={labelClass}>講師の講座仕入代（税込）</label>
             <input type="number" min={0} className={inputClass} value={form.kitCost} onChange={(e) => set("kitCost", Number(e.target.value) || 0)} />
           </div>
         </div>

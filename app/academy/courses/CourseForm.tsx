@@ -16,19 +16,19 @@ const FIELD_TYPES: AcademyFormField["type"][] = ["text", "textarea", "email", "t
 
 const COURSE_FEATURES: Array<{ key: keyof Omit<AcademyCourseFeatureSettings, "portal">; label: string; description: string; location: string }> = [
   { key: "stepLearning", label: "オンラインのステップ教材", description: "動画・文章・課題を順番に学ぶページを作ります。", location: "ステップ教材" },
-  { key: "materialLicenses", label: "教材・復習資料を共有", description: "PDF、動画、外部URLなどを対象者へ共有します。", location: "教材・資料" },
+  { key: "materialLicenses", label: "復習用の教材・資料を共有", description: "PDF、動画、外部URLなどをマイポータルの復習・共有ページにまとめます。", location: "復習・共有ページ ＞ 教材・資料" },
   { key: "materialAssignments", label: "教材を受講者に割り当てる", description: "誰がどの教材を見られるかを管理します。", location: "教材・資料" },
-  { key: "applications", label: "講座申込を受け付ける", description: "講座の紹介と申込フォームを使えます。", location: "講座の紹介・申込ページ" },
-  { key: "classes", label: "開催日・参加者を管理", description: "開催日時、定員、担当講師、参加者をまとめます。", location: "クラス・担当講師" },
+  { key: "applications", label: "講座申込を受け付ける", description: "公開講座ページに紹介と申込フォームを表示します。", location: "公開講座ページ" },
+  { key: "classes", label: "開催日程・参加者を管理", description: "講座を実際に行う日時、定員、担当講師、参加者をまとめます。", location: "開催日程・担当講師" },
   { key: "kits", label: "現物教材を発送", description: "教材の注文、配送先、発送状況を管理します。", location: "教材・キット" },
   { key: "certification", label: "修了者を認定講師として管理", description: "本人の承諾後、認定日・講師番号・認定状態を記録します。", location: "講師管理" },
   { key: "renewal", label: "認定の更新期限を管理", description: "更新日と更新状況を記録します。", location: "講師管理" },
   { key: "subscriptions", label: "月額で継続受講", description: "会費や継続受講の契約状態を管理します。", location: "契約管理" },
-  { key: "publicCoursePage", label: "講座の紹介・申込ページ", description: "1つの講座の内容・料金・開催方法を紹介します。", location: "講座ページ" }
+  { key: "publicCoursePage", label: "公開講座ページ", description: "1つの講座の内容・料金・開催方法を紹介し、必要に応じて申込を受け付けます。", location: "公開講座ページ" }
 ];
 
 const PORTAL_FEATURES: Array<{ key: keyof AcademyCoursePortalFeatureSettings; label: string; description: string }> = [
-  { key: "learning", label: "教材・復習", description: "受講中・修了後の教材をマイポータルで見る" },
+  { key: "learning", label: "復習・共有ページ", description: "受講中・修了後の教材や共有情報をマイポータルで見る" },
   { key: "applications", label: "自分経由の申込", description: "営業権限がある講師が申込を確認する" },
   { key: "classes", label: "担当する開催日", description: "講師が自分の開催予定と参加者を確認する" },
   { key: "approvals", label: "課題の提出・確認", description: "受講者の提出物と講師の確認を行う" },
@@ -257,21 +257,21 @@ export function CourseForm({
             checked={form.featureSettings.kits}
             onChange={() => toggleCourseFeature("kits")}
           />
-          この講座はキット（教材）を販売する
+          この講座では、認定講師が開催用教材を仕入れる
         </label>
         {form.featureSettings.kits ? (
           <>
             <div>
-              <label className={labelClass}>キット内容</label>
+              <label className={labelClass}>仕入れる教材の内容</label>
               <textarea className={`${inputClass} min-h-16`} value={form.kitContents} onChange={(e) => set("kitContents", e.target.value)} />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className={labelClass}>キット代金（円）</label>
+                <label className={labelClass}>講師の講座仕入代（税込）</label>
                 <input type="number" min={0} className={inputClass} value={form.kitPrice} onChange={(e) => set("kitPrice", Number(e.target.value) || 0)} />
               </div>
               <div>
-                <label className={labelClass}>キット代金 決済URL</label>
+                <label className={labelClass}>講座仕入代の決済URL</label>
                 <input className={inputClass} value={form.kitPaymentUrl} onChange={(e) => set("kitPaymentUrl", e.target.value)} placeholder="https://…" />
               </div>
             </div>
@@ -280,7 +280,7 @@ export function CourseForm({
         <div>
           <label className={labelClass}>教材の使い方</label>
           <textarea className={`${inputClass} min-h-16`} value={form.materialContents} onChange={(e) => set("materialContents", e.target.value)} />
-          <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">講座作成後に「教材・資料」で、現物教材、PDF、動画、外部URLなどの内容を登録します。</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">現物教材の発送は「現物教材を発送」、オンラインで順番に学ぶ内容は「ステップ教材」、PDF・動画・外部URLは「教材・資料」として分けて管理します。</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <div>
@@ -308,8 +308,8 @@ export function CourseForm({
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <div>
-          <p className="text-xs font-bold text-[var(--mikke-accent)]">講座の紹介・申込ページ</p>
-          <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">1つの講座の内容・料金・開催方法を紹介するページです。本部全体のホームページとは別です。</p>
+          <p className="text-sm font-bold text-[var(--mikke-text)]">公開講座ページ</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">1つの講座の内容・料金・開催方法を紹介し、必要に応じて申込も受け付けるページです。本部全体のホームページとは別です。</p>
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {([

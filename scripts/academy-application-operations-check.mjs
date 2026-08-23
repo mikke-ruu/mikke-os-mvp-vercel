@@ -9,7 +9,7 @@ const migration = readFileSync(new URL("../supabase/migrations/20260821100151_ac
 assert.match(portal, /mailto:\$\{a\.applicant_email\}/, "instructor must have a direct applicant email action");
 assert.match(portal, /tel:\$\{a\.applicant_phone\}/, "instructor must be able to call a supplied phone number");
 assert.match(portal, /先に.*受講日を決めてから登録/u, "schedule guidance must precede kit ordering");
-assert.match(portal, /教材仕入れ金額/, "kit amount must be visible before confirmation");
+assert.match(portal, /講師の講座仕入代（税込）/, "course procurement amount must be visible before confirmation");
 assert.match(portal, /finally\s*\{\s*setLoading\(false\)/, "portal loading must finish on errors");
 assert.match(detail, /申込詳細を開けませんでした/, "detail must show a recoverable load error");
 assert.match(front, /academy\/site\/\$\{encodeURIComponent\(hq\.handle\)\}/, "preview must target the selected headquarters handle");

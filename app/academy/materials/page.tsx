@@ -83,6 +83,10 @@ function MaterialsContent() {
         </Link>
       </div>
 
+      <div className="rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
+        ここで登録したPDF・動画・ダウンロード資料・外部URLは、マイポータルの「復習・共有ページ」に表示されます。現物教材の発送とステップ教材は、それぞれ別の設定です。
+      </div>
+
       {courses.length > 0 ? (
         <select
           className="w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none"

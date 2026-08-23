@@ -111,7 +111,7 @@ function KitIntakeModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[var(--mikke-text)]">受講日を確定してキットを仕入れる</h2>
+          <h2 className="text-sm font-bold text-[var(--mikke-text)]">受講日を確定して講座用教材を仕入れる</h2>
           <button
             type="button"
             onClick={onClose}
@@ -127,7 +127,7 @@ function KitIntakeModal({
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div className="rounded-xl bg-[var(--mikke-accent-soft)] px-3 py-2">
-            <p className="text-[11px] font-bold text-[var(--mikke-accent-strong)]">教材仕入れ金額</p>
+            <p className="text-sm font-bold text-[var(--mikke-text)]">講師の講座仕入代（税込）</p>
             <p className="mt-0.5 text-lg font-bold text-[var(--mikke-text)]">
               {(course?.kit_price ?? 0).toLocaleString()}円
             </p>
@@ -186,7 +186,7 @@ function KitIntakeModal({
           {error ? <p className="text-xs font-bold text-[var(--mikke-danger)]">{error}</p> : null}
 
           <button type="submit" disabled={saving} className="w-full rounded-xl bg-[var(--mikke-accent)] py-2.5 text-sm font-bold text-white disabled:opacity-60">
-            {saving ? "送信中…" : "キットを仕入れる"}
+            {saving ? "送信中…" : "講座用教材を仕入れる"}
           </button>
         </form>
       </div>
@@ -253,7 +253,7 @@ function MyApplicationsContent() {
     <div className="mx-auto max-w-3xl space-y-4">
       <p className="text-xs text-[var(--mikke-muted)]">
         あなたの営業用URLから入った申込（担当申込）の一覧です。ステータスの更新は本部が行います。
-        受講日が決まったら「受講日を確定してキットを仕入れる」から本部にキットを注文してください（1申込につき1回）。
+        受講日が決まったら「受講日を確定して講座用教材を仕入れる」から本部に注文してください（1申込につき1回）。
       </p>
 
       {apps.length === 0 ? (
@@ -302,7 +302,7 @@ function MyApplicationsContent() {
                 </div>
                 {!requiresKit ? null : existingOrder ? (
                   <p className="mt-2 text-[11px] font-bold text-[var(--mikke-accent-strong)]">
-                    キット仕入れ済み（{KIT_STATUS_LABELS[existingOrder.status]}）
+                    講座用教材の仕入れ済み（{KIT_STATUS_LABELS[existingOrder.status]}）
                   </p>
                 ) : inst ? (
                   <button
@@ -310,7 +310,7 @@ function MyApplicationsContent() {
                     onClick={() => setModalApp(a)}
                     className="mt-2 inline-flex items-center gap-1 rounded-full border border-[var(--mikke-line)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-accent-strong)]"
                   >
-                    <Package size={12} /> 受講日を確定してキットを仕入れる
+                    <Package size={12} /> 受講日を確定して講座用教材を仕入れる
                   </button>
                 ) : null}
               </li>

@@ -31,7 +31,7 @@ function InstructorPagesContent() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <p className="text-xs text-[var(--mikke-muted)]">
-        講座ごとの講師専用ページ（復習・資材仕入共有・資料）を編集します。この講座を取得した活動中の講師だけが閲覧できます。
+        講座ごとの復習・共有ページ（復習、材料購入先、共有資料など）を編集します。以後は講座管理から対象の講座を開い、「復習・共有ページ」を選んでください。
       </p>
       <ul className="space-y-2">
         {courses.map((c) => (
@@ -40,7 +40,7 @@ function InstructorPagesContent() {
               <p className="truncate text-sm font-bold text-[var(--mikke-text)]">
                 {c.code} {c.name}
               </p>
-              <p className="text-[11px] text-[var(--mikke-muted)]">講師専用ページをビルド式で編集</p>
+              <p className="text-sm text-[var(--mikke-muted)]">マイポータルに表示する復習・共有ページを編集</p>
             </div>
             <Link
               href={`/academy/courses/${c.id}/instructor-page`}
@@ -57,7 +57,7 @@ function InstructorPagesContent() {
 
 export default function InstructorPagesPage() {
   return (
-    <HonbuShell title="講師ページ編集">
+    <HonbuShell title="復習・共有ページ">
       <InstructorPagesContent />
     </HonbuShell>
   );

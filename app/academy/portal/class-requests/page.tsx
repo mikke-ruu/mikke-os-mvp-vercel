@@ -62,7 +62,7 @@ function ClassRequestsContent() {
             <CalendarCheck size={19} />
           </span>
           <div>
-            <h2 className="text-base font-bold text-[var(--mikke-text)]">クラス担当の依頼</h2>
+            <h2 className="text-base font-bold text-[var(--mikke-text)]">開催日程の担当依頼</h2>
             <p className="mt-1 text-sm text-[var(--mikke-muted)]">本部から届いた依頼を確認し、承諾または辞退できます。</p>
           </div>
         </div>
@@ -79,7 +79,7 @@ function ClassRequestsContent() {
                 <p className="text-xs font-bold text-[var(--mikke-accent-strong)]">
                   {request.class?.course?.code} {request.class?.course?.name}
                 </p>
-                <h3 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{request.class?.title ?? "クラス"}</h3>
+                <h3 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{request.class?.title ?? "開催日程"}</h3>
                 <p className="mt-2 text-sm text-[var(--mikke-muted)]">
                   {formatDateTime(request.class?.starts_at ?? null)}
                   {request.class?.ends_at ? ` 〜 ${formatDateTime(request.class.ends_at)}` : ""}
@@ -136,7 +136,7 @@ function ClassRequestsContent() {
         ))
       ) : (
         <p className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-sm text-[var(--mikke-muted)]">
-          現在、クラス担当の依頼はありません。
+          現在、開催日程の担当依頼はありません。
         </p>
       )}
     </div>
@@ -145,7 +145,7 @@ function ClassRequestsContent() {
 
 export default function AcademyClassRequestsPage() {
   return (
-    <KoushiShell title="クラス担当依頼">
+    <KoushiShell title="開催日程の担当依頼">
       <ClassRequestsContent />
     </KoushiShell>
   );

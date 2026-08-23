@@ -34,7 +34,7 @@ if (!listPage.includes("/academy/classes/new")) throw new Error("class list must
 if (!shell.includes('href.startsWith("/academy/classes")') || !shell.includes('academy:headquarters:manage')) {
   throw new Error("class management must be hidden from course editors");
 }
-for (const expected of ["日程の決め方", "申込後に個別調整", "非公開でクラスを作成する"]) {
+for (const expected of ["日程の決め方", "申込後に個別調整", "開催日程を作成する", "公開講座ページに開催日を表示する連携はこれから追加します"]) {
   if (!newPage.includes(expected)) throw new Error(`missing class creation UI: ${expected}`);
 }
 

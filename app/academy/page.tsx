@@ -206,9 +206,9 @@ function DashboardContent() {
         : {
             position: "STEP 6",
             question: "公開前の最終確認をしましょう",
-            description: "講座の紹介・申込ページを、受講希望者と同じ見え方で確認します。",
+            description: "公開講座ページを、受講希望者と同じ見え方で確認します。",
             href: `/academy/c/${firstPublishedCourse!.id}`,
-            action: "講座の紹介・申込ページを確認"
+            action: "公開講座ページを確認"
           };
   const activeInstructors = instructors.filter((i) => i.is_active).length;
   const honbuIntake = monthApps.filter((a) => a.intake_source !== "koushi").length;
@@ -237,7 +237,7 @@ function DashboardContent() {
     { step: 3, label: "講座の詳細を設定", description: "申込、料金、開催日、教材、認定", href: firstCourse ? `/academy/courses/${firstCourse.id}` : "/academy/courses", state: courses.length > 0 ? "current" : "pending" },
     { step: 4, label: "本部ホームページを作成", description: "団体全体の紹介と講座一覧", href: "/academy/homepage", state: "pending" },
     { step: 5, label: "講師を登録", description: "自分、既存講師、修了した受講者から登録", href: "/academy/instructors", state: instructors.length > 0 ? "complete" : "pending" },
-    { step: 6, label: "公開前に確認", description: "講座の紹介・申込ページを確認", href: firstPublishedCourse ? `/academy/c/${firstPublishedCourse.id}` : "/academy/courses", state: "pending" }
+    { step: 6, label: "公開前に確認", description: "公開講座ページを確認", href: firstPublishedCourse ? `/academy/c/${firstPublishedCourse.id}` : "/academy/courses", state: "pending" }
   ] as const;
 
   return (
@@ -265,7 +265,7 @@ function DashboardContent() {
           ))}
         </ol>
         <div className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-[11px] leading-5 text-[var(--mikke-muted)]">
-          <span className="font-bold text-[var(--mikke-text)]">本部ホームページ</span>は団体全体の紹介と講座一覧、<span className="font-bold text-[var(--mikke-text)]">講座の紹介・申込ページ</span>は1つの講座の説明と申込受付のためのページです。
+          <span className="font-bold text-[var(--mikke-text)]">本部ホームページ</span>は団体全体の紹介と講座一覧、<span className="font-bold text-[var(--mikke-text)]">公開講座ページ</span>は1つの講座の説明と申込受付のためのページです。
         </div>
       </section>
 

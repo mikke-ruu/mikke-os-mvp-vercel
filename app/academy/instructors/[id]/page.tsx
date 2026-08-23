@@ -208,7 +208,7 @@ function DetailContent({ instructorId }: { instructorId: string }) {
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <p className="text-xs font-bold text-[var(--mikke-accent)]">掲載情報（写真・紹介文）</p>
         <p className="text-[11px] text-[var(--mikke-muted)]">
-          講師ページや講師一覧など公開ページに表示されます。講師本人も講師ポータルから編集できます。
+          公開中の講師プロフィールや講師一覧に表示されます。講師本人もマイポータルから編集できます。
         </p>
         <div>
           <label className={labelClass}>講師写真</label>

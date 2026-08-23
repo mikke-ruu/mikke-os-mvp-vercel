@@ -64,7 +64,7 @@ function NewAcademyClassContent() {
     event.preventDefault();
     setError(null);
     if (!headquarters || !selectedCourse) return setError("講座を選択してください。");
-    if (!form.title.trim()) return setError("クラス名を入力してください。");
+    if (!form.title.trim()) return setError("開催名を入力してください。");
     if (!form.startsAt) return setError("開始日時を入力してください。");
     if (form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       return setError("終了日時は開始日時より後にしてください。");
@@ -79,7 +79,7 @@ function NewAcademyClassContent() {
       });
       router.push(toCurrentAcademyContextHref("/academy/classes"));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "クラスを作成できませんでした。");
+      setError(caught instanceof Error ? caught.message : "開催日程を作成できませんでした。");
       setSaving(false);
     }
   }
@@ -91,8 +91,8 @@ function NewAcademyClassContent() {
   return (
     <form onSubmit={submit} className="space-y-4">
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-accent-soft)] p-4">
-        <p className="text-sm font-bold text-[var(--mikke-text)]">講座を開催する単位を作ります</p>
-        <p className="mt-1 text-xs text-[var(--mikke-muted)]">クラス作成後に、同じ講座の認定講師へ担当を依頼できます。作成しただけでは公開されません。</p>
+        <p className="text-base font-bold text-[var(--mikke-text)]">講座開催日を作成する</p>
+        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">作成後、認定講師にこの開催日の担当を依頼できます。現在の募集状態は本部内の管理用で、公開講座ページに開催日を表示する連携はこれから追加します。</p>
         {selectedCourse ? (
           <Link
             href={toCurrentAcademyContextHref(`/academy/courses/${selectedCourse.id}/program`)}
@@ -107,14 +107,14 @@ function NewAcademyClassContent() {
         <label className={labelClass}>講座*
           <select className={inputClass} value={form.courseId} onChange={(event) => {
             const course = courses.find((item) => item.id === event.target.value);
-            setForm((current) => ({ ...current, courseId: event.target.value, title: current.title || (course ? `${course.name} クラス` : "") }));
+            setForm((current) => ({ ...current, courseId: event.target.value, title: current.title || (course ? `${course.name} 開催日` : "") }));
           }}>
             <option value="">選択してください</option>
             {courses.map((course) => <option key={course.id} value={course.id}>{course.code} {course.name}</option>)}
           </select>
         </label>
-        <label className={labelClass}>クラス名*
-          <input className={inputClass} value={form.title} onChange={(event) => set("title", event.target.value)} placeholder="例: 2026年9月 オンラインクラス" />
+        <label className={labelClass}>開催名*
+          <input className={inputClass} value={form.title} onChange={(event) => set("title", event.target.value)} placeholder="例: 2026年9月 オンライン開催" />
         </label>
         <label className={labelClass}>日程の決め方
           <select className={inputClass} value={form.scheduleMode} onChange={(event) => set("scheduleMode", event.target.value as AcademyClassInput["scheduleMode"])}>
@@ -157,12 +157,12 @@ function NewAcademyClassContent() {
 
       {error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">{error}</p> : null}
       <button type="submit" disabled={saving} className="w-full rounded-xl bg-[var(--mikke-primary)] px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
-        {saving ? "作成中…" : "非公開でクラスを作成する"}
+        {saving ? "作成中…" : "開催日程を作成する"}
       </button>
     </form>
   );
 }
 
 export default function NewAcademyClassPage() {
-  return <HonbuShell title="クラスを作成"><NewAcademyClassContent /></HonbuShell>;
+  return <HonbuShell title="開催日程を作成"><NewAcademyClassContent /></HonbuShell>;
 }

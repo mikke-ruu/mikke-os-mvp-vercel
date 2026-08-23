@@ -126,7 +126,7 @@ function ApplyInner({ courseId }: { courseId: string }) {
           </a>
         ) : null}
         <Link href={`/academy/c/${course.id}${instructorId ? `?k=${instructorId}` : ""}`} className="mt-6 block text-sm font-bold text-[var(--mikke-accent-strong)]">
-          講座ページに戻る
+          公開講座ページに戻る
         </Link>
       </div>
     );
@@ -156,7 +156,7 @@ function ApplyInner({ courseId }: { courseId: string }) {
           </div>
         </div>
         <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">
-          既にmikkeIDをお持ちの方は、そのログインメールアドレスでお申込みください。受講後、このメールアドレスで講師ページにログインできます。
+          既にmikke IDをお持ちの方は、そのログインメールアドレスでお申込みください。受講情報は、同じアカウントのマイポータルで確認できるようになります。
         </p>
         {features.certification ? (
           <div>

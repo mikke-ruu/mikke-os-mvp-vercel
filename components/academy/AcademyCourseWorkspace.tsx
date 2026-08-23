@@ -8,7 +8,7 @@ import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feat
 const courseTabs = [
   { id: "settings", label: "講座設定", href: (courseId: string) => `/academy/courses/${courseId}` },
   { id: "program", label: "ステップ教材", href: (courseId: string) => `/academy/courses/${courseId}/program` },
-  { id: "page", label: "講座ページ", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
+  { id: "page", label: "公開講座ページ", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
   {
     id: "instructor",
     label: "復習・共有ページ",
@@ -72,7 +72,7 @@ export function AcademyCourseWorkspace({
             className="inline-flex items-center gap-1 self-start rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)] lg:self-auto"
           >
             <ExternalLink size={14} />
-            講座の紹介・申込ページを見る
+            公開講座ページを見る
           </Link>
         </div>
       </header>

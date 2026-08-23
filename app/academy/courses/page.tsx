@@ -113,13 +113,13 @@ function CoursesContent() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
-                  {[intake, format, material, features.certification ? "講師認定" : null, features.classes ? "クラス管理" : null, course.accept_at_koushi ? "講師の営業・受付" : null].filter(Boolean).map((label) => (
+                  {[intake, format, material, features.certification ? "講師認定" : null, features.classes ? "開催日程管理" : null, course.accept_at_koushi ? "講師の営業・受付" : null].filter(Boolean).map((label) => (
                     <span key={label} className="rounded-full bg-[var(--mikke-surface-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-text-soft)]">{label}</span>
                   ))}
                 </div>
 
                 <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-[11px] leading-5 text-[var(--mikke-text-soft)]">
-                  受講料・教材・申込方法は「講座の詳細設定」、受講希望者へ見せる内容は「講座の紹介・申込ページ」で編集します。
+                  受講料・教材・申込方法は「講座の詳細設定」、受講希望者へ見せる内容は「公開講座ページ」で編集します。
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 border-t border-[var(--mikke-line-soft)] pt-3">

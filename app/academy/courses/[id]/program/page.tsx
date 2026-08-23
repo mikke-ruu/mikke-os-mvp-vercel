@@ -243,9 +243,9 @@ function ProgramContent({ courseId }: { courseId: string }) {
             <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-bold text-[var(--mikke-primary)]">クラスで使う内容を確定</h3>
+                  <h3 className="text-sm font-bold text-[var(--mikke-primary)]">開催日程で使う内容を確定</h3>
                   <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">
-                    現在のステップを版として保存します。クラス作成前に1回以上確定してください。確定後に編集した場合は、もう一度確定すると新しい版になります。
+                    現在のステップを版として保存します。開催日程を作成する前に1回以上確定してください。確定後に編集した場合は、もう一度確定すると新しい版になります。
                   </p>
                 </div>
                 <button

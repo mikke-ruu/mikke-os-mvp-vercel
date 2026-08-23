@@ -6,7 +6,7 @@ import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { getCoursesByIds, getMyInstructorRecords, listMaterialsForInstructor } from "@/lib/academy/instructor-portal";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
-import { PageBlocks, pageBlocksHasMaterialsList } from "@/components/academy/PageBlocks";
+import { PageBlocks } from "@/components/academy/PageBlocks";
 import type { AcademyCourse, AcademyInstructor, AcademyInstructorPage, AcademyMaterial } from "@/types/database";
 
 function kindIcon(kind: AcademyMaterial["kind"]) {
@@ -51,9 +51,8 @@ function StudyContent() {
         const course = courseMap[rec.course_id];
         const courseMaterials = materials.filter((m) => m.course_id === rec.course_id);
         const page = pageMap[rec.course_id];
-        // AC-C3: 講師専用ページに「教材リスト」ブロックがあれば、そこ(PageBlocks内)に一覧を差し込む。
-        // 旧データ（ブロック未設置）との互換のため、無い場合だけ末尾に別枠で表示する。
-        const hasMaterialsBlock = pageBlocksHasMaterialsList(page?.blocks);
+        // 教材・資料は設置ブロックに依存させず、復習・共有ページの定位置に必ず表示する。
+        const contentBlocks = (page?.blocks ?? []).filter((block) => block.type !== "materials-list");
         return (
           <section key={rec.id} className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
             <div className="flex items-center gap-2">
@@ -62,20 +61,21 @@ function StudyContent() {
             </div>
 
             {!rec.is_active ? (
-              <p className="text-xs text-[var(--mikke-muted)]">活動権限がないため、復習コンテンツは表示されません。本部にお問い合わせください。</p>
+              <p className="text-sm font-bold leading-6 text-[var(--mikke-text)]">この講座の復習・共有ページは現在利用できません。本部にお問い合わせください。</p>
             ) : (
               <>
-                {page?.blocks.length ? (
+                {contentBlocks.length ? (
                   <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4 md:p-5">
-                    <PageBlocks blocks={page.blocks} materials={courseMaterials} />
+                    <PageBlocks blocks={contentBlocks} />
                   </div>
                 ) : (
-                  <p className="text-xs text-[var(--mikke-muted)]">復習ページは準備中です。</p>
+                  <p className="text-sm text-[var(--mikke-muted)]">本部からの復習・共有内容はまだありません。</p>
                 )}
 
-                {!hasMaterialsBlock && courseMaterials.length ? (
-                  <div>
-                    <p className="text-xs font-bold text-[var(--mikke-accent)]">教材・資料</p>
+                <div className="rounded-xl border border-[var(--mikke-line)] bg-white p-4">
+                    <p className="text-sm font-bold text-[var(--mikke-text)]">教材・資料</p>
+                    <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">PDF、動画、ダウンロード資料、外部URLなど、本部がこの講座で共有した内容です。</p>
+                  {courseMaterials.length ? (
                     <ul className="mt-2 grid gap-1.5 md:grid-cols-2">
                       {courseMaterials.map((m) => (
                         <li key={m.id}>
@@ -92,8 +92,10 @@ function StudyContent() {
                         </li>
                       ))}
                     </ul>
-                  </div>
-                ) : null}
+                  ) : (
+                    <p className="mt-3 text-sm text-[var(--mikke-muted)]">現在、表示できる教材・資料はありません。</p>
+                  )}
+                </div>
               </>
             )}
           </section>
@@ -105,7 +107,7 @@ function StudyContent() {
 
 export default function StudyPage() {
   return (
-    <KoushiShell title="講師ページ">
+    <KoushiShell title="復習・共有ページ">
       <StudyContent />
     </KoushiShell>
   );
