@@ -31,7 +31,7 @@ function InstructorPagesContent() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <p className="text-xs text-[var(--mikke-muted)]">
-        講座ごとの復習・共有ページ（復習、材料購入先、共有資料など）を編集します。以後は講座管理から対象の講座を開い、「復習・共有ページ」を選んでください。
+        講座ごとの講師用資料ページ（講座の進め方、材料購入先、営業方法など）を編集します。以後は講座管理から対象の講座を開い、「講師用資料ページ」を選んでください。
       </p>
       <ul className="space-y-2">
         {courses.map((c) => (
@@ -40,7 +40,7 @@ function InstructorPagesContent() {
               <p className="truncate text-sm font-bold text-[var(--mikke-text)]">
                 {c.code} {c.name}
               </p>
-              <p className="text-sm text-[var(--mikke-muted)]">マイポータルに表示する復習・共有ページを編集</p>
+              <p className="text-sm text-[var(--mikke-muted)]">認定講師のマイポータルに表示する資料ページを編集</p>
             </div>
             <Link
               href={`/academy/courses/${c.id}/instructor-page`}
@@ -57,7 +57,7 @@ function InstructorPagesContent() {
 
 export default function InstructorPagesPage() {
   return (
-    <HonbuShell title="復習・共有ページ">
+    <HonbuShell title="講師用資料ページ">
       <InstructorPagesContent />
     </HonbuShell>
   );

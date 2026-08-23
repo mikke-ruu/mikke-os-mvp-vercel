@@ -11,10 +11,10 @@ const courseTabs = [
   { id: "page", label: "公開講座ページ", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
   {
     id: "instructor",
-    label: "復習・共有ページ",
+    label: "講師用資料ページ",
     href: (courseId: string) => `/academy/courses/${courseId}/instructor-page`
   },
-  { id: "materials", label: "教材・資料", href: (courseId: string) => `/academy/materials?course=${courseId}` }
+  { id: "materials", label: "講師用ファイル", href: (courseId: string) => `/academy/materials?course=${courseId}` }
 ] as const;
 
 export type AcademyCourseWorkspaceTab = (typeof courseTabs)[number]["id"];
@@ -62,7 +62,7 @@ export function AcademyCourseWorkspace({
                     : "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]"
                 }`}
               >
-                {course.is_published ? "公開中" : "非公開"}
+                {course.is_published ? "公開講座ページ：公開中" : "公開講座ページ：下書き"}
               </span>
             </div>
           </div>

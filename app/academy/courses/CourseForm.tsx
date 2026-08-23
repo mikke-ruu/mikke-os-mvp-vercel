@@ -16,8 +16,8 @@ const FIELD_TYPES: AcademyFormField["type"][] = ["text", "textarea", "email", "t
 
 const COURSE_FEATURES: Array<{ key: keyof Omit<AcademyCourseFeatureSettings, "portal">; label: string; description: string; location: string }> = [
   { key: "stepLearning", label: "オンラインのステップ教材", description: "動画・文章・課題を順番に学ぶページを作ります。", location: "ステップ教材" },
-  { key: "materialLicenses", label: "復習用の教材・資料を共有", description: "PDF、動画、外部URLなどをマイポータルの復習・共有ページにまとめます。", location: "復習・共有ページ ＞ 教材・資料" },
-  { key: "materialAssignments", label: "教材を受講者に割り当てる", description: "誰がどの教材を見られるかを管理します。", location: "教材・資料" },
+  { key: "materialLicenses", label: "認定講師へ資料を共有", description: "講座の進め方、PDF、動画、外部URLなどを講師のマイポータルに表示します。", location: "講師用資料ページ・講師用ファイル" },
+  { key: "materialAssignments", label: "受講者に復習教材を割り当てる", description: "誰がどの復習教材を見られるかを管理します。", location: "復習ページ" },
   { key: "applications", label: "講座申込を受け付ける", description: "公開講座ページに紹介と申込フォームを表示します。", location: "公開講座ページ" },
   { key: "classes", label: "開催日程・参加者を管理", description: "講座を実際に行う日時、定員、担当講師、参加者をまとめます。", location: "開催日程・担当講師" },
   { key: "kits", label: "現物教材を発送", description: "教材の注文、配送先、発送状況を管理します。", location: "教材・キット" },
@@ -28,7 +28,7 @@ const COURSE_FEATURES: Array<{ key: keyof Omit<AcademyCourseFeatureSettings, "po
 ];
 
 const PORTAL_FEATURES: Array<{ key: keyof AcademyCoursePortalFeatureSettings; label: string; description: string }> = [
-  { key: "learning", label: "復習・共有ページ", description: "受講中・修了後の教材や共有情報をマイポータルで見る" },
+  { key: "learning", label: "復習ページ", description: "受講中・修了後の復習内容をマイポータルで見る" },
   { key: "applications", label: "自分経由の申込", description: "営業権限がある講師が申込を確認する" },
   { key: "classes", label: "担当する開催日", description: "講師が自分の開催予定と参加者を確認する" },
   { key: "approvals", label: "課題の提出・確認", description: "受講者の提出物と講師の確認を行う" },
@@ -212,16 +212,37 @@ export function CourseForm({
       </section>
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
-        <p className="text-xs font-bold text-[var(--mikke-accent)]">受講条件・料金</p>
-        <div className="grid grid-cols-2 gap-2">
+        <p className="text-xs font-bold text-[var(--mikke-accent)]">受講者が支払う金額</p>
+        <div>
+          <label className={labelClass}>受講料（税込・円）</label>
+          <input type="number" min={0} className={inputClass} value={form.price} onChange={(e) => set("price", Number(e.target.value) || 0)} />
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>受講料（税込・円）</label>
-            <input type="number" min={0} className={inputClass} value={form.price} onChange={(e) => set("price", Number(e.target.value) || 0)} />
+            <label className={labelClass}>受講者の決済方法</label>
+            <select
+              className={inputClass}
+              value={form.paymentProvider}
+              onChange={(e) => set("paymentProvider", e.target.value as CourseInput["paymentProvider"])}
+            >
+              <option value="manual">手動（振込・現金など）</option>
+              <option value="stripe">Stripe</option>
+              <option value="square">Square</option>
+              <option value="paycas">PayCAS（端末確認）</option>
+            </select>
           </div>
           <div>
-            <label className={labelClass}>所要時間（目安）</label>
-            <input className={inputClass} value={form.durationText} onChange={(e) => set("durationText", e.target.value)} placeholder="約3時間" />
+            <label className={labelClass}>受講料の決済URL（外部）</label>
+            <input className={inputClass} value={form.paymentUrl} onChange={(e) => set("paymentUrl", e.target.value)} placeholder="https://…" />
           </div>
+        </div>
+        <p className="text-sm leading-6 text-[var(--mikke-muted)]">ここは、受講者が講座を申し込むときの料金と決済先です。</p>
+        <div className="border-t border-[var(--mikke-line-soft)] pt-3">
+          <p className="text-xs font-bold text-[var(--mikke-accent)]">開催方法と認定</p>
+        </div>
+        <div>
+          <label className={labelClass}>所要時間（目安）</label>
+          <input className={inputClass} value={form.durationText} onChange={(e) => set("durationText", e.target.value)} placeholder="約3時間" />
         </div>
         <div>
           <label className={labelClass}>受講形式</label>
@@ -251,6 +272,10 @@ export function CourseForm({
           <label className={labelClass}>受講後にできること</label>
           <textarea className={`${inputClass} min-h-16`} value={form.canDoAfter} onChange={(e) => set("canDoAfter", e.target.value)} />
         </div>
+        <div className="border-t border-[var(--mikke-line-soft)] pt-3">
+          <p className="text-xs font-bold text-[var(--mikke-accent)]">認定講師が仕入れるもの</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">受講料とは別に、認定講師が自分で講座を開催するための仕入れを設定します。</p>
+        </div>
         <label className="flex items-center gap-2 text-sm text-[var(--mikke-text)]">
           <input
             type="checkbox"
@@ -277,33 +302,15 @@ export function CourseForm({
             </div>
           </>
         ) : null}
+        <div className="border-t border-[var(--mikke-line-soft)] pt-3">
+          <p className="text-xs font-bold text-[var(--mikke-accent)]">受講者へ渡す教材</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">公開講座ページで、受講者にどんな教材があるか案内します。</p>
+        </div>
         <div>
-          <label className={labelClass}>教材の使い方</label>
+          <label className={labelClass}>受講者への教材案内</label>
           <textarea className={`${inputClass} min-h-16`} value={form.materialContents} onChange={(e) => set("materialContents", e.target.value)} />
-          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">現物教材の発送は「現物教材を発送」、オンラインで順番に学ぶ内容は「ステップ教材」、PDF・動画・外部URLは「教材・資料」として分けて管理します。</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">例：現物テキストを発送、PDFをダウンロード、動画URLを案内。実際の復習内容と講師用資料は、それぞれ専用ページで管理します。</p>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div>
-            <label className={labelClass}>決済方法</label>
-            <select
-              className={inputClass}
-              value={form.paymentProvider}
-              onChange={(e) => set("paymentProvider", e.target.value as CourseInput["paymentProvider"])}
-            >
-              <option value="manual">手動（振込・現金など）</option>
-              <option value="stripe">Stripe</option>
-              <option value="square">Square</option>
-              <option value="paycas">PayCAS（端末確認）</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelClass}>受講料 決済URL（外部）</label>
-            <input className={inputClass} value={form.paymentUrl} onChange={(e) => set("paymentUrl", e.target.value)} placeholder="https://…" />
-          </div>
-        </div>
-        <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">
-          Stripeは申込IDを決済リンクに連携します。Squareの自動入金確認はSandbox接続後、PayCASは当面本部の端末確認で運用します。
-        </p>
       </section>
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">

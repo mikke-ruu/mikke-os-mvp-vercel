@@ -7,7 +7,7 @@ import { HonbuShell } from "@/components/academy/AcademyShell";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
-import { getCourse, updateCourse, type CourseInput } from "@/lib/academy/courses";
+import { getCourse, setCoursePublished, updateCourse, type CourseInput } from "@/lib/academy/courses";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 import { CourseForm } from "../CourseForm";
@@ -45,6 +45,7 @@ function EditCourseContent({ courseId }: { courseId: string }) {
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [course, setCourse] = useState<AcademyCourse | null>(null);
   const [loading, setLoading] = useState(true);
+  const [publishing, setPublishing] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -61,6 +62,41 @@ function EditCourseContent({ courseId }: { courseId: string }) {
 
   return (
     <AcademyCourseWorkspace course={course} activeTab="settings">
+      <section className="mb-4 space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <div>
+          <p className="text-sm font-bold text-[var(--mikke-text)]">公開講座ページの表示</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">講座の紹介と申込フォームを、受講希望者に見せるかをここで切り替えます。</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {([
+            [false, "下書き", "本部だけが編集・確認できます"],
+            [true, "公開中", "公開講座ページに表示します"]
+          ] as const).map(([value, label, description]) => {
+            const selected = course.is_published === value;
+            return (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={selected}
+                disabled={publishing || selected}
+                onClick={async () => {
+                  setPublishing(true);
+                  try {
+                    const next = await setCoursePublished(profile, hq.id, course, value);
+                    setCourse(next);
+                  } finally {
+                    setPublishing(false);
+                  }
+                }}
+                className={`rounded-xl border p-3 text-left ${selected ? "border-[#3f4eb5] bg-[#3f4eb5] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"}`}
+              >
+                <span className="block text-sm font-bold">{label}</span>
+                <span className={`mt-1 block text-xs leading-5 ${selected ? "text-white/90" : "text-[var(--mikke-muted)]"}`}>{description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
       <CourseForm
         initial={toInput(course)}
         submitLabel="変更を保存する"

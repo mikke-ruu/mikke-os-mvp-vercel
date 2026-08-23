@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowRight, BookOpen, ClipboardList, Heart, JapaneseYen, Package, Sparkles, Users } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, ClipboardList, GraduationCap, Heart, JapaneseYen, Package, Sparkles, Users } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { canCreateAcademyHeadquarters, toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
@@ -191,9 +191,9 @@ function DashboardContent() {
         ? {
             position: "STEP 3",
             question: "講座の教材を登録しましょう",
-            description: `「${courseNeedingMaterial.name}」のPDF・動画・外部URLを登録し、受講者と認定講師のどちらに見せるかを設定します。`,
+            description: `「${courseNeedingMaterial.name}」の認定講師に共有するPDF・動画・外部URLを登録します。`,
             href: `/academy/materials/new?course=${encodeURIComponent(courseNeedingMaterial.id)}`,
-            action: "教材を登録する"
+            action: "講師用ファイルを登録"
           }
         : instructors.length === 0
           ? {
@@ -289,9 +289,12 @@ function DashboardContent() {
       </section>
 
       {localPreview ? (
-        <p className="text-center text-[11px] text-[var(--mikke-muted)]">
-          ローカル確認用の複数パターで、講座一覧と設定画面を巡回できます。
-        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <p className="text-[11px] text-[var(--mikke-muted)]">ローカル確認用の複数パターで、講座一覧と設定画面を巡回できます。</p>
+          <Link href={toCurrentAcademyContextHref("/academy/portal?preview=walkthrough&sample=learner")} className="inline-flex items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]">
+            <GraduationCap size={14} /> マイポータルサンプルを見る
+          </Link>
+        </div>
       ) : null}
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">

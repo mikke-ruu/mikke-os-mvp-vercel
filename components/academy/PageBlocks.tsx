@@ -86,7 +86,7 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
         if (b.type === "materials-list")
           return materials.length ? (
             <div key={i}>
-              <p className="mb-1 text-xs font-bold text-[var(--mikke-accent)]">教材・資料</p>
+              <p className="mb-1 text-xs font-bold text-[var(--mikke-accent)]">講師用ファイル</p>
               <ul className="grid gap-1.5 md:grid-cols-2">
                 {materials.map((m) => (
                   <li key={m.id}>

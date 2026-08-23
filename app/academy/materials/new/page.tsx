@@ -30,8 +30,8 @@ function NewMaterialContent() {
     title: "",
     url: "",
     description: "",
-    requiresActive: true,
-    isPublished: true
+    requiresActive: false,
+    isPublished: false
   });
 
   useEffect(() => {
@@ -56,7 +56,7 @@ function NewMaterialContent() {
     setSaving(true);
     try {
       await createMaterial(profile, hq!.id, form);
-      router.push(toCurrentAcademyContextHref("/academy/materials"));
+      router.push(toCurrentAcademyContextHref(`/academy/materials?course=${encodeURIComponent(form.courseId)}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
       setSaving(false);
@@ -113,22 +113,52 @@ function NewMaterialContent() {
       </section>
 
       <section className="space-y-2 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
-        <p className="text-xs font-bold text-[var(--mikke-accent)]">閲覧設定</p>
-        <label className="flex items-center gap-2 text-sm text-[var(--mikke-text)]">
-          <input type="checkbox" checked={form.requiresActive} onChange={(e) => set("requiresActive", e.target.checked)} />
-          活動中の講師のみ閲覧可（OFFなら認定講師全員）
-        </label>
-        <label className="flex items-center gap-2 text-sm text-[var(--mikke-text)]">
-          <input type="checkbox" checked={form.isPublished} onChange={(e) => set("isPublished", e.target.checked)} />
-          公開する（講師に見せる）
-        </label>
-        <p className="text-[11px] text-[var(--mikke-muted)]">この講座を取得した講師だけが閲覧できます（他講座・部外者は見えません）。</p>
+        <p className="text-xs font-bold text-[var(--mikke-accent)]">講師用ファイルの表示設定</p>
+        <div>
+          <p className={labelClass}>見せる講師</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {([
+              [false, "この講座の認定講師全員"],
+              [true, "活動中の講師だけ"]
+            ] as const).map(([value, label]) => (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={form.requiresActive === value}
+                onClick={() => set("requiresActive", value)}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-bold ${form.requiresActive === value ? "border-[#3f4eb5] bg-[#3f4eb5] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className={labelClass}>表示状態</p>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {([
+              [false, "下書き（まだ講師に表示しない）"],
+              [true, "講師のマイポータルに表示"]
+            ] as const).map(([value, label]) => (
+              <button
+                key={label}
+                type="button"
+                aria-pressed={form.isPublished === value}
+                onClick={() => set("isPublished", value)}
+                className={`rounded-xl border px-3 py-3 text-left text-sm font-bold ${form.isPublished === value ? "border-[#3f4eb5] bg-[#3f4eb5] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="text-sm leading-6 text-[var(--mikke-muted)]">この講座の認定講師だけが見られます。他の講座の講師や受講者には表示されません。</p>
       </section>
 
       {error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">{error}</p> : null}
 
       <button type="submit" disabled={saving} className="w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-        {saving ? "保存中…" : "教材を追加する"}
+        {saving ? "保存中…" : "講師用ファイルを追加する"}
       </button>
     </form>
   );
@@ -136,7 +166,7 @@ function NewMaterialContent() {
 
 export default function NewMaterialPage() {
   return (
-    <HonbuShell title="教材を追加">
+    <HonbuShell title="講師用ファイルを追加">
       <div className="mx-auto max-w-2xl">
         <Suspense fallback={<p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>}>
           <NewMaterialContent />

@@ -48,10 +48,10 @@ const honbuNav: MikkeShellNavItem[] = [
 const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard, section: "マイポータル" },
   { href: "/academy/portal/class-requests", label: "担当する開催日", icon: CalendarCheck, section: "マイポータル" },
-  { href: "/academy/portal/study", label: "復習・共有ページ", icon: GraduationCap, section: "マイポータル" },
+  { href: "/academy/portal/study", label: "復習ページ・講師用資料", icon: GraduationCap, section: "マイポータル" },
   { href: "/academy/portal/url", label: "営業用URL", icon: Link2, section: "募集" },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
-  { href: "/academy/portal/kits", label: "キット発注", icon: Package, section: "発注" }
+  { href: "/academy/portal/kits", label: "講座仕入れ", icon: Package, section: "発注" }
 ];
 
 const honbuBottomNav: MikkeShellBottomNavItem[] = [
@@ -63,9 +63,9 @@ const honbuBottomNav: MikkeShellBottomNavItem[] = [
 
 const koushiBottomNav: MikkeShellBottomNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard },
-  { href: "/academy/portal/study", label: "復習・共有", icon: GraduationCap },
+  { href: "/academy/portal/study", label: "復習・資料", icon: GraduationCap },
   { href: "/academy/portal/applications", label: "申込", icon: ClipboardList },
-  { href: "/academy/portal/kits", label: "発注", icon: Package }
+  { href: "/academy/portal/kits", label: "仕入れ", icon: Package }
 ];
 
 function canShowManageHref(context: AcademyAccessContext | null, href: string) {

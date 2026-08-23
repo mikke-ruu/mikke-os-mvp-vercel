@@ -12,7 +12,8 @@ assert.match(dashboard, /本部ホームページを作成/, "journey must disti
 assert.match(dashboard, /講師を登録/, "journey must include instructor registration");
 assert.match(dashboard, /本部ホームページ<\/span>は団体全体の紹介/, "homepage and course application page must be explained separately");
 assert.match(dashboard, /この時点では公開されません/, "guide must not auto-publish a course");
-assert.match(dashboard, /受講者と認定講師のどちらに見せるか/, "material step must explain its audience");
+assert.match(dashboard, /認定講師に共有するPDF・動画・外部URL/, "instructor file step must explain its audience");
+assert.doesNotMatch(dashboard, /受講者と認定講師のどちらに見せるか/, "learner review content and instructor files must not be mixed");
 assert.match(dashboard, /`\/academy\/c\/\$\{firstPublishedCourse!\.id\}`/, "final question must open public applicant view");
 assert.match(dashboard, /process\.env\.NODE_ENV === "development"/, "preview data must be development-only");
 assert.match(dashboard, /academyPreviewHeadquarters/, "dashboard must use the shared walkthrough fixture");

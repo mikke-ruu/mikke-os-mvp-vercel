@@ -7,7 +7,7 @@ import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
-import { listCourses, setCoursePublished } from "@/lib/academy/courses";
+import { listCourses } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 
 function CoursesContent() {
@@ -15,7 +15,6 @@ function CoursesContent() {
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -28,17 +27,6 @@ function CoursesContent() {
   useEffect(() => {
     load();
   }, [load]);
-
-  async function togglePublish(course: AcademyCourse) {
-    if (!hq) return;
-    setBusyId(course.id);
-    try {
-      await setCoursePublished(profile, hq.id, course, !course.is_published);
-      setCourses(await listCourses(hq.id));
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   if (loading) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
 
@@ -98,9 +86,7 @@ function CoursesContent() {
                       受講料（税込） {course.price.toLocaleString()}円{course.duration_text ? ` ・ ${course.duration_text}` : ""}
                     </p>
                   </div>
-                  <button
-                    onClick={() => togglePublish(course)}
-                    disabled={busyId === course.id}
+                  <span
                     className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${
                       course.is_published
                         ? "border-[var(--mikke-success)]/30 bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]"
@@ -108,8 +94,8 @@ function CoursesContent() {
                     }`}
                   >
                     {course.is_published ? <Eye size={12} /> : <EyeOff size={12} />}
-                    {course.is_published ? "公開中" : "非公開"}
-                  </button>
+                    {course.is_published ? "公開中" : "下書き"}
+                  </span>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
@@ -146,7 +132,7 @@ function CoursesContent() {
                     href={`/academy/courses/${course.id}/instructor-page`}
                     className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
                   >
-                    <GraduationCap size={14} /> 復習・共有ページ
+                    <GraduationCap size={14} /> 講師用資料ページ編集
                   </Link>
                 </div>
               </div>

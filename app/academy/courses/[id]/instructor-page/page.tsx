@@ -136,7 +136,7 @@ function BlockEditor({
   if (block.type === "materials-list")
     return (
       <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs text-[var(--mikke-muted)]">
-        設定項目はありません。この講座の教材・資料（公開設定にしたもの）が、ここに自動で一覧表示されます。
+        設定項目はありません。「講師用ファイル」でマイポータルに表示する設定にしたPDF・動画・リンクが、ここに自動で一覧表示されます。
       </p>
     );
 
@@ -239,17 +239,17 @@ function BuilderContent({ courseId }: { courseId: string }) {
       <div className="space-y-4">
       <div>
         <p className="truncate text-xs text-[var(--mikke-muted)]">{course.code} {course.name}</p>
-        <h2 className="text-base font-bold text-[var(--mikke-text)]">復習・共有ページ</h2>
+        <h2 className="text-base font-bold text-[var(--mikke-text)]">講師用資料ページ</h2>
       </div>
       <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
-        この講座の復習、進め方、材料購入先などをまとめる非公開ページです。マイポータルの「復習・共有ページ」に表示します。
+        講座の進め方、材料の購入先、営業方法などを、この講座の認定講師に共有するページです。受講者の復習ページとは別です。
       </p>
 
-      {/* AC-C4: 教材・資料タブを独立ナビから外した代わりの導線。教材データはacademy_materialsのまま。 */}
+      {/* AC-C4: academy_materials を講師用ファイルとして編集する導線。 */}
       <div className="rounded-xl border border-dashed border-[var(--mikke-line)] bg-white p-3">
-        <p className="text-xs font-bold text-[var(--mikke-text)]">教材・資料はこの講座専用の管理画面で編集します</p>
+        <p className="text-xs font-bold text-[var(--mikke-text)]">PDF・動画・リンクは「講師用ファイル」で追加します</p>
         <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">
-          教材・資料を編集すると、マイポータルのこのページ下部に自動で反映されます。
+          表示対象と表示状態を選び、講師のマイポータルに追加できます。
         </p>
         <Link
           href={`/academy/materials?course=${course.id}`}
@@ -313,7 +313,7 @@ function BuilderContent({ courseId }: { courseId: string }) {
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-          {saving ? "保存中…" : "復習・共有ページを保存"}
+          {saving ? "保存中…" : "講師用資料ページを保存"}
         </button>
         {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
       </div>
@@ -325,7 +325,7 @@ function BuilderContent({ courseId }: { courseId: string }) {
 export default function InstructorPageBuilder({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return (
-    <HonbuShell title="復習・共有ページ">
+    <HonbuShell title="講師用資料ページ">
       <BuilderContent courseId={id} />
     </HonbuShell>
   );

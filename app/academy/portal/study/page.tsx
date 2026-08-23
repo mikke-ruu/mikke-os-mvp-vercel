@@ -7,6 +7,7 @@ import { KoushiShell } from "@/components/academy/AcademyShell";
 import { getCoursesByIds, getMyInstructorRecords, listMaterialsForInstructor } from "@/lib/academy/instructor-portal";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
 import { PageBlocks } from "@/components/academy/PageBlocks";
+import { isAcademyLocalReview, academyPreviewCourses } from "@/lib/academy/preview";
 import type { AcademyCourse, AcademyInstructor, AcademyInstructorPage, AcademyMaterial } from "@/types/database";
 
 function kindIcon(kind: AcademyMaterial["kind"]) {
@@ -22,8 +23,12 @@ function StudyContent() {
   const [materials, setMaterials] = useState<AcademyMaterial[]>([]);
   const [pageMap, setPageMap] = useState<Record<string, AcademyInstructorPage>>({});
   const [loading, setLoading] = useState(true);
+  const [learnerSample, setLearnerSample] = useState(false);
 
   useEffect(() => {
+    setLearnerSample(
+      isAcademyLocalReview() && new URLSearchParams(window.location.search).get("sample") === "learner"
+    );
     async function load() {
       const myRecords = await getMyInstructorRecords(profile.user_id);
       setRecords(myRecords);
@@ -43,6 +48,25 @@ function StudyContent() {
   }, [profile.user_id]);
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (learnerSample) {
+    const course = academyPreviewCourses[0];
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
+          <div className="flex items-center gap-2">
+            <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course.code}</span>
+            <h2 className="text-base font-bold text-[var(--mikke-text)]">{course.name}</h2>
+          </div>
+          <p className="mt-4 text-sm font-bold text-[var(--mikke-text)]">受講者用の復習ページ</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">講座の振り返り、受講者に配布する資料、本部からのお知らせをここで確認できます。</p>
+          <div className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+            <p className="text-sm font-bold text-[var(--mikke-text)]">講座の振り返り</p>
+            <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">当日のポイントと、自宅で練習する内容を確認しましょう。</p>
+          </div>
+        </section>
+      </div>
+    );
+  }
   if (records.length === 0) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">まだ講師登録されていません。</p>;
 
   return (
@@ -51,7 +75,7 @@ function StudyContent() {
         const course = courseMap[rec.course_id];
         const courseMaterials = materials.filter((m) => m.course_id === rec.course_id);
         const page = pageMap[rec.course_id];
-        // 教材・資料は設置ブロックに依存させず、復習・共有ページの定位置に必ず表示する。
+        // 講師用ファイルは設置ブロックに依存させず、講師用資料ページの定位置に必ず表示する。
         const contentBlocks = (page?.blocks ?? []).filter((block) => block.type !== "materials-list");
         return (
           <section key={rec.id} className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
@@ -61,7 +85,7 @@ function StudyContent() {
             </div>
 
             {!rec.is_active ? (
-              <p className="text-sm font-bold leading-6 text-[var(--mikke-text)]">この講座の復習・共有ページは現在利用できません。本部にお問い合わせください。</p>
+              <p className="text-sm font-bold leading-6 text-[var(--mikke-text)]">活動中の講師だけに限定された資料は現在利用できません。本部にお問い合わせください。</p>
             ) : (
               <>
                 {contentBlocks.length ? (
@@ -69,11 +93,11 @@ function StudyContent() {
                     <PageBlocks blocks={contentBlocks} />
                   </div>
                 ) : (
-                  <p className="text-sm text-[var(--mikke-muted)]">本部からの復習・共有内容はまだありません。</p>
+                  <p className="text-sm text-[var(--mikke-muted)]">本部からの講師用資料はまだありません。</p>
                 )}
 
                 <div className="rounded-xl border border-[var(--mikke-line)] bg-white p-4">
-                    <p className="text-sm font-bold text-[var(--mikke-text)]">教材・資料</p>
+                    <p className="text-sm font-bold text-[var(--mikke-text)]">講師用ファイル</p>
                     <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">PDF、動画、ダウンロード資料、外部URLなど、本部がこの講座で共有した内容です。</p>
                   {courseMaterials.length ? (
                     <ul className="mt-2 grid gap-1.5 md:grid-cols-2">
@@ -93,7 +117,7 @@ function StudyContent() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-3 text-sm text-[var(--mikke-muted)]">現在、表示できる教材・資料はありません。</p>
+                    <p className="mt-3 text-sm text-[var(--mikke-muted)]">現在、表示できる講師用ファイルはありません。</p>
                   )}
                 </div>
               </>
@@ -107,7 +131,7 @@ function StudyContent() {
 
 export default function StudyPage() {
   return (
-    <KoushiShell title="復習・共有ページ">
+    <KoushiShell title="復習ページ・講師用資料">
       <StudyContent />
     </KoushiShell>
   );

@@ -9,6 +9,7 @@ import { INSTRUCTOR_STATUS_LABELS } from "@/lib/academy/instructors";
 import { getCoursesByIds, getMyInstructorRecords, listMyApplications } from "@/lib/academy/instructor-portal";
 import { listMyKitOrders } from "@/lib/academy/kits";
 import { APPLICATION_STATUS_LABELS } from "@/lib/academy/applications";
+import { isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyApplication, AcademyCourse, AcademyInstructor, AcademyKitOrder } from "@/types/database";
 
 function QuickCard({
@@ -43,8 +44,11 @@ function PortalDashboard() {
   const [apps, setApps] = useState<AcademyApplication[]>([]);
   const [kits, setKits] = useState<AcademyKitOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sampleView, setSampleView] = useState<"learner" | "instructor">("learner");
+  const [localSample, setLocalSample] = useState(false);
 
   useEffect(() => {
+    setLocalSample(isAcademyLocalReview());
     async function load() {
       const myRecords = await getMyInstructorRecords(profile.user_id);
       setRecords(myRecords);
@@ -79,10 +83,29 @@ function PortalDashboard() {
     <div className="space-y-6">
       <section className="rounded-2xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] p-4">
         <p className="text-sm font-bold text-[var(--mikke-accent-strong)]">{profile.display_name}さんのマイポータル</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">受講中・修了した講座と教材はここで確認します。認定講師になった講座には、営業・申込・開催・キット発注の機能が追加されます。</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{localSample && sampleView === "learner" ? "受講した講座と復習内容を確認できます。" : "認定講師として活動する講座を確認できます。"}</p>
       </section>
 
-      <h2 className="text-sm font-bold text-[var(--mikke-text)]">取得した認定・営業できる講座</h2>
+      {localSample ? (
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[var(--mikke-line)] bg-white p-2" aria-label="マイポータルのサンプル表示">
+          {([
+            ["learner", "受講者用"],
+            ["instructor", "認定講師用"]
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={sampleView === value}
+              onClick={() => setSampleView(value)}
+              className={`rounded-xl px-3 py-2 text-sm font-bold ${sampleView === value ? "bg-[#3f4eb5] text-white" : "bg-white text-[var(--mikke-text-soft)]"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <h2 className="text-sm font-bold text-[var(--mikke-text)]">{localSample && sampleView === "learner" ? "受講中・修了した講座" : "取得した認定・営業できる講座"}</h2>
       <div className="grid gap-3 md:grid-cols-2">
         {records.map((rec) => {
           const course = courseMap[rec.course_id];
@@ -93,10 +116,14 @@ function PortalDashboard() {
                 <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
                 <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{course?.name}</p>
               </div>
-              <p className="mt-1.5 text-[11px] text-[var(--mikke-muted)]">
-                {rec.is_certified ? "認定済み" : "未認定"} ・ {activityLabel}
-                {rec.instructor_number ? ` ・ No.${rec.instructor_number}` : ""}
-              </p>
+              {localSample && sampleView === "learner" ? (
+                <p className="mt-1.5 text-xs text-[var(--mikke-muted)]">修了済み ・ 復習ページを見られます</p>
+              ) : (
+                <p className="mt-1.5 text-[11px] text-[var(--mikke-muted)]">
+                  {rec.is_certified ? "認定済み" : "未認定"} ・ {activityLabel}
+                  {rec.instructor_number ? ` ・ No.${rec.instructor_number}` : ""}
+                </p>
+              )}
             </div>
           );
         })}
@@ -104,14 +131,18 @@ function PortalDashboard() {
 
       {/* クイックメニュー */}
       <div className="grid gap-3 md:grid-cols-2">
-        <QuickCard href="/academy/portal/study" icon={GraduationCap} title="復習・共有ページ" desc="受講した講座の復習内容、教材、資料、共有情報を確認" />
-        <QuickCard href="/academy/portal/url" icon={Link2} title="営業用URL" desc="あなた専用の講師紹介ページをSNSで活用" />
-        <QuickCard href="/academy/portal/applications" icon={ClipboardList} title="申込管理" desc={`担当申込 ${apps.length}件${pendingApps.length ? `（未対応 ${pendingApps.length}件）` : ""}`} />
-        <QuickCard href="/academy/portal/kits" icon={Package} title="キット発注" desc={`注文履歴 ${kits.length}件`} />
+        <QuickCard href={localSample && sampleView === "learner" ? "/academy/portal/study?sample=learner" : "/academy/portal/study?sample=instructor"} icon={GraduationCap} title={localSample && sampleView === "learner" ? "復習ページ" : "講師用資料"} desc={localSample && sampleView === "learner" ? "受講した講座の復習内容を確認" : "講座運営に必要なマニュアル、PDF、動画、リンクを確認"} />
+        {!localSample || sampleView === "instructor" ? (
+          <>
+            <QuickCard href="/academy/portal/url" icon={Link2} title="営業用URL" desc="あなた専用の講師紹介ページをSNSで活用" />
+            <QuickCard href="/academy/portal/applications" icon={ClipboardList} title="申込管理" desc={`担当申込 ${apps.length}件${pendingApps.length ? `（未対応 ${pendingApps.length}件）` : ""}`} />
+            <QuickCard href="/academy/portal/kits" icon={Package} title="講座仕入れ" desc={`注文履歴 ${kits.length}件`} />
+          </>
+        ) : null}
       </div>
 
       {/* 最近の担当申込 */}
-      <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
+      {!localSample || sampleView === "instructor" ? <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-[var(--mikke-text)]">最近の担当申込</h2>
           <Link href="/academy/portal/applications" className="flex items-center gap-1 text-xs font-bold text-[var(--mikke-accent)]">
@@ -135,7 +166,7 @@ function PortalDashboard() {
             ))}
           </ul>
         )}
-      </section>
+      </section> : null}
     </div>
   );
 }
