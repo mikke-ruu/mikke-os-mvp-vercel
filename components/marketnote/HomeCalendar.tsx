@@ -155,8 +155,8 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between gap-2 px-1">
+    <div className="min-w-0">
+      <div className="-mx-1 flex items-center justify-between gap-1 px-1">
         {viewToggle}
         <div className="flex min-w-0 items-center justify-end gap-0.5">
           <button type="button" onClick={() => moveMonth(-1)} aria-label="前の月" className="grid h-8 w-7 shrink-0 place-items-center rounded-full text-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)]">
@@ -175,7 +175,7 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
       </div>
 
       <div
-        className="mt-2 grid touch-pan-y grid-cols-7 gap-1 rounded-xl border border-[var(--mikke-line)] bg-white p-2"
+        className="-mx-3 mt-1.5 grid touch-pan-y grid-cols-7 gap-0.5 rounded-lg border border-[var(--mikke-line)] bg-white p-1 sm:mx-0 sm:gap-1 sm:rounded-xl sm:p-2"
         onTouchStart={(event) => {
           touchStartX.current = event.touches[0]?.clientX ?? null;
           touchStartY.current = event.touches[0]?.clientY ?? null;
@@ -192,7 +192,7 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
         }}
       >
         {weekdayLabels.map((label) => (
-          <div key={label} className="py-1 text-center text-[11px] font-bold text-[var(--mikke-muted-light)]">{label}</div>
+          <div key={label} className="py-0.5 text-center text-[10px] font-bold text-[var(--mikke-muted-light)] sm:py-1 sm:text-[11px]">{label}</div>
         ))}
         {weeks.flat().map((date) => {
           const key = toDateKey(date);
@@ -206,10 +206,10 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
               onClick={() => selectDate(key)}
               aria-label={calendarDayLabel(date, dayEvents)}
               aria-pressed={selectedDate === key}
-              className={`flex h-[68px] min-w-0 flex-col items-stretch rounded-lg border p-0.5 text-center hover:border-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)] sm:h-[74px] ${selectedDate === key ? "border-[var(--mikke-blue)] bg-[var(--mikke-surface-soft)]" : "border-transparent"} ${inMonth ? "" : "opacity-40"}`}
+              className={`flex h-[58px] min-w-0 flex-col items-stretch rounded-md border p-px text-center hover:border-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)] sm:h-[74px] sm:rounded-lg sm:p-0.5 ${selectedDate === key ? "border-[var(--mikke-blue)] bg-[var(--mikke-surface-soft)]" : "border-transparent"} ${inMonth ? "" : "opacity-40"}`}
             >
-              <span className="mx-auto flex h-6 items-center justify-center">
-                <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-bold ${today ? "border border-[var(--mikke-blue)] text-[var(--mikke-blue)]" : "text-[var(--mikke-text)]"}`}>{date.getDate()}</span>
+              <span className="mx-auto flex h-5 items-center justify-center sm:h-6">
+                <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-bold sm:h-6 sm:w-6 sm:text-xs ${today ? "border border-[var(--mikke-blue)] text-[var(--mikke-blue)]" : "text-[var(--mikke-text)]"}`}>{date.getDate()}</span>
               </span>
               <CalendarCellBody
                 events={dayEvents}
@@ -290,23 +290,23 @@ function CalendarCellBody({
   if (singlePastEvent && photo) {
     const hoverText = reflectionText ? `${singlePastEvent.title}：${reflectionText}` : singlePastEvent.title;
     return (
-      <span className="mt-0.5 block min-h-0 flex-1 overflow-hidden" title={hoverText} aria-hidden="true">
-        <img src={photo.imageUrl} alt="" className="h-9 w-full rounded-[5px] object-cover" />
+      <span className="mt-px block min-h-0 flex-1 overflow-hidden" title={hoverText} aria-hidden="true">
+        <img src={photo.imageUrl} alt="" className="h-8 w-full rounded-[4px] object-cover sm:h-9 sm:rounded-[5px]" />
       </span>
     );
   }
 
   return (
-    <div className="mt-0.5 min-w-0 space-y-0.5" aria-hidden="true">
+    <div className="mt-px min-w-0 space-y-px sm:mt-0.5 sm:space-y-0.5" aria-hidden="true">
       {events.slice(0, 2).map((event) => {
         const color = getMarketEventTypeColor(getMarketEventType(event), settings);
-        return <span key={event.id} className="block h-3 truncate rounded-[3px] px-0.5 text-left text-[9px] font-bold leading-3" style={{ backgroundColor: color, color: readableTextColor(color) }}>
+        return <span key={event.id} className="block h-3 overflow-hidden whitespace-nowrap rounded-[3px] px-0.5 text-left text-[9px] font-bold leading-3 [text-overflow:clip]" style={{ backgroundColor: color, color: readableTextColor(color) }}>
           {event.title}
         </span>;
       })}
-      {events.length > 2 ? <span className="block truncate text-right text-[8px] font-bold leading-none text-[var(--mikke-muted)]">＋残り{events.length - 2}件</span> : null}
+      {events.length > 2 ? <span className="block overflow-hidden whitespace-nowrap text-right text-[8px] font-bold leading-none text-[var(--mikke-muted)] [text-overflow:clip]">＋残り{events.length - 2}件</span> : null}
       {singlePastEvent && reflectionText ? (
-        <span className="block h-3 truncate rounded-[3px] bg-[var(--mikke-green)] px-0.5 text-left text-[8px] font-bold leading-3 text-[var(--mikke-text)]">{reflectionText}</span>
+        <span className="block h-3 overflow-hidden whitespace-nowrap rounded-[3px] bg-[var(--mikke-green)] px-0.5 text-left text-[8px] font-bold leading-3 text-[var(--mikke-text)] [text-overflow:clip]">{reflectionText}</span>
       ) : null}
     </div>
   );
@@ -340,7 +340,7 @@ function SelectedDayEvents({
   onToggleCheck: (item: MarketCheckItem, nextValue: boolean) => Promise<void>;
 }) {
   return (
-    <section className="mt-3 border-t border-[var(--mikke-line)] pt-3">
+    <section className="mt-2 border-t border-[var(--mikke-line)] pt-2">
       <div className="flex items-center justify-between gap-3 px-1">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--mikke-blue)]" style={{ fontFamily: "var(--mikke-font-display)" }}>SCHEDULE</p>
@@ -352,7 +352,7 @@ function SelectedDayEvents({
       {events.length === 0 ? (
         <p className="mt-2 rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-5 text-center text-xs font-bold text-[var(--mikke-muted)]">この日の予定はありません</p>
       ) : (
-        <div className="mt-2 space-y-2.5">
+        <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
           {events.map((event) => {
             const checks = checksByEvent[event.id] ?? [];
             const done = checks.filter((item) => item.is_done).length;
@@ -368,11 +368,11 @@ function SelectedDayEvents({
             return (
               <article key={event.id} className="overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-white">
                 <div className="h-1.5" style={{ backgroundColor: color }} />
-                <div className="p-3">
+                <div className="p-2.5 sm:p-3">
                   <div className="flex items-start justify-between gap-2">
                     <Link href={`/marketnote/${event.id}`} className="min-w-0 flex-1">
                       <span className="inline-flex max-w-full rounded-full px-2 py-1 text-[10px] font-extrabold" style={{ backgroundColor: color, color: readableTextColor(color) }}>{eventType}</span>
-                      <h4 className="mt-1.5 truncate text-base font-extrabold text-[var(--mikke-text)]">{event.title}</h4>
+                      <h4 className="mt-1 truncate text-base font-extrabold text-[var(--mikke-text)]">{event.title}</h4>
                     </Link>
                     <select value={workflow} onChange={(input) => onStatusChange(event, input.target.value as MarketEventWorkflowStatus)} disabled={busyKey === `status:${event.id}`} aria-label={`${event.title}のステータス`} className={`min-h-9 shrink-0 rounded-lg border px-2 text-[11px] font-bold outline-none disabled:opacity-50 ${workflow === "confirmed" ? "border-[var(--mikke-orange)] bg-[var(--mikke-orange)] text-white" : workflow === "intermediate" ? "border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)] text-[var(--mikke-text)]" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"}`}>
                       <option value="considering">検討中</option>
@@ -381,21 +381,30 @@ function SelectedDayEvents({
                     </select>
                   </div>
 
-                  <Link href={`/marketnote/${event.id}`} className="mt-2 grid gap-1 text-[11px] font-semibold text-[var(--mikke-muted)]">
-                    <span className="flex items-center gap-1.5"><Clock3 size={13} />{eventTimeLabel(event)}</span>
-                    <span className="flex items-center gap-1.5 truncate"><MapPin size={13} className="shrink-0" /><span className="truncate">{[event.venue_name, event.area].filter(Boolean).join(" / ") || "場所未設定"}</span></span>
-                  </Link>
-
-                  <div className="mt-3 flex items-center justify-end gap-3 text-[11px] font-bold text-[var(--mikke-text-soft)]">
-                    {!isEnded ? <span className="mr-auto">タスク {done}/{checks.length}</span> : null}
-                    {paymentState !== "not_required" ? (
+                  {!isEnded ? (
+                    <div className="mt-1.5 flex items-center gap-3 text-[11px] font-bold text-[var(--mikke-text-soft)]">
+                      <span className="mr-auto">タスク {done}/{checks.length}</span>
+                      {paymentState !== "not_required" ? (
+                        <select value={paymentState} onChange={(input) => onPaymentStatusChange(event, input.target.value as "unpaid" | "paid")} disabled={busyKey === `payment:${event.id}`} aria-label={`${event.title}の支払ステータス`} className={`min-h-8 rounded-full border px-2 text-[10px] font-extrabold outline-none disabled:opacity-50 ${paymentState === "unpaid" ? "border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)] text-[var(--mikke-text)]" : "border-[var(--mikke-green)] bg-[var(--mikke-green)] text-[var(--mikke-text)]"}`}>
+                          <option value="unpaid">未払い</option>
+                          <option value="paid">支払済み</option>
+                        </select>
+                      ) : null}
+                    </div>
+                  ) : paymentState !== "not_required" ? (
+                    <div className="mt-1.5 flex justify-end">
                       <select value={paymentState} onChange={(input) => onPaymentStatusChange(event, input.target.value as "unpaid" | "paid")} disabled={busyKey === `payment:${event.id}`} aria-label={`${event.title}の支払ステータス`} className={`min-h-8 rounded-full border px-2 text-[10px] font-extrabold outline-none disabled:opacity-50 ${paymentState === "unpaid" ? "border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)] text-[var(--mikke-text)]" : "border-[var(--mikke-green)] bg-[var(--mikke-green)] text-[var(--mikke-text)]"}`}>
                         <option value="unpaid">未払い</option>
                         <option value="paid">支払済み</option>
                       </select>
-                    ) : null}
-                  </div>
-                  {!isEnded ? <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-[var(--mikke-line-soft)]"><div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: color }} /></div> : null}
+                    </div>
+                  ) : null}
+                  {!isEnded ? <div className="mt-1 h-1 overflow-hidden rounded-full bg-[var(--mikke-line-soft)]"><div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: color }} /></div> : null}
+
+                  <Link href={`/marketnote/${event.id}`} className="mt-1.5 grid grid-cols-2 gap-2 text-[11px] font-semibold text-[var(--mikke-muted)]">
+                    <span className="flex min-w-0 items-center gap-1.5 truncate"><Clock3 size={13} className="shrink-0" /><span className="truncate">{eventTimeLabel(event)}</span></span>
+                    <span className="flex items-center gap-1.5 truncate"><MapPin size={13} className="shrink-0" /><span className="truncate">{[event.venue_name, event.area].filter(Boolean).join(" / ") || "場所未設定"}</span></span>
+                  </Link>
 
                   {!isEnded && checks.length ? (
                     <div className="mt-2 space-y-1 border-t border-[var(--mikke-line-soft)] pt-2">

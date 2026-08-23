@@ -213,7 +213,7 @@ function NewMarketEventContent() {
 
   return (
     <MarketNoteShell title="予定を追加" subtitle="MarketNote" isGuest={isGuest} hideBottomNav>
-      <form onSubmit={submit} className="pb-28">
+      <form onSubmit={submit} className="min-w-0 max-w-full overflow-x-clip pb-28">
         <header className="mb-4 grid grid-cols-[40px_1fr_40px] items-center pt-1">
           <button
             type="button"
@@ -242,7 +242,7 @@ function NewMarketEventContent() {
           </FormCard>
 
           <FormCard title="基本情報" tone="blue" icon={<ClipboardList size={16} strokeWidth={1.8} />}>
-            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-[1fr_0.86fr]">
+            <div className="grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-[minmax(0,1fr)_minmax(0,0.86fr)]">
               <Field label="予定名" required compact>
                 <TextInput value={title} onChange={setTitle} placeholder="例）ハンドメイドフェス" required />
               </Field>
@@ -276,7 +276,7 @@ function NewMarketEventContent() {
             </div>
 
             {multiDay ? (
-              <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-[1fr_0.86fr]">
+              <div className="grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-[minmax(0,1fr)_minmax(0,0.86fr)]">
                 <span className="hidden min-[360px]:block" />
                 <Field label="終了日" required compact>
                   <TextInput value={endDate} onChange={setEndDate} type="date" required icon={<CalendarDays size={15} />} />
@@ -312,7 +312,7 @@ function NewMarketEventContent() {
           </FormCard>
 
           <AccordionCard title="日時（任意）" tone="yellow" icon={<Clock3 size={16} />} open={timeOpen} onToggle={() => setTimeOpen((value) => !value)}>
-            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
+            <div className="grid min-w-0 grid-cols-1 gap-3 min-[360px]:grid-cols-2">
               <Field label="開始時間" compact>
                 <TextInput value={startTime} onChange={setStartTime} type="time" />
               </Field>
@@ -343,7 +343,7 @@ function NewMarketEventContent() {
             <p className="text-xs font-bold leading-5 text-[var(--mikke-muted)]">入力しなくても予定は保存できます。支払済みの項目だけが経費に反映されます。</p>
             <div className="space-y-2.5">
               {payments.map((payment, index) => (
-                <div key={payment.id} className="rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-2.5">
+                <div key={payment.id} className="min-w-0 rounded-xl border border-[var(--mikke-line-soft)] bg-[var(--mikke-surface-soft)] p-2.5">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-[11px] font-bold text-[var(--mikke-muted)]">事前経費 {index + 1}</span>
                     {payments.length > 1 ? (
@@ -352,7 +352,7 @@ function NewMarketEventContent() {
                       </button>
                     ) : null}
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid min-w-0 grid-cols-2 gap-2">
                     <TextInput value={payment.title} onChange={(value) => updatePayment(payment.id, { title: value })} placeholder="項目" />
                     <SelectBox value={payment.status} onChange={(value) => updatePayment(payment.id, { status: value as PaymentStatus })} options={paymentStatusOptions} tone={payment.status === "paid" ? "green" : payment.status === "unpaid" ? "orange" : "gray"} />
                     <SelectBox value={payment.method} onChange={(value) => updatePayment(payment.id, { method: value })} options={getPaymentMethodOptions(fixedPaymentMethodNames, payment.method)} tone="gray" />
@@ -380,7 +380,7 @@ function NewMarketEventContent() {
               onChange={(event) => setMemo(event.target.value)}
               rows={4}
               placeholder="電源使用予定、搬入時間、主催者からの連絡など"
-              className="scroll-mb-28 w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-base leading-6 text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)] sm:text-sm"
+              className="scroll-mb-28 block min-w-0 max-w-full w-full resize-none rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-base leading-6 text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)] sm:text-sm"
             />
           </FormCard>
 
@@ -405,7 +405,7 @@ function NewMarketEventContent() {
                 );
               })}
             </div>
-            <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
+            <div className="mt-3 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-2">
               <TextInput value={customCheck} onChange={setCustomCheck} placeholder="項目を追加" />
               <button
                 type="button"
@@ -463,9 +463,9 @@ type SectionTone = "blue" | "orange" | "green" | "yellow" | "pink";
 
 function FormCard({ title, icon, tone = "blue", children }: { title: string; icon?: React.ReactNode; tone?: SectionTone; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-[var(--mikke-line)] bg-white p-3.5">
+    <section className="min-w-0 max-w-full rounded-xl border border-[var(--mikke-line)] bg-white p-3.5">
       <SectionHeading title={title} icon={icon} tone={tone} />
-      <div className="mt-3 space-y-2.5">{children}</div>
+      <div className="mt-3 min-w-0 space-y-2.5">{children}</div>
     </section>
   );
 }
@@ -486,12 +486,12 @@ function AccordionCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-[var(--mikke-line)] bg-white">
+    <section className="min-w-0 max-w-full rounded-xl border border-[var(--mikke-line)] bg-white">
       <button type="button" onClick={onToggle} className="flex min-h-12 w-full items-center justify-between gap-3 p-3.5 text-left">
         <SectionHeading title={title} icon={icon} tone={tone} />
         <ChevronDown size={17} className={`shrink-0 text-[var(--mikke-muted)] transition ${open ? "rotate-180" : ""}`} />
       </button>
-      {open ? <div className="border-t border-[var(--mikke-line-soft)] px-3.5 pb-3.5 pt-3">{children}</div> : null}
+      {open ? <div className="min-w-0 border-t border-[var(--mikke-line-soft)] px-3.5 pb-3.5 pt-3">{children}</div> : null}
     </section>
   );
 }
@@ -533,7 +533,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className={compact ? "block" : "grid gap-1.5"}>
+    <label className={compact ? "block min-w-0" : "grid min-w-0 gap-1.5"}>
       <span className="text-xs font-extrabold text-[var(--mikke-text-soft)]">
         {label}{required ? <span className="ml-0.5 text-[var(--mikke-accent)]">*</span> : null}
       </span>
@@ -558,14 +558,14 @@ function TextInput({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="relative">
+    <div className="relative min-w-0 max-w-full">
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
         type={type}
         required={required}
         placeholder={placeholder}
-        className="scroll-mb-28 h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 pr-9 text-base font-semibold text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)] sm:h-10 sm:text-sm"
+        className="scroll-mb-28 block h-11 min-w-0 max-w-full w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 pr-9 text-base font-semibold text-[var(--mikke-text)] outline-none transition placeholder:text-[var(--mikke-muted-light)] focus:border-[var(--mikke-blue)] sm:h-10 sm:text-sm"
       />
       {icon ? <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--mikke-muted)]">{icon}</span> : null}
     </div>
@@ -633,11 +633,11 @@ function SelectBox({
       : "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]";
 
   return (
-    <label className="relative block">
+    <label className="relative block min-w-0 max-w-full">
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className={`scroll-mb-28 h-11 w-full appearance-none rounded-xl border px-3 pr-7 text-base font-extrabold outline-none sm:h-10 sm:text-xs ${toneClass}`}
+        className={`scroll-mb-28 block h-11 min-w-0 max-w-full w-full appearance-none rounded-xl border px-3 pr-7 text-base font-extrabold outline-none sm:h-10 sm:text-xs ${toneClass}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
@@ -650,7 +650,7 @@ function SelectBox({
 
 function MoneyInput({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
-    <div className="grid h-9 grid-cols-[24px_1fr] overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)]">
+    <div className="grid h-9 min-w-0 max-w-full grid-cols-[24px_minmax(0,1fr)] overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)]">
       <span className="grid place-items-center text-xs font-bold text-[var(--mikke-muted)]">¥</span>
       <input
         value={value}
