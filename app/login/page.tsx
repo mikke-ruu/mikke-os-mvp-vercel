@@ -12,6 +12,48 @@ import { supabase } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
 
+type PasswordStrength = {
+  level: 0 | 1 | 2;
+  label: string;
+  guidance: string;
+};
+
+const passwordStrengthLabels = ["低（もう少し）", "中（安心）", "高（より安心）"] as const;
+const passwordStrengthBarClasses = ["bg-[var(--mikke-pink)]", "bg-[var(--mikke-yellow)]", "bg-[var(--mikke-green)]"] as const;
+
+function getPasswordStrength(password: string, email: string): PasswordStrength {
+  const normalized = password.toLowerCase();
+  const emailName = email.split("@")[0]?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+  const characterGroups = [/[a-z]/i, /\d/, /[^a-z\d]/i].filter((pattern) => pattern.test(password)).length;
+  const hasGuessablePattern =
+    /^\d+$/.test(password) ||
+    /(.)\1{2,}/.test(normalized) ||
+    /(?:0123|1234|2345|3456|4567|5678|6789|abcd|qwerty|password|pass|admin|mikke)/.test(normalized) ||
+    /(?:19|20)\d{2}/.test(normalized) ||
+    /(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])/.test(normalized) ||
+    (emailName.length >= 4 && normalized.includes(emailName));
+
+  let points = 0;
+  if (password.length >= 8) points += 1;
+  if (password.length >= 10) points += 1;
+  if (password.length >= 12) points += 1;
+  if (characterGroups >= 2) points += 1;
+  if (characterGroups >= 3) points += 1;
+  if (hasGuessablePattern) points = Math.max(0, points - 2);
+
+  if (password.length >= 10 && points >= 4 && !hasGuessablePattern) {
+    return { level: 2, label: passwordStrengthLabels[2], guidance: "推測されにくいパスワードです。" };
+  }
+  if (password.length >= 8 && points >= 2) {
+    return { level: 1, label: passwordStrengthLabels[1], guidance: "推測されにくい組み合わせです。" };
+  }
+  return {
+    level: 0,
+    label: passwordStrengthLabels[0],
+    guidance: password.length < 8 ? "8文字以上で入力してください。" : "名前や誕生日、連続した文字を避けると安心です。"
+  };
+}
+
 const loginDestinations = [
   { prefix: "/story", eyebrow: "STORY", title: "Storyをつくる", description: "mikke IDひとつで、Storyとmikkeのすべてのアプリが使えます。" },
   { prefix: "/marketnote", eyebrow: "MARKETNOTE", title: "MarketNoteをはじめる", description: "mikke IDひとつで、MarketNoteとmikkeのすべてのアプリが使えます。" }
@@ -55,6 +97,7 @@ function LoginPageContent() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const passwordStrength = getPasswordStrength(password, email);
 
   async function finishLogin() {
     try {
@@ -207,6 +250,9 @@ function LoginPageContent() {
                 <br />
                 迷惑メールフォルダに入ることもあります。
               </p>
+              <p className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-muted)]">
+                ご自分の端末の場合は、次回のログインに備えてパスワードを保存しておくと便利です。
+              </p>
 
               <form onSubmit={verifyConfirmationCode} className="mt-5 space-y-4">
                 <label className="block">
@@ -313,7 +359,35 @@ function LoginPageContent() {
                   {showPassword ? <EyeOff size={19} /> : <Eye size={19} />}
                 </button>
               </span>
-              {mode === "signup" ? <span id="password-help" className={`mt-2 block text-xs ${password.length >= 8 ? "text-[var(--mikke-green)]" : "text-[var(--mikke-muted)]"}`}>{password.length >= 8 ? "8文字以上になりました" : "8文字以上で入力してください"}</span> : null}
+              {mode === "signup" ? (
+                <span id="password-help" className="mt-2 block">
+                  {password ? (
+                    <span
+                      role="meter"
+                      aria-label="パスワードの安心度"
+                      aria-valuemin={0}
+                      aria-valuemax={2}
+                      aria-valuenow={passwordStrength.level}
+                      aria-valuetext={passwordStrength.label}
+                      className="block"
+                    >
+                      <span className="grid grid-cols-3 gap-1" aria-hidden="true">
+                        {passwordStrengthBarClasses.map((barClass, index) => (
+                          <span key={barClass} className={`h-1.5 rounded-full ${index <= passwordStrength.level ? barClass : "bg-[var(--mikke-surface-soft)]"}`} />
+                        ))}
+                      </span>
+                      <span className="mt-2 block text-xs">
+                        <span className="block font-bold text-[var(--mikke-primary)]">安心度：{passwordStrength.label}</span>
+                        <span className="mt-1 block leading-5 text-[var(--mikke-muted)]">{passwordStrength.guidance}</span>
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-xs leading-5 text-[var(--mikke-muted)]">
+                      8文字以上で入力してください。名前や誕生日だけの組み合わせは避けましょう。
+                    </span>
+                  )}
+                </span>
+              ) : null}
             </label>
 
             {mode === "login" ? (

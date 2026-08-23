@@ -10,7 +10,7 @@ export function getJapaneseAuthError(message: string) {
     normalized.includes("weak password") ||
     normalized.includes("data breach") ||
     normalized.includes("pwned")
-  ) return "このパスワードは過去に流出したものです。別のパスワードを設定してください。";
+  ) return "このパスワードは使用できません。名前や誕生日などを避け、推測されにくい別のパスワードで、もう一度お試しください。";
   if (normalized.includes("password should be at least") || normalized.includes("password must be at least")) return "パスワードは8文字以上で入力してください。";
   if (normalized.includes("signup is disabled")) return "現在、新規登録を受け付けていません。しばらくしてからお試しください。";
   if (normalized.includes("rate limit") || normalized.includes("too many requests")) return "短時間に操作が集中しました。少し時間をおいてからお試しください。";
