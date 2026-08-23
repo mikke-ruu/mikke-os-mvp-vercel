@@ -6,6 +6,7 @@ import { BookOpen, Eye, EyeOff, GraduationCap, LayoutTemplate, PenSquare, Plus }
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
+import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import { listCourses, setCoursePublished } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 
@@ -72,7 +73,12 @@ function CoursesContent() {
         </div>
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
-          {courses.map((course) => (
+          {courses.map((course) => {
+            const features = resolveAcademyCourseFeaturesForCourse(course);
+            const intake = course.accept_at_honbu && course.accept_at_koushi ? "本部・講師受付" : course.accept_at_koushi ? "講師受付" : "本部受付";
+            const format = course.formats.length === 2 ? "対面・オンライン" : course.formats[0] === "online" ? "オンライン" : "対面";
+            const material = features.kits ? "現物教材を発送" : features.stepLearning ? "ステップ教材" : features.materialLicenses ? "デジタル教材" : "教材なし";
+            return (
             <li key={course.id} className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
               {course.main_image_url ? (
                 <img src={course.main_image_url} alt="" className="h-36 w-full object-cover" />
@@ -89,7 +95,7 @@ function CoursesContent() {
                       <span className="truncate text-sm font-bold text-[var(--mikke-text)]">{course.name}</span>
                     </div>
                     <p className="mt-1 text-xs text-[var(--mikke-muted)]">
-                      受講料 {course.price.toLocaleString()}円{course.duration_text ? ` ・ ${course.duration_text}` : ""}
+                      受講料（税込） {course.price.toLocaleString()}円{course.duration_text ? ` ・ ${course.duration_text}` : ""}
                     </p>
                   </div>
                   <button
@@ -106,8 +112,14 @@ function CoursesContent() {
                   </button>
                 </div>
 
+                <div className="flex flex-wrap gap-1.5">
+                  {[intake, format, material, features.certification ? "講師認定" : null, features.classes ? "クラス管理" : null, course.accept_at_koushi ? "講師の営業・受付" : null].filter(Boolean).map((label) => (
+                    <span key={label} className="rounded-full bg-[var(--mikke-surface-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-text-soft)]">{label}</span>
+                  ))}
+                </div>
+
                 <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-[11px] leading-5 text-[var(--mikke-text-soft)]">
-                  受講料・キット・FAQなどの基本情報は「講座情報を編集」、ページの見せ方は「LPビルダー」で編集します。
+                  受講料・教材・申込方法は「講座の詳細設定」、受講希望者へ見せる内容は「講座の紹介・申込ページ」で編集します。
                 </p>
 
                 <div className="grid grid-cols-2 gap-2 border-t border-[var(--mikke-line-soft)] pt-3">
@@ -115,31 +127,32 @@ function CoursesContent() {
                     href={`/academy/courses/${course.id}`}
                     className="flex items-center justify-center gap-1.5 rounded-xl bg-[var(--mikke-accent)] px-2 py-2 text-xs font-bold text-white"
                   >
-                    <PenSquare size={14} /> 講座情報を編集
+                    <PenSquare size={14} /> 講座の詳細設定
                   </Link>
                   <Link
                     href={`/academy/courses/${course.id}/lp`}
                     className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-accent)] px-2 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
                   >
-                    <LayoutTemplate size={14} /> LPビルダー
+                    <LayoutTemplate size={14} /> 紹介・申込ページを編集
                   </Link>
                   <Link
                     href={`/academy/c/${course.id}`}
                     target="_blank"
                     className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
                   >
-                    <Eye size={14} /> 公開LPを見る
+                    <Eye size={14} /> 紹介・申込ページを見る
                   </Link>
                   <Link
                     href={`/academy/courses/${course.id}/instructor-page`}
                     className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
                   >
-                    <GraduationCap size={14} /> 講師専用ページ
+                    <GraduationCap size={14} /> 復習・共有ページ
                   </Link>
                 </div>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

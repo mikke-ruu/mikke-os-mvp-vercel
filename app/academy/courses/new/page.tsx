@@ -36,7 +36,7 @@ function NewCourseContent() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3">
-        <div><p className="text-xs font-bold text-[var(--mikke-accent-strong)]">6つの回答を反映しました</p><p className="mt-1 text-[11px] text-[var(--mikke-muted)]">必要な細かい項目を確認してください。作成後も公開は別の操作です。</p></div>
+        <div><p className="text-xs font-bold text-[var(--mikke-accent-strong)]">講座の基本設定が終わりました</p><p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">質問の回答から必要な機能を設定しました。この講座はまだ公開されていません。内容を確認して下書きを作成してください。</p></div>
         <button type="button" onClick={() => setGuidedInitial(null)} className="shrink-0 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold">質問に戻る</button>
       </div>
       <CourseForm

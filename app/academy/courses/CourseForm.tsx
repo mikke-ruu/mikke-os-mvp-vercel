@@ -14,28 +14,28 @@ import { DEFAULT_ACADEMY_COURSE_FEATURE_SETTINGS } from "@/lib/academy/course-fe
 
 const FIELD_TYPES: AcademyFormField["type"][] = ["text", "textarea", "email", "tel", "select", "checkbox"];
 
-const COURSE_FEATURES: Array<{ key: keyof Omit<AcademyCourseFeatureSettings, "portal">; label: string }> = [
-  { key: "stepLearning", label: "ステップ教材" },
-  { key: "materialLicenses", label: "教材ライセンス" },
-  { key: "materialAssignments", label: "教材の割り当て" },
-  { key: "applications", label: "申込" },
-  { key: "classes", label: "開催・受講者" },
-  { key: "kits", label: "キット受注" },
-  { key: "certification", label: "認定" },
-  { key: "renewal", label: "更新" },
-  { key: "subscriptions", label: "月額契約" },
-  { key: "publicCoursePage", label: "講座ページ" }
+const COURSE_FEATURES: Array<{ key: keyof Omit<AcademyCourseFeatureSettings, "portal">; label: string; description: string; location: string }> = [
+  { key: "stepLearning", label: "オンラインのステップ教材", description: "動画・文章・課題を順番に学ぶページを作ります。", location: "ステップ教材" },
+  { key: "materialLicenses", label: "教材・復習資料を共有", description: "PDF、動画、外部URLなどを対象者へ共有します。", location: "教材・資料" },
+  { key: "materialAssignments", label: "教材を受講者に割り当てる", description: "誰がどの教材を見られるかを管理します。", location: "教材・資料" },
+  { key: "applications", label: "講座申込を受け付ける", description: "講座の紹介と申込フォームを使えます。", location: "講座の紹介・申込ページ" },
+  { key: "classes", label: "開催日・参加者を管理", description: "開催日時、定員、担当講師、参加者をまとめます。", location: "クラス・担当講師" },
+  { key: "kits", label: "現物教材を発送", description: "教材の注文、配送先、発送状況を管理します。", location: "教材・キット" },
+  { key: "certification", label: "修了者を認定講師として管理", description: "本人の承諾後、認定日・講師番号・認定状態を記録します。", location: "講師管理" },
+  { key: "renewal", label: "認定の更新期限を管理", description: "更新日と更新状況を記録します。", location: "講師管理" },
+  { key: "subscriptions", label: "月額で継続受講", description: "会費や継続受講の契約状態を管理します。", location: "契約管理" },
+  { key: "publicCoursePage", label: "講座の紹介・申込ページ", description: "1つの講座の内容・料金・開催方法を紹介します。", location: "講座ページ" }
 ];
 
-const PORTAL_FEATURES: Array<{ key: keyof AcademyCoursePortalFeatureSettings; label: string }> = [
-  { key: "learning", label: "受講教材" },
-  { key: "applications", label: "申込管理" },
-  { key: "classes", label: "開催回" },
-  { key: "approvals", label: "提出・確認" },
-  { key: "kits", label: "キット" },
-  { key: "procurement", label: "資材発注" },
-  { key: "credentials", label: "認定業務" },
-  { key: "subscription", label: "契約状況" }
+const PORTAL_FEATURES: Array<{ key: keyof AcademyCoursePortalFeatureSettings; label: string; description: string }> = [
+  { key: "learning", label: "教材・復習", description: "受講中・修了後の教材をマイポータルで見る" },
+  { key: "applications", label: "自分経由の申込", description: "営業権限がある講師が申込を確認する" },
+  { key: "classes", label: "担当する開催日", description: "講師が自分の開催予定と参加者を確認する" },
+  { key: "approvals", label: "課題の提出・確認", description: "受講者の提出物と講師の確認を行う" },
+  { key: "kits", label: "教材・キット", description: "発送状況や利用できる教材を確認する" },
+  { key: "procurement", label: "キット・資材発注", description: "認定講師が講座用の教材を発注する" },
+  { key: "credentials", label: "取得した認定", description: "認定講師が認定状況と営業できる講座を確認する" },
+  { key: "subscription", label: "継続受講・契約状況", description: "会費や継続受講の状態を確認する" }
 ];
 
 const inputClass =
@@ -64,10 +64,26 @@ function emptyInput(): CourseInput {
     paymentProvider: "manual",
     kitPrice: 0,
     kitPaymentUrl: "",
-    requiresKit: true,
+    requiresKit: false,
     featureSettings: {
       ...DEFAULT_ACADEMY_COURSE_FEATURE_SETTINGS,
-      portal: { ...DEFAULT_ACADEMY_COURSE_FEATURE_SETTINGS.portal }
+      stepLearning: false,
+      materialLicenses: false,
+      materialAssignments: false,
+      kits: false,
+      certification: false,
+      renewal: false,
+      subscriptions: false,
+      portal: {
+        learning: false,
+        applications: false,
+        classes: false,
+        approvals: false,
+        kits: false,
+        procurement: false,
+        credentials: false,
+        subscription: false
+      }
     }
   };
 }
@@ -132,16 +148,34 @@ export function CourseForm({
     }));
   }
 
+  function setCoursePageMode(mode: "application" | "introduction" | "none") {
+    setForm((prev) => ({
+      ...prev,
+      featureSettings: {
+        ...prev.featureSettings,
+        publicCoursePage: mode !== "none",
+        applications: mode === "application",
+        portal: {
+          ...prev.featureSettings.portal,
+          applications: mode === "application" && prev.acceptAtKoushi
+        }
+      }
+    }));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!form.code.trim() || !form.name.trim()) {
-      setError("講座コードと講座名は必須です。");
+    if (!form.name.trim()) {
+      setError("講座名は必須です。");
       return;
     }
     setSaving(true);
     try {
-      await onSubmit(form);
+      await onSubmit({
+        ...form,
+        code: form.code.trim() || `COURSE-${Date.now().toString().slice(-8)}`
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
       setSaving(false);
@@ -153,12 +187,14 @@ export function CourseForm({
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <div className="grid grid-cols-3 gap-2">
           <div className="col-span-1">
-            <label className={labelClass}>講座コード*</label>
+            <label className={labelClass}>管理用コード（任意）</label>
             <input className={inputClass} value={form.code} onChange={(e) => set("code", e.target.value)} placeholder="CACM" />
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">本部内で講座を区別する番号です。英数字とハイフンを推奨します。空欄なら自動で作成します。</p>
           </div>
           <div className="col-span-2">
             <label className={labelClass}>講座名*</label>
             <input className={inputClass} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="コンテナアロマキャンドル認定講座" />
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">講座名を入力してください。後から変更できます。</p>
           </div>
         </div>
         <div>
@@ -179,11 +215,11 @@ export function CourseForm({
         <p className="text-xs font-bold text-[var(--mikke-accent)]">受講条件・料金</p>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className={labelClass}>受講料（円）</label>
+            <label className={labelClass}>受講料（税込・円）</label>
             <input type="number" min={0} className={inputClass} value={form.price} onChange={(e) => set("price", Number(e.target.value) || 0)} />
           </div>
           <div>
-            <label className={labelClass}>所要時間</label>
+            <label className={labelClass}>所要時間（目安）</label>
             <input className={inputClass} value={form.durationText} onChange={(e) => set("durationText", e.target.value)} placeholder="約3時間" />
           </div>
         </div>
@@ -209,6 +245,7 @@ export function CourseForm({
         <div>
           <label className={labelClass}>認定条件</label>
           <textarea className={`${inputClass} min-h-16`} value={form.certificationConditions} onChange={(e) => set("certificationConditions", e.target.value)} />
+          <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">例：講座修了、本人の講師活動への意思、規約への同意、mikke Communityまたは外部コミュニティへの参加、本部の承認。認定証の自動発送を設定する項目ではありません。</p>
         </div>
         <div>
           <label className={labelClass}>受講後にできること</label>
@@ -241,12 +278,13 @@ export function CourseForm({
           </>
         ) : null}
         <div>
-          <label className={labelClass}>教材内容</label>
+          <label className={labelClass}>教材の使い方</label>
           <textarea className={`${inputClass} min-h-16`} value={form.materialContents} onChange={(e) => set("materialContents", e.target.value)} />
+          <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">講座作成後に「教材・資料」で、現物教材、PDF、動画、外部URLなどの内容を登録します。</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <div>
-            <label className={labelClass}>決済方式</label>
+            <label className={labelClass}>決済方法</label>
             <select
               className={inputClass}
               value={form.paymentProvider}
@@ -268,47 +306,72 @@ export function CourseForm({
         </p>
       </section>
 
+      <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <div>
+          <p className="text-xs font-bold text-[var(--mikke-accent)]">講座の紹介・申込ページ</p>
+          <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">1つの講座の内容・料金・開催方法を紹介するページです。本部全体のホームページとは別です。</p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          {([
+            ["application", "講座を紹介して、申込も受け付ける", "紹介と申込フォームを表示"],
+            ["introduction", "講座の紹介だけ掲載する", "申込は電話や外部フォームなどで受付"],
+            ["none", "ページを作らない", "Academy上に講座の紹介ページを出さない"]
+          ] as const).map(([mode, title, description]) => {
+            const selected = mode === "application"
+              ? form.featureSettings.publicCoursePage && form.featureSettings.applications
+              : mode === "introduction"
+                ? form.featureSettings.publicCoursePage && !form.featureSettings.applications
+                : !form.featureSettings.publicCoursePage;
+            return (
+              <button key={mode} type="button" aria-pressed={selected} onClick={() => setCoursePageMode(mode)} className={`rounded-xl border p-3 text-left ${selected ? "border-[#3f4eb5] bg-[#3f4eb5] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"}`}>
+                <span className="block text-sm font-bold">{title}</span>
+                <span className={`mt-1 block text-[11px] leading-5 ${selected ? "text-white/90" : "text-[var(--mikke-muted)]"}`}>{description}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <div>
-          <p className="text-xs font-bold text-[var(--mikke-accent)]">講座で使う機能</p>
-          <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">
-            OFFにした機能は、この講座の管理画面と受講者ポータルから順次非表示になります。
-          </p>
+          <p className="text-xs font-bold text-[var(--mikke-accent)]">質問から設定した機能</p>
+          <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">この講座で使える機能と、どこで設定するかを表示しています。</p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          {COURSE_FEATURES.map((feature) => (
-            <label
-              key={feature.key}
-              className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm text-[var(--mikke-text)]"
-            >
-              <span>{feature.label}</span>
-              <input
-                type="checkbox"
-                checked={form.featureSettings[feature.key]}
-                onChange={() => toggleCourseFeature(feature.key)}
-              />
-            </label>
+          {COURSE_FEATURES.filter((feature) => form.featureSettings[feature.key]).map((feature) => (
+            <div key={feature.key} className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+              <p className="text-sm font-bold text-[var(--mikke-text)]">{feature.label}</p>
+              <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">{feature.description}</p>
+              <p className="mt-2 text-[10px] font-bold text-[var(--mikke-accent-strong)]">設定する場所：{feature.location}</p>
+            </div>
           ))}
         </div>
 
-        <div className="border-t border-[var(--mikke-line)] pt-4">
-          <p className="text-xs font-bold text-[var(--mikke-accent)]">受講者・サポーターポータル</p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {PORTAL_FEATURES.map((feature) => (
-              <label
-                key={feature.key}
-                className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-sm text-[var(--mikke-text)]"
-              >
-                <span>{feature.label}</span>
-                <input
-                  type="checkbox"
-                  checked={form.featureSettings.portal[feature.key]}
-                  onChange={() => togglePortalFeature(feature.key)}
-                />
+        <details className="border-t border-[var(--mikke-line)] pt-4">
+          <summary className="cursor-pointer text-xs font-bold text-[var(--mikke-accent-strong)]">詳細な機能設定を変更する</summary>
+          <p className="mt-2 text-[11px] leading-5 text-[var(--mikke-muted)]">通常は質問で選んだ設定のままで使えます。後から必要になった機能だけ変更してください。</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {COURSE_FEATURES.map((feature) => (
+              <label key={feature.key} className="flex items-start justify-between gap-3 rounded-xl border border-[var(--mikke-line)] bg-white p-3 text-sm text-[var(--mikke-text)]">
+                <span><span className="block font-bold">{feature.label}</span><span className="mt-1 block text-[11px] leading-5 text-[var(--mikke-muted)]">{feature.description}</span></span>
+                <input className="mt-1" type="checkbox" checked={form.featureSettings[feature.key]} onChange={() => toggleCourseFeature(feature.key)} />
               </label>
             ))}
           </div>
-        </div>
+
+          <div className="mt-4 border-t border-[var(--mikke-line)] pt-4">
+            <p className="text-xs font-bold text-[var(--mikke-accent)]">マイポータルに追加する機能</p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">受講者は教材や復習を確認し、認定講師になった人には申込・開催・発注などの機能を追加します。</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {PORTAL_FEATURES.map((feature) => (
+                <label key={feature.key} className="flex items-start justify-between gap-3 rounded-xl border border-[var(--mikke-line)] p-3 text-sm text-[var(--mikke-text)]">
+                  <span><span className="block font-bold">{feature.label}</span><span className="mt-1 block text-[11px] leading-5 text-[var(--mikke-muted)]">{feature.description}</span></span>
+                  <input className="mt-1" type="checkbox" checked={form.featureSettings.portal[feature.key]} onChange={() => togglePortalFeature(feature.key)} />
+                </label>
+              ))}
+            </div>
+          </div>
+        </details>
       </section>
 
       <FaqEditor value={form.faq} onChange={(v) => set("faq", v)} />

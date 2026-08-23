@@ -28,6 +28,7 @@ function NewInstructorContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSelfRegistration, setIsSelfRegistration] = useState(false);
 
   // 講師番号: 同一人物が既に他講座で認定済みなら既存番号を引き継ぐ。
   // それ以外は自動採番（有効時）か、なければ手入力。
@@ -57,10 +58,18 @@ function NewInstructorContent() {
       const foundHq = await getOwnedHeadquarters(profile.user_id);
       setHq(foundHq);
       if (foundHq) setCourses(await listCourses(foundHq.id));
+      if (new URLSearchParams(window.location.search).get("self") === "1") {
+        setIsSelfRegistration(true);
+        setForm((current) => ({
+          ...current,
+          handle: profile.handle,
+          businessName: current.businessName || profile.display_name
+        }));
+      }
       setLoading(false);
     }
     load();
-  }, [profile.user_id]);
+  }, [profile.display_name, profile.handle, profile.user_id]);
 
   function set<K extends keyof InstructorInput>(key: K, value: InstructorInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -150,6 +159,12 @@ function NewInstructorContent() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {isSelfRegistration ? (
+        <section className="rounded-2xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] p-4">
+          <p className="text-sm font-bold text-[var(--mikke-accent-strong)]">本部オーナー自身を講師として登録します</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">実際に講座を教える場合だけ登録してください。登録中は講師1名として利用人数に数えます。講師として使える機能は、同じアカウントのマイポータルに追加されます。</p>
+        </section>
+      ) : null}
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <div>
           <label className={labelClass}>認定講座*</label>
@@ -163,7 +178,7 @@ function NewInstructorContent() {
           </select>
         </div>
         <div>
-          <label className={labelClass}>講師のMikke IDハンドル*</label>
+          <label className={labelClass}>講師のmikke ID*</label>
           <input
             className={inputClass}
             value={form.handle}
@@ -171,7 +186,7 @@ function NewInstructorContent() {
             onBlur={handleHandleBlur}
             placeholder="例: arisa_hattori"
           />
-          <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">講師本人が先にmikke IDに登録している必要があります（同じMikke IDでCommunity等とも連携）。</p>
+          <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">講師本人がmikkeアカウントを持っている必要があります。mikke IDは「@」から始まる本人確認用の名前です。</p>
           {numberLookup === "loading" ? <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">講師番号を確認中…</p> : null}
           {numberLookup === "not_found" ? (
             <p className="mt-1 text-[11px] font-bold text-[var(--mikke-danger)]">

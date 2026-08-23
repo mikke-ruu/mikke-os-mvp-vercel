@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Hash, Plus, Settings, Users } from "lucide-react";
+import { AlertTriangle, FileUp, Hash, Plus, Settings, UserRoundCheck, Users } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
@@ -196,13 +196,36 @@ function InstructorsContent() {
         <InstructorNumberSettings hq={hq} onUpdated={setHq} />
       </div>
 
+      <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <div>
+          <p className="text-sm font-bold text-[var(--mikke-text)]">講師を登録しましょう</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">本部オーナー自身が教える場合と、既存の講師を移行する場合では登録方法が異なります。受講者から認定講師になる人は、本人の承諾後に申込情報を引き継ぎます。</p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-3">
+          <Link href="/academy/instructors/new?self=1" className="rounded-xl border border-[var(--mikke-line)] p-3 hover:border-[var(--mikke-accent)]">
+            <UserRoundCheck size={18} className="text-[var(--mikke-accent)]" />
+            <p className="mt-2 text-sm font-bold text-[var(--mikke-text)]">自分を講師として登録</p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">本部オーナー自身が教える場合に使います。登録中は講師1名として利用人数に数えます。</p>
+          </Link>
+          <Link href="/academy/applications" className="rounded-xl border border-[var(--mikke-line)] p-3 hover:border-[var(--mikke-accent)]">
+            <Users size={18} className="text-[var(--mikke-accent)]" />
+            <p className="mt-2 text-sm font-bold text-[var(--mikke-text)]">受講者から登録</p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">修了・本人の活動意思・必要条件を確認し、申込情報を引き継いで登録します。</p>
+          </Link>
+          <div className="rounded-xl border border-dashed border-[var(--mikke-line)] p-3">
+            <FileUp size={18} className="text-[var(--mikke-muted)]" />
+            <p className="mt-2 text-sm font-bold text-[var(--mikke-text)]">CSVでまとめて登録</p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">数百・数千名規模の移行用です。重複・不足を確認して仮登録する機能を将来対応します。</p>
+            <span className="mt-2 inline-flex rounded-full bg-[var(--mikke-surface-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-muted)]">将来対応</span>
+          </div>
+        </div>
+      </section>
+
       {instructors.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-8 text-center">
           <Users size={28} className="mx-auto text-[var(--mikke-accent)]" />
           <p className="mt-2 text-sm text-[var(--mikke-text-soft)]">まだ講師がいません。</p>
-          <Link href="/academy/instructors/new" className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
-            講師を登録する
-          </Link>
+          <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">上の3つの方法から、現在の状況に合う登録方法を選んでください。</p>
         </div>
       ) : (
         <ul className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">

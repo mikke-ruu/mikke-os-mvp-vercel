@@ -48,9 +48,9 @@ const honbuNav: MikkeShellNavItem[] = [
 ];
 
 const koushiNav: MikkeShellNavItem[] = [
-  { href: "/academy/portal", label: "ダッシュボード", icon: LayoutDashboard, section: "講師ポータル" },
-  { href: "/academy/portal/class-requests", label: "クラス担当依頼", icon: CalendarCheck, section: "講師ポータル" },
-  { href: "/academy/portal/study", label: "講師ページ", icon: GraduationCap, section: "講師ポータル" },
+  { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard, section: "マイポータル" },
+  { href: "/academy/portal/class-requests", label: "担当する開催日", icon: CalendarCheck, section: "マイポータル" },
+  { href: "/academy/portal/study", label: "教材・復習", icon: GraduationCap, section: "マイポータル" },
   { href: "/academy/portal/url", label: "営業用URL", icon: Link2, section: "募集" },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
   { href: "/academy/portal/kits", label: "キット発注", icon: Package, section: "発注" }
@@ -346,12 +346,12 @@ function ShellInner({
       <main className="mx-auto max-w-lg px-4 py-16">
         <div className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
           <p className="text-sm font-bold text-[var(--mikke-text)]">
-            {variant === "honbu" ? "本部画面を利用できません" : "講師ポータルを利用できません"}
+            {variant === "honbu" ? "本部画面を利用できません" : "マイポータルの講師機能を利用できません"}
           </p>
           <p className="text-xs leading-5 text-[var(--mikke-muted)]">
             {variant === "honbu"
               ? "本部画面は、有効なAcademy契約または本部から付与された運営権限がある場合だけ表示されます。"
-              : "講師ポータルは、登録中の講師として紐づいている場合だけ表示されます。"}
+              : "講師用の申込・開催・発注機能は、本人が承諾し、登録中の認定講師として紐づいている場合だけ表示されます。"}
           </p>
           <Link href="/academy/select" className="inline-flex rounded-xl border border-[var(--mikke-line)] px-4 py-2 text-xs font-bold text-[var(--mikke-text-soft)]">
             利用できるAcademyを確認する
@@ -381,7 +381,7 @@ function ShellInner({
     <MikkeAppShell
       appName="Academy"
       title={title}
-      subtitle={variant === "honbu" ? "本部管理" : "講師ポータル"}
+      subtitle={variant === "honbu" ? "本部管理" : "マイポータル"}
       theme="blue"
       currentApp={{
         label: "Academy",
@@ -414,7 +414,7 @@ function ShellInner({
       <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-bold text-[var(--mikke-muted)]">
           {selectedContext ? `${selectedContext.academy_name} / ` : ""}
-          {variant === "honbu" ? "本部管理" : "講師ポータル"}
+          {variant === "honbu" ? "本部管理" : "マイポータル"}
         </p>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {homepageHref ? (
@@ -436,7 +436,7 @@ function ShellInner({
               className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
             >
               {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-              {variant === "honbu" ? "講師ポータルへ" : "本部画面へ"}
+              {variant === "honbu" ? "マイポータルへ" : "本部画面へ"}
             </Link>
           ) : null}
         </div>

@@ -77,9 +77,12 @@ function PortalDashboard() {
 
   return (
     <div className="space-y-6">
-      <p className="text-sm text-[var(--mikke-muted)]">こんにちは、{profile.display_name}さん。今日も講師活動をサポートします。</p>
+      <section className="rounded-2xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] p-4">
+        <p className="text-sm font-bold text-[var(--mikke-accent-strong)]">{profile.display_name}さんのマイポータル</p>
+        <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">受講中・修了した講座と教材はここで確認します。認定講師になった講座には、営業・申込・開催・キット発注の機能が追加されます。</p>
+      </section>
 
-      {/* 取得講座 */}
+      <h2 className="text-sm font-bold text-[var(--mikke-text)]">取得した認定・営業できる講座</h2>
       <div className="grid gap-3 md:grid-cols-2">
         {records.map((rec) => {
           const course = courseMap[rec.course_id];
@@ -101,7 +104,7 @@ function PortalDashboard() {
 
       {/* クイックメニュー */}
       <div className="grid gap-3 md:grid-cols-2">
-        <QuickCard href="/academy/portal/study" icon={GraduationCap} title="講師ページ" desc="講座の資料・動画・リンク集をいつでも確認" />
+        <QuickCard href="/academy/portal/study" icon={GraduationCap} title="教材・復習" desc="講座の資料・動画・リンク集をいつでも確認" />
         <QuickCard href="/academy/portal/url" icon={Link2} title="営業用URL" desc="あなた専用の講師紹介ページをSNSで活用" />
         <QuickCard href="/academy/portal/applications" icon={ClipboardList} title="申込管理" desc={`担当申込 ${apps.length}件${pendingApps.length ? `（未対応 ${pendingApps.length}件）` : ""}`} />
         <QuickCard href="/academy/portal/kits" icon={Package} title="キット発注" desc={`注文履歴 ${kits.length}件`} />
@@ -139,7 +142,7 @@ function PortalDashboard() {
 
 export default function PortalPage() {
   return (
-    <KoushiShell title="ダッシュボード">
+    <KoushiShell title="マイポータル">
       <PortalDashboard />
     </KoushiShell>
   );

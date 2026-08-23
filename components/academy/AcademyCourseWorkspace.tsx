@@ -11,7 +11,7 @@ const courseTabs = [
   { id: "page", label: "講座ページ", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
   {
     id: "instructor",
-    label: "講師専用ページ",
+    label: "復習・共有ページ",
     href: (courseId: string) => `/academy/courses/${courseId}/instructor-page`
   },
   { id: "materials", label: "教材・資料", href: (courseId: string) => `/academy/materials?course=${courseId}` }
@@ -72,7 +72,7 @@ export function AcademyCourseWorkspace({
             className="inline-flex items-center gap-1 self-start rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)] lg:self-auto"
           >
             <ExternalLink size={14} />
-            公開ページを見る
+            講座の紹介・申込ページを見る
           </Link>
         </div>
       </header>

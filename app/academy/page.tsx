@@ -173,34 +173,42 @@ function DashboardContent() {
   });
   const gettingStarted = courses.length === 0
     ? {
-        step: 1,
-        question: "最初に、募集する認定講座を作りますか？",
-        description: "講座名・料金・開催方法など、募集ページの土台を順番に登録します。",
+        position: "STEP 2",
+        question: "講座を作りましょう",
+        description: "6つの質問に答えると、講座の下書きができます。この時点では公開されません。",
         href: "/academy/courses/new",
-        action: "講座を作りはじめる"
+        action: "講座の質問へ進む"
       }
     : publishedCourses === 0
       ? {
-          step: 2,
-          question: "次に、講座ページを整えて公開準備をしますか？",
-          description: `「${firstCourse.name}」の内容と申込方法を確認します。公開は確認後の明示操作です。`,
+          position: "STEP 3",
+          question: "講座の詳細を設定しましょう",
+          description: `「${firstCourse.name}」の料金、教材、開催日、申込方法を項目ごとに確認します。`,
           href: `/academy/courses/${firstCourse.id}`,
-          action: "講座の設定を確認する"
+          action: "講座の詳細設定へ進む"
         }
       : courseNeedingMaterial
         ? {
-            step: 3,
-            question: "受講者や講師へ渡す教材を登録しますか？",
-            description: `「${courseNeedingMaterial.name}」のPDF・動画・リンクを登録し、誰が見られるかを設定できます。`,
+            position: "STEP 3",
+            question: "講座の教材を登録しましょう",
+            description: `「${courseNeedingMaterial.name}」のPDF・動画・外部URLを登録し、受講者と認定講師のどちらに見せるかを設定します。`,
             href: `/academy/materials/new?course=${encodeURIComponent(courseNeedingMaterial.id)}`,
             action: "教材を登録する"
           }
+        : instructors.length === 0
+          ? {
+              position: "STEP 5",
+              question: "講師を登録しましょう",
+              description: "本部オーナー自身が教える場合、既存講師を移行する場合、受講者から認定講師になる場合から選べます。",
+              href: "/academy/instructors",
+              action: "講師の登録方法を選ぶ"
+            }
         : {
-            step: 4,
-            question: "最後に、申込者からどう見えるか確認しますか？",
-            description: "公開中の講座ページを申込者と同じ画面で確認します。",
+            position: "STEP 6",
+            question: "公開前の最終確認をしましょう",
+            description: "講座の紹介・申込ページを、受講希望者と同じ見え方で確認します。",
             href: `/academy/c/${firstPublishedCourse!.id}`,
-            action: "公開ページを確認する"
+            action: "講座の紹介・申込ページを確認"
           };
   const activeInstructors = instructors.filter((i) => i.is_active).length;
   const honbuIntake = monthApps.filter((a) => a.intake_source !== "koushi").length;
@@ -223,6 +231,14 @@ function DashboardContent() {
 
   // 「community参加希望」= community_interest=trueの件数（本部受付分のみ。RLS上見える範囲がそもそもそれ）。
   const communityInterestCount = apps.filter((a) => a.intake_source !== "koushi" && a.community_interest).length;
+  const launchSteps = [
+    { step: 1, label: "本部を設定", description: "団体名、連絡先、ロゴなど", href: "/academy/settings", state: "complete" },
+    { step: 2, label: "講座を作成", description: "6つの質問から下書きを作成", href: "/academy/courses/new", state: courses.length > 0 ? "complete" : "current" },
+    { step: 3, label: "講座の詳細を設定", description: "申込、料金、開催日、教材、認定", href: firstCourse ? `/academy/courses/${firstCourse.id}` : "/academy/courses", state: courses.length > 0 ? "current" : "pending" },
+    { step: 4, label: "本部ホームページを作成", description: "団体全体の紹介と講座一覧", href: "/academy/homepage", state: "pending" },
+    { step: 5, label: "講師を登録", description: "自分、既存講師、修了した受講者から登録", href: "/academy/instructors", state: instructors.length > 0 ? "complete" : "pending" },
+    { step: 6, label: "公開前に確認", description: "講座の紹介・申込ページを確認", href: firstPublishedCourse ? `/academy/c/${firstPublishedCourse.id}` : "/academy/courses", state: "pending" }
+  ] as const;
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 md:space-y-6">
@@ -232,13 +248,34 @@ function DashboardContent() {
         </p>
       </div>
 
+      <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
+        <div>
+          <p className="text-sm font-bold text-[var(--mikke-text)]">Academy開講までの流れ</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">今どこを設定しているか、次に何をするかを確認できます。</p>
+        </div>
+        <ol className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+          {launchSteps.map((item) => (
+            <li key={item.step}>
+              <Link href={toCurrentAcademyContextHref(item.href)} className={`block h-full rounded-xl border p-3 ${item.state === "complete" ? "border-[var(--mikke-success)]/35 bg-[var(--mikke-success-soft)]" : item.state === "current" ? "border-[#3f4eb5] bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
+                <p className="text-[10px] font-bold text-[var(--mikke-accent-strong)]">STEP {item.step}{item.state === "complete" ? " ・ 完了" : item.state === "current" ? " ・ いまここ" : ""}</p>
+                <p className="mt-1 text-sm font-bold text-[var(--mikke-text)]">{item.label}</p>
+                <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">{item.description}</p>
+              </Link>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-[11px] leading-5 text-[var(--mikke-muted)]">
+          <span className="font-bold text-[var(--mikke-text)]">本部ホームページ</span>は団体全体の紹介と講座一覧、<span className="font-bold text-[var(--mikke-text)]">講座の紹介・申込ページ</span>は1つの講座の説明と申込受付のためのページです。
+        </div>
+      </section>
+
       <section className="rounded-2xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] p-4 md:p-5">
         <div className="flex items-start gap-3">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[var(--mikke-accent)]">
             <Sparkles size={18} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold text-[var(--mikke-accent-strong)]">はじめるガイド {gettingStarted.step}/4</p>
+            <p className="text-[11px] font-bold text-[var(--mikke-accent-strong)]">次にすること ・ {gettingStarted.position}</p>
             <h2 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{gettingStarted.question}</h2>
             <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{gettingStarted.description}</p>
             <Link
@@ -253,7 +290,7 @@ function DashboardContent() {
 
       {localPreview ? (
         <p className="text-center text-[11px] text-[var(--mikke-muted)]">
-          このサンプルでは未設定のAcademyを想定しているため、最初の質問を表示しています。
+          ローカル確認用の複数パターで、講座一覧と設定画面を巡回できます。
         </p>
       ) : null}
 
