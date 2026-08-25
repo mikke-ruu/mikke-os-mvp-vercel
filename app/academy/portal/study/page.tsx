@@ -8,10 +8,22 @@ import { getCoursesByIds, getMyInstructorRecords, listMaterialsForInstructor } f
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
 import { getLearnerPageForViewer } from "@/lib/academy/learner-page";
 import { listMyLearnerApplications } from "@/lib/academy/learner-portal";
+import { listMyCourseAccessGrants, resolveCourseAccessGrant } from "@/lib/academy/course-access";
 import { getAcademyRouteContext } from "@/lib/academy/access-context";
 import { PageBlocks } from "@/components/academy/PageBlocks";
 import { isAcademyLocalReview, academyPreviewCourses } from "@/lib/academy/preview";
-import type { AcademyApplication, AcademyCourse, AcademyInstructor, AcademyInstructorPage, AcademyLearnerPage, AcademyMaterial } from "@/types/database";
+import type { AcademyApplication, AcademyCourse, AcademyCourseAccessGrant, AcademyInstructor, AcademyInstructorPage, AcademyLearnerPage, AcademyMaterial } from "@/types/database";
+
+function formatAccessDate(value: string) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Tokyo"
+  }).format(new Date(value));
+}
 
 function kindIcon(kind: AcademyMaterial["kind"]) {
   if (kind === "video") return <Video size={14} className="shrink-0 text-[var(--mikke-accent-strong)]" />;
@@ -27,6 +39,7 @@ function StudyContent() {
   const [materials, setMaterials] = useState<AcademyMaterial[]>([]);
   const [pageMap, setPageMap] = useState<Record<string, AcademyInstructorPage>>({});
   const [learnerPageMap, setLearnerPageMap] = useState<Record<string, AcademyLearnerPage>>({});
+  const [accessGrants, setAccessGrants] = useState<AcademyCourseAccessGrant[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<"learner" | "instructor">("learner");
 
@@ -46,16 +59,18 @@ function StudyContent() {
       const instructorCourseIds = myRecords.map((record) => record.course_id);
       const learnerCourseIds = [...new Set(myLearnerApps.map((application) => application.course_id))];
       const courseIds = [...new Set([...instructorCourseIds, ...learnerCourseIds])];
-      const [courses, mats, pages, learnerPages] = await Promise.all([
+      const [courses, mats, pages, learnerPages, grants] = await Promise.all([
         getCoursesByIds(courseIds),
         listMaterialsForInstructor(instructorCourseIds),
         Promise.all(instructorCourseIds.map((courseId) => getInstructorPageForViewer(courseId).catch(() => null))),
-        Promise.all(learnerCourseIds.map((courseId) => getLearnerPageForViewer(courseId).catch(() => null)))
+        Promise.all(learnerCourseIds.map((courseId) => getLearnerPageForViewer(courseId).catch(() => null))),
+        listMyCourseAccessGrants(learnerCourseIds)
       ]);
       setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
       setMaterials(mats);
       setPageMap(Object.fromEntries(pages.filter((p): p is AcademyInstructorPage => !!p).map((p) => [p.course_id, p])));
       setLearnerPageMap(Object.fromEntries(learnerPages.filter((page): page is AcademyLearnerPage => !!page).map((page) => [page.course_id, page])));
+      setAccessGrants(grants);
       setLoading(false);
     }
     load();
@@ -72,14 +87,33 @@ function StudyContent() {
         {learnerCourseIds.map((courseId) => {
           const course = courseMap[courseId] ?? (isAcademyLocalReview() ? academyPreviewCourses.find((item) => item.id === courseId) : undefined);
           const page = learnerPageMap[courseId];
+          const access = resolveCourseAccessGrant(accessGrants, courseId);
           return <section key={courseId} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
           <div className="flex items-center gap-2">
             <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
             <h2 className="text-base font-bold text-[var(--mikke-text)]">{course?.name}</h2>
           </div>
-          <div className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4 md:p-5">
-            {page?.blocks.length ? <PageBlocks blocks={page.blocks} /> : <p className="text-sm text-[var(--mikke-muted)]">本部が復習ページを準備中です。</p>}
-          </div>
+          {access.state === "active" ? (
+            <>
+              <p className="mt-3 text-sm font-bold text-[var(--mikke-text)]">
+                {access.grant.ends_at ? `閲覧期限：${formatAccessDate(access.grant.ends_at)}` : "閲覧期限：期限なし"}
+              </p>
+              <div className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] p-4 md:p-5">
+                {page?.blocks.length ? <PageBlocks blocks={page.blocks} /> : <p className="text-sm text-[var(--mikke-muted)]">本部が復習ページを準備中です。</p>}
+              </div>
+            </>
+          ) : access.state === "upcoming" ? (
+            <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4 text-sm font-bold text-[var(--mikke-text)]">閲覧開始：{formatAccessDate(access.grant.starts_at)}</p>
+          ) : access.state === "expired" ? (
+            <div className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+              <p className="text-sm font-bold text-[var(--mikke-text)]">教材の閲覧期間は終了しました。</p>
+              <p className="mt-1 text-sm text-[var(--mikke-muted)]">修了・認定の履歴はそのまま残ります。延長については本部へお問い合わせください。</p>
+            </div>
+          ) : access.state === "revoked" ? (
+            <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4 text-sm font-bold text-[var(--mikke-text)]">現在、この教材は利用できません。本部へお問い合わせください。</p>
+          ) : (
+            <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] p-4 text-sm font-bold text-[var(--mikke-text)]">本部が教材の利用期間を確認中です。</p>
+          )}
         </section>;
         })}
       </div>

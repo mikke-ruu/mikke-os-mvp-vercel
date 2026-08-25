@@ -5,6 +5,7 @@ import { academyPreviewCourses, assertAcademyWritable, isAcademyLocalReview } fr
 import type {
   AcademyCourse,
   AcademyCourseFeatureSettings,
+  AcademyLearnerAccessMode,
   AcademyPaymentProvider,
   AcademyFaqItem,
   AcademyFormField,
@@ -34,11 +35,17 @@ export type CourseInput = {
   kitPrice: number;
   kitPaymentUrl: string;
   requiresKit: boolean;
+  learnerAccessMode: AcademyLearnerAccessMode;
+  learnerAccessDays: number | null;
+  learnerAccessFixedEndAt: string;
   featureSettings: AcademyCourseFeatureSettings;
 };
 
 function toRow(hqId: string, input: CourseInput) {
   const featureSettings = resolveAcademyCourseFeatureSettings(input.featureSettings);
+  const fixedEndAt = input.learnerAccessMode === "fixed_end" && input.learnerAccessFixedEndAt
+    ? new Date(input.learnerAccessFixedEndAt).toISOString()
+    : null;
   return {
     headquarters_id: hqId,
     code: input.code.trim(),
@@ -62,6 +69,9 @@ function toRow(hqId: string, input: CourseInput) {
     kit_price: input.kitPrice,
     kit_payment_url: input.kitPaymentUrl || null,
     requires_kit: featureSettings.kits,
+    learner_access_mode: input.learnerAccessMode,
+    learner_access_days: input.learnerAccessMode.startsWith("days_after_") ? input.learnerAccessDays : null,
+    learner_access_fixed_end_at: fixedEndAt,
     feature_settings: featureSettings
   };
 }

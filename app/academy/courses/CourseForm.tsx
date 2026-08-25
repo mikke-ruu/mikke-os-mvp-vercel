@@ -38,6 +38,18 @@ const PORTAL_FEATURES: Array<{ key: keyof AcademyCoursePortalFeatureSettings; la
   { key: "subscription", label: "継続受講・契約状況", description: "会費や継続受講の状態を確認する" }
 ];
 
+const LEARNER_ACCESS_MODES: Array<{
+  value: CourseInput["learnerAccessMode"];
+  label: string;
+  description: string;
+}> = [
+  { value: "unlimited", label: "期限なし", description: "受講後も引き続き見られます" },
+  { value: "days_after_payment", label: "入金日から", description: "入金確認を起点にします" },
+  { value: "days_after_enrollment", label: "受講開始日から", description: "受講登録を起点にします" },
+  { value: "days_after_completion", label: "修了日から", description: "講座の修了を起点にします" },
+  { value: "fixed_end", label: "終了日を指定", description: "全受講者が同じ日時まで見られます" }
+];
+
 const inputClass =
   "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
@@ -65,6 +77,9 @@ function emptyInput(): CourseInput {
     kitPrice: 0,
     kitPaymentUrl: "",
     requiresKit: false,
+    learnerAccessMode: "unlimited",
+    learnerAccessDays: null,
+    learnerAccessFixedEndAt: "",
     featureSettings: {
       ...DEFAULT_ACADEMY_COURSE_FEATURE_SETTINGS,
       stepLearning: false,
@@ -168,6 +183,14 @@ export function CourseForm({
     setError(null);
     if (!form.name.trim()) {
       setError("講座名は必須です。");
+      return;
+    }
+    if (form.learnerAccessMode.startsWith("days_after_") && (!form.learnerAccessDays || form.learnerAccessDays < 1 || form.learnerAccessDays > 3650)) {
+      setError("教材を見られる日数は、1日から3650日の間で入力してください。");
+      return;
+    }
+    if (form.learnerAccessMode === "fixed_end" && (!form.learnerAccessFixedEndAt || Number.isNaN(new Date(form.learnerAccessFixedEndAt).getTime()))) {
+      setError("教材の閲覧終了日時を入力してください。");
       return;
     }
     setSaving(true);
@@ -311,6 +334,69 @@ export function CourseForm({
           <textarea className={`${inputClass} min-h-16`} value={form.materialContents} onChange={(e) => set("materialContents", e.target.value)} />
           <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">例：現物テキストを発送、PDFをダウンロード、動画URLを案内。実際の復習内容と講師用資料は、それぞれ専用ページで管理します。</p>
         </div>
+        <div className="border-t border-[var(--mikke-line-soft)] pt-4">
+          <p className="text-sm font-bold text-[var(--mikke-text)]">教材を見られる期間</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
+            ステップ教材、復習ページ、受講者向け資料、動画にまとめて適用します。認定講師用の資料は、講師登録・資格の状態で別に管理します。
+          </p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {LEARNER_ACCESS_MODES.map((mode) => {
+            const selected = form.learnerAccessMode === mode.value;
+            return (
+              <button
+                key={mode.value}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => {
+                  set("learnerAccessMode", mode.value);
+                  if (mode.value === "unlimited") {
+                    set("learnerAccessDays", null);
+                    set("learnerAccessFixedEndAt", "");
+                  } else if (mode.value === "fixed_end") {
+                    set("learnerAccessDays", null);
+                  } else {
+                    set("learnerAccessFixedEndAt", "");
+                    if (!form.learnerAccessDays) set("learnerAccessDays", 365);
+                  }
+                }}
+                className={`rounded-xl border p-3 text-left ${selected ? "border-[#3f4eb5] bg-[#3f4eb5] text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"}`}
+              >
+                <span className="block text-sm font-bold">{mode.label}</span>
+                <span className={`mt-1 block text-[11px] leading-5 ${selected ? "text-white/90" : "text-[var(--mikke-muted)]"}`}>{mode.description}</span>
+              </button>
+            );
+          })}
+        </div>
+        {form.learnerAccessMode.startsWith("days_after_") ? (
+          <div className="max-w-xs">
+            <label className={labelClass}>見られる日数</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                className={inputClass}
+                value={form.learnerAccessDays ?? ""}
+                onChange={(e) => set("learnerAccessDays", e.target.value ? Number(e.target.value) : null)}
+              />
+              <span className="shrink-0 text-sm font-bold text-[var(--mikke-text)]">日間</span>
+            </div>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">例：1年間なら365日。後から講座設定を変更しても、すでに受講を始めた人の期限は変わりません。</p>
+          </div>
+        ) : null}
+        {form.learnerAccessMode === "fixed_end" ? (
+          <div className="max-w-sm">
+            <label className={labelClass}>閲覧終了日時</label>
+            <input
+              type="datetime-local"
+              className={inputClass}
+              value={form.learnerAccessFixedEndAt}
+              onChange={(e) => set("learnerAccessFixedEndAt", e.target.value)}
+            />
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">この日時を過ぎると、受講者には教材本文を表示しません。修了・認定の履歴は残ります。</p>
+          </div>
+        ) : null}
       </section>
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">

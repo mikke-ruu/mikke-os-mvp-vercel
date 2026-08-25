@@ -12,6 +12,12 @@ import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feat
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 import { CourseForm } from "../CourseForm";
 
+function toLocalDateTimeValue(value: string) {
+  const date = new Date(value);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function toInput(course: AcademyCourse): CourseInput {
   return {
     code: course.code,
@@ -35,6 +41,11 @@ function toInput(course: AcademyCourse): CourseInput {
     kitPrice: course.kit_price ?? 0,
     kitPaymentUrl: course.kit_payment_url ?? "",
     requiresKit: course.requires_kit ?? true,
+    learnerAccessMode: course.learner_access_mode ?? "unlimited",
+    learnerAccessDays: course.learner_access_days ?? null,
+    learnerAccessFixedEndAt: course.learner_access_fixed_end_at
+      ? toLocalDateTimeValue(course.learner_access_fixed_end_at)
+      : "",
     featureSettings: resolveAcademyCourseFeaturesForCourse(course)
   };
 }

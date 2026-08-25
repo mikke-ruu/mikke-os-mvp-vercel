@@ -4,6 +4,7 @@ import type {
   AcademyClass,
   AcademyClassInstructorRequest,
   AcademyCourse,
+  AcademyCourseAccessGrant,
   AcademyHeadquarters,
   AcademyHeadquartersInvitation,
   AcademyHeadquartersMember,
@@ -36,7 +37,8 @@ export const ACADEMY_PREVIEW_IDS = {
   section: "00000000-0000-4000-8000-000000000701",
   step: "00000000-0000-4000-8000-000000000801",
   material: "00000000-0000-4000-8000-000000000901",
-  kitOrder: "00000000-0000-4000-8000-000000001001"
+  kitOrder: "00000000-0000-4000-8000-000000001001",
+  courseAccessGrant: "00000000-0000-4000-8000-000000001401"
 } as const;
 
 const now = "2026-08-22T00:00:00.000Z";
@@ -127,6 +129,9 @@ export const academyPreviewCourses: AcademyCourse[] = [
     kit_price: 5500,
     kit_payment_url: null,
     requires_kit: true,
+    learner_access_mode: "days_after_completion",
+    learner_access_days: 365,
+    learner_access_fixed_end_at: null,
     feature_settings: defaultFeatures,
     sort_order: 1,
     created_at: now,
@@ -159,6 +164,9 @@ export const academyPreviewCourses: AcademyCourse[] = [
     kit_price: 0,
     kit_payment_url: null,
     requires_kit: false,
+    learner_access_mode: "days_after_payment",
+    learner_access_days: 90,
+    learner_access_fixed_end_at: null,
     feature_settings: {
       ...defaultFeatures,
       stepLearning: false,
@@ -200,6 +208,9 @@ export const academyPreviewCourses: AcademyCourse[] = [
     kit_price: 0,
     kit_payment_url: null,
     requires_kit: false,
+    learner_access_mode: "unlimited",
+    learner_access_days: null,
+    learner_access_fixed_end_at: null,
     feature_settings: {
       ...defaultFeatures,
       stepLearning: false,
@@ -241,6 +252,9 @@ export const academyPreviewCourses: AcademyCourse[] = [
     kit_price: 8800,
     kit_payment_url: null,
     requires_kit: true,
+    learner_access_mode: "days_after_completion",
+    learner_access_days: 365,
+    learner_access_fixed_end_at: null,
     feature_settings: { ...defaultFeatures, stepLearning: false, materialLicenses: true, materialAssignments: false },
     sort_order: 4,
     created_at: now,
@@ -593,6 +607,23 @@ export const academyPreviewLearnerPage: AcademyLearnerPage = {
   created_at: now,
   updated_at: now
 };
+
+export const academyPreviewCourseAccessGrants: AcademyCourseAccessGrant[] = [
+  {
+    id: ACADEMY_PREVIEW_IDS.courseAccessGrant,
+    headquarters_id: ACADEMY_PREVIEW_IDS.headquarters,
+    course_id: ACADEMY_PREVIEW_IDS.course,
+    application_id: ACADEMY_PREVIEW_IDS.applicationPaid,
+    learner_user_id: academyPreviewHeadquarters.owner_user_id,
+    source: "completion",
+    status: "active",
+    starts_at: "2026-08-22T00:00:00.000Z",
+    ends_at: "2027-08-22T00:00:00.000Z",
+    created_by_user_id: null,
+    created_at: now,
+    updated_at: now
+  }
+];
 
 export const academyPreviewSettings: AcademyHeadquartersSettings = {
   headquarters_id: ACADEMY_PREVIEW_IDS.headquarters,

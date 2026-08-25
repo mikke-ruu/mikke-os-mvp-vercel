@@ -249,6 +249,13 @@ export type AcademyCourseFeatureSettings = {
   portal: AcademyCoursePortalFeatureSettings;
 };
 
+export type AcademyLearnerAccessMode =
+  | "unlimited"
+  | "days_after_payment"
+  | "days_after_enrollment"
+  | "days_after_completion"
+  | "fixed_end";
+
 export type AcademyCourse = {
   id: string;
   headquarters_id: string;
@@ -280,8 +287,26 @@ export type AcademyCourse = {
   // キット関連UI（発注ボタン・CourseFormのキット欄・キット系ステータス選択肢）を隠す。
   // 既存データはundefined→true扱い（デフォルトON・破壊的変更ではない）。
   requires_kit: boolean;
+  learner_access_mode: AcademyLearnerAccessMode;
+  learner_access_days: number | null;
+  learner_access_fixed_end_at: string | null;
   feature_settings: Partial<AcademyCourseFeatureSettings> | null;
   sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyCourseAccessGrant = {
+  id: string;
+  headquarters_id: string;
+  course_id: string;
+  application_id: string | null;
+  learner_user_id: string;
+  source: "legacy" | "application" | "payment" | "enrollment" | "completion" | "fixed" | "manual" | "extension";
+  status: "active" | "revoked";
+  starts_at: string;
+  ends_at: string | null;
+  created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
