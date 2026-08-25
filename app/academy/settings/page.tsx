@@ -1,10 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Building2, Check, ShieldCheck, UserPlus } from "lucide-react";
+import { Building2, Check, ReceiptJapaneseYen, ShieldCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
+import {
+  getMyAcademyBillingSnapshot,
+  type AcademyBillingSnapshot,
+} from "@/lib/academy/billing";
 import {
   getMyHeadquartersRole,
   inviteHeadquartersMember,
@@ -44,6 +48,7 @@ function SettingsContent() {
   const [members, setMembers] = useState<AcademyHeadquartersMember[]>([]);
   const [invitations, setInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [myInvitations, setMyInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
+  const [billingSnapshot, setBillingSnapshot] = useState<AcademyBillingSnapshot | null>(null);
   const [form, setForm] = useState({
     name: "",
     logo_url: "",
@@ -74,6 +79,7 @@ function SettingsContent() {
         setRole(null);
         setMembers([]);
         setInvitations([]);
+        setBillingSnapshot(null);
         return;
       }
 
@@ -96,6 +102,9 @@ function SettingsContent() {
         setMembers(nextMembers);
         setInvitations(nextInvitations);
       }
+      setBillingSnapshot(
+        nextRole === "owner" ? await getMyAcademyBillingSnapshot(hq.id) : null,
+      );
     } catch {
       setMessage("本部設定を読み込めませんでした。DB設定と権限を確認してください。");
     } finally {
@@ -267,6 +276,63 @@ function SettingsContent() {
               <p className="mt-4 text-sm text-[var(--mikke-muted)]">Course Editorは本部情報を変更できません。</p>
             )}
           </section>
+
+          {role === "owner" ? (
+            <section className={cardClass}>
+              <h2 className="flex items-center gap-2 text-base font-bold">
+                <ReceiptJapaneseYen size={18} /> Academy利用料金
+              </h2>
+              <p className="mt-1 text-sm text-[var(--mikke-muted)]">
+                請求先の本部Ownerだけに表示しています。すべて税込です。
+              </p>
+
+              {billingSnapshot ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+                    <p className="text-xs font-bold text-[var(--mikke-muted)]">月末の登録講師</p>
+                    <p className="mt-1 text-2xl font-bold">{billingSnapshot.registered_instructor_count}<span className="ml-1 text-sm">名</span></p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+                    <p className="text-xs font-bold text-[var(--mikke-muted)]">{Number(billingSnapshot.charge_month.slice(5, 7))}月分</p>
+                    <p className="mt-1 text-2xl font-bold">{billingSnapshot.charge_price_yen.toLocaleString()}<span className="ml-1 text-sm">円</span></p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+                    <p className="text-xs font-bold text-[var(--mikke-muted)]">通常料金</p>
+                    <p className="mt-1 text-2xl font-bold">{billingSnapshot.catalog_price_yen.toLocaleString()}<span className="ml-1 text-sm">円</span></p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">
+                  最初の月末集計後に、登録講師数と次回料金を表示します。
+                </p>
+              )}
+
+              {billingSnapshot?.price_notice_required ? (
+                <p className="mt-3 rounded-xl border border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold">
+                  21名または51名に到達したため、次月は現在の料金を据え置きます。人数が上限を超えたままの場合は、その次の更新月から通常料金になります。
+                </p>
+              ) : null}
+
+              <div className="mt-5 overflow-x-auto rounded-xl border border-[var(--mikke-line)] text-sm">
+                <div className="grid min-w-[640px] grid-cols-[1fr_1.4fr_1.2fr] bg-[var(--mikke-surface-soft)] px-4 py-2 text-xs font-bold">
+                  <span>登録講師数</span><span>月額</span><span>上限利用時の1名あたり</span>
+                </div>
+                {[
+                  ["20名まで", "5,000円", "250円"],
+                  ["50名まで", "10,000円", "200円"],
+                  ["200名まで", "20,000円", "100円"],
+                  ["201名以上", "20,000円＋超過1名100円", "人数により変動"],
+                ].map((row) => (
+                  <div key={row[0]} className="grid min-w-[640px] grid-cols-[1fr_1.4fr_1.2fr] gap-2 border-t border-[var(--mikke-line)] px-4 py-3">
+                    {row.map((cell) => <span key={cell}>{cell}</span>)}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">
+                登録中の講師を数えます。活動中・休眠・停止中も登録解除までは対象です。同じ人が同一本部で複数講座を担当しても1名です。本部Ownerも講師登録している場合は1名に含まれます。登録解除は翌月分から反映します。
+              </p>
+            </section>
+          ) : null}
 
           <section className={cardClass}>
             <h2 className="flex items-center gap-2 text-base font-bold"><ShieldCheck size={18} /> 役割・権限</h2>
