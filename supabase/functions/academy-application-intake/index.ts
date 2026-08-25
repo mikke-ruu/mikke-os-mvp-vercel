@@ -187,6 +187,7 @@ Deno.serve(async (request) => {
     const hqEmail = headquarters?.contact_email as string | null;
     const paymentNote = String(headquarters?.default_payment_note ?? "").trim();
     const applicationId = String(application.id);
+    const portalClaimUrl = `https://app.mikke-os.com/academy/claim/${encodeURIComponent(applicationId)}`;
     let paymentUrl = typeof submitted.payment_url === "string" ? submitted.payment_url : null;
     if (application.payment_provider === "stripe" && paymentUrl) {
       paymentUrl = buildStripePaymentUrl(paymentUrl, applicationId, applicantEmail);
@@ -218,7 +219,7 @@ Deno.serve(async (request) => {
         kind: "applicant",
         to: applicantEmail,
         subject: `【mikkeOS Academy】${course?.name ?? "講座"}のお申込みを受け付けました`,
-        html: `<div style="${commonStyle}"><h1 style="font-size:20px;color:#4655c7">お申込みを受け付けました</h1><p>${escapeHtml(String(application.applicant_name))} 様</p><p>${escapeHtml(course?.name ?? "講座")} のお申込みありがとうございます。本部より改めてご連絡します。</p>${paymentNote ? `<h2 style="font-size:16px">お支払いのご案内</h2><p>${textToHtml(paymentNote)}</p>` : ""}${paymentUrl ? `<p><a href="${escapeHtml(paymentUrl)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#4655c7;color:#fff;text-decoration:none;font-weight:700">お支払い手続きへ進む</a></p>` : ""}<p style="font-size:13px;color:#6f6b78">受付番号: ${escapeHtml(applicationId)}</p></div>`
+        html: `<div style="${commonStyle}"><h1 style="font-size:20px;color:#4655c7">お申込みを受け付けました</h1><p>${escapeHtml(String(application.applicant_name))} 様</p><p>${escapeHtml(course?.name ?? "講座")} のお申込みありがとうございます。本部より改めてご連絡します。</p>${paymentNote ? `<h2 style="font-size:16px">お支払いのご案内</h2><p>${textToHtml(paymentNote)}</p>` : ""}${paymentUrl ? `<p><a href="${escapeHtml(paymentUrl)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#4655c7;color:#fff;text-decoration:none;font-weight:700">お支払い手続きへ進む</a></p>` : ""}<h2 style="font-size:16px">マイポータルのご案内</h2><p>申込時と同じメールアドレスでログインすると、この受講情報をマイポータルにつなげられます。</p><p><a href="${escapeHtml(portalClaimUrl)}" style="display:inline-block;padding:12px 20px;border-radius:10px;border:1px solid #4655c7;color:#4655c7;text-decoration:none;font-weight:700">受講情報をマイポータルにつなぐ</a></p><p style="font-size:13px;color:#6f6b78">受付番号: ${escapeHtml(applicationId)}</p></div>`
       },
       ...(hqEmail ? [{
         kind: "headquarters",

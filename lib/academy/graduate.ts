@@ -2,6 +2,15 @@ import { supabase } from "@/lib/supabase/client";
 import { academyPreviewApplications, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyApplication } from "@/types/database";
 
+export async function claimMyApplication(applicationId: string) {
+  if (isAcademyLocalReview()) return true;
+  const { data, error } = await supabase.rpc("academy_claim_my_application", {
+    p_application_id: applicationId
+  });
+  if (error) throw error;
+  return data === true;
+}
+
 // Wave E (AC-E7): 受講後の任意講師登録・community参加フロー。
 // RLSは「申込者本人（user_id = auth.uid()）」の行だけを返す前提（§9のAC-E6を参照）。
 // 自分の行以外は常に0件で返るため、これらの関数はRLSの範囲内でしか動作しない＝安全。

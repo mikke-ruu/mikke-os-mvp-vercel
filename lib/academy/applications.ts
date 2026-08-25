@@ -135,7 +135,9 @@ export async function createApplication(profile: Profile, headquartersId: string
     .insert({
       headquarters_id: headquartersId,
       course_id: input.courseId,
-      user_id: profile.user_id,
+      // The operator is not the learner. The learner claims this application
+      // later with a verified login email through academy_claim_my_application.
+      user_id: null,
       intake_source: input.intakeSource,
       instructor_id: input.instructorId,
       applicant_name: input.applicantName.trim(),

@@ -6,6 +6,7 @@ import { getPublicCourse } from "@/lib/academy/lp";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
 import { PageBlocks } from "@/components/academy/PageBlocks";
 import {
+  claimMyApplication,
   findMyApplicationsByEmail,
   getMyApplicationById,
   setCommunityInterest
@@ -36,6 +37,7 @@ function GraduateContent({ applicationId }: { applicationId: string }) {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      await claimMyApplication(applicationId).catch(() => false);
       const found = await getMyApplicationById(applicationId).catch(() => null);
       const myEmail = (user.email ?? "").trim().toLowerCase();
       if (found && (found.applicant_email ?? "").trim().toLowerCase() === myEmail) {

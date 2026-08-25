@@ -235,7 +235,7 @@ function DashboardContent() {
     { step: 1, label: "本部を設定", description: "団体名、連絡先、ロゴなど", href: "/academy/settings", state: "complete" },
     { step: 2, label: "講座を作成", description: "6つの質問から下書きを作成", href: "/academy/courses/new", state: courses.length > 0 ? "complete" : "current" },
     { step: 3, label: "講座の詳細を設定", description: "申込、料金、開催日、教材、認定", href: firstCourse ? `/academy/courses/${firstCourse.id}` : "/academy/courses", state: courses.length > 0 ? "current" : "pending" },
-    { step: 4, label: "本部ホームページを作成", description: "団体全体の紹介と講座一覧", href: "/academy/homepage", state: "pending" },
+    { step: 4, label: "本部ホームページを作成", description: "団体全体の紹介と講座一覧", href: "/academy/front", state: "pending" },
     { step: 5, label: "講師を登録", description: "自分、既存講師、修了した受講者から登録", href: "/academy/instructors", state: instructors.length > 0 ? "complete" : "pending" },
     { step: 6, label: "公開前に確認", description: "公開講座ページを確認", href: firstPublishedCourse ? `/academy/c/${firstPublishedCourse.id}` : "/academy/courses", state: "pending" }
   ] as const;
