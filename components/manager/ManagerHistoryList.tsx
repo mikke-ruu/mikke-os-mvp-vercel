@@ -1,13 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Clock3, LockKeyhole, Trophy } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeStatusBadge } from "@/components/mikkeos/MikkeStatusBadge";
-import { listMyManagerActivityLogs, type ManagerActivityLog } from "@/lib/manager/activity-logs";
+import {
+  isManagerAchievement,
+  listMyManagerActivityLogs,
+  type ManagerActivityLog
+} from "@/lib/manager/activity-logs";
 import { ManagerShell } from "./ManagerShell";
 
 const managerTimeZone = "Asia/Tokyo";
+type HistoryView = "recent" | "achievements";
 
 const sourceServiceLabels: Record<string, string> = {
   academy: "Academy",
@@ -35,6 +41,7 @@ export function ManagerHistoryList() {
   const [logs, setLogs] = useState<ManagerActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [view, setView] = useState<HistoryView>("recent");
 
   useEffect(() => {
     let active = true;
@@ -58,11 +65,56 @@ export function ManagerHistoryList() {
     }
   }
 
-  const groupedLogs = groupLogsByDate(logs);
+  const achievements = logs.filter((log) => isManagerAchievement(log));
+  const visibleLogs = view === "achievements" ? achievements : logs;
+  const groupedLogs = groupLogsByDate(visibleLogs);
+  const emptyTitle = view === "achievements" ? "実績はまだありません" : "履歴はまだありません";
+  const emptyHelper = view === "achievements"
+    ? "確定したMarketNoteの予定は、終了日の翌日から実績として確認できます。"
+    : "各アプリの活動が記録されると、ここに表示されます。";
 
   return (
-    <ManagerShell title="履歴" subtitle="あなた自身の活動を、各アプリをまたいで振り返ります。">
+    <ManagerShell title="履歴" subtitle="各アプリで起きたことを、あとから振り返れます。">
+      <section className="mb-4 flex items-start gap-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-[var(--mikke-primary)]" aria-hidden="true">
+          <LockKeyhole size={18} />
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-bold text-[var(--mikke-text)]">この履歴は本人だけに表示されます</span>
+          <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
+            STORYなどの公開ページへ、自動で掲載されることはありません。
+          </span>
+        </span>
+      </section>
+
+      <div className="mb-4 grid grid-cols-2 gap-2" role="tablist" aria-label="履歴の表示切り替え">
+        <HistoryTab
+          active={view === "recent"}
+          icon={<Clock3 size={16} />}
+          label="最近の動き"
+          count={logs.length}
+          onClick={() => setView("recent")}
+        />
+        <HistoryTab
+          active={view === "achievements"}
+          icon={<Trophy size={16} />}
+          label="過去の実績"
+          count={achievements.length}
+          onClick={() => setView("achievements")}
+        />
+      </div>
+
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
+        <div className="mb-4">
+          <h2 className="text-base font-bold text-[var(--mikke-text)]">
+            {view === "achievements" ? "過去の実績" : "最近の動き"}
+          </h2>
+          <p className="mt-1 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
+            {view === "achievements"
+              ? "終了日が昨日以前になったMarketNoteの確定予定です。"
+              : "新しい記録から順に、日付ごとに表示します。"}
+          </p>
+        </div>
         {loading ? (
           <p className="py-8 text-center text-sm font-semibold text-[var(--mikke-muted)]">履歴を読み込んでいます…</p>
         ) : loadError ? (
@@ -76,8 +128,8 @@ export function ManagerHistoryList() {
               もう一度試す
             </button>
           </div>
-        ) : logs.length === 0 ? (
-          <MikkeEmptyState title="履歴はまだありません" helper="各アプリの活動が記録されると、ここに表示されます。" />
+        ) : visibleLogs.length === 0 ? (
+          <MikkeEmptyState title={emptyTitle} helper={emptyHelper} />
         ) : (
           <div className="grid gap-6">
             {groupedLogs.map((group) => (
@@ -87,20 +139,11 @@ export function ManagerHistoryList() {
                 </h2>
                 <div className="grid gap-2">
                   {group.logs.map((log, index) => (
-                    <article
+                    <HistoryRow
                       key={`${log.occurredAt}:${log.sourceService}:${log.title}:${index}`}
-                      className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-sm font-bold leading-6 text-[var(--mikke-text)]">{log.title}</span>
-                        <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
-                          {formatHistoryTime(log.occurredAt)} / {log.description || "活動を記録しました"}
-                        </span>
-                      </span>
-                      <MikkeStatusBadge tone="primary" className="shrink-0 px-2 py-1 text-[10px]">
-                        {getSourceServiceLabel(log.sourceService)}
-                      </MikkeStatusBadge>
-                    </article>
+                      log={log}
+                      achievement={view === "achievements"}
+                    />
                   ))}
                 </div>
               </section>
@@ -109,6 +152,59 @@ export function ManagerHistoryList() {
         )}
       </section>
     </ManagerShell>
+  );
+}
+
+function HistoryTab({
+  active,
+  icon,
+  label,
+  count,
+  onClick
+}: {
+  active: boolean;
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold ${
+        active
+          ? "border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]"
+          : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"
+      }`}
+    >
+      {icon}
+      <span>{label}</span>
+      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] tabular-nums">{count}</span>
+    </button>
+  );
+}
+
+function HistoryRow({ log, achievement }: { log: ManagerActivityLog; achievement: boolean }) {
+  return (
+    <article className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
+      <span className="min-w-0">
+        <span className="block text-sm font-bold leading-6 text-[var(--mikke-text)]">{log.title}</span>
+        <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
+          {formatHistoryTime(log.occurredAt)} / {log.description || "活動を記録しました"}
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-col items-end gap-1">
+        {achievement ? (
+          <MikkeStatusBadge tone="success" withDot className="px-2 py-1 text-[10px]">実績</MikkeStatusBadge>
+        ) : null}
+        <MikkeStatusBadge tone="primary" className="px-2 py-1 text-[10px]">
+          {getSourceServiceLabel(log.sourceService)}
+        </MikkeStatusBadge>
+      </span>
+    </article>
   );
 }
 
