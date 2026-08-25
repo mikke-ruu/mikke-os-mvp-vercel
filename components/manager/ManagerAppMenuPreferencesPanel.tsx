@@ -1,9 +1,10 @@
 "use client";
 
 import { ChevronDown, ChevronUp, Eye, EyeOff, LayoutDashboard, RotateCcw } from "lucide-react";
+import type { MikkeMenuAppKey } from "@/lib/mikkeos/menu-preferences-model";
 
 export type ManagerMenuAppDraftItem = {
-  key: string;
+  key: MikkeMenuAppKey;
   label: string;
   isHidden: boolean;
 };
@@ -24,8 +25,8 @@ export function ManagerAppMenuPreferencesPanel({
   saving: boolean;
   error: string | null;
   saved: boolean;
-  onMove: (key: string, direction: -1 | 1) => void;
-  onToggle: (key: string) => void;
+  onMove: (key: MikkeMenuAppKey, direction: -1 | 1) => void;
+  onToggle: (key: MikkeMenuAppKey) => void;
   onSave: () => void;
   onReset: () => void;
 }) {
