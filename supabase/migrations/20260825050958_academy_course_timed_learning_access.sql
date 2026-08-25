@@ -89,6 +89,8 @@ $$;
 
 revoke all on function private.academy_can_manage_learner_access(uuid)
   from public, anon, authenticated;
+grant execute on function private.academy_can_manage_learner_access(uuid)
+  to authenticated;
 
 create policy "academy course access grants learner select"
 on public.academy_course_access_grants
@@ -163,7 +165,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select p_user_id is not null and exists (
+  select p_user_id = (select auth.uid()) and exists (
     select 1
     from public.academy_course_access_grants access_grant
     where access_grant.course_id = p_course_id
@@ -176,6 +178,8 @@ $$;
 
 revoke all on function private.academy_has_course_content_access(uuid, uuid)
   from public, anon, authenticated;
+grant execute on function private.academy_has_course_content_access(uuid, uuid)
+  to authenticated;
 
 create or replace function private.academy_insert_automatic_course_access_grant(
   p_headquarters_id uuid,

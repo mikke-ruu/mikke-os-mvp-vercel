@@ -51,6 +51,14 @@ security definer
 set search_path = ''
 as $$
 begin
+  -- Provider webhook functions run with the service-role JWT and must be able
+  -- to record server-validated payment fields. This bypass is limited to the
+  -- trusted service role; browser-authenticated applicants still enter the
+  -- narrow self-claim branch below.
+  if (select auth.role()) = 'service_role' then
+    return new;
+  end if;
+
   if private.academy_can_manage_headquarters(new.headquarters_id)
     or exists (
       select 1

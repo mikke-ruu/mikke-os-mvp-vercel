@@ -21,6 +21,14 @@ assert.match(migration, /academy_course_access_grant_window_is_immutable/);
 assert.match(migration, /on delete restrict/);
 assert.doesNotMatch(migration, /policy[\s\S]{0,120}for delete/i);
 assert.match(migration, /private\.academy_has_course_content_access/);
+assert.match(
+  migration,
+  /p_user_id\s*=\s*\(select auth\.uid\(\)\)[\s\S]*grant execute on function private\.academy_has_course_content_access\(uuid, uuid\)\s+to authenticated/,
+);
+assert.match(
+  migration,
+  /grant execute on function private\.academy_can_manage_learner_access\(uuid\)\s+to authenticated/,
+);
 assert.match(migration, /access_grant\.starts_at <= now\(\)/);
 assert.match(migration, /access_grant\.ends_at is null or access_grant\.ends_at > now\(\)/);
 assert.match(migration, /academy_learner_pages_learner_select[\s\S]*academy_has_course_content_access/);

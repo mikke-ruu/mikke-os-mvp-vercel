@@ -33,7 +33,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select p_user_id is not null and exists (
+  select p_user_id = (select auth.uid()) and exists (
     select 1
     from public.academy_applications application
     where application.course_id = p_course_id
@@ -54,6 +54,8 @@ $$;
 
 revoke all on function private.academy_is_course_learner(uuid, uuid)
   from public, anon, authenticated;
+grant execute on function private.academy_is_course_learner(uuid, uuid)
+  to authenticated;
 
 create or replace function private.academy_is_registered_course_instructor(
   p_course_id uuid,
@@ -66,7 +68,7 @@ stable
 security definer
 set search_path = ''
 as $$
-  select p_user_id is not null and exists (
+  select p_user_id = (select auth.uid()) and exists (
     select 1
     from public.academy_instructors instructor
     where instructor.course_id = p_course_id
@@ -82,6 +84,8 @@ $$;
 
 revoke all on function private.academy_is_registered_course_instructor(uuid, uuid, boolean)
   from public, anon, authenticated;
+grant execute on function private.academy_is_registered_course_instructor(uuid, uuid, boolean)
+  to authenticated;
 
 drop policy if exists "instructor pages read hq or active instructor"
   on public.academy_instructor_pages;

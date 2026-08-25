@@ -12,6 +12,7 @@ const dashboard = readFileSync(join(root, "app/academy/page.tsx"), "utf8");
 const required = [
   [migration, "email_confirmed_at is not null"],
   [migration, "academy_claim_my_application"],
+  [migration, "auth.role()) = 'service_role'"],
   [migration, "application.user_id is null"],
   [migration, "grant execute on function public.academy_claim_my_application(uuid)\n  to authenticated"],
   [applications, "user_id: null"],

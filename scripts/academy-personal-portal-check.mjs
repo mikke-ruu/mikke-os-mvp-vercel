@@ -10,6 +10,9 @@ const workspace = readFileSync(new URL("../components/academy/AcademyCourseWorks
 
 assert.match(migration, /create table if not exists public\.academy_learner_pages/);
 assert.match(migration, /private\.academy_is_course_learner/);
+assert.match(migration, /p_user_id = \(select auth\.uid\(\)\)/);
+assert.match(migration, /grant execute on function private\.academy_is_course_learner\(uuid, uuid\)[\s\S]*to authenticated/);
+assert.match(migration, /grant execute on function private\.academy_is_registered_course_instructor\(uuid, uuid, boolean\)[\s\S]*to authenticated/);
 assert.match(migration, /application\.user_id = p_user_id/);
 assert.match(migration, /application\.status in \(/);
 assert.match(migration, /is_published = true[\s\S]*academy_is_course_learner/);
