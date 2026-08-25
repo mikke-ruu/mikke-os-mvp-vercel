@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BellRing, CalendarRange, ChevronRight, ClipboardCheck, Tag, type LucideIcon } from "lucide-react";
+import { BellRing, CalendarRange, ChevronRight, ClipboardCheck, FileUp, Tag, type LucideIcon } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 
@@ -36,6 +36,12 @@ const settingsItems: SettingsItem[] = [
     description: "やることの表示と期限を設定します。",
     href: "/settings/reminders",
     icon: BellRing
+  },
+  {
+    title: "Googleカレンダーを取り込む",
+    description: "ICSファイルをこの画面だけで解析し、取り込み前に確認します。",
+    href: "/marketnote/import/google",
+    icon: FileUp
   }
 ];
 
