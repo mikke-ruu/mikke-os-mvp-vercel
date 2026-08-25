@@ -438,6 +438,7 @@ export const academyPreviewSections: (AcademyProgramSection & { steps: AcademyPr
         title: "Academyの目的を確認する",
         content: "講座の目的と、認定後にできることを確認します。",
         external_url: null,
+        video_asset_id: null,
         sort_order: 1,
         requires_previous: false,
         self_completion_allowed: true,

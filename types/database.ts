@@ -335,6 +335,7 @@ export type AcademyProgramSection = {
 
 export type AcademyProgramStepType =
   | "text"
+  | "video"
   | "external_url"
   | "download"
   | "live_session"
@@ -350,6 +351,7 @@ export type AcademyProgramStep = {
   title: string;
   content: string | null;
   external_url: string | null;
+  video_asset_id: string | null;
   sort_order: number;
   requires_previous: boolean;
   self_completion_allowed: boolean;
@@ -416,6 +418,25 @@ export type AcademyClass = {
   updated_at: string;
   course?: Pick<AcademyCourse, "id" | "code" | "name"> | null;
   instructor?: Pick<AcademyInstructor, "id" | "business_name" | "profile_id"> | null;
+};
+
+export type AcademyVideoProvider = "unconfigured" | "cloudflare_stream" | "mux";
+export type AcademyVideoAssetStatus = "draft" | "uploading" | "processing" | "ready" | "failed" | "archived";
+
+export type AcademyVideoAsset = {
+  id: string;
+  headquarters_id: string;
+  course_id: string;
+  title: string;
+  provider: AcademyVideoProvider;
+  provider_asset_id: string | null;
+  status: AcademyVideoAssetStatus;
+  duration_seconds: number | null;
+  error_message: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
 };
 
 export type AcademyPublicClass = Pick<
