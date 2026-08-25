@@ -75,9 +75,9 @@ export function ManagerHistoryList() {
 
   return (
     <ManagerShell title="履歴" subtitle="各アプリで起きたことを、あとから振り返れます。">
-      <section className="mb-4 flex items-start gap-3 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-white text-[var(--mikke-primary)]" aria-hidden="true">
-          <LockKeyhole size={18} />
+      <section className="mb-3 flex items-start gap-2.5 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-white text-[var(--mikke-primary)]" aria-hidden="true">
+          <LockKeyhole size={16} />
         </span>
         <span className="min-w-0">
           <span className="block text-sm font-bold text-[var(--mikke-text)]">この履歴は本人だけに表示されます</span>
@@ -87,7 +87,7 @@ export function ManagerHistoryList() {
         </span>
       </section>
 
-      <div className="mb-4 grid grid-cols-2 gap-2" role="tablist" aria-label="履歴の表示切り替え">
+      <div className="mb-3 grid grid-cols-2 gap-2" role="tablist" aria-label="履歴の表示切り替え">
         <HistoryTab
           active={view === "recent"}
           icon={<Clock3 size={16} />}
@@ -104,9 +104,9 @@ export function ManagerHistoryList() {
         />
       </div>
 
-      <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
-        <div className="mb-4">
-          <h2 className="text-base font-bold text-[var(--mikke-text)]">
+      <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-3 shadow-sm">
+        <div className="mb-3">
+          <h2 className="text-sm font-bold text-[var(--mikke-text)]">
             {view === "achievements" ? "過去の実績" : "最近の動き"}
           </h2>
           <p className="mt-1 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
@@ -131,10 +131,10 @@ export function ManagerHistoryList() {
         ) : visibleLogs.length === 0 ? (
           <MikkeEmptyState title={emptyTitle} helper={emptyHelper} />
         ) : (
-          <div className="grid gap-6">
+          <div className="grid gap-4">
             {groupedLogs.map((group) => (
               <section key={group.dateKey} aria-labelledby={`history-${group.dateKey}`}>
-                <h2 id={`history-${group.dateKey}`} className="mb-2 text-sm font-bold text-[var(--mikke-muted)]">
+                <h2 id={`history-${group.dateKey}`} className="mb-1.5 text-xs font-bold text-[var(--mikke-muted)]">
                   {group.dateLabel}
                 </h2>
                 <div className="grid gap-2">
@@ -174,7 +174,7 @@ function HistoryTab({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex min-h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-sm font-bold ${
+      className={`flex min-h-10 items-center justify-center gap-1.5 rounded-xl border px-2 text-xs font-bold ${
         active
           ? "border-[var(--mikke-primary-border)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]"
           : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"
@@ -182,25 +182,25 @@ function HistoryTab({
     >
       {icon}
       <span>{label}</span>
-      <span className="rounded-full bg-white px-2 py-0.5 text-[11px] tabular-nums">{count}</span>
+      <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] tabular-nums">{count}</span>
     </button>
   );
 }
 
 function HistoryRow({ log, achievement }: { log: ManagerActivityLog; achievement: boolean }) {
   return (
-    <article className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
+    <article className="flex items-start justify-between gap-2.5 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 shadow-sm">
       <span className="min-w-0">
-        <span className="block text-sm font-bold leading-6 text-[var(--mikke-text)]">{log.title}</span>
-        <span className="mt-1 block text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
+        <span className="block text-xs font-bold leading-5 text-[var(--mikke-text)]">{log.title}</span>
+        <span className="mt-0.5 block text-[11px] font-semibold leading-4 text-[var(--mikke-muted)]">
           {formatHistoryTime(log.occurredAt)} / {log.description || "活動を記録しました"}
         </span>
       </span>
       <span className="flex shrink-0 flex-col items-end gap-1">
         {achievement ? (
-          <MikkeStatusBadge tone="success" withDot className="px-2 py-1 text-[10px]">実績</MikkeStatusBadge>
+          <MikkeStatusBadge tone="success" withDot className="px-1.5 py-0.5 text-[9px]">実績</MikkeStatusBadge>
         ) : null}
-        <MikkeStatusBadge tone="primary" className="px-2 py-1 text-[10px]">
+        <MikkeStatusBadge tone="primary" className="px-1.5 py-0.5 text-[9px]">
           {getSourceServiceLabel(log.sourceService)}
         </MikkeStatusBadge>
       </span>
