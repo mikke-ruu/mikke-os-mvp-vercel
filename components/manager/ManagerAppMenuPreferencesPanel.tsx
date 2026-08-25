@@ -15,20 +15,24 @@ export function ManagerAppMenuPreferencesPanel({
   saving,
   error,
   saved,
+  retryable,
   onMove,
   onToggle,
   onSave,
-  onReset
+  onReset,
+  onRetry
 }: {
   apps: ManagerMenuAppDraftItem[];
   loading: boolean;
   saving: boolean;
   error: string | null;
   saved: boolean;
+  retryable: boolean;
   onMove: (key: MikkeMenuAppKey, direction: -1 | 1) => void;
   onToggle: (key: MikkeMenuAppKey) => void;
   onSave: () => void;
   onReset: () => void;
+  onRetry: () => void;
 }) {
   return (
     <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
@@ -79,7 +83,7 @@ export function ManagerAppMenuPreferencesPanel({
                 <button
                   type="button"
                   onClick={() => onMove(app.key, -1)}
-                  disabled={saving || index === 0}
+                  disabled={saving || retryable || index === 0}
                   aria-label={`${app.label}を上へ移動`}
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)] disabled:opacity-30"
                 >
@@ -88,7 +92,7 @@ export function ManagerAppMenuPreferencesPanel({
                 <button
                   type="button"
                   onClick={() => onMove(app.key, 1)}
-                  disabled={saving || index === apps.length - 1}
+                  disabled={saving || retryable || index === apps.length - 1}
                   aria-label={`${app.label}を下へ移動`}
                   className="grid h-9 w-9 place-items-center rounded-lg border border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)] disabled:opacity-30"
                 >
@@ -97,7 +101,7 @@ export function ManagerAppMenuPreferencesPanel({
                 <button
                   type="button"
                   onClick={() => onToggle(app.key)}
-                  disabled={saving}
+                  disabled={saving || retryable}
                   className="ml-1 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] bg-white px-2.5 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50"
                 >
                   {app.isHidden ? <Eye size={16} /> : <EyeOff size={16} />}
@@ -109,14 +113,28 @@ export function ManagerAppMenuPreferencesPanel({
         )}
       </div>
 
-      {error ? <p role="alert" className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm font-semibold text-[var(--mikke-danger)]">{error}</p> : null}
+      {error ? (
+        <div role="alert" className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm font-semibold text-[var(--mikke-danger)]">
+          <p>{error}</p>
+          {retryable ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={loading}
+              className="mt-2 rounded-full border border-[var(--mikke-line)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50"
+            >
+              再読み込み
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       {saved ? <p role="status" className="mt-3 rounded-xl bg-[var(--mikke-success-soft)] px-3 py-2 text-sm font-semibold text-[var(--mikke-success)]">アプリメニューを保存しました。</p> : null}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={onSave}
-          disabled={loading || saving || apps.length === 0}
+          disabled={loading || saving || retryable || apps.length === 0}
           className="rounded-full bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
         >
           {saving ? "保存中…" : "並び順を保存"}
@@ -124,7 +142,7 @@ export function ManagerAppMenuPreferencesPanel({
         <button
           type="button"
           onClick={onReset}
-          disabled={loading || saving}
+          disabled={loading || saving || retryable}
           className="inline-flex items-center gap-1.5 rounded-full border border-[var(--mikke-line)] bg-white px-4 py-2 text-sm font-bold text-[var(--mikke-muted)] disabled:opacity-50"
         >
           <RotateCcw size={15} />

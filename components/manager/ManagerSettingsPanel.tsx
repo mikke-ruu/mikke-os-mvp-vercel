@@ -103,10 +103,16 @@ export function ManagerSettingsPanel() {
         saving={menuSaving}
         error={menuActionError ?? preferenceError}
         saved={menuSaved}
+        retryable={Boolean(preferenceError)}
         onMove={moveMenuApp}
         onToggle={toggleMenuApp}
         onSave={() => void saveMenuApps()}
         onReset={() => void resetMenuApps()}
+        onRetry={() => {
+          setMenuActionError(null);
+          setMenuSaved(false);
+          refreshMenuPreferences();
+        }}
       />
 
       <section className="mt-5 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
