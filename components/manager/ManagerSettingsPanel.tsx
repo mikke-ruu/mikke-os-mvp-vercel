@@ -1,41 +1,20 @@
 "use client";
 
-import { useManagerPreferences } from "@/lib/manager/store";
+import Link from "next/link";
+import { useManagerPersonalEvents, useManagerPreferences } from "@/lib/manager/store";
 import { ManagerShell } from "./ManagerShell";
-
-const defaultViewOptions = [
-  { value: "dashboard", label: "今日" },
-  { value: "calendar", label: "予定" },
-  { value: "tasks", label: "タスク" },
-  { value: "progress", label: "進行" },
-  { value: "history", label: "履歴" }
-] as const;
 
 export function ManagerSettingsPanel() {
   const { preferences, updatePreferences } = useManagerPreferences();
+  const { personalEvents } = useManagerPersonalEvents();
 
   return (
-    <ManagerShell title="設定" subtitle="Managerの見え方だけを調整します。">
+    <ManagerShell title="設定" subtitle="Managerとアプリメニューの見え方を調整します。">
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
         <h2 className="text-lg font-bold tracking-normal">表示設定</h2>
         <p className="mt-1 text-sm text-[var(--mikke-muted)]">設定はManager専用に保存され、各アプリのデータは変更しません。</p>
 
         <div className="mt-5 grid gap-4">
-          <label className="grid gap-2">
-            <span className="text-sm font-bold text-[var(--mikke-text)]">最初に見たい画面</span>
-            <select
-              value={preferences.defaultView}
-              onChange={(event) => updatePreferences({ defaultView: event.target.value as typeof preferences.defaultView })}
-              className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm font-semibold"
-            >
-              {defaultViewOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
           <label className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
             <span>
               <span className="block text-sm font-bold text-[var(--mikke-text)]">完了済みも表示する</span>
@@ -50,6 +29,21 @@ export function ManagerSettingsPanel() {
           </label>
         </div>
       </section>
+
+      {personalEvents.length > 0 ? (
+        <section className="mt-5 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-bold tracking-normal">以前の個人予定</h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
+            この端末のManagerに保存されている個人予定が{personalEvents.length}件あります。MarketNoteへの移行方法が決まるまで、ここから確認・編集できます。
+          </p>
+          <Link
+            href="/manager/calendar"
+            className="mt-4 inline-flex rounded-full border border-[var(--mikke-line)] bg-white px-4 py-2 text-sm font-bold text-[var(--mikke-primary)]"
+          >
+            個人予定を確認する
+          </Link>
+        </section>
+      ) : null}
     </ManagerShell>
   );
 }

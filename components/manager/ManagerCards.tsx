@@ -16,7 +16,7 @@ export function ManagerMetricCard({ label, value, helper }: { label: string; val
 }
 
 export function ManagerScheduleList({ items, emptyTitle = "予定はまだありません" }: { items: ManagerScheduleItem[]; emptyTitle?: string }) {
-  if (items.length === 0) return <MikkeEmptyState title={emptyTitle} helper="各アプリの予定やManagerの個人予定がここに集まります。" />;
+  if (items.length === 0) return <MikkeEmptyState title={emptyTitle} helper="各アプリの予定がここに集まります。詳しいカレンダーはMarketNoteで確認できます。" />;
 
   return (
     <div className="grid gap-2">

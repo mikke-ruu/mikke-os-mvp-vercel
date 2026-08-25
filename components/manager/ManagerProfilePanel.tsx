@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Check, Copy, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
+import { AlertTriangle, Check, Copy, Eye, EyeOff, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "@/components/AuthGate";
@@ -61,6 +61,7 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswords, setShowPasswords] = useState(false);
   const [passwordNotice, setPasswordNotice] = useState<Notice>(null);
   const [savingPassword, setSavingPassword] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -317,20 +318,31 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
         </section>
 
         <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
-          <h2 className="flex items-center gap-2 text-base font-bold text-[var(--mikke-text)]"><KeyRound size={18} />パスワード</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="flex items-center gap-2 text-base font-bold text-[var(--mikke-text)]"><KeyRound size={18} />パスワード</h2>
+            <button
+              type="button"
+              onClick={() => setShowPasswords((value) => !value)}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold text-[var(--mikke-muted)]"
+              aria-pressed={showPasswords}
+            >
+              {showPasswords ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showPasswords ? "隠す" : "表示する"}
+            </button>
+          </div>
           <p className="mt-1 text-sm text-[var(--mikke-muted)]">ログイン中の本人が、現在のパスワードを使って変更します。</p>
           <form onSubmit={savePassword} className="mt-4 grid max-w-xl gap-3">
             <label className="grid gap-2">
               <span className="text-sm font-bold">現在のパスワード</span>
-              <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" className={inputClassName} />
+              <input type={showPasswords ? "text" : "password"} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" className={inputClassName} />
             </label>
             <label className="grid gap-2">
               <span className="text-sm font-bold">新しいパスワード（8文字以上）</span>
-              <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
+              <input type={showPasswords ? "text" : "password"} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
             </label>
             <label className="grid gap-2">
               <span className="text-sm font-bold">新しいパスワード（確認）</span>
-              <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
+              <input type={showPasswords ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
             </label>
             <button type="submit" disabled={savingPassword} className={`${primaryButtonClassName} mt-1 w-fit`}>
               {savingPassword ? "変更中…" : "パスワードを変更"}

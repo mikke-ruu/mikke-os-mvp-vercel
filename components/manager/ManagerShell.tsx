@@ -1,15 +1,13 @@
 "use client";
 
-import { BarChart3, CalendarDays, ClipboardList, History, LayoutDashboard, Settings, UserRound } from "lucide-react";
+import { Bell, History, LayoutDashboard, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 
 const managerNavItems = [
   { href: "/manager", label: "今日", icon: LayoutDashboard },
-  { href: "/manager/calendar", label: "予定", icon: CalendarDays },
-  { href: "/manager/tasks", label: "タスク", icon: ClipboardList },
-  { href: "/manager/progress", label: "進行", icon: BarChart3 },
+  { href: "/manager/notifications", label: "お知らせ", icon: Bell },
   { href: "/manager/history", label: "履歴", icon: History },
   { href: "/manager/account", label: "基本情報", icon: UserRound },
   { href: "/manager/settings", label: "設定", icon: Settings }
@@ -24,7 +22,7 @@ export function ManagerShell({ title, subtitle, children }: { title: string; sub
       title={title}
       subtitle={subtitle}
       currentApp={{ label: "Manager", href: "/manager", icon: LayoutDashboard }}
-      menuDescription="Managerは作業入口ではなく、各アプリの予定・タスク・進行を横断で見る場所です。"
+      menuDescription="Managerは、今日の予定、お知らせ、履歴、基本情報、設定をまとめて確認する場所です。"
       footerLabel="Manager by mikke"
     >
       <nav className="mb-5 flex gap-2 overflow-x-auto pb-1">
