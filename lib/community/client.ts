@@ -69,6 +69,7 @@ function mapMembership(row: any): CommunityMembership {
     userId: row.user_id,
     role: row.role,
     status: row.status,
+    accessScope: row.access_scope ?? "community",
     joinedAt: row.joined_at,
     memo: row.memo ?? null
   };
@@ -147,6 +148,7 @@ function mapMemberEntitlement(row: any): CommunityMemberEntitlement {
     userId: row.user_id,
     entitlementKey: row.entitlement_key,
     source: row.source,
+    sourceReference: row.source_reference ?? null,
     status: row.status,
     startsAt: row.starts_at,
     endsAt: row.ends_at ?? null
@@ -915,10 +917,13 @@ export async function createCommunityMembershipPlan(client: DbClient, communityI
 }
 
 export async function createCommunityPaymentClaim(client: DbClient, communityId: string, planId: string, userId: string, payerName: string, externalReference: string, note: string) {
-  const { error } = await client.from("community_payment_claims").insert({
-    community_id: communityId, plan_id: planId, user_id: userId,
-    payer_name: payerName.trim(), external_reference: externalReference.trim() || null,
-    note: note.trim() || null, status: "pending"
+  if (!userId) throw new Error("ログインが必要です。");
+  const { error } = await client.rpc("community_create_payment_claim", {
+    p_community_id: communityId,
+    p_plan_id: planId,
+    p_payer_name: payerName.trim(),
+    p_external_reference: externalReference.trim() || null,
+    p_note: note.trim() || null
   });
   if (error) throw error;
 }
@@ -936,7 +941,7 @@ export async function reviewCommunityPaymentClaim(client: DbClient, claimId: str
   if (approved) {
     const { error: grantError } = await client.from("community_member_entitlements").upsert({
       community_id: claim.community_id, user_id: claim.user_id, entitlement_key: plan.entitlement_key,
-      source: "external", source_reference: `payment-claim:${claimId}`, status: "active",
+      source: "subscription", source_reference: `payment-claim:${claimId}`, status: "active",
       starts_at: new Date().toISOString(), ends_at: null, granted_by_user_id: reviewerUserId
     }, { onConflict: "community_id,user_id,entitlement_key,source" });
     if (grantError) throw grantError;

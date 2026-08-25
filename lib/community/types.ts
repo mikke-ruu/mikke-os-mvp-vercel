@@ -1,5 +1,6 @@
 export type CommunityRole = "owner" | "moderator" | "member";
 export type CommunityMembershipStatus = "active" | "suspended" | "left";
+export type CommunityMembershipAccessScope = "community" | "linked_rooms";
 export type CommunityRoomKind = "announcement" | "normal" | "question" | "event";
 export type CommunityConversationMode = "thread" | "chat";
 export type CommunityRoomAccessType = "free" | "entitlement" | "staff";
@@ -8,7 +9,7 @@ export type CommunityPostKind = "announcement" | "normal" | "question";
 export type CommunityEventStatus = "open" | "closed" | "cancelled";
 export type CommunityResourceKind = "web" | "pdf" | "video" | "other";
 export type CommunityEntitlementStatus = "active" | "revoked" | "expired";
-export type CommunityEntitlementSource = "manual" | "subscription" | "external";
+export type CommunityEntitlementSource = "manual" | "subscription" | "external" | "academy_subscription";
 export type CommunityInvitationStatus = "pending" | "accepted" | "declined" | "revoked" | "expired";
 export type CommunityMembershipPlanStatus = "draft" | "active" | "archived";
 export type CommunityPaymentClaimStatus = "pending" | "approved" | "rejected" | "cancelled";
@@ -40,6 +41,7 @@ export type CommunityMembership = {
   userId: string;
   role: CommunityRole;
   status: CommunityMembershipStatus;
+  accessScope: CommunityMembershipAccessScope;
   joinedAt: string;
   memo: string | null;
 };
@@ -71,6 +73,7 @@ export type CommunityMemberEntitlement = {
   userId: string;
   entitlementKey: string;
   source: CommunityEntitlementSource;
+  sourceReference: string | null;
   status: CommunityEntitlementStatus;
   startsAt: string;
   endsAt: string | null;
