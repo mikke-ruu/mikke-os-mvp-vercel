@@ -42,17 +42,17 @@ function MarketNoteGoogleImportPreview() {
     setErrorMessage("");
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".ics")) {
-      setErrorMessage(".icsファイルを選んでください。ZIPファイルはこの段階では対応していません。");
+      setErrorMessage("Googleカレンダーから書き出した予定ファイル（.ics）を選んでください。ZIPファイルは先に展開してください。");
       return;
     }
     if (file.size > MAX_FILE_BYTES) {
-      setErrorMessage("ファイルが大きすぎます。10MB以下の.icsファイルを選んでください。");
+      setErrorMessage("ファイルが大きすぎます。10MB以下の予定ファイル（.ics）を選んでください。");
       return;
     }
 
     const text = await file.text();
     if (!/BEGIN:VCALENDAR/i.test(text)) {
-      setErrorMessage("GoogleカレンダーのICS形式を確認できませんでした。");
+      setErrorMessage("Googleカレンダーから書き出した予定ファイルか確認できませんでした。");
       return;
     }
 
@@ -89,7 +89,7 @@ function MarketNoteGoogleImportPreview() {
   const allSelected = Boolean(preview?.items.length) && selectedIds.size === preview?.items.length;
 
   return (
-    <MarketNoteShell title="Googleカレンダーを取り込む" subtitle="MarketNote" isGuest={isGuest}>
+    <MarketNoteShell title="Googleの予定をファイルから移す" subtitle="MarketNote" isGuest={isGuest}>
       <div className="space-y-4 pb-8">
         <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
           <div className="flex items-start gap-3">
@@ -97,19 +97,27 @@ function MarketNoteGoogleImportPreview() {
               <ShieldCheck size={20} />
             </span>
             <div>
-              <h1 className="text-lg font-bold text-[var(--mikke-text)]">ICSファイルをこの画面だけで確認</h1>
+              <h1 className="text-lg font-bold text-[var(--mikke-text)]">この方法は手動です</h1>
               <p className="mt-1 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
-                ファイルはサーバー・Storage・DBへ送りません。説明、参加者、メール、会議URL、添付、リマインダーも読み取り結果へ残しません。
+                Googleへログインして自動同期する画面ではありません。Googleカレンダーから予定ファイルを書き出し、この画面で選びます。
               </p>
             </div>
           </div>
 
+          <ol className="mt-4 space-y-2 rounded-xl bg-[var(--mikke-yellow)] px-3 py-3 text-xs font-semibold leading-5 text-[var(--mikke-text)]">
+            <li><span className="font-extrabold">1.</span> Google Takeoutで「カレンダー」だけを選び、データを書き出す</li>
+            <li><span className="font-extrabold">2.</span> ダウンロードしたZIPファイルを開く</li>
+            <li><span className="font-extrabold">3.</span> 中にある予定ファイル（末尾が .ics）を下から選ぶ</li>
+          </ol>
+
           <label className="mt-4 flex min-h-20 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] px-4 text-sm font-bold text-[var(--mikke-accent)]">
             <FileUp size={19} />
-            <span>{fileName || ".icsファイルを選択"}</span>
+            <span>{fileName || "書き出した予定ファイルを選ぶ"}</span>
             <input type="file" accept=".ics,text/calendar" className="sr-only" onChange={(event) => void selectFile(event)} />
           </label>
-          <p className="mt-2 text-[11px] font-semibold text-[var(--mikke-muted)]">Google Takeoutを展開した.icsファイル／最大10MB。ZIPは未対応です。</p>
+          <p className="mt-2 text-[11px] font-semibold leading-5 text-[var(--mikke-muted)]">
+            少し手間のかかる移行方法です。選んだ元ファイルはサーバー・Storage・DBへ送りません。説明、参加者、メール、会議URL等も保存しません。
+          </p>
           {errorMessage ? <p className="mt-3 rounded-xl bg-[var(--mikke-pink)] px-3 py-2 text-xs font-bold text-[var(--mikke-text)]">{errorMessage}</p> : null}
         </section>
 

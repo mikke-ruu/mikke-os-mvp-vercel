@@ -38,8 +38,8 @@ const settingsItems: SettingsItem[] = [
     icon: BellRing
   },
   {
-    title: "Googleカレンダーを取り込む",
-    description: "ICSファイルをこの画面だけで解析し、取り込み前に確認します。",
+    title: "Googleの予定をファイルから移す",
+    description: "Googleへのログインや自動同期ではなく、書き出した予定ファイルを手動で選ぶ方法です。",
     href: "/marketnote/import/google",
     icon: FileUp
   }
