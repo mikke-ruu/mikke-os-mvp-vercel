@@ -67,7 +67,7 @@ export function ManagerAppMenuPreferencesPanel({
           apps.map((app, index) => (
             <div
               key={app.key}
-              className={`flex items-center justify-between gap-3 rounded-xl border p-3 ${
+              className={`flex flex-col items-stretch gap-2.5 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 ${
                 app.isHidden
                   ? "border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)]"
                   : "border-[var(--mikke-line)] bg-white"
@@ -79,7 +79,7 @@ export function ManagerAppMenuPreferencesPanel({
                   {app.isHidden ? "メニューでは非表示" : "メニューに表示中"}
                 </span>
               </span>
-              <span className="flex shrink-0 items-center gap-1">
+              <span className="flex shrink-0 items-center justify-end gap-1">
                 <button
                   type="button"
                   onClick={() => onMove(app.key, -1)}
@@ -102,7 +102,7 @@ export function ManagerAppMenuPreferencesPanel({
                   type="button"
                   onClick={() => onToggle(app.key)}
                   disabled={saving || retryable}
-                  className="ml-1 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] bg-white px-2.5 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50"
+                  className="ml-0.5 inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[var(--mikke-line)] bg-white px-2.5 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50 sm:ml-1"
                 >
                   {app.isHidden ? <Eye size={16} /> : <EyeOff size={16} />}
                   {app.isHidden ? "表示" : "隠す"}
@@ -137,7 +137,7 @@ export function ManagerAppMenuPreferencesPanel({
           disabled={loading || saving || retryable || apps.length === 0}
           className="rounded-full bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
         >
-          {saving ? "保存中…" : "並び順を保存"}
+          {saving ? "保存中…" : "メニュー設定を保存"}
         </button>
         <button
           type="button"
