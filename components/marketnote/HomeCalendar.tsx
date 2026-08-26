@@ -8,6 +8,7 @@ import { getMarketEventWorkflowStatus, marketEventWorkflowLabel, type MarketEven
 import { defaultMarketEventTypeSettings, getMarketEventType, getMarketEventTypeColor, loadMarketEventTypeSettingsForProfile, readableTextColor, type MarketEventTypeSettings } from "@/lib/marketnote-event-types";
 import type { MarketNotePhotoPreviewMap } from "@/lib/marketnote-photos";
 import { mergeMarketNoteReflectionText } from "@/lib/marketnote-reflection-text";
+import { scheduleProjectionDateKey, scheduleProjectionTimeLabel, type MarketScheduleProjection, type MarketScheduleSourcePreference } from "@/lib/marketnote-schedule-projections";
 import { defaultReminderSettings, loadReminderSettings } from "@/lib/reminders";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection, Profile } from "@/types/database";
 
@@ -16,6 +17,8 @@ type PaymentState = "paid" | "unpaid" | "not_required";
 type Props = {
   profile: Profile;
   events: MarketEvent[];
+  scheduleProjections: MarketScheduleProjection[];
+  scheduleSourcePreferences: MarketScheduleSourcePreference[];
   checksByEvent: Record<string, MarketCheckItem[]>;
   financesByEvent: Record<string, MarketFinancialRecord[]>;
   reflectionsByEvent: Record<string, MarketReflection>;
@@ -29,7 +32,7 @@ type Props = {
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"];
 
-export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, reflectionsByEvent, photoPreviewsByEvent, viewToggle, onStatusChange, onPaymentStatusChange, onToggleCheck, onSelectedDateChange }: Props) {
+export function HomeCalendar({ profile, events, scheduleProjections, scheduleSourcePreferences, checksByEvent, financesByEvent, reflectionsByEvent, photoPreviewsByEvent, viewToggle, onStatusChange, onPaymentStatusChange, onToggleCheck, onSelectedDateChange }: Props) {
   const todayKey = toDateKey(new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
@@ -63,6 +66,21 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
     }
     return map;
   }, [events]);
+  const schedulePreferenceByKey = useMemo(() => new Map(
+    scheduleSourcePreferences.map((item) => [scheduleSourceKey(item.source_service, item.source_calendar_key), item])
+  ), [scheduleSourcePreferences]);
+  const projectionsByDate = useMemo(() => {
+    const map: Record<string, MarketScheduleProjection[]> = {};
+    for (const item of scheduleProjections) {
+      const preference = schedulePreferenceByKey.get(scheduleSourceKey(item.source_service, item.source_calendar_key));
+      if (preference && !preference.is_visible) continue;
+      const key = scheduleProjectionDateKey(item);
+      if (!key) continue;
+      if (!map[key]) map[key] = [];
+      map[key].push(item);
+    }
+    return map;
+  }, [schedulePreferenceByKey, scheduleProjections]);
 
   const weeks = useMemo(() => buildMonthMatrix(visibleMonth), [visibleMonth]);
   const activeEvents = useMemo(
@@ -99,6 +117,7 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
   const currentTasks = taskGroups.current;
   const overdueTasks = taskGroups.overdue;
   const selectedEvents = useMemo(() => eventsByDate[selectedDate] ?? [], [eventsByDate, selectedDate]);
+  const selectedProjections = useMemo(() => projectionsByDate[selectedDate] ?? [], [projectionsByDate, selectedDate]);
 
   function moveMonth(delta: number) {
     setVisibleMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
@@ -198,13 +217,14 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
           const key = toDateKey(date);
           const inMonth = date.getMonth() === visibleMonth.getMonth();
           const dayEvents = eventsByDate[key] ?? [];
+          const dayProjections = projectionsByDate[key] ?? [];
           const today = key === todayKey;
           return (
             <button
               type="button"
               key={key}
               onClick={() => selectDate(key)}
-              aria-label={calendarDayLabel(date, dayEvents)}
+              aria-label={calendarDayLabel(date, dayEvents, dayProjections)}
               aria-pressed={selectedDate === key}
               className={`flex h-[58px] min-w-0 flex-col items-stretch rounded-md border p-px text-center hover:border-[var(--mikke-blue)] hover:bg-[var(--mikke-surface-soft)] sm:h-[74px] sm:rounded-lg sm:p-0.5 ${selectedDate === key ? "border-[var(--mikke-blue)] bg-[var(--mikke-surface-soft)]" : "border-transparent"} ${inMonth ? "" : "opacity-40"}`}
             >
@@ -213,6 +233,8 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
               </span>
               <CalendarCellBody
                 events={dayEvents}
+                projections={dayProjections}
+                schedulePreferenceByKey={schedulePreferenceByKey}
                 settings={eventTypeSettings}
                 isPastDate={key < todayKey}
                 reflectionsByEvent={reflectionsByEvent}
@@ -227,6 +249,8 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
         dateKey={selectedDate}
         todayKey={todayKey}
         events={selectedEvents}
+        projections={selectedProjections}
+        schedulePreferenceByKey={schedulePreferenceByKey}
         checksByEvent={checksByEvent}
         financesByEvent={financesByEvent}
         reflectionsByEvent={reflectionsByEvent}
@@ -271,19 +295,23 @@ export function HomeCalendar({ profile, events, checksByEvent, financesByEvent, 
 
 function CalendarCellBody({
   events,
+  projections,
+  schedulePreferenceByKey,
   settings,
   isPastDate,
   reflectionsByEvent,
   photoPreviewsByEvent
 }: {
   events: MarketEvent[];
+  projections: MarketScheduleProjection[];
+  schedulePreferenceByKey: Map<string, MarketScheduleSourcePreference>;
   settings: MarketEventTypeSettings;
   isPastDate: boolean;
   reflectionsByEvent: Record<string, MarketReflection>;
   photoPreviewsByEvent: MarketNotePhotoPreviewMap;
 }) {
-  if (events.length === 0) return null;
-  const singlePastEvent = isPastDate && events.length === 1 ? events[0] : null;
+  if (events.length === 0 && projections.length === 0) return null;
+  const singlePastEvent = isPastDate && events.length === 1 && projections.length === 0 ? events[0] : null;
   const reflectionText = singlePastEvent ? getReflectionExcerpt(reflectionsByEvent[singlePastEvent.id]) : "";
   const photo = singlePastEvent ? photoPreviewsByEvent[singlePastEvent.id] : null;
 
@@ -298,13 +326,10 @@ function CalendarCellBody({
 
   return (
     <div className="mt-px min-w-0 space-y-px sm:mt-0.5 sm:space-y-0.5" aria-hidden="true">
-      {events.slice(0, 2).map((event) => {
-        const color = getMarketEventTypeColor(getMarketEventType(event), settings);
-        return <span key={event.id} className="block h-3 overflow-hidden whitespace-nowrap rounded-[3px] px-0.5 text-left text-[9px] font-bold leading-3 [text-overflow:clip]" style={{ backgroundColor: color, color: readableTextColor(color) }}>
-          {event.title}
-        </span>;
-      })}
-      {events.length > 2 ? <span className="block overflow-hidden whitespace-nowrap text-right text-[8px] font-bold leading-none text-[var(--mikke-muted)] [text-overflow:clip]">＋残り{events.length - 2}件</span> : null}
+      {[...events.map((event) => ({ id: `event:${event.id}`, title: event.title, color: getMarketEventTypeColor(getMarketEventType(event), settings) })), ...projections.map((item) => ({ id: `projection:${item.id}`, title: item.title, color: schedulePreferenceByKey.get(scheduleSourceKey(item.source_service, item.source_calendar_key))?.display_color ?? "#9CCDB9" }))].slice(0, 2).map((item) => (
+        <span key={item.id} className="block h-3 overflow-hidden whitespace-nowrap rounded-[3px] px-0.5 text-left text-[9px] font-bold leading-3 [text-overflow:clip]" style={{ backgroundColor: item.color, color: readableTextColor(item.color) }}>{item.title}</span>
+      ))}
+      {events.length + projections.length > 2 ? <span className="block overflow-hidden whitespace-nowrap text-right text-[8px] font-bold leading-none text-[var(--mikke-muted)] [text-overflow:clip]">＋残り{events.length + projections.length - 2}件</span> : null}
       {singlePastEvent && reflectionText ? (
         <span className="block h-3 overflow-hidden whitespace-nowrap rounded-[3px] bg-[var(--mikke-green)] px-0.5 text-left text-[8px] font-bold leading-3 text-[var(--mikke-text)] [text-overflow:clip]">{reflectionText}</span>
       ) : null}
@@ -316,6 +341,8 @@ function SelectedDayEvents({
   dateKey,
   todayKey,
   events,
+  projections,
+  schedulePreferenceByKey,
   checksByEvent,
   financesByEvent,
   reflectionsByEvent,
@@ -329,6 +356,8 @@ function SelectedDayEvents({
   dateKey: string;
   todayKey: string;
   events: MarketEvent[];
+  projections: MarketScheduleProjection[];
+  schedulePreferenceByKey: Map<string, MarketScheduleSourcePreference>;
   checksByEvent: Record<string, MarketCheckItem[]>;
   financesByEvent: Record<string, MarketFinancialRecord[]>;
   reflectionsByEvent: Record<string, MarketReflection>;
@@ -346,13 +375,36 @@ function SelectedDayEvents({
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--mikke-blue)]" style={{ fontFamily: "var(--mikke-font-display)" }}>SCHEDULE</p>
           <h3 className="mt-0.5 text-sm font-extrabold text-[var(--mikke-text)]">{dateKey === todayKey ? "本日の予定" : `${formatMonthDayWeekday(dateKey)}の予定`}</h3>
         </div>
-        <span className="text-xs font-bold text-[var(--mikke-muted)]">{events.length}件</span>
+        <span className="text-xs font-bold text-[var(--mikke-muted)]">{events.length + projections.length}件</span>
       </div>
 
-      {events.length === 0 ? (
+      {events.length === 0 && projections.length === 0 ? (
         <p className="mt-2 rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-5 text-center text-xs font-bold text-[var(--mikke-muted)]">この日の予定はありません</p>
       ) : (
         <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {projections.map((item) => {
+            const preference = schedulePreferenceByKey.get(scheduleSourceKey(item.source_service, item.source_calendar_key));
+            const color = preference?.display_color ?? "#9CCDB9";
+            return (
+              <article key={`projection:${item.id}`} className="overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-white">
+                <div className="h-1.5" style={{ backgroundColor: color }} />
+                <div className="p-2.5 sm:p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <span className="inline-flex max-w-full rounded-full px-2 py-1 text-[10px] font-extrabold" style={{ backgroundColor: color, color: readableTextColor(color) }}>Googleから</span>
+                      <h4 className="mt-1 truncate text-base font-extrabold text-[var(--mikke-text)]">{item.title}</h4>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-[var(--mikke-surface-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-muted)]">読み取り専用</span>
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] font-semibold text-[var(--mikke-muted)]">
+                    <span className="flex min-w-0 items-center gap-1.5 truncate"><Clock3 size={13} className="shrink-0" /><span className="truncate">{scheduleProjectionTimeLabel(item)}</span></span>
+                    <span className="flex min-w-0 items-center gap-1.5 truncate"><MapPin size={13} className="shrink-0" /><span className="truncate">{item.location || "場所未設定"}</span></span>
+                  </div>
+                  <p className="mt-2 text-[10px] font-semibold leading-4 text-[var(--mikke-muted)]">表示・色はMarketNoteだけの設定です。Googleの予定は変更しません。</p>
+                </div>
+              </article>
+            );
+          })}
           {events.map((event) => {
             const checks = checksByEvent[event.id] ?? [];
             const done = checks.filter((item) => item.is_done).length;
@@ -478,10 +530,14 @@ function TaskList({
   );
 }
 
-function calendarDayLabel(date: Date, events: MarketEvent[]) {
+function calendarDayLabel(date: Date, events: MarketEvent[], projections: MarketScheduleProjection[]) {
   const dateLabel = date.toLocaleDateString("ja-JP", { month: "long", day: "numeric", weekday: "short" });
-  if (events.length === 0) return `${dateLabel}、予定なし`;
-  return `${dateLabel}、${events.map((event) => `${event.title}（${statusLabel(event.status)}）`).join("、")}`;
+  if (events.length === 0 && projections.length === 0) return `${dateLabel}、予定なし`;
+  return `${dateLabel}、${[...events.map((event) => `${event.title}（${statusLabel(event.status)}）`), ...projections.map((item) => `${item.title}（Googleから）`)].join("、")}`;
+}
+
+function scheduleSourceKey(sourceService: string, sourceCalendarKey: string) {
+  return `${sourceService}:${sourceCalendarKey}`;
 }
 
 function buildMonthMatrix(monthStart: Date) {

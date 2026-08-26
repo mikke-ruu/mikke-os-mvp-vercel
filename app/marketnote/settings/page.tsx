@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { BellRing, CalendarRange, ChevronRight, ClipboardCheck, FileUp, Tag, type LucideIcon } from "lucide-react";
+import { BellRing, CalendarRange, ChevronRight, ClipboardCheck, Eye, FileUp, Tag, type LucideIcon } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { MarketNoteShell } from "@/components/marketnote/MarketNoteShell";
 
@@ -36,6 +36,12 @@ const settingsItems: SettingsItem[] = [
     description: "やることの表示と期限を設定します。",
     href: "/settings/reminders",
     icon: BellRing
+  },
+  {
+    title: "表示する予定・色",
+    description: "Googleなど外部から移した予定の表示・色・通知を設定します。",
+    href: "/marketnote/settings/sources",
+    icon: Eye
   },
   {
     title: "Googleカレンダーの予定をMarketNoteへ移す",

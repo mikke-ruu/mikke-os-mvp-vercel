@@ -37,6 +37,7 @@ Google Calendarの手動取り込み、および各mikkeOSアプリの予定をM
 - series IDだけで繰り返し予定を保存しない
 - 取消・取下げは物理削除せずstatusへ保持する
 - source表示OFFは投影削除や同期停止を意味しない。通知ON/OFFも別列
+- `display_color`はMarketNote/Manager内だけの表示色とし、Googleへ書き戻さない
 
 ## 適用前ゲート
 
@@ -61,3 +62,10 @@ Google Calendarの手動取り込み、および各mikkeOSアプリの予定をM
 - batch単位の「元に戻す」は、既存投影を更新した場合の復元履歴が必要なため今回入れない。履歴契約を決めてから別migrationとする
 
 本番トランザクション検証では新規2件→同じ2件の更新、未知キー拒否、Supabase匿名ユーザー拒否、Activity Log件数不変、`anon`実行権限なしを確認し、ROLLBACK後にtable/functionが存在しないことを再確認した。
+
+## 2026-08-26 本適用後の画面接続
+
+- foundationと手動取り込みRPCは本番適用・migration-only PR #70 merge済み。
+- 表示ON/OFFと通知ON/OFFに加え、PC/スマホで同じ色を使うため`display_color`追加migrationを別ゲートにする。
+- Google由来予定はMarketNoteカレンダーへ読み取り専用カードとして表示し、タイトル・日時・場所をGoogleへ書き戻さない。
+- 通知ON/OFFは設定保存だけ先行し、スマホ通知・メール配信が未稼働であることをUIに明記する。
