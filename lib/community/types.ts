@@ -10,6 +10,7 @@ export type CommunityEventStatus = "open" | "closed" | "cancelled";
 export type CommunityResourceKind = "web" | "pdf" | "video" | "other";
 export type CommunityEntitlementStatus = "active" | "revoked" | "expired";
 export type CommunityEntitlementSource = "manual" | "subscription" | "external" | "academy_subscription";
+export type CommunityAcademyRole = "learner" | "instructor" | "staff" | "contract_holder";
 export type CommunityInvitationStatus = "pending" | "accepted" | "declined" | "revoked" | "expired";
 export type CommunityMembershipPlanStatus = "draft" | "active" | "archived";
 export type CommunityPaymentClaimStatus = "pending" | "approved" | "rejected" | "cancelled";
@@ -96,6 +97,40 @@ export type CommunityInvitation = {
   expiresAt: string | null;
   acceptedAt: string | null;
   createdAt: string;
+};
+
+export type CommunityAcademyAccessInvitation = {
+  id: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  academyRole: CommunityAcademyRole;
+  startsAt: string;
+  endsAt: string | null;
+  expiresAt: string | null;
+  community: {
+    id: string;
+    slug: string;
+    name: string;
+    description: string | null;
+    logoUrl: string | null;
+  };
+  access: {
+    entitlementKey: string;
+    name: string;
+    description: string | null;
+    rooms: Array<{ id: string; title: string; description: string | null }>;
+  };
+  consent: {
+    requireLegalName: boolean;
+    requirePhone: boolean;
+    requireJoinReason: boolean;
+    termsVersion: number;
+    termsText: string;
+    rulesVersion: number;
+    rulesText: string;
+    privacyVersion: number;
+    privacyText: string;
+  };
+  hasNormalCommunityAccess: boolean;
 };
 
 export type CommunityMembershipPlan = {

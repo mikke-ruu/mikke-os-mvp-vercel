@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Building2, Check, ReceiptJapaneseYen, ShieldCheck, UserPlus } from "lucide-react";
+import { Building2, Check, Link2, ReceiptJapaneseYen, ShieldCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
@@ -18,6 +18,11 @@ import {
   respondHeadquartersInvitation,
   stopHeadquartersMember
 } from "@/lib/academy/headquarters-settings";
+import {
+  listMyAcademyCommunityLinkOptions,
+  saveAcademyCommunityRoomLink,
+  type AcademyCommunityLinkOption
+} from "@/lib/academy/community-links";
 import type {
   AcademyHeadquarters,
   AcademyHeadquartersInvitation,
@@ -49,6 +54,7 @@ function SettingsContent() {
   const [invitations, setInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [myInvitations, setMyInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [billingSnapshot, setBillingSnapshot] = useState<AcademyBillingSnapshot | null>(null);
+  const [communityLinks, setCommunityLinks] = useState<AcademyCommunityLinkOption[]>([]);
   const [form, setForm] = useState({
     name: "",
     logo_url: "",
@@ -63,6 +69,7 @@ function SettingsContent() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [communityForm, setCommunityForm] = useState({ communityId: "", entitlementKey: "", sourceProductKey: "academy-membership", status: "draft" as "draft" | "active" });
 
   const canManage = role === "owner" || role === "administrator";
 
@@ -101,6 +108,17 @@ function SettingsContent() {
         ]);
         setMembers(nextMembers);
         setInvitations(nextInvitations);
+        try {
+          const nextCommunityLinks = await listMyAcademyCommunityLinkOptions(hq.id);
+          setCommunityLinks(nextCommunityLinks);
+          const firstCommunity = nextCommunityLinks[0];
+          const firstDefinition = firstCommunity?.definitions[0];
+          if (firstCommunity && firstDefinition) {
+            setCommunityForm((current) => ({ ...current, communityId: firstCommunity.communityId, entitlementKey: firstDefinition.key }));
+          }
+        } catch {
+          setCommunityLinks([]);
+        }
       }
       setBillingSnapshot(
         nextRole === "owner" ? await getMyAcademyBillingSnapshot(hq.id) : null,
@@ -186,6 +204,27 @@ function SettingsContent() {
       await load();
     } catch {
       setMessage("メンバーを停止できませんでした。Owner権限を確認してください。");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function saveCommunityLink() {
+    if (!headquarters || !canManage || !communityForm.communityId || !communityForm.entitlementKey) return;
+    setBusy("community-link");
+    setMessage("");
+    try {
+      await saveAcademyCommunityRoomLink({
+        headquartersId: headquarters.id,
+        communityId: communityForm.communityId,
+        entitlementKey: communityForm.entitlementKey,
+        sourceProductKey: communityForm.sourceProductKey,
+        status: communityForm.status
+      });
+      setMessage(communityForm.status === "active" ? "Communityの指定Room連携を有効にしました。" : "Community連携を下書き保存しました。");
+      setCommunityLinks(await listMyAcademyCommunityLinkOptions(headquarters.id));
+    } catch {
+      setMessage("Community連携を保存できませんでした。Academy本部とCommunityの両方の運営権限を確認してください。");
     } finally {
       setBusy("");
     }
@@ -331,6 +370,44 @@ function SettingsContent() {
               <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">
                 登録中の講師を数えます。活動中・休眠・停止中も登録解除までは対象です。同じ人が同一本部で複数講座を担当しても1名です。本部Ownerも講師登録している場合は1名に含まれます。登録解除は翌月分から反映します。
               </p>
+            </section>
+          ) : null}
+
+          {canManage ? (
+            <section className={cardClass}>
+              <h2 className="flex items-center gap-2 text-base font-bold"><Link2 size={18} /> Community連携</h2>
+              <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
+                AcademyとCommunityは別商品のまま、受講者や認定講師に指定Roomだけを追加料金なしで案内します。通常のCommunity会費や契約は変更しません。
+              </p>
+              {communityLinks.length ? (
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-bold">接続するCommunity
+                    <select className={inputClass} value={communityForm.communityId} onChange={(event) => {
+                      const nextCommunity = communityLinks.find((item) => item.communityId === event.target.value);
+                      setCommunityForm({ ...communityForm, communityId: event.target.value, entitlementKey: nextCommunity?.definitions[0]?.key ?? "" });
+                    }}>
+                      {communityLinks.map((item) => <option key={item.communityId} value={item.communityId}>{item.communityName}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold">利用できるRoomの範囲
+                    <select className={inputClass} value={communityForm.entitlementKey} onChange={(event) => setCommunityForm({ ...communityForm, entitlementKey: event.target.value })}>
+                      {(communityLinks.find((item) => item.communityId === communityForm.communityId)?.definitions ?? []).map((definition) => <option key={definition.key} value={definition.key}>{definition.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold">Academy内の区分名
+                    <input className={inputClass} value={communityForm.sourceProductKey} onChange={(event) => setCommunityForm({ ...communityForm, sourceProductKey: event.target.value })} placeholder="例: basic-learner" />
+                  </label>
+                  <label className="text-xs font-bold">状態
+                    <select className={inputClass} value={communityForm.status} onChange={(event) => setCommunityForm({ ...communityForm, status: event.target.value as "draft" | "active" })}>
+                      <option value="draft">下書き（まだ案内しない）</option>
+                      <option value="active">有効（招待に利用する）</option>
+                    </select>
+                  </label>
+                  <button type="button" disabled={busy === "community-link" || !communityForm.entitlementKey} onClick={() => void saveCommunityLink()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40 md:col-span-2">Community連携を保存</button>
+                </div>
+              ) : (
+                <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">あなたが運営するCommunityと、Roomの利用範囲を先にCommunity側で作成してください。</p>
+              )}
             </section>
           ) : null}
 

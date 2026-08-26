@@ -5,12 +5,21 @@ const migration = readFileSync(
   new URL("../supabase/migrations/20260825222427_community_academy_linked_room_entitlements.sql", import.meta.url),
   "utf8",
 );
+const uiMigration = readFileSync(
+  new URL("../supabase/migrations/20260826011738_community_academy_link_acceptance_ui_contract.sql", import.meta.url),
+  "utf8",
+);
 const test = readFileSync(
   new URL("../supabase/tests/community_academy_linked_room_entitlements_test.sql", import.meta.url),
   "utf8",
 );
 const client = readFileSync(new URL("../lib/community/client.ts", import.meta.url), "utf8");
 const types = readFileSync(new URL("../lib/community/types.ts", import.meta.url), "utf8");
+const acceptancePage = readFileSync(
+  new URL("../app/community/academy-invitations/[invitationId]/page.tsx", import.meta.url),
+  "utf8",
+);
+const settingsPage = readFileSync(new URL("../app/academy/settings/page.tsx", import.meta.url), "utf8");
 
 assert.match(migration, /academy_subscription/);
 assert.match(migration, /access_scope in \('community', 'linked_rooms'\)/);
@@ -42,5 +51,18 @@ assert.match(test, /linked_rooms member can read a Community-wide resource/);
 assert.match(client, /rpc\("community_create_payment_claim"/);
 assert.match(client, /source: "subscription"/);
 assert.match(types, /"academy_subscription"/);
+
+assert.match(uiMigration, /invitation\.user_id = \(select auth\.uid\(\)\)/);
+assert.match(uiMigration, /provider_type <> 'academy_subscription'/);
+assert.match(uiMigration, /private\.academy_can_manage_headquarters\(p_headquarters_id\)/);
+assert.match(uiMigration, /community_private\.is_staff\(p_community_id\)/);
+assert.match(uiMigration, /termsVersion/);
+assert.match(uiMigration, /rulesVersion/);
+assert.match(uiMigration, /privacyVersion/);
+assert.match(acceptancePage, /通常有料契約とは別の商品/);
+assert.match(acceptancePage, /自動解約・返金は行わず/);
+assert.match(acceptancePage, /同意してCommunityへ参加する/);
+assert.match(settingsPage, /AcademyとCommunityは別商品のまま/);
+assert.doesNotMatch(acceptancePage, /service_role/);
 
 console.log("Community Academy linked access contract: OK");

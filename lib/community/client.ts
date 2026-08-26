@@ -37,6 +37,7 @@ import type {
   CommunityRoomKind,
   CommunitySearchResult,
   CommunitySafetySettings,
+  CommunityAcademyAccessInvitation,
   CommunityStamp
 } from "./types";
 import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
@@ -1423,4 +1424,39 @@ export async function updateCommunityResource(client: DbClient, resourceId: stri
     published_at: input.isPublished ? new Date().toISOString() : null
   }).eq("id", resourceId);
   if (error) throw error;
+}
+
+export async function getMyCommunityAcademyAccessInvitation(
+  client: DbClient,
+  invitationId: string
+) {
+  const { data, error } = await client.rpc("community_get_my_academy_access_invitation", {
+    p_invitation_id: invitationId
+  });
+  if (error) throw error;
+  return (data ?? null) as CommunityAcademyAccessInvitation | null;
+}
+
+export async function acceptCommunityAcademyAccessInvitation(
+  client: DbClient,
+  input: {
+    invitationId: string;
+    displayName: string;
+    legalName?: string;
+    phone?: string;
+    joinReason?: string;
+  }
+) {
+  const { data, error } = await client.rpc("community_accept_academy_access_invitation", {
+    p_invitation_id: input.invitationId,
+    p_display_name: input.displayName.trim(),
+    p_legal_name: input.legalName?.trim() || null,
+    p_phone: input.phone?.trim() || null,
+    p_join_reason: input.joinReason?.trim() || null,
+    p_accept_terms: true,
+    p_accept_rules: true,
+    p_accept_privacy: true
+  });
+  if (error) throw error;
+  return data as string;
 }
