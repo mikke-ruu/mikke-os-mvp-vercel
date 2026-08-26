@@ -22,6 +22,12 @@ import {
   type MarketEventWorkflowStatus
 } from "@/lib/marketnote";
 import { listMarketNotePhotoPreviews, retryPendingMarketNotePhotoCleanup, type MarketNotePhotoPreviewMap } from "@/lib/marketnote-photos";
+import {
+  listMarketScheduleProjections,
+  listMarketScheduleSourcePreferences,
+  type MarketScheduleProjection,
+  type MarketScheduleSourcePreference
+} from "@/lib/marketnote-schedule-projections";
 import type { MarketCheckItem, MarketEvent, MarketFinancialRecord, MarketReflection } from "@/types/database";
 
 type HomeTab = "calendar" | "list";
@@ -43,6 +49,8 @@ function MarketNoteContent() {
   const [financesByEvent, setFinancesByEvent] = useState<Record<string, MarketFinancialRecord[]>>({});
   const [reflectionsByEvent, setReflectionsByEvent] = useState<Record<string, MarketReflection>>({});
   const [photoPreviewsByEvent, setPhotoPreviewsByEvent] = useState<MarketNotePhotoPreviewMap>({});
+  const [scheduleProjections, setScheduleProjections] = useState<MarketScheduleProjection[]>([]);
+  const [scheduleSourcePreferences, setScheduleSourcePreferences] = useState<MarketScheduleSourcePreference[]>([]);
   const [activeTab, setActiveTab] = useState<ListTab>("upcoming");
   const [guestStats, setGuestStats] = useState<GuestImportStats | null>(null);
   const [photoCleanupPending, setPhotoCleanupPending] = useState(false);
@@ -64,6 +72,23 @@ function MarketNoteContent() {
     setReflectionsByEvent(Object.fromEntries(reflections.map((reflection) => [reflection.market_event_id, reflection])));
     setGuestStats(getGuestMarketNoteImportStats());
 
+    if (!isGuest) {
+      try {
+        const [projections, preferences] = await Promise.all([
+          listMarketScheduleProjections(),
+          listMarketScheduleSourcePreferences()
+        ]);
+        setScheduleProjections(projections);
+        setScheduleSourcePreferences(preferences);
+      } catch {
+        setScheduleProjections([]);
+        setScheduleSourcePreferences([]);
+      }
+    } else {
+      setScheduleProjections([]);
+      setScheduleSourcePreferences([]);
+    }
+
     try {
       const todayKey = toDateKey(new Date());
       const pastEventIds = nextEvents.filter((event) => event.event_date < todayKey).map((event) => event.id);
@@ -72,7 +97,7 @@ function MarketNoteContent() {
       // The schedule remains usable if a signed photo preview cannot be loaded.
       setPhotoPreviewsByEvent({});
     }
-  }, [profile]);
+  }, [isGuest, profile]);
 
   useEffect(() => {
     let active = true;
@@ -180,6 +205,8 @@ function MarketNoteContent() {
           <HomeCalendar
             profile={profile}
             events={events}
+            scheduleProjections={scheduleProjections}
+            scheduleSourcePreferences={scheduleSourcePreferences}
             checksByEvent={checksByEvent}
             financesByEvent={financesByEvent}
             reflectionsByEvent={reflectionsByEvent}
