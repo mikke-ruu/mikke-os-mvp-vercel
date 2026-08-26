@@ -68,6 +68,32 @@ export async function syncMarketEventActivityLog(
   if (error) throw error;
 }
 
+export async function syncMarketEventsActivityLogs(profile: Profile, events: MarketEvent[]) {
+  if (events.length === 0) return;
+
+  const eventTypeIds = Array.from(new Set(events.map((event) => event.event_type_id).filter((id): id is string => Boolean(id))));
+  const summaryByType = new Map<string, boolean>();
+  if (eventTypeIds.length > 0) {
+    const { data, error } = await supabase
+      .from("market_event_types")
+      .select("id, counts_toward_summary")
+      .eq("profile_id", profile.id)
+      .in("id", eventTypeIds);
+    if (error) throw error;
+    for (const row of data ?? []) summaryByType.set(row.id as string, row.counts_toward_summary === true);
+  }
+
+  const payloads = events.map((event) => toMarketEventActivityLogPayload(
+    profile,
+    event,
+    event.event_type_id ? summaryByType.get(event.event_type_id) === true : false
+  ));
+  const { error } = await supabase.from("activity_logs").upsert(payloads, {
+    onConflict: "profile_id,source_service,source_record_id"
+  });
+  if (error) throw error;
+}
+
 export async function syncMarketEventTypeSummaryEligibility(
   profileId: string,
   eventTypeId: string,
