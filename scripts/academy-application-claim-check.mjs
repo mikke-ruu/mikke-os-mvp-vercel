@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const migration = readFileSync(join(root, "supabase/migrations/20260825075830_academy_application_claim.sql"), "utf8");
+const migration = readFileSync(
+  join(root, "supabase/migrations/20260825075830_academy_application_claim.sql"),
+  "utf8",
+).replace(/\r\n/g, "\n");
 const applications = readFileSync(join(root, "lib/academy/applications.ts"), "utf8");
 const graduate = readFileSync(join(root, "lib/academy/graduate.ts"), "utf8");
 const claimPage = readFileSync(join(root, "app/academy/claim/[applicationId]/page.tsx"), "utf8");

@@ -29,7 +29,8 @@ assert.match(headquarters, /academy_create_headquarters/);
 assert.match(shell, /hasPortalAccess/);
 assert.match(shell, /canSwitchPortal \?/);
 assert.match(shell, /contextCount > 1/);
-assert.match(dashboard, /canCreateAcademyHeadquarters/);
-assert.match(dashboard, /ここから無料で本部が作られることはありません/);
+assert.match(dashboard, /getAcademyOnboardingEligibility/);
+assert.match(dashboard, /7日間お試しを始める/);
+assert.match(dashboard, /契約確認済みの本部を作成する/);
 
 console.log("academy access context and creation gate checks passed");

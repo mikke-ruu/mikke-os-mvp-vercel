@@ -1,4 +1,6 @@
 -- Academy-to-Community linked-Room contract test. All fixtures roll back.
+-- Run after the Academy seven-day trial foundation so Academy mappings are
+-- backed by a concrete paid headquarters access state.
 
 begin;
 
@@ -10,6 +12,7 @@ declare
   v_other_user uuid := gen_random_uuid();
   v_suspended_user uuid := gen_random_uuid();
   v_community uuid := gen_random_uuid();
+  v_headquarters uuid := gen_random_uuid();
   v_mapping uuid := gen_random_uuid();
   v_free_room uuid := gen_random_uuid();
   v_academy_room uuid := gen_random_uuid();
@@ -48,6 +51,19 @@ begin
     (v_other_user, 'academy-community-other-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now()),
     (v_suspended_user, 'academy-community-suspended-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now());
 
+  insert into public.academy_headquarters (
+    id, owner_user_id, name, handle, plan, is_active
+  ) values (
+    v_headquarters, v_owner, 'Academy Community test headquarters',
+    'academy-community-' || v_suffix, 'small', true
+  );
+
+  insert into public.academy_headquarters_access_states (
+    headquarters_id, owner_user_id, access_kind, status, starts_at, paid_started_at
+  ) values (
+    v_headquarters, v_owner, 'paid', 'active', now(), now()
+  );
+
   insert into public.community_communities (id, slug, name, join_mode, status, owner_user_id)
   values (v_community, 'academy-community-' || v_suffix, 'Academy Community test', 'invite_only', 'active', v_owner);
 
@@ -75,7 +91,7 @@ begin
     id, community_id, provider_type, provider_owner_key, source_product_key,
     entitlement_key, status, created_by_user_id
   ) values (
-    v_mapping, v_community, 'academy_subscription', 'academy-hq:test',
+    v_mapping, v_community, 'academy_subscription', v_headquarters::text,
     'course:test', 'academy-room', 'active', v_owner
   );
 

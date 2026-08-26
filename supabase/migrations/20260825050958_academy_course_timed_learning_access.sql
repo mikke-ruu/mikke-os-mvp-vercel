@@ -483,3 +483,5 @@ $$;
 
 revoke all on function private.academy_profile_has_program_access(uuid, uuid)
   from public, anon, authenticated;
+grant execute on function private.academy_profile_has_program_access(uuid, uuid)
+  to authenticated;

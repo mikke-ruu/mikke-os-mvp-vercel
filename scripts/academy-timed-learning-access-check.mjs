@@ -33,6 +33,10 @@ assert.match(migration, /access_grant\.starts_at <= now\(\)/);
 assert.match(migration, /access_grant\.ends_at is null or access_grant\.ends_at > now\(\)/);
 assert.match(migration, /academy_learner_pages_learner_select[\s\S]*academy_has_course_content_access/);
 assert.match(migration, /academy_profile_has_program_access[\s\S]*academy_has_course_content_access/);
+assert.match(
+  migration,
+  /grant execute on function private\.academy_profile_has_program_access\(uuid, uuid\)\s+to authenticated/,
+);
 assert.match(migration, /Existing learners retain the access promised/);
 assert.match(migration, /'legacy'/);
 assert.match(migration, /on conflict \(application_id, source\) do nothing/);
