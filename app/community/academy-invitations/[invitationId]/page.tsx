@@ -128,19 +128,20 @@ function InvitationContent({ invitationId, preview }: { invitationId: string; pr
       <section className="rounded-3xl border border-[var(--mikke-line)] bg-white p-6 shadow-sm">
         <div className="flex items-start gap-3">
           <span className="rounded-2xl bg-[var(--mikke-accent-soft)] p-3"><GraduationCap size={24} /></span>
-          <div><p className="text-xs font-bold text-[var(--mikke-accent)]">Academyからのご案内</p><h1 className="mt-1 text-xl font-bold">{invitation.community.name}へ参加しますか？</h1></div>
+          <div><p className="text-xs font-bold text-[var(--mikke-accent)]">{invitation.community.name}からのご案内</p><h1 className="mt-1 text-xl font-bold">Communityへ参加しますか？</h1></div>
         </div>
         <p className="mt-4 text-sm leading-7 text-[var(--mikke-text)]">
-          Academy契約に付いている、指定Roomへの追加料金なしの利用権です。Communityの通常有料契約とは別の商品です。
+          参加すると、この団体から案内されたRoomを追加料金なしで利用できます。
         </p>
         {invitation.hasNormalCommunityAccess ? (
-          <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-900">すでに通常のCommunity利用権があります。自動解約・返金は行わず、現在の利用範囲を維持します。</p>
+          <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-900">すでにこのCommunityへ参加しています。現在見られる場所はそのまま利用できます。</p>
         ) : null}
       </section>
 
       <section className="rounded-3xl border border-[var(--mikke-line)] bg-white p-6">
-        <h2 className="flex items-center gap-2 font-bold"><DoorOpen size={19} /> 利用できるRoom</h2>
+        <h2 className="flex items-center gap-2 font-bold"><DoorOpen size={19} /> 参加後に見られるRoom</h2>
         <p className="mt-1 text-sm text-[var(--mikke-muted)]">{invitation.access.name}</p>
+        <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">この団体が現在公開しているRoomだけが表示されます。</p>
         <div className="mt-4 space-y-2">
           {invitation.access.rooms.map((room) => <div key={room.id} className="rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3"><p className="text-sm font-bold">{room.title}</p>{room.description ? <p className="mt-1 text-xs text-[var(--mikke-muted)]">{room.description}</p> : null}</div>)}
           {!invitation.access.rooms.length ? <p className="text-sm text-[var(--mikke-muted)]">対象Roomは準備中です。</p> : null}
