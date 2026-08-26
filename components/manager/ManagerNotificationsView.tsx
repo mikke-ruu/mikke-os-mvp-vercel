@@ -11,20 +11,20 @@ export function ManagerNotificationsView() {
 
   return (
     <ManagerShell title="お知らせ" subtitle="各アプリで、確認や対応が必要なものをまとめて見ます。">
-      <div className="grid gap-5 xl:grid-cols-2">
-        <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
-          <h2 className="text-lg font-bold tracking-normal">対応すること</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">申込み、予約、提供など、対応が必要なものです。</p>
-          <div className="mt-4">
-            <ManagerTaskListRows tasks={snapshot.tasks} emptyTitle="対応が必要なものはありません" />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <section className="rounded-xl border border-[var(--mikke-line)] border-t-[3px] border-t-[var(--mikke-orange)] bg-[var(--mikke-surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4">
+          <h2 className="text-base font-bold tracking-normal sm:text-lg">対応すること</h2>
+          <p className="mt-0.5 text-xs text-[var(--mikke-muted)] sm:mt-1 sm:text-sm">申込み、予約、提供など、対応が必要なものです。</p>
+          <div className="mt-3">
+            <ManagerTaskListRows tasks={snapshot.tasks} initialLimit={5} emptyTitle="対応が必要なものはありません" />
           </div>
         </section>
 
-        <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
-          <h2 className="text-lg font-bold tracking-normal">進行中</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">各アプリで進んでいる活動の現在地です。</p>
-          <div className="mt-4">
-            <ManagerProgressList progress={snapshot.progress} />
+        <section className="rounded-xl border border-[var(--mikke-line)] border-t-[3px] border-t-[var(--mikke-green)] bg-[var(--mikke-surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4">
+          <h2 className="text-base font-bold tracking-normal sm:text-lg">進行中</h2>
+          <p className="mt-0.5 text-xs text-[var(--mikke-muted)] sm:mt-1 sm:text-sm">各アプリで進んでいる活動の現在地です。</p>
+          <div className="mt-3">
+            <ManagerProgressList progress={snapshot.progress} initialLimit={5} />
           </div>
         </section>
       </div>

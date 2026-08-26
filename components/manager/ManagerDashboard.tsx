@@ -22,13 +22,13 @@ export function ManagerDashboard() {
 
   return (
     <ManagerShell title="今日のManager" subtitle="今日の予定、各アプリからのお知らせ、設定をまとめて確認します。">
-      <section className="grid gap-3 sm:grid-cols-3">
-        <ManagerMetricCard label="今日の予定" value={`${todaySchedules.length}件`} helper="各アプリから集まる予定" />
-        <ManagerMetricCard label="対応すること" value={`${snapshot.tasks.length}件`} helper="確認や対応が必要なもの" />
-        <ManagerMetricCard label="進行中" value={`${snapshot.progress.length}件`} helper="各アプリの進み具合" />
+      <section className="grid grid-cols-3 gap-2 sm:gap-3">
+        <ManagerMetricCard label="今日の予定" value={`${todaySchedules.length}件`} helper="各アプリから集まる予定" tone="yellow" />
+        <ManagerMetricCard label="対応すること" value={`${snapshot.tasks.length}件`} helper="確認や対応が必要なもの" tone="orange" />
+        <ManagerMetricCard label="進行中" value={`${snapshot.progress.length}件`} helper="各アプリの進み具合" tone="green" />
       </section>
 
-      <section className="mt-6 grid gap-5 xl:grid-cols-[1.1fr_1fr]">
+      <section className="mt-4 grid gap-4 sm:mt-6 xl:grid-cols-[1.1fr_1fr]">
         <Panel
           title="今日の予定"
           helper="詳しい予定や別の日のカレンダーはMarketNoteで確認できます。"
@@ -55,17 +55,21 @@ export function ManagerDashboard() {
             </Link>
           )}
         >
-          <ManagerTaskListRows tasks={urgentTasks.slice(0, 6)} emptyTitle="新しいお知らせはありません" />
+          <ManagerTaskListRows tasks={urgentTasks.slice(0, 3)} emptyTitle="新しいお知らせはありません" />
         </Panel>
       </section>
 
-      <section className="mt-6">
-        <Panel title="進行中のもの" helper="イベントやFundなどの進捗をまとめます。">
-          <ManagerProgressList progress={snapshot.progress.slice(0, 5)} />
+      <section className="mt-4 sm:mt-6">
+        <Panel
+          title="進行中のもの"
+          helper="イベントやFundなどの進捗をまとめます。"
+          action={<Link href="/manager/notifications" className="shrink-0 text-xs font-bold text-[var(--mikke-primary)]">すべて見る</Link>}
+        >
+          <ManagerProgressList progress={snapshot.progress.slice(0, 3)} />
         </Panel>
       </section>
 
-      <section className="mt-6">
+      <section className="mt-4 sm:mt-6">
         <Panel title="次に使えそうなアプリ" helper="今の動きに合わせて、押しつけずに候補だけ出します。">
           <ManagerAppSuggestions suggestions={suggestions} />
         </Panel>
@@ -86,11 +90,11 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
+    <section className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-3 shadow-sm sm:rounded-2xl sm:p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg font-bold tracking-normal">{title}</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">{helper}</p>
+          <h2 className="text-base font-bold tracking-normal sm:text-lg">{title}</h2>
+          <p className="mt-0.5 text-xs leading-5 text-[var(--mikke-muted)] sm:mt-1 sm:text-sm">{helper}</p>
         </div>
         {action}
       </div>
