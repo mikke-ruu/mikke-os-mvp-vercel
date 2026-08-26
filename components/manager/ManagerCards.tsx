@@ -16,19 +16,29 @@ export function ManagerMetricCard({
   label,
   value,
   helper,
-  tone
+  tone,
+  href
 }: {
   label: string;
   value: string;
   helper: string;
   tone: keyof typeof metricToneColor;
+  href: string;
 }) {
   return (
-    <div className="min-w-0 rounded-xl border border-[var(--mikke-line)] border-t-[3px] bg-white px-2 py-2.5 shadow-sm sm:rounded-2xl sm:p-4" style={{ borderTopColor: metricToneColor[tone] }}>
+    <Link
+      href={href}
+      aria-label={`${label} ${value}を見る`}
+      className="group min-w-0 rounded-xl border border-[var(--mikke-line)] border-t-[3px] bg-white px-2 py-2.5 shadow-sm transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mikke-blue)] active:scale-[0.98] sm:rounded-2xl sm:p-4"
+      style={{ borderTopColor: metricToneColor[tone] }}
+    >
       <p className="truncate text-[10px] font-bold text-[var(--mikke-muted)] sm:text-xs">{label}</p>
-      <p className="mt-1 text-xl font-extrabold tracking-tight text-[var(--mikke-text)] sm:mt-2 sm:text-2xl">{value}</p>
+      <span className="mt-1 flex items-center justify-between gap-1 sm:mt-2">
+        <span className="text-xl font-extrabold tracking-tight text-[var(--mikke-text)] sm:text-2xl">{value}</span>
+        <span aria-hidden="true" className="text-sm font-bold text-[var(--mikke-blue)] transition-transform group-hover:translate-x-0.5">→</span>
+      </span>
       <p className="mt-1 hidden text-xs font-semibold text-[var(--mikke-muted)] sm:block">{helper}</p>
-    </div>
+    </Link>
   );
 }
 
