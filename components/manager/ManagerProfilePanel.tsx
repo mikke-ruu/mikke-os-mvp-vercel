@@ -77,12 +77,14 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
     }
 
     setSavingDisplayName(true);
-    const { error } = await supabase
+    const { data: updatedProfile, error } = await supabase
       .from("profiles")
       .update({ display_name: nextDisplayName })
       .eq("id", profile.id)
-      .eq("user_id", user.id);
-    if (error) {
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
+    if (error || !updatedProfile) {
       setDisplayNameNotice({ type: "error", text: "表示名を保存できませんでした。時間をおいてもう一度お試しください。" });
     } else {
       await refreshProfile();
