@@ -2,8 +2,6 @@ import { supabase } from "@/lib/supabase/client";
 import type { GoogleManualImportRequest } from "@/lib/marketnote-google-import-contract.mjs";
 
 export type GoogleManualImportResult = {
-  inserted: number;
-  updated: number;
   total: number;
 };
 

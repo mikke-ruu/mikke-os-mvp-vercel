@@ -13,10 +13,17 @@ assert.match(migration, /security definer\s+set search_path = ''/);
 assert.match(migration, /auth\.uid\(\)/);
 assert.match(migration, /is_anonymous/);
 assert.match(migration, /jsonb_array_length\(p_items\) not between 1 and 2000/);
+assert.match(migration, /p_items is null/);
 assert.match(migration, /Duplicate occurrence in import request/);
 assert.match(migration, /Import item contains unsupported fields/);
+assert.match(migration, /\^uid_\[0-9a-f\]\{64\}\$/);
+assert.match(migration, /pg_catalog\.pg_timezone_names/);
+assert.match(migration, /jsonb_typeof\(v_item->'all_day'\) is distinct from 'boolean'/);
+assert.match(migration, /\\d\{4\}-\\d\{2\}-\\d\{2\}T\\d\{2\}:\\d\{2\}:\\d\{2\}\\\.\\d\{3\}Z/);
+assert.match(migration, /btrim\(item->>'source_record_id'\)/);
+assert.match(migration, /p_source_calendar_key is distinct from 'ics_manual'/);
 assert.match(migration, /source_service[^\n]*'google_manual'/);
-assert.match(migration, /on conflict \(user_id, source_service, source_calendar_key, source_record_id, occurrence_key\)/);
+assert.match(migration, /on conflict \(user_id, source_service, source_record_id, occurrence_key\)/);
 assert.match(migration, /revoke all on function public\.marketnote_import_google_calendar_manual\(text, text, jsonb\)\s+from public, anon, authenticated;/);
 assert.match(migration, /grant execute on function public\.marketnote_import_google_calendar_manual\(text, text, jsonb\)\s+to authenticated;/);
 

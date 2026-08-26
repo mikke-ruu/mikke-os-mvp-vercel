@@ -17,6 +17,9 @@ for (const table of ["market_schedule_source_preferences", "market_schedule_proj
 assert.match(migration, /grant select on table public\.market_schedule_projections to authenticated;/);
 assert.doesNotMatch(migration, /grant [^;]*(insert|update|delete)[^;]*market_schedule_projections to authenticated;/i);
 assert.match(migration, /market_schedule_projections_select_owner/);
+assert.match(migration, /market_schedule_projections_google_manual_occurrence_key/);
+assert.match(migration, /market_schedule_source_preferences_google_manual_identity_check/);
+assert.match(migration, /market_schedule_projections_google_manual_identity_check/);
 assert.match(migration, /\(select auth\.uid\(\)\) = user_id/);
 assert.match(migration, /is_anonymous/);
 assert.match(migration, /unique \(user_id, source_service, source_calendar_key, source_record_id, occurrence_key\)/);

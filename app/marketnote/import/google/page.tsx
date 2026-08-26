@@ -76,9 +76,9 @@ function MarketNoteGoogleImportPreview() {
     setSaving(true);
     try {
       const selected = preview.items.filter((item) => selectedIds.has(item.id));
-      const request = buildGoogleManualImportRequest(preview.calendarName, selected);
+      const request = await buildGoogleManualImportRequest(preview.calendarName, selected);
       const result = await saveGoogleManualImport(request);
-      setSaveMessage(`${result.total}件をMarketNoteへ取り込みました（新規${result.inserted}件・更新${result.updated}件）。`);
+      setSaveMessage(`${result.total}件をMarketNoteへ取り込みました。`);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "取り込みに失敗しました。通信状態を確認してください。");
     } finally {

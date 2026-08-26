@@ -22,4 +22,4 @@ export type GoogleManualImportRequest = {
 export function buildGoogleManualImportRequest(
   calendarName: string,
   items: IcsPreviewItem[]
-): GoogleManualImportRequest;
+): Promise<GoogleManualImportRequest>;
