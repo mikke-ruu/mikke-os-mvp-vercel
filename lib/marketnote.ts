@@ -26,7 +26,7 @@ import {
 } from "@/lib/marketnote-guest";
 import { supabase } from "@/lib/supabase/client";
 import { importGuestMarketNotePhotos } from "@/lib/marketnote-photos";
-import { syncMarketEventActivityLog } from "@/lib/marketnote-activity-log";
+import { syncMarketEventActivityLog, syncMarketEventsActivityLogs } from "@/lib/marketnote-activity-log";
 import { findMarketEventTypeId, loadMarketEventTypeSettingsForProfile } from "@/lib/marketnote-event-types";
 import { toDateKey } from "@/lib/format";
 import type {
@@ -337,6 +337,50 @@ export async function createMarketEvent(
   await syncMarketEventActivityLog(profile, event);
 
   return event;
+}
+
+export async function createMarketEvents(
+  profile: Profile,
+  inputs: Array<{
+    title: string;
+    eventDate: string;
+    venueName: string;
+    area: string;
+    genre: string;
+    publicNote: string;
+    privateNote?: string;
+    status?: "planned" | "preparing";
+  }>
+) {
+  if (inputs.length === 0) return [];
+  if (isMarketNoteGuestProfile(profile)) return inputs.map((input) => createGuestMarketEvent(input));
+
+  const genres = Array.from(new Set(inputs.map((input) => input.genre || "出店")));
+  const eventTypeEntries = await Promise.all(genres.map(async (genre) => [genre, await findMarketEventTypeId(profile.id, genre)] as const));
+  const eventTypeByGenre = new Map(eventTypeEntries);
+  const { data, error } = await supabase
+    .from("market_events")
+    .insert(inputs.map((input) => ({
+      user_id: profile.user_id,
+      profile_id: profile.id,
+      title: input.title,
+      event_date: input.eventDate,
+      venue_name: input.venueName || null,
+      area: input.area || null,
+      genre: input.genre || null,
+      event_type_id: eventTypeByGenre.get(input.genre || "出店") ?? null,
+      status: input.status ?? "planned",
+      visibility: "private",
+      display_on_story: false,
+      public_note: input.publicNote || null,
+      private_note: input.privateNote || null
+    })))
+    .select("*");
+
+  if (error) throw error;
+  const events = (data ?? []) as MarketEvent[];
+  await syncMarketEventsActivityLogs(profile, events);
+  return events;
 }
 
 export async function updateMarketEventDetails(
