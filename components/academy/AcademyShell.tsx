@@ -24,16 +24,16 @@ import {
 } from "@/components/mikkeos/MikkeAppShell";
 import { useOwnedMikkeApps } from "@/components/mikkeos/useOwnedMikkeApps";
 import {
-  canCreateAcademyHeadquarters,
   listMyAcademyContexts,
   parseAcademyContextPath,
   toAcademyContextHref
 } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
+import { getAcademyOnboardingEligibility, getMyAcademyHeadquartersAccess } from "@/lib/academy/trial";
 import { getMyInstructorRecords } from "@/lib/academy/instructor-portal";
 import { listPublicHeadquartersByIds } from "@/lib/academy/lp";
 import { supabase } from "@/lib/supabase/client";
-import type { AcademyAccessContext } from "@/types/database";
+import type { AcademyAccessContext, AcademyHeadquartersAccess } from "@/types/database";
 
 const honbuNav: MikkeShellNavItem[] = [
   { href: "/academy", label: "ダッシュボード", icon: LayoutDashboard, section: "本部" },
@@ -124,13 +124,14 @@ function ShellInner({
   const [canSwitchPortal, setCanSwitchPortal] = useState(false);
   const [contextCount, setContextCount] = useState(0);
   const [selectedContext, setSelectedContext] = useState<AcademyAccessContext | null>(null);
-  const [previewMode, setPreviewMode] = useState<"checking" | "dashboard" | "walkthrough" | "readonly" | "off">("checking");
+  const [headquartersAccess, setHeadquartersAccess] = useState<AcademyHeadquartersAccess | null>(null);
+  const [previewMode, setPreviewMode] = useState<"checking" | "dashboard" | "walkthrough" | "trial" | "readonly" | "off">("checking");
 
   useEffect(() => {
     const requestedPreview = new URLSearchParams(window.location.search).get("preview");
     setPreviewMode(
       process.env.NODE_ENV === "development" &&
-        (requestedPreview === "dashboard" || requestedPreview === "walkthrough" || requestedPreview === "readonly")
+        (requestedPreview === "dashboard" || requestedPreview === "walkthrough" || requestedPreview === "trial" || requestedPreview === "readonly")
         ? requestedPreview
         : "off"
     );
@@ -141,7 +142,7 @@ function ShellInner({
     let active = true;
 
     async function resolveAccess() {
-      if (previewMode === "dashboard" || previewMode === "walkthrough") {
+      if (previewMode === "dashboard" || previewMode === "walkthrough" || previewMode === "trial") {
         const previewContext: AcademyAccessContext = {
           academy_id: "00000000-0000-4000-8000-000000000001",
           academy_name: "ローカル確認用Academy",
@@ -163,6 +164,11 @@ function ShellInner({
         };
         setContextCount(1);
         setSelectedContext(previewContext);
+        setHeadquartersAccess(
+          previewMode === "trial"
+            ? await getMyAcademyHeadquartersAccess(previewContext.academy_id)
+            : null
+        );
         setHasPortalAccess(true);
         setCanSwitchPortal(true);
         setAccessError(false);
@@ -171,9 +177,11 @@ function ShellInner({
       }
       try {
         setAccessError(false);
-        const [contexts, creationAllowed] = await Promise.all([
+        const [contexts, onboarding] = await Promise.all([
           listMyAcademyContexts(),
-          variant === "honbu" ? canCreateAcademyHeadquarters() : Promise.resolve(false)
+          variant === "honbu"
+            ? getAcademyOnboardingEligibility()
+            : Promise.resolve({ trial_available: false, paid_creation_available: false, trial_block_reason: null })
         ]);
         if (!active) return;
         const currentPortal = variant === "honbu" ? "manage" : "teach";
@@ -186,11 +194,16 @@ function ShellInner({
         const routeMatchesPortal = !routeContext || routeContext.portal === currentPortal;
         const routeMatchesCapability =
           variant === "koushi" || canShowManageHref(selected, manageHrefForCapabilityCheck(pathname));
+        const access = selected
+          ? await getMyAcademyHeadquartersAccess(selected.academy_id)
+          : null;
         setContextCount(contexts.length);
         setSelectedContext(selected);
+        setHeadquartersAccess(access);
         setHasPortalAccess(
           (routeMatchesPortal && routeMatchesCapability && selected?.portals.includes(currentPortal)) ||
-            (!hasContextPathPrefix && contexts.length === 0 && variant === "honbu" && creationAllowed)
+            (!hasContextPathPrefix && contexts.length === 0 && variant === "honbu" &&
+              (onboarding.trial_available || onboarding.paid_creation_available))
         );
         setCanSwitchPortal(selected?.portals.includes(otherPortal) ?? false);
       } catch {
@@ -200,6 +213,7 @@ function ShellInner({
         setCanSwitchPortal(false);
         setContextCount(0);
         setSelectedContext(null);
+        setHeadquartersAccess(null);
       } finally {
         if (active) setAccessLoading(false);
       }
@@ -215,6 +229,7 @@ function ShellInner({
     if (
       previewMode === "dashboard" ||
       previewMode === "walkthrough" ||
+      previewMode === "trial" ||
       accessLoading ||
       hasContextPathPrefix ||
       !selectedContext ||
@@ -232,7 +247,7 @@ function ShellInner({
     let active = true;
 
     async function resolveHomepage() {
-      if (previewMode === "dashboard" || previewMode === "walkthrough") {
+      if (previewMode === "dashboard" || previewMode === "walkthrough" || previewMode === "trial") {
         setHomepageHref(null);
         return;
       }
@@ -278,7 +293,7 @@ function ShellInner({
       portalOverride ?? (variant === "honbu" ? "manage" : "teach")
     );
     if (
-      (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough") &&
+      (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough" || previewMode === "trial") &&
       contextualHref.startsWith("/academy") &&
       !contextualHref.includes("preview=")
     ) {
@@ -288,8 +303,10 @@ function ShellInner({
     return contextualHref;
   }
 
+  const trialLocked = headquartersAccess?.access_kind === "trial" && !headquartersAccess.can_manage_drafts;
+
   function captureAcademyLink(event: React.MouseEvent<HTMLDivElement>) {
-    if (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough") {
+    if (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough" || previewMode === "trial" || trialLocked) {
       const target = event.target as Element;
       const toggle = target.closest('input[type="checkbox"], input[type="radio"]');
       const button = target.closest("button");
@@ -300,7 +317,11 @@ function ShellInner({
       ) {
         event.preventDefault();
         event.stopPropagation();
-        window.alert("ローカル確認中は変更できません。本番データは変更されていません。");
+        window.alert(
+          trialLocked
+            ? "7日間お試しは終了しています。有料利用を開始するまで変更できません。自動課金はされていません。"
+            : "ローカル確認中は変更できません。本番データは変更されていません。"
+        );
         return;
       }
     }
@@ -315,10 +336,14 @@ function ShellInner({
   }
 
   function blockReadonlySubmit(event: React.FormEvent<HTMLDivElement>) {
-    if (previewMode !== "readonly" && previewMode !== "dashboard" && previewMode !== "walkthrough") return;
+    if (previewMode !== "readonly" && previewMode !== "dashboard" && previewMode !== "walkthrough" && previewMode !== "trial" && !trialLocked) return;
     event.preventDefault();
     event.stopPropagation();
-    window.alert("ローカル確認中は保存できません。本番データは変更されていません。");
+    window.alert(
+      trialLocked
+        ? "7日間お試しは終了しています。有料利用を開始するまで保存できません。自動課金はされていません。"
+        : "ローカル確認中は保存できません。本番データは変更されていません。"
+    );
   }
 
   const requestedPersonalView = searchParams.get("view") ?? searchParams.get("sample");
@@ -330,7 +355,13 @@ function ShellInner({
       : canUseLearnerView
         ? "learner"
         : "instructor";
+  const trialManageHrefs = new Set(
+    trialLocked
+      ? ["/academy"]
+      : ["/academy", "/academy/courses", "/academy/front", "/academy/settings"]
+  );
   const navItems = (variant === "honbu" ? honbuNav : koushiNav)
+    .filter((item) => variant !== "honbu" || headquartersAccess?.access_kind !== "trial" || trialManageHrefs.has(item.href))
     .filter((item) => variant === "honbu" ? canShowManageHref(selectedContext, item.href) : canShowPersonalHref(selectedContext, item.href, personalView))
     .map((item) => ({
       ...item,
@@ -344,6 +375,7 @@ function ShellInner({
       )
     }));
   const bottomNavItems = (variant === "honbu" ? honbuBottomNav : koushiBottomNav)
+    .filter((item) => variant !== "honbu" || headquartersAccess?.access_kind !== "trial" || trialManageHrefs.has(item.href))
     .filter((item) => variant === "honbu" ? canShowManageHref(selectedContext, item.href) : canShowPersonalHref(selectedContext, item.href, personalView))
     .map((item) => ({
       ...item,
@@ -359,6 +391,7 @@ function ShellInner({
   const redirectingToCanonical =
     previewMode !== "dashboard" &&
     previewMode !== "walkthrough" &&
+    previewMode !== "trial" &&
     !hasContextPathPrefix &&
     selectedContext &&
     hasPortalAccess;
@@ -446,6 +479,18 @@ function ShellInner({
       {previewMode === "dashboard" || previewMode === "walkthrough" ? (
         <div className="mb-4 rounded-xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
           ローカル確認用のサンプル表示です。本部運営者が認定講師も兼ねる例のため、本部画面とマイポータルの両方を確認できます。実データの保存や本番DBの変更は行いません。
+        </div>
+      ) : null}
+      {headquartersAccess?.access_kind === "trial" ? (
+        <div className="mb-4 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)]/20 px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
+          <p className="font-bold">
+            {trialLocked ? "7日間お試しは終了しました" : `7日間お試し ・ あと${headquartersAccess.days_remaining}日`}
+          </p>
+          <p className="mt-1 text-xs font-medium">
+            {trialLocked
+              ? "作成した下書きは残っています。有料利用を開始すると編集を再開できます。自動課金はされていません。"
+              : "本部設定や講座の下書きを作れます。公開、実際の申込受付、講師登録、Community連携、動画配信は有料利用の開始後に使えます。自動課金はされません。"}
+          </p>
         </div>
       ) : null}
       {previewMode === "readonly" ? (

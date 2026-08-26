@@ -118,6 +118,21 @@ export type AcademyAccessContext = {
   portals: AcademyPortal[];
   capabilities: string[];
 };
+export type AcademyOnboardingEligibility = {
+  trial_available: boolean;
+  paid_creation_available: boolean;
+  trial_block_reason: "authentication_required" | "headquarters_already_owned" | "trial_already_used" | null;
+};
+export type AcademyHeadquartersAccess = {
+  headquarters_id: string;
+  access_kind: "trial" | "paid";
+  status: "trialing" | "active" | "past_due" | "expired" | "cancelled";
+  starts_at: string;
+  ends_at: string | null;
+  days_remaining: number;
+  can_manage_drafts: boolean;
+  can_use_live_features: boolean;
+};
 export type AcademyHeadquartersMemberStatus = "active" | "stopped";
 export type AcademyHeadquartersInvitationStatus =
   | "pending"

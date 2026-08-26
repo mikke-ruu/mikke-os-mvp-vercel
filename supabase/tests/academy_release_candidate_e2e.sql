@@ -55,6 +55,14 @@ insert into public.academy_headquarters (
   'Academy E2E Headquarters', 'academy-e2e-headquarters', 'small', 7001
 );
 
+insert into public.academy_headquarters_access_states (
+  headquarters_id, owner_user_id, access_kind, status, starts_at, paid_started_at
+) values (
+  'c1000000-0000-4000-8000-000000000001',
+  'a1000000-0000-4000-8000-000000000001',
+  'paid', 'active', now(), now()
+);
+
 insert into public.academy_courses (
   id, headquarters_id, user_id, code, name, price, is_published,
   learner_access_mode, learner_access_days

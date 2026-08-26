@@ -46,7 +46,7 @@ const now = "2026-08-22T00:00:00.000Z";
 export function isAcademyLocalReview() {
   if (process.env.NODE_ENV !== "development" || typeof window === "undefined") return false;
   const preview = new URLSearchParams(window.location.search).get("preview");
-  return preview === "walkthrough" || preview === "dashboard";
+  return preview === "walkthrough" || preview === "dashboard" || preview === "trial";
 }
 
 export function assertAcademyWritable() {

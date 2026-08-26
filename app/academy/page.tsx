@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, BookOpen, ClipboardList, GraduationCap, Heart, JapaneseYen, Package, Sparkles, Users } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
-import { canCreateAcademyHeadquarters, toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
+import { toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import { createHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
+import { getAcademyOnboardingEligibility, startAcademySevenDayTrial } from "@/lib/academy/trial";
 import { listCourses } from "@/lib/academy/courses";
 import { listMaterials } from "@/lib/academy/materials";
 import { getRenewalAlerts, listInstructors } from "@/lib/academy/instructors";
@@ -74,6 +75,7 @@ function DashboardContent() {
   const [materials, setMaterials] = useState<AcademyMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [canCreate, setCanCreate] = useState(false);
+  const [canStartTrial, setCanStartTrial] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [localPreview, setLocalPreview] = useState(false);
 
@@ -81,7 +83,7 @@ function DashboardContent() {
     async function load() {
       const previewRequested =
         process.env.NODE_ENV === "development" &&
-        ["dashboard", "walkthrough"].includes(new URLSearchParams(window.location.search).get("preview") ?? "");
+        ["dashboard", "walkthrough", "trial"].includes(new URLSearchParams(window.location.search).get("preview") ?? "");
       if (previewRequested) {
         setLocalPreview(true);
         setHq(academyPreviewHeadquarters);
@@ -93,12 +95,13 @@ function DashboardContent() {
         setLoading(false);
         return;
       }
-      const [foundHq, creationAllowed] = await Promise.all([
+      const [foundHq, eligibility] = await Promise.all([
         getOwnedHeadquarters(profile.user_id),
-        canCreateAcademyHeadquarters()
+        getAcademyOnboardingEligibility()
       ]);
       setHq(foundHq);
-      setCanCreate(creationAllowed);
+      setCanCreate(eligibility.paid_creation_available);
+      setCanStartTrial(eligibility.trial_available);
       if (foundHq) {
         const [c, i, a, k, m] = await Promise.all([
           listCourses(foundHq.id),
@@ -133,21 +136,43 @@ function DashboardContent() {
     }
   }
 
+  async function startTrial() {
+    setLoading(true);
+    setCreationError(null);
+    try {
+      const created = await startAcademySevenDayTrial(`${profile.display_name}アカデミー`);
+      setHq(created);
+      setCanStartTrial(false);
+      router.replace(toAcademyContextHref("/academy", created.id, "manage"));
+    } catch {
+      setCreationError("7日間お試しを開始できませんでした。画面を読み込み直して、もう一度お試しください。");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
 
   if (!hq) {
     return (
       <div className="mx-auto max-w-md space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
         <p className="text-sm font-bold text-[var(--mikke-text)]">
-          {canCreate ? "本部を作成できます" : "Academyの契約確認が必要です"}
+          {canStartTrial ? "7日間、無料でお試しできます" : canCreate ? "本部を作成できます" : "Academyの利用確認が必要です"}
         </p>
         <p className="text-xs leading-5 text-[var(--mikke-muted)]">
-          {canCreate
+          {canStartTrial
+            ? "質問に答えながら本部設定と講座の下書きを作れます。公開や実際の申込受付は行われず、自動課金もありません。"
+            : canCreate
             ? "契約確認済みの作成権を使って、認定講座を管理する本部を作成します。"
-            : "契約確認後に本部作成が有効になります。ここから無料で本部が作られることはありません。"}
+            : "利用状況を確認できませんでした。すでに本部をお持ちの場合は、所属Academyの選択画面をご確認ください。"}
         </p>
+        {canStartTrial ? (
+          <button onClick={startTrial} className="w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white">
+            7日間お試しを始める
+          </button>
+        ) : null}
         {canCreate ? (
-          <button onClick={initHq} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white">
+          <button onClick={initHq} className="w-full rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2.5 text-sm font-bold text-[var(--mikke-text)]">
             契約確認済みの本部を作成する
           </button>
         ) : null}
