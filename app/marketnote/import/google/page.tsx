@@ -107,17 +107,28 @@ function MarketNoteGoogleImportPreview() {
             </div>
           </div>
 
-          <ol className="mt-4 space-y-2 rounded-xl bg-[var(--mikke-yellow)] px-3 py-3 text-xs font-semibold leading-5 text-[var(--mikke-text)]">
-            <li>
-              <span className="font-extrabold">1.</span>{" "}
-              <a href="https://takeout.google.com/" target="_blank" rel="noreferrer" className="font-extrabold text-[var(--mikke-accent)] underline underline-offset-2">
-                Google Takeout
-              </a>
-              で「カレンダー」だけを選んで書き出す
-            </li>
-            <li><span className="font-extrabold">2.</span> ダウンロードしたZIPファイルを開く</li>
-            <li><span className="font-extrabold">3.</span> 中にある予定ファイル（末尾が .ics）を下から選ぶ</li>
-          </ol>
+          <div className="mt-5">
+            <p className="text-xs font-bold text-[var(--mikke-muted)]">移行の手順</p>
+            <ol className="mt-3 space-y-3 text-xs font-semibold leading-5 text-[var(--mikke-text)]">
+              <li className="flex items-start gap-3">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--mikke-surface-soft)] font-extrabold text-[var(--mikke-primary)]">1</span>
+                <span>
+                  <a href="https://takeout.google.com/" target="_blank" rel="noreferrer" className="font-extrabold text-[var(--mikke-accent)] underline underline-offset-2">
+                    Google Takeout
+                  </a>
+                  で「カレンダー」だけを選んで書き出す
+                </span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--mikke-surface-soft)] font-extrabold text-[var(--mikke-primary)]">2</span>
+                <span>ダウンロードしたZIPファイルを開く</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[var(--mikke-surface-soft)] font-extrabold text-[var(--mikke-primary)]">3</span>
+                <span>中にある予定ファイル（末尾が .ics）を下から選ぶ</span>
+              </li>
+            </ol>
+          </div>
           <p className="mt-2 text-[11px] font-semibold leading-5 text-[var(--mikke-muted)]">
             スマホでもZIPファイルを開けます。iPhone・iPadは「ファイル」アプリでZIPをタップ、Androidは「Files by Google」でZIPを選び「展開」を押します。
           </p>
