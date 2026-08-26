@@ -89,7 +89,7 @@ function MarketNoteGoogleImportPreview() {
   const allSelected = Boolean(preview?.items.length) && selectedIds.size === preview?.items.length;
 
   return (
-    <MarketNoteShell title="Googleの予定をファイルから移す" subtitle="MarketNote" isGuest={isGuest}>
+    <MarketNoteShell title="Googleカレンダーの予定をMarketNoteへ移す" subtitle="MarketNote" isGuest={isGuest}>
       <div className="space-y-4 pb-8">
         <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
           <div className="flex items-start gap-3">
@@ -97,26 +97,39 @@ function MarketNoteGoogleImportPreview() {
               <ShieldCheck size={20} />
             </span>
             <div>
-              <h1 className="text-lg font-bold text-[var(--mikke-text)]">この方法は手動です</h1>
+              <h1 className="text-lg font-bold text-[var(--mikke-text)]">Googleカレンダーの予定をMarketNoteへ移す</h1>
+              <p className="mt-2 text-sm font-bold leading-6 text-[var(--mikke-text)]">
+                Googleカレンダーのデータを手動でMarketNoteへ移行できます
+              </p>
               <p className="mt-1 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">
-                Googleへログインして自動同期する画面ではありません。Googleカレンダーから予定ファイルを書き出し、この画面で選びます。
+                Googleカレンダーから予定を書き出し、この画面でファイルを選んで移行します。
               </p>
             </div>
           </div>
 
           <ol className="mt-4 space-y-2 rounded-xl bg-[var(--mikke-yellow)] px-3 py-3 text-xs font-semibold leading-5 text-[var(--mikke-text)]">
-            <li><span className="font-extrabold">1.</span> Google Takeoutで「カレンダー」だけを選び、データを書き出す</li>
+            <li>
+              <span className="font-extrabold">1.</span>{" "}
+              <a href="https://takeout.google.com/" target="_blank" rel="noreferrer" className="font-extrabold text-[var(--mikke-accent)] underline underline-offset-2">
+                Google Takeout
+              </a>
+              で「カレンダー」だけを選んで書き出す
+            </li>
             <li><span className="font-extrabold">2.</span> ダウンロードしたZIPファイルを開く</li>
             <li><span className="font-extrabold">3.</span> 中にある予定ファイル（末尾が .ics）を下から選ぶ</li>
           </ol>
+          <p className="mt-2 text-[11px] font-semibold leading-5 text-[var(--mikke-muted)]">
+            スマホでもZIPファイルを開けます。iPhone・iPadは「ファイル」アプリでZIPをタップ、Androidは「Files by Google」でZIPを選び「展開」を押します。
+          </p>
 
           <label className="mt-4 flex min-h-20 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] px-4 text-sm font-bold text-[var(--mikke-accent)]">
             <FileUp size={19} />
-            <span>{fileName || "書き出した予定ファイルを選ぶ"}</span>
+            <span>{fileName || "予定ファイルを選ぶ"}</span>
             <input type="file" accept=".ics,text/calendar" className="sr-only" onChange={(event) => void selectFile(event)} />
           </label>
           <p className="mt-2 text-[11px] font-semibold leading-5 text-[var(--mikke-muted)]">
-            少し手間のかかる移行方法です。選んだ元ファイルはサーバー・Storage・DBへ送りません。説明、参加者、メール、会議URL等も保存しません。
+            <strong className="text-[var(--mikke-text)]">Googleへログインして自動同期する画面ではありません。</strong><br />
+            選んだファイルはサーバーに送信されません。予定の説明・参加者・メール・会議URLなどは保存しません。
           </p>
           {errorMessage ? <p className="mt-3 rounded-xl bg-[var(--mikke-pink)] px-3 py-2 text-xs font-bold text-[var(--mikke-text)]">{errorMessage}</p> : null}
         </section>

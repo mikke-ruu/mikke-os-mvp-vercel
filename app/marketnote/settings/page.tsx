@@ -38,8 +38,8 @@ const settingsItems: SettingsItem[] = [
     icon: BellRing
   },
   {
-    title: "Googleの予定をファイルから移す",
-    description: "Googleへのログインや自動同期ではなく、書き出した予定ファイルを手動で選ぶ方法です。",
+    title: "Googleカレンダーの予定をMarketNoteへ移す",
+    description: "Googleカレンダーのデータを手動でMarketNoteへ移行できます。",
     href: "/marketnote/import/google",
     icon: FileUp
   }
