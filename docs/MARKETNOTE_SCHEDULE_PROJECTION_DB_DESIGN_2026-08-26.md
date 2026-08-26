@@ -48,3 +48,16 @@ Google Calendarの手動取り込み、および各mikkeOSアプリの予定をM
 6. `supabase_migrations.schema_migrations`へversion記録
 
 現時点ではmigrationファイル作成のみ。本番・開発DBとも未適用。
+
+## Google手動取り込みRPC（ローカル追加設計）
+
+- ブラウザで解析したうち、本人が選択した予定だけを`marketnote_import_google_calendar_manual`へ渡す
+- RPCはログイン済み本人のみ。Supabase匿名ユーザーと`anon`は拒否する
+- 生ICS、ファイル名、説明、参加者、メール、会議URL、添付、リマインダーをDBへ送らない
+- 受け付けるJSONキーを固定し、未知のキーが1つでもあれば全体を拒否する
+- 1回1〜2000件。UID＋RECURRENCE-ID相当の組み合わせをrequest内とDB一意制約の両方で重複防止する
+- 再取り込みは同じ予定投影を更新し、MarketNote予定・Activity Log・STORYへは変換しない
+- 単発取消と特定できるoccurrenceは`cancelled`として保持する。取消シリーズ全体を安全に特定できない場合は警告して除外する
+- batch単位の「元に戻す」は、既存投影を更新した場合の復元履歴が必要なため今回入れない。履歴契約を決めてから別migrationとする
+
+本番トランザクション検証では新規2件→同じ2件の更新、未知キー拒否、Supabase匿名ユーザー拒否、Activity Log件数不変、`anon`実行権限なしを確認し、ROLLBACK後にtable/functionが存在しないことを再確認した。

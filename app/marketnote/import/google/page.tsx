@@ -10,6 +10,8 @@ import {
   type IcsPreviewItem,
   type ParsedIcsCalendar
 } from "@/lib/marketnote-ics-preview.mjs";
+import { buildGoogleManualImportRequest } from "@/lib/marketnote-google-import-contract.mjs";
+import { saveGoogleManualImport } from "@/lib/marketnote-google-import";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
@@ -21,6 +23,8 @@ function MarketNoteGoogleImportPreview() {
   const [to, setTo] = useState(() => offsetDateKey(365));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   const preview = useMemo(
     () => calendar ? buildIcsPreview(calendar, { from, to }) : null,
@@ -63,6 +67,23 @@ function MarketNoteGoogleImportPreview() {
       else next.add(id);
       return next;
     });
+  }
+
+  async function saveSelectedItems() {
+    if (!preview || isGuest || saving) return;
+    setErrorMessage("");
+    setSaveMessage("");
+    setSaving(true);
+    try {
+      const selected = preview.items.filter((item) => selectedIds.has(item.id));
+      const request = buildGoogleManualImportRequest(preview.calendarName, selected);
+      const result = await saveGoogleManualImport(request);
+      setSaveMessage(`${result.total}件をMarketNoteへ取り込みました（新規${result.inserted}件・更新${result.updated}件）。`);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "取り込みに失敗しました。通信状態を確認してください。");
+    } finally {
+      setSaving(false);
+    }
   }
 
   const allSelected = Boolean(preview?.items.length) && selectedIds.size === preview?.items.length;
@@ -151,13 +172,18 @@ function MarketNoteGoogleImportPreview() {
               )}
             </section>
 
+            {saveMessage ? <p className="rounded-xl bg-[var(--mikke-green)] px-4 py-3 text-sm font-bold text-[var(--mikke-text)]">{saveMessage}</p> : null}
             <button
               type="button"
-              disabled
-              className="min-h-12 w-full cursor-not-allowed rounded-xl bg-[var(--mikke-line)] px-4 text-sm font-bold text-white"
+              disabled={isGuest || saving || selectedIds.size === 0}
+              onClick={() => void saveSelectedItems()}
+              className="min-h-12 w-full rounded-xl bg-[var(--mikke-accent)] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-[var(--mikke-line)]"
             >
-              確定取り込みは次の段階で対応します
+              {saving ? "取り込み中…" : isGuest ? "ログインすると取り込めます" : `${selectedIds.size}件をMarketNoteへ取り込む`}
             </button>
+            <p className="text-center text-[11px] font-semibold leading-5 text-[var(--mikke-muted)]">
+              同じ予定をもう一度選んでも二重登録せず、最新内容へ更新します。Google側の説明・参加者・メール等は保存しません。
+            </p>
           </>
         ) : null}
       </div>
@@ -175,7 +201,7 @@ function PreviewRow({ item, selected, onToggle }: { item: IcsPreviewItem; select
       <span className="min-w-0">
         <span className="block truncate text-sm font-bold text-[var(--mikke-text)]">{item.title}</span>
         <span className="mt-1 block text-xs font-semibold text-[var(--mikke-muted)]">
-          {item.dateKey} {item.allDay ? "終日" : `${item.localTime}（${item.timeZone}）`}
+          {item.dateKey} {item.allDay ? "終日" : `${item.localTime}（${item.timeZone}）`}{item.status === "cancelled" ? "・取消として反映" : ""}
         </span>
       </span>
     </label>

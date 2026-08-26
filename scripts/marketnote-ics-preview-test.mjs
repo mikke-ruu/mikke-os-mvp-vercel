@@ -68,6 +68,7 @@ assert.deepEqual(
 assert.equal(preview.items.find((item) => item.title === "毎週の予定")?.startsAt, "2026-08-03T01:00:00.000Z");
 assert.equal(preview.items.find((item) => item.title === "終日の予定")?.allDay, true);
 assert.equal(preview.items.find((item) => item.title === "終日の予定")?.endsAt, "2026-08-10");
+assert.equal(preview.items.find((item) => item.title === "取消予定")?.status, "cancelled");
 assert.equal(preview.duplicateCount, 1);
 assert.equal(JSON.stringify(preview).includes("secret@example.com"), false);
 assert.equal(JSON.stringify(preview).includes("画面に出してはいけない本文"), false);
