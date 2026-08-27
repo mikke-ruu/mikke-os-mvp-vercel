@@ -9,13 +9,16 @@ const entityLabels: Record<string, string> = {
   mikkeos_hq_announcements: "お知らせ",
   mikkeos_hq_article_categories: "記事カテゴリー",
   mikkeos_hq_articles: "記事",
-  mikkeos_hq_updates: "アップデート"
+  mikkeos_hq_updates: "アップデート",
+  mikkeos_ai_tech_experiments: "AI TECH LABの実験"
 };
 
 const actionLabels: Record<string, string> = {
   insert: "作成",
   update: "更新",
-  delete: "削除"
+  delete: "削除",
+  approve_for_lab: "LABテスト承認",
+  decide_experiment: "採用判断"
 };
 
 export default function HqAuditPage() {
