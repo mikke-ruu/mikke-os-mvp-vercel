@@ -407,18 +407,27 @@ begin
     and invitation.user_id = v_user_id
     and invitation.status = 'pending'
     and (invitation.expires_at is null or invitation.expires_at > pg_catalog.now())
-    and (invitation.ends_at is null or invitation.ends_at > pg_catalog.now())
-  for update;
+    and (invitation.ends_at is null or invitation.ends_at > pg_catalog.now());
   if v_invitation.id is null then raise exception 'Pending Academy access invitation was not found'; end if;
 
-  -- Serialise Academy acceptance and Community payment actions for the same
-  -- Community/user/entitlement. The entitlement definition is their shared,
-  -- stable lock row.
+  -- LOCK ORDER 1: shared entitlement definition.
   perform 1
   from public.community_entitlement_definitions definition
   where definition.community_id = v_invitation.community_id
     and definition.key = v_invitation.entitlement_key
   for update;
+
+  -- LOCK ORDER 2: re-read and lock the invitation after waiting for the shared
+  -- entitlement lock. Every competing mutation uses the same order.
+  select invitation.* into v_invitation
+  from public.community_academy_access_invitations invitation
+  where invitation.id = p_invitation_id
+    and invitation.user_id = v_user_id
+    and invitation.status = 'pending'
+    and (invitation.expires_at is null or invitation.expires_at > pg_catalog.now())
+    and (invitation.ends_at is null or invitation.ends_at > pg_catalog.now())
+  for update;
+  if v_invitation.id is null then raise exception 'Pending Academy access invitation was not found'; end if;
 
   if exists (
     select 1
@@ -559,6 +568,9 @@ set search_path = ''
 as $$
 declare
   v_claim public.community_academy_entitlement_claims;
+  v_claim_id uuid;
+  v_claim_community_id uuid;
+  v_claim_entitlement_key text;
 begin
   if coalesce(pg_catalog.current_setting('request.jwt.claim.role', true), '') <> 'service_role'
     and coalesce(auth.jwt() ->> 'role', '') <> 'service_role' then
@@ -567,21 +579,37 @@ begin
   if p_status not in ('active', 'revoked', 'expired') then raise exception 'Unsupported Academy entitlement status'; end if;
   if p_ends_at is not null and p_ends_at <= p_starts_at then raise exception 'Academy access end must be after its start'; end if;
 
+  -- Resolve the immutable entitlement identity without taking a row lock.
   select claim.* into v_claim
   from public.community_academy_entitlement_claims claim
   where claim.mapping_id = p_mapping_id
+    and claim.user_id = p_user_id
+    and claim.source_reference = pg_catalog.btrim(p_source_reference);
+  if v_claim.id is null then
+    raise exception 'Accepted Academy entitlement claim was not found';
+  end if;
+  v_claim_id := v_claim.id;
+  v_claim_community_id := v_claim.community_id;
+  v_claim_entitlement_key := v_claim.entitlement_key;
+
+  -- LOCK ORDER 1: shared entitlement definition.
+  perform 1
+  from public.community_entitlement_definitions definition
+  where definition.community_id = v_claim_community_id
+    and definition.key = v_claim_entitlement_key
+  for update;
+
+  -- LOCK ORDER 2: lock and revalidate the claim after waiting.
+  select claim.* into v_claim
+  from public.community_academy_entitlement_claims claim
+  where claim.id = v_claim_id
+    and claim.mapping_id = p_mapping_id
     and claim.user_id = p_user_id
     and claim.source_reference = pg_catalog.btrim(p_source_reference)
   for update;
   if v_claim.id is null then
     raise exception 'Accepted Academy entitlement claim was not found';
   end if;
-
-  perform 1
-  from public.community_entitlement_definitions definition
-  where definition.community_id = v_claim.community_id
-    and definition.key = v_claim.entitlement_key
-  for update;
   if p_status = 'active' and not exists (
     select 1
     from public.community_access_source_mappings mapping
@@ -824,6 +852,8 @@ begin
     and plan.status = 'active';
   if v_plan.id is null then raise exception 'Active Community plan was not found'; end if;
 
+  -- LOCK ORDER 1: shared entitlement definition; the pending claim is inserted
+  -- only after this lock so review and duplicate-create cannot invert order.
   perform 1
   from public.community_entitlement_definitions definition
   where definition.community_id = p_community_id
@@ -873,18 +903,24 @@ declare
   v_reviewer_user_id uuid := (select auth.uid());
   v_claim public.community_payment_claims;
   v_entitlement_key text;
+  v_claim_community_id uuid;
+  v_claim_plan_id uuid;
+  v_claim_user_id uuid;
 begin
   if v_reviewer_user_id is null then raise exception 'Authentication is required'; end if;
   if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
     raise exception using errcode = '42501', message = 'A registered account is required';
   end if;
 
+  -- Resolve the immutable payment identity without taking a row lock.
   select payment_claim.* into v_claim
   from public.community_payment_claims payment_claim
   where payment_claim.id = p_claim_id
-    and payment_claim.status = 'pending'
-  for update;
+    and payment_claim.status = 'pending';
   if v_claim.id is null then raise exception 'Pending Community payment claim was not found'; end if;
+  v_claim_community_id := v_claim.community_id;
+  v_claim_plan_id := v_claim.plan_id;
+  v_claim_user_id := v_claim.user_id;
   if not community_private.is_staff(v_claim.community_id) then
     raise exception using errcode = '42501', message = 'Community staff authority is required';
   end if;
@@ -895,11 +931,26 @@ begin
     and plan.community_id = v_claim.community_id;
   if v_entitlement_key is null then raise exception 'Community plan was not found'; end if;
 
+  -- LOCK ORDER 1: shared entitlement definition.
   perform 1
   from public.community_entitlement_definitions definition
   where definition.community_id = v_claim.community_id
     and definition.key = v_entitlement_key
   for update;
+
+  -- LOCK ORDER 2: lock and revalidate the pending payment claim after waiting.
+  select payment_claim.* into v_claim
+  from public.community_payment_claims payment_claim
+  where payment_claim.id = p_claim_id
+    and payment_claim.status = 'pending'
+    and payment_claim.community_id = v_claim_community_id
+    and payment_claim.plan_id = v_claim_plan_id
+    and payment_claim.user_id = v_claim_user_id
+  for update;
+  if v_claim.id is null then raise exception 'Pending Community payment claim was not found'; end if;
+  if not community_private.is_staff(v_claim.community_id) then
+    raise exception using errcode = '42501', message = 'Community staff authority is required';
+  end if;
 
   if p_approved and exists (
     select 1

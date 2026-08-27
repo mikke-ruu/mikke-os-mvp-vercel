@@ -21,6 +21,34 @@ const acceptancePage = readFileSync(
 );
 const communityApp = readFileSync(new URL("../components/community/CommunityApp.tsx", import.meta.url), "utf8");
 
+function functionSlice(sql, start, end) {
+  const startIndex = sql.indexOf(start);
+  const endIndex = sql.indexOf(end, startIndex + start.length);
+  assert.ok(startIndex >= 0 && endIndex > startIndex, `Missing SQL function slice: ${start}`);
+  return sql.slice(startIndex, endIndex);
+}
+
+const acceptFunction = functionSlice(
+  migration,
+  "create or replace function public.community_accept_academy_access_invitation",
+  "revoke all on function public.community_accept_academy_access_invitation",
+);
+const syncFunction = functionSlice(
+  migration,
+  "create or replace function public.community_sync_academy_entitlement",
+  "revoke all on function public.community_sync_academy_entitlement",
+);
+const createPaymentFunction = functionSlice(
+  migration,
+  "create or replace function public.community_create_payment_claim",
+  "revoke all on function public.community_create_payment_claim",
+);
+const reviewPaymentFunction = functionSlice(
+  migration,
+  "create or replace function public.community_review_payment_claim",
+  "revoke all on function public.community_review_payment_claim",
+);
+
 assert.match(migration, /academy_subscription/);
 assert.match(migration, /access_scope in \('community', 'linked_rooms'\)/);
 assert.match(migration, /membership\.access_scope = 'community' and room\.access_type = 'free'/);
@@ -49,6 +77,10 @@ for (const match of migration.matchAll(/security definer\s+set search_path = ([^
 assert.match(migration, /on delete restrict/);
 assert.doesNotMatch(migration, /stripe/i);
 assert.doesNotMatch(migration, /grant execute[\s\S]{0,200}community_sync_academy_entitlement[\s\S]{0,100}authenticated/i);
+assert.match(acceptFunction, /LOCK ORDER 1:[\s\S]*community_entitlement_definitions[\s\S]*for update;[\s\S]*LOCK ORDER 2:[\s\S]*community_academy_access_invitations[\s\S]*for update;/i);
+assert.match(syncFunction, /LOCK ORDER 1:[\s\S]*community_entitlement_definitions[\s\S]*for update;[\s\S]*LOCK ORDER 2:[\s\S]*community_academy_entitlement_claims[\s\S]*for update;/i);
+assert.match(createPaymentFunction, /LOCK ORDER 1:[\s\S]*community_entitlement_definitions[\s\S]*for update;[\s\S]*insert into public\.community_payment_claims/i);
+assert.match(reviewPaymentFunction, /LOCK ORDER 1:[\s\S]*community_entitlement_definitions[\s\S]*for update;[\s\S]*LOCK ORDER 2:[\s\S]*community_payment_claims[\s\S]*for update;/i);
 
 assert.match(test, /linked_rooms member can access a normal free Room/);
 assert.match(test, /Revoking one Academy source revoked another source/);
