@@ -215,6 +215,14 @@ grant select, insert, update on
   public.mikkeos_ai_tech_adoptions,
   public.mikkeos_ai_tech_weekly_reports
 to service_role;
+revoke delete, truncate, references, trigger on
+  public.mikkeos_ai_tech_sources,
+  public.mikkeos_ai_tech_news,
+  public.mikkeos_ai_tech_candidates,
+  public.mikkeos_ai_tech_experiments,
+  public.mikkeos_ai_tech_adoptions,
+  public.mikkeos_ai_tech_weekly_reports
+from service_role;
 
 revoke all on sequence public.mikkeos_ai_tech_experiments_experiment_number_seq from public, anon, authenticated;
 grant usage, select on sequence public.mikkeos_ai_tech_experiments_experiment_number_seq to service_role;
