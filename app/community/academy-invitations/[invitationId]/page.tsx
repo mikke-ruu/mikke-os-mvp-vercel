@@ -179,7 +179,7 @@ function InvitationContent({ invitationId, preview }: { invitationId: string; pr
 export default function CommunityAcademyInvitationPage({ params, searchParams }: { params: Promise<{ invitationId: string }>; searchParams: Promise<{ preview?: string }> }) {
   const { invitationId } = use(params);
   const query = use(searchParams);
-  const preview = query.preview === "walkthrough";
+  const preview = process.env.NODE_ENV !== "production" && query.preview === "walkthrough";
   return (
     <main className="min-h-screen bg-[var(--mikke-surface-soft)] px-5 py-10">
       <AuthGate allowGuest={preview}><InvitationContent invitationId={invitationId} preview={preview} /></AuthGate>

@@ -65,6 +65,7 @@ assert.match(acceptancePage, /この団体が現在公開しているRoomだけ�
 assert.doesNotMatch(acceptancePage, /Academy契約/);
 assert.match(acceptancePage, /同意してCommunityへ参加する/);
 assert.doesNotMatch(acceptancePage, /service_role/);
+assert.match(acceptancePage, /process\.env\.NODE_ENV !== "production"/);
 assert.match(communityApp, /Academy連携/);
 assert.match(communityApp, /この利用範囲は利用中です/);
 assert.match(communityApp, /item\.source !== "academy_subscription"/);
