@@ -19,6 +19,7 @@ const acceptancePage = readFileSync(
   new URL("../app/community/academy-invitations/[invitationId]/page.tsx", import.meta.url),
   "utf8",
 );
+const communityApp = readFileSync(new URL("../components/community/CommunityApp.tsx", import.meta.url), "utf8");
 
 assert.match(migration, /academy_subscription/);
 assert.match(migration, /access_scope in \('community', 'linked_rooms'\)/);
@@ -64,5 +65,8 @@ assert.match(acceptancePage, /この団体が現在公開しているRoomだけ�
 assert.doesNotMatch(acceptancePage, /Academy契約/);
 assert.match(acceptancePage, /同意してCommunityへ参加する/);
 assert.doesNotMatch(acceptancePage, /service_role/);
+assert.match(communityApp, /Academy連携/);
+assert.match(communityApp, /この利用範囲は利用中です/);
+assert.match(communityApp, /item\.source !== "academy_subscription"/);
 
 console.log("Community Academy linked access contract: OK");
