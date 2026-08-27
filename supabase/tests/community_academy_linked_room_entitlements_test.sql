@@ -22,6 +22,7 @@ declare
   v_invitation_two uuid;
   v_existing_invitation uuid;
   v_archived_invitation uuid;
+  v_expired_invitation uuid;
   v_suspended_invitation uuid;
   v_plan_same uuid := gen_random_uuid();
   v_plan_other uuid := gen_random_uuid();
@@ -29,7 +30,8 @@ declare
   v_count integer;
 begin
   if has_table_privilege('anon', 'public.community_academy_entitlement_claims', 'select')
-    or has_table_privilege('authenticated', 'public.community_academy_entitlement_claims', 'insert,update,delete') then
+    or has_table_privilege('authenticated', 'public.community_academy_entitlement_claims', 'select,insert,update,delete')
+    or has_table_privilege('authenticated', 'public.community_academy_access_invitations', 'select,insert,update,delete') then
     raise exception 'Academy claim ledger has unsafe client grants';
   end if;
   if has_function_privilege(
@@ -127,6 +129,9 @@ begin
   v_archived_invitation := public.community_create_academy_access_invitation(
     v_mapping, v_other_user, 'academy-archived:1', 'learner', now() - interval '1 hour', null, now() + interval '7 days'
   );
+  v_expired_invitation := public.community_create_academy_access_invitation(
+    v_mapping, v_other_user, 'academy-expired:1', 'learner', now() - interval '2 days', now() - interval '1 day', now() + interval '7 days'
+  );
   v_suspended_invitation := public.community_create_academy_access_invitation(
     v_mapping, v_suspended_user, 'academy-suspended:1', 'learner', now() - interval '1 hour', null, now() + interval '7 days'
   );
@@ -161,6 +166,38 @@ begin
   if not community_private.can_access_room(v_academy_room) then
     raise exception 'linked_rooms member cannot access the mapped Academy Room';
   end if;
+
+  execute 'reset role';
+  perform set_config('request.jwt.claim.role', 'service_role', true);
+  begin
+    update public.community_access_source_mappings
+    set entitlement_key = 'community-paid'
+    where id = v_mapping;
+    raise exception 'Active Academy mapping was retargeted while a claim was active';
+  exception when others then
+    if sqlerrm = 'Active Academy mapping was retargeted while a claim was active' then raise; end if;
+  end;
+  begin
+    update public.community_access_source_mappings
+    set status = 'archived'
+    where id = v_mapping;
+    raise exception 'Academy mapping was archived while a claim was active';
+  exception when others then
+    if sqlerrm = 'Academy mapping was archived while a claim was active' then raise; end if;
+  end;
+  begin
+    update public.community_academy_entitlement_claims
+    set source_reference = 'tampered-source'
+    where mapping_id = v_mapping and user_id = v_linked_user;
+    raise exception 'Academy immutable claim identity was changed';
+  exception when others then
+    if sqlerrm = 'Academy immutable claim identity was changed' then raise; end if;
+  end;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', v_linked_user, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_linked_user::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
   if exists (select 1 from public.community_events where id = v_event) then
     raise exception 'linked_rooms member can read a Community-wide event';
   end if;
@@ -194,7 +231,35 @@ begin
     raise exception 'Authenticated participant directly updated Academy claim ledger';
   exception when insufficient_privilege then null;
   end;
+  begin
+    perform 1 from public.community_academy_access_invitations where user_id = v_linked_user;
+    raise exception 'Authenticated invitee directly read Academy invitation internals';
+  exception when insufficient_privilege then null;
+  end;
 
+  execute 'reset role';
+
+  -- A pending Community payment must be resolved explicitly before Academy
+  -- acceptance; neither path silently cancels, refunds or duplicates it.
+  perform set_config('request.jwt.claims', json_build_object('sub', v_existing_member, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_existing_member::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  perform public.community_create_payment_claim(
+    v_community, v_plan_same, 'Existing member', null, 'pending before Academy'
+  );
+  begin
+    perform public.community_accept_academy_access_invitation(
+      v_existing_invitation, 'Existing member', 'Existing member', '09000000001', '',
+      true, true, true
+    );
+    raise exception 'Academy invitation accepted while equivalent payment claim was pending';
+  exception when others then
+    if sqlerrm = 'Academy invitation accepted while equivalent payment claim was pending' then raise; end if;
+  end;
+  update public.community_payment_claims
+  set status = 'cancelled'
+  where community_id = v_community and user_id = v_existing_member and plan_id = v_plan_same and status = 'pending';
   execute 'reset role';
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_suspended_user, 'role', 'authenticated')::text, true);
@@ -261,10 +326,35 @@ begin
   end if;
   execute 'reset role';
 
+  -- Even if a pending claim is introduced by a trusted integration during a
+  -- race, staff approval is guarded at the database boundary.
+  insert into public.community_payment_claims (
+    community_id, plan_id, user_id, payer_name, note, status
+  ) values (
+    v_community, v_plan_same, v_existing_member, 'Existing member', 'race fixture', 'pending'
+  );
+  perform set_config('request.jwt.claims', json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_owner::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  begin
+    perform public.community_review_payment_claim(
+      (select id from public.community_payment_claims
+       where community_id = v_community and user_id = v_existing_member
+         and plan_id = v_plan_same and status = 'pending'),
+      true,
+      'must fail'
+    );
+    raise exception 'Staff approved an equivalent payment claim during active Academy access';
+  exception when others then
+    if sqlerrm = 'Staff approved an equivalent payment claim during active Academy access' then raise; end if;
+  end;
+  execute 'reset role';
+
   insert into public.community_member_entitlements (
     community_id, user_id, entitlement_key, source, source_reference, status
   ) values (
-    v_community, v_existing_member, 'community-paid', 'subscription', 'existing-paid-contract', 'active'
+    v_community, v_existing_member, 'academy-room', 'subscription', 'existing-paid-contract', 'active'
   );
 
   perform set_config('request.jwt.claim.role', 'service_role', true);
@@ -281,6 +371,7 @@ begin
   if not exists (
     select 1 from public.community_member_entitlements
     where community_id = v_community and user_id = v_existing_member
+      and entitlement_key = 'academy-room'
       and source = 'subscription' and source_reference = 'existing-paid-contract' and status = 'active'
   ) then
     raise exception 'Academy revocation changed the existing paid Community entitlement';
@@ -300,9 +391,43 @@ begin
   perform set_config('request.jwt.claim.sub', v_other_user::text, true);
   perform set_config('request.jwt.claim.role', 'authenticated', true);
   execute 'set local role authenticated';
-  if exists (select 1 from public.community_academy_entitlement_claims where community_id = v_community) then
+  begin
+    perform 1 from public.community_academy_entitlement_claims where community_id = v_community;
     raise exception 'Another user can read Academy entitlement claims';
+  exception when insufficient_privilege then null;
+  end;
+  if public.community_get_my_academy_access_invitation(v_expired_invitation) is not null then
+    raise exception 'Expired Academy access invitation was returned as joinable';
   end if;
+  begin
+    perform public.community_accept_academy_access_invitation(
+      v_expired_invitation, 'Other user', 'Other user', '09000000003', '',
+      true, true, true
+    );
+    raise exception 'Expired Academy access invitation was accepted';
+  exception when others then
+    if sqlerrm = 'Expired Academy access invitation was accepted' then raise; end if;
+  end;
+  execute 'reset role';
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', v_other_user, 'role', 'authenticated', 'is_anonymous', true
+  )::text, true);
+  perform set_config('request.jwt.claim.sub', v_other_user::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  if public.community_get_my_academy_access_invitation(v_archived_invitation) is not null then
+    raise exception 'Anonymous Auth user can read Academy invitation';
+  end if;
+  begin
+    perform public.community_accept_academy_access_invitation(
+      v_archived_invitation, 'Anonymous', 'Anonymous', '09000000003', '',
+      true, true, true
+    );
+    raise exception 'Anonymous Auth user accepted Academy invitation';
+  exception when others then
+    if sqlerrm = 'Anonymous Auth user accepted Academy invitation' then raise; end if;
+  end;
   execute 'reset role';
 
   update public.community_access_source_mappings

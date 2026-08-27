@@ -78,7 +78,11 @@ as $$
    and mapping.provider_type = 'academy_subscription'
    and mapping.status = 'active'
   where invitation.id = p_invitation_id
-    and invitation.user_id = (select auth.uid());
+    and invitation.user_id = (select auth.uid())
+    and (select auth.uid()) is not null
+    and not coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)
+    and (invitation.expires_at is null or invitation.expires_at > pg_catalog.now())
+    and (invitation.ends_at is null or invitation.ends_at > pg_catalog.now());
 $$;
 
 revoke all on function public.community_get_my_academy_access_invitation(uuid)

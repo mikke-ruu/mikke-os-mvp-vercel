@@ -930,23 +930,13 @@ export async function createCommunityPaymentClaim(client: DbClient, communityId:
 }
 
 export async function reviewCommunityPaymentClaim(client: DbClient, claimId: string, reviewerUserId: string, approved: boolean, note = "") {
-  const { data: claim, error: claimError } = await client.from("community_payment_claims").select("community_id,plan_id,user_id").eq("id", claimId).single();
-  if (claimError) throw claimError;
-  const { data: plan, error: planError } = await client.from("community_membership_plans").select("entitlement_key").eq("id", claim.plan_id).single();
-  if (planError) throw planError;
-  const { error } = await client.from("community_payment_claims").update({
-    status: approved ? "approved" : "rejected", reviewed_by_user_id: reviewerUserId,
-    reviewed_at: new Date().toISOString(), review_note: note.trim() || null
-  }).eq("id", claimId);
+  if (!reviewerUserId) throw new Error("ログインが必要です。");
+  const { error } = await client.rpc("community_review_payment_claim", {
+    p_claim_id: claimId,
+    p_approved: approved,
+    p_review_note: note.trim() || null
+  });
   if (error) throw error;
-  if (approved) {
-    const { error: grantError } = await client.from("community_member_entitlements").upsert({
-      community_id: claim.community_id, user_id: claim.user_id, entitlement_key: plan.entitlement_key,
-      source: "subscription", source_reference: `payment-claim:${claimId}`, status: "active",
-      starts_at: new Date().toISOString(), ends_at: null, granted_by_user_id: reviewerUserId
-    }, { onConflict: "community_id,user_id,entitlement_key,source" });
-    if (grantError) throw grantError;
-  }
 }
 
 export async function createCommunityDataRequest(client: DbClient, communityId: string, userId: string, requestType: CommunityMemberDataRequest["requestType"], note = "") {
