@@ -148,7 +148,7 @@ export function personalEventsToManagerSchedules(personalEvents: ManagerPersonal
         appKey: "manager" as const,
         sourceType: "personal_event" as const,
         sourceId: event.id,
-        href: "/manager/calendar"
+        href: "/manager/personal-events"
       }
     }))
     .sort((a, b) => compareManagerItems(a, b, now));

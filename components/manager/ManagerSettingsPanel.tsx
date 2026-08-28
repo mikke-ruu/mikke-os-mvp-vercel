@@ -142,7 +142,7 @@ export function ManagerSettingsPanel() {
             この端末のManagerに保存されている個人予定が{personalEvents.length}件あります。MarketNoteへの移行方法が決まるまで、ここから確認・編集できます。
           </p>
           <Link
-            href="/manager/calendar"
+            href="/manager/personal-events"
             className="mt-4 inline-flex rounded-full border border-[var(--mikke-line)] bg-white px-4 py-2 text-sm font-bold text-[var(--mikke-primary)]"
           >
             個人予定を確認する
