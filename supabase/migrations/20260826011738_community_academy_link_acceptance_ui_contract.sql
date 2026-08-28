@@ -93,6 +93,24 @@ grant execute on function public.community_get_my_academy_access_invitation(uuid
 comment on function public.community_get_my_academy_access_invitation(uuid) is
   'Returns the minimum invite, Room scope and versioned Community consent data for the authenticated invitee.';
 
+-- Academy mappings are immutable history once archived. Keep the existing
+-- uniqueness contract for other providers, while allowing one current Academy
+-- mapping plus any number of archived versions for the same source product.
+alter table public.community_access_source_mappings
+  drop constraint if exists community_access_source_mappi_community_id_provider_type_pr_key;
+
+create unique index if not exists community_access_source_mappings_non_academy_source_uidx
+  on public.community_access_source_mappings (
+    community_id, provider_type, provider_owner_key, source_product_key
+  )
+  where provider_type <> 'academy_subscription';
+
+create unique index if not exists community_access_source_mappings_current_academy_source_uidx
+  on public.community_access_source_mappings (
+    community_id, provider_type, provider_owner_key, source_product_key
+  )
+  where provider_type = 'academy_subscription' and status <> 'archived';
+
 -- Community staff may continue to manage manual/API mappings, but an Academy
 -- mapping also needs current Academy headquarters authority. Route those rows
 -- through the dual-authority RPC below.
@@ -156,8 +174,17 @@ begin
           'id', mapping.id,
           'sourceProductKey', mapping.source_product_key,
           'entitlementKey', mapping.entitlement_key,
-          'status', mapping.status
-        ) order by mapping.created_at)
+          'status', mapping.status,
+          'isCurrent', mapping.status <> 'archived',
+          'activeClaimCount', (
+            select count(*)
+            from public.community_academy_entitlement_claims claim
+            where claim.mapping_id = mapping.id
+              and claim.status = 'active'
+              and claim.starts_at <= pg_catalog.now()
+              and (claim.ends_at is null or claim.ends_at > pg_catalog.now())
+          )
+        ) order by (mapping.status = 'archived'), mapping.created_at desc)
         from public.community_access_source_mappings mapping
         where mapping.community_id = community.id
           and mapping.provider_type = 'academy_subscription'
@@ -191,38 +218,92 @@ as $$
 declare
   v_user_id uuid := (select auth.uid());
   v_mapping_id uuid;
+  v_current_mapping public.community_access_source_mappings;
+  v_source_product_key text := pg_catalog.btrim(p_source_product_key);
+  v_entitlement_key text := pg_catalog.btrim(p_entitlement_key);
 begin
   if v_user_id is null then raise exception 'Authentication is required'; end if;
+  if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception using errcode = '42501', message = 'Anonymous Auth users cannot manage Academy Community links';
+  end if;
   if not private.academy_can_manage_headquarters(p_headquarters_id) then
     raise exception using errcode = '42501', message = 'Academy headquarters management is required';
   end if;
   if not community_private.is_staff(p_community_id) then
     raise exception using errcode = '42501', message = 'Community staff authority is required';
   end if;
-  if char_length(trim(coalesce(p_source_product_key, ''))) not between 1 and 120 then
+  if char_length(coalesce(v_source_product_key, '')) not between 1 and 120 then
     raise exception 'A source product key is required';
   end if;
   if p_status not in ('draft', 'active', 'archived') then raise exception 'Unsupported mapping status'; end if;
-  if not exists (
-    select 1 from public.community_entitlement_definitions definition
-    where definition.community_id = p_community_id
-      and definition.key = trim(p_entitlement_key)
-      and definition.status = 'active'
-  ) then raise exception 'Active Community entitlement was not found'; end if;
 
-  insert into public.community_access_source_mappings (
-    community_id, provider_type, provider_owner_key, source_product_key,
-    entitlement_key, status, created_by_user_id
-  ) values (
-    p_community_id, 'academy_subscription', p_headquarters_id::text,
-    trim(p_source_product_key), trim(p_entitlement_key), p_status, v_user_id
-  )
-  on conflict (community_id, provider_type, provider_owner_key, source_product_key)
-  do update set
-    entitlement_key = excluded.entitlement_key,
-    status = excluded.status,
-    updated_at = now()
-  returning id into v_mapping_id;
+  -- Serialize every configuration change for one Community before locking a
+  -- possibly different target definition. This avoids two administrators
+  -- creating competing current versions for the same Academy product.
+  perform 1
+  from public.community_communities community
+  where community.id = p_community_id
+    and community.status = 'active'
+  for update;
+  if not found then raise exception 'Active Community was not found'; end if;
+
+  perform 1
+  from public.community_entitlement_definitions definition
+    where definition.community_id = p_community_id
+      and definition.key = v_entitlement_key
+      and definition.status = 'active'
+  for update;
+  if not found then raise exception 'Active Community entitlement was not found'; end if;
+
+  select mapping.* into v_current_mapping
+  from public.community_access_source_mappings mapping
+  where mapping.community_id = p_community_id
+    and mapping.provider_type = 'academy_subscription'
+    and mapping.provider_owner_key = p_headquarters_id::text
+    and mapping.source_product_key = v_source_product_key
+    and mapping.status <> 'archived'
+  for update;
+
+  if v_current_mapping.id is null then
+    if p_status = 'archived' then
+      raise exception 'A current Academy Community link was not found';
+    end if;
+    insert into public.community_access_source_mappings (
+      community_id, provider_type, provider_owner_key, source_product_key,
+      entitlement_key, status, created_by_user_id
+    ) values (
+      p_community_id, 'academy_subscription', p_headquarters_id::text,
+      v_source_product_key, v_entitlement_key, p_status, v_user_id
+    )
+    returning id into v_mapping_id;
+  elsif v_current_mapping.entitlement_key = v_entitlement_key then
+    update public.community_access_source_mappings
+    set status = p_status,
+        updated_at = pg_catalog.now()
+    where id = v_current_mapping.id
+    returning id into v_mapping_id;
+  else
+    if p_status = 'archived' then
+      raise exception 'Choose draft or active when changing the Community Room scope';
+    end if;
+
+    -- The guard from the linked-entitlement migration rejects this archive
+    -- until every active Academy claim for the old mapping has been revoked.
+    update public.community_access_source_mappings
+    set status = 'archived',
+        updated_at = pg_catalog.now()
+    where id = v_current_mapping.id;
+
+    insert into public.community_access_source_mappings (
+      community_id, provider_type, provider_owner_key, source_product_key,
+      entitlement_key, status, created_by_user_id
+    ) values (
+      p_community_id, 'academy_subscription', p_headquarters_id::text,
+      v_source_product_key, v_entitlement_key, p_status, v_user_id
+    )
+    returning id into v_mapping_id;
+  end if;
+
   return v_mapping_id;
 end;
 $$;

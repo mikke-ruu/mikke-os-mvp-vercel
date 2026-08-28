@@ -48,6 +48,11 @@ const reviewPaymentFunction = functionSlice(
   "create or replace function public.community_review_payment_claim",
   "revoke all on function public.community_review_payment_claim",
 );
+const upsertAcademyLinkFunction = functionSlice(
+  uiMigration,
+  "create or replace function public.academy_upsert_community_room_link",
+  "revoke all on function public.academy_upsert_community_room_link",
+);
 
 assert.match(migration, /academy_subscription/);
 assert.match(migration, /access_scope in \('community', 'linked_rooms'\)/);
@@ -94,6 +99,8 @@ assert.match(test, /Staff approved an equivalent payment claim during active Aca
 assert.match(test, /Expired Academy access invitation was accepted/);
 assert.match(test, /Anonymous Auth user accepted Academy invitation/);
 assert.match(test, /Active Academy mapping was retargeted while a claim was active/);
+assert.match(test, /Academy Room scope changed before active claims were revoked/);
+assert.match(test, /Academy mapping scope change overwrote immutable mapping history/);
 assert.match(test, /linked_rooms member can read a Community-wide event/);
 assert.match(test, /linked_rooms member can read a Community-wide resource/);
 assert.match(client, /rpc\("community_create_payment_claim"/);
@@ -108,6 +115,12 @@ assert.match(uiMigration, /termsVersion/);
 assert.match(uiMigration, /rulesVersion/);
 assert.match(uiMigration, /privacyVersion/);
 assert.match(uiMigration, /not coalesce\(\(auth\.jwt\(\) ->> 'is_anonymous'\)::boolean, false\)/);
+assert.match(uiMigration, /community_access_source_mappings_current_academy_source_uidx/);
+assert.match(uiMigration, /where provider_type = 'academy_subscription' and status <> 'archived'/);
+assert.match(uiMigration, /'activeClaimCount'/);
+assert.match(upsertAcademyLinkFunction, /community_communities[\s\S]*for update;[\s\S]*community_entitlement_definitions[\s\S]*for update;[\s\S]*community_access_source_mappings[\s\S]*for update;/i);
+assert.match(upsertAcademyLinkFunction, /set status = 'archived'[\s\S]*insert into public\.community_access_source_mappings/i);
+assert.doesNotMatch(upsertAcademyLinkFunction, /on conflict/i);
 assert.match(acceptancePage, /この団体から案内されたRoomを追加料金なしで利用できます/);
 assert.match(acceptancePage, /現在見られる場所はそのまま利用できます/);
 assert.match(acceptancePage, /この団体が現在公開しているRoomだけが表示されます/);

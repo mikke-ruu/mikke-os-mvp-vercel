@@ -14,6 +14,7 @@ declare
   v_community uuid := gen_random_uuid();
   v_headquarters uuid := gen_random_uuid();
   v_mapping uuid := gen_random_uuid();
+  v_replacement_mapping uuid;
   v_free_room uuid := gen_random_uuid();
   v_academy_room uuid := gen_random_uuid();
   v_event uuid := gen_random_uuid();
@@ -68,6 +69,9 @@ begin
 
   insert into public.community_communities (id, slug, name, join_mode, status, owner_user_id)
   values (v_community, 'academy-community-' || v_suffix, 'Academy Community test', 'invite_only', 'active', v_owner);
+
+  insert into public.academy_headquarters (id, owner_user_id, name, handle)
+  values (v_headquarters, v_owner, 'Academy headquarters test', 'academy-hq-' || v_suffix);
 
   insert into public.community_safety_settings (community_id)
   values (v_community)
@@ -193,6 +197,20 @@ begin
   exception when others then
     if sqlerrm = 'Academy immutable claim identity was changed' then raise; end if;
   end;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_owner::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  begin
+    perform public.academy_upsert_community_room_link(
+      v_headquarters, v_community, 'course:test', 'community-paid', 'active'
+    );
+    raise exception 'Academy Room scope changed before active claims were revoked';
+  exception when others then
+    if sqlerrm = 'Academy Room scope changed before active claims were revoked' then raise; end if;
+  end;
+  execute 'reset role';
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_linked_user, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', v_linked_user::text, true);
@@ -430,9 +448,40 @@ begin
   end;
   execute 'reset role';
 
-  update public.community_access_source_mappings
-  set status = 'archived'
-  where id = v_mapping;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_owner::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  v_replacement_mapping := public.academy_upsert_community_room_link(
+    v_headquarters, v_community, 'course:test', 'community-paid', 'active'
+  );
+  execute 'reset role';
+
+  if v_replacement_mapping = v_mapping then
+    raise exception 'Academy mapping scope change overwrote immutable mapping history';
+  end if;
+  if not exists (
+    select 1 from public.community_access_source_mappings
+    where id = v_mapping and status = 'archived' and entitlement_key = 'academy-room'
+  ) then
+    raise exception 'Old Academy mapping was not archived during scope change';
+  end if;
+  if not exists (
+    select 1 from public.community_access_source_mappings
+    where id = v_replacement_mapping and status = 'active' and entitlement_key = 'community-paid'
+  ) then
+    raise exception 'Replacement Academy mapping was not created for the new scope';
+  end if;
+  select count(*) into v_count
+  from public.community_access_source_mappings
+  where community_id = v_community
+    and provider_type = 'academy_subscription'
+    and provider_owner_key = v_headquarters::text
+    and source_product_key = 'course:test'
+    and status <> 'archived';
+  if v_count <> 1 then
+    raise exception 'Academy source has more than one current mapping version';
+  end if;
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_other_user, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', v_other_user::text, true);
