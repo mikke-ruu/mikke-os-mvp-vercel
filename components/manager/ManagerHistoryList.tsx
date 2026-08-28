@@ -10,31 +10,11 @@ import {
   listMyManagerActivityLogs,
   type ManagerActivityLog
 } from "@/lib/manager/activity-logs";
+import { getManagerHistorySourceLabel } from "@/lib/manager/history-labels";
 import { ManagerShell } from "./ManagerShell";
 
 const managerTimeZone = "Asia/Tokyo";
 type HistoryView = "recent" | "achievements";
-
-const sourceServiceLabels: Record<string, string> = {
-  academy: "Academy",
-  community: "Community",
-  event: "Event",
-  fund: "Fund",
-  item_studio: "Item Studio",
-  library: "Library",
-  manual: "mikkeOS",
-  market_note: "MarketNote",
-  marketnote: "MarketNote",
-  order: "Order",
-  page: "Page",
-  session: "Session",
-  studio: "Item Studio",
-  team_works: "Team Works"
-};
-
-function getSourceServiceLabel(sourceService: string) {
-  return sourceServiceLabels[sourceService] ?? "mikkeOS";
-}
 
 export function ManagerHistoryList() {
   const { user } = useAuth();
@@ -201,7 +181,7 @@ function HistoryRow({ log, achievement }: { log: ManagerActivityLog; achievement
           <MikkeStatusBadge tone="success" withDot className="px-1.5 py-0.5 text-[9px]">実績</MikkeStatusBadge>
         ) : null}
         <MikkeStatusBadge tone="primary" className="px-1.5 py-0.5 text-[9px]">
-          {getSourceServiceLabel(log.sourceService)}
+          {getManagerHistorySourceLabel(log.sourceService)}
         </MikkeStatusBadge>
       </span>
     </article>
