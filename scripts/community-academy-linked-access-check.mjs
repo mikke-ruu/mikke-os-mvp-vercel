@@ -115,6 +115,7 @@ assert.match(test, /Academy Room scope changed before active claims were revoked
 assert.match(test, /Academy mapping scope change overwrote immutable mapping history/);
 assert.match(test, /Academy Room scope changed while a future accepted claim remained active/);
 assert.match(test, /Anonymous Auth user listed Academy Community links/);
+assert.match(test, /Anonymous Auth user changed an Academy Community link/);
 assert.match(test, /linked_rooms member can read a Community-wide event/);
 assert.match(test, /linked_rooms member can read a Community-wide resource/);
 assert.match(client, /rpc\("community_create_payment_claim"/);

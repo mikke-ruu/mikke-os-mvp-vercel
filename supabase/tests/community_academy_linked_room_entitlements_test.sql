@@ -88,6 +88,14 @@ begin
   exception when others then
     if sqlerrm <> 'Anonymous Auth users cannot manage Academy Community links' then raise; end if;
   end;
+  begin
+    perform public.academy_upsert_community_room_link(
+      v_headquarters, v_community, 'course:test', 'academy-room', 'draft'
+    );
+    raise exception 'Anonymous Auth user changed an Academy Community link';
+  exception when others then
+    if sqlerrm <> 'Anonymous Auth users cannot manage Academy Community links' then raise; end if;
+  end;
   execute 'reset role';
 
   insert into public.community_safety_settings (community_id)
