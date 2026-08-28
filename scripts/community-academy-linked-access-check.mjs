@@ -48,10 +48,20 @@ const reviewPaymentFunction = functionSlice(
   "create or replace function public.community_review_payment_claim",
   "revoke all on function public.community_review_payment_claim",
 );
+const mappingGuardFunction = functionSlice(
+  migration,
+  "create or replace function community_private.guard_academy_mapping_version",
+  "revoke all on function community_private.guard_academy_invitation_identity",
+);
 const upsertAcademyLinkFunction = functionSlice(
   uiMigration,
   "create or replace function public.academy_upsert_community_room_link",
   "revoke all on function public.academy_upsert_community_room_link",
+);
+const listAcademyLinkFunction = functionSlice(
+  uiMigration,
+  "create or replace function public.academy_list_my_community_link_options",
+  "revoke all on function public.academy_list_my_community_link_options",
 );
 
 assert.match(migration, /academy_subscription/);
@@ -72,6 +82,8 @@ assert.match(migration, /drop policy if exists "staff can review payment claims"
 assert.match(migration, /community_review_payment_claim/);
 assert.match(migration, /Resolve the pending Community payment claim before accepting Academy access/);
 assert.match(migration, /Revoke active Academy claims before changing or archiving this mapping/);
+assert.match(mappingGuardFunction, /claim\.status = 'active'\s+and \(claim\.ends_at is null or claim\.ends_at > pg_catalog\.now\(\)\)/);
+assert.doesNotMatch(mappingGuardFunction, /claim\.starts_at <= pg_catalog\.now\(\)/);
 assert.match(migration, /Academy invitation source identity is immutable/);
 assert.match(migration, /Academy entitlement source identity is immutable/);
 assert.match(migration, /invitation\.ends_at is null or invitation\.ends_at > pg_catalog\.now\(\)/);
@@ -101,6 +113,8 @@ assert.match(test, /Anonymous Auth user accepted Academy invitation/);
 assert.match(test, /Active Academy mapping was retargeted while a claim was active/);
 assert.match(test, /Academy Room scope changed before active claims were revoked/);
 assert.match(test, /Academy mapping scope change overwrote immutable mapping history/);
+assert.match(test, /Academy Room scope changed while a future accepted claim remained active/);
+assert.match(test, /Anonymous Auth user listed Academy Community links/);
 assert.match(test, /linked_rooms member can read a Community-wide event/);
 assert.match(test, /linked_rooms member can read a Community-wide resource/);
 assert.match(client, /rpc\("community_create_payment_claim"/);
@@ -121,6 +135,9 @@ assert.match(uiMigration, /'activeClaimCount'/);
 assert.match(upsertAcademyLinkFunction, /community_communities[\s\S]*for update;[\s\S]*community_entitlement_definitions[\s\S]*for update;[\s\S]*community_access_source_mappings[\s\S]*for update;/i);
 assert.match(upsertAcademyLinkFunction, /set status = 'archived'[\s\S]*insert into public\.community_access_source_mappings/i);
 assert.doesNotMatch(upsertAcademyLinkFunction, /on conflict/i);
+assert.match(listAcademyLinkFunction, /Anonymous Auth users cannot manage Academy Community links/);
+assert.match(upsertAcademyLinkFunction, /Anonymous Auth users cannot manage Academy Community links/);
+assert.doesNotMatch(listAcademyLinkFunction, /claim\.starts_at <= pg_catalog\.now\(\)/);
 assert.match(acceptancePage, /この団体から案内されたRoomを追加料金なしで利用できます/);
 assert.match(acceptancePage, /現在見られる場所はそのまま利用できます/);
 assert.match(acceptancePage, /この団体が現在公開しているRoomだけが表示されます/);

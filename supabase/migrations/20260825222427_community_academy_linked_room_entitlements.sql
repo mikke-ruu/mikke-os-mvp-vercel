@@ -150,7 +150,6 @@ begin
       from public.community_academy_entitlement_claims claim
       where claim.mapping_id = old.id
         and claim.status = 'active'
-        and claim.starts_at <= pg_catalog.now()
         and (claim.ends_at is null or claim.ends_at > pg_catalog.now())
     ) then
     raise exception using errcode = '23514',

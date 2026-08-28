@@ -150,6 +150,9 @@ declare
   v_user_id uuid := (select auth.uid());
 begin
   if v_user_id is null then raise exception 'Authentication is required'; end if;
+  if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception using errcode = '42501', message = 'Anonymous Auth users cannot manage Academy Community links';
+  end if;
   if not private.academy_can_manage_headquarters(p_headquarters_id) then
     raise exception using errcode = '42501', message = 'Academy headquarters management is required';
   end if;
@@ -181,7 +184,6 @@ begin
             from public.community_academy_entitlement_claims claim
             where claim.mapping_id = mapping.id
               and claim.status = 'active'
-              and claim.starts_at <= pg_catalog.now()
               and (claim.ends_at is null or claim.ends_at > pg_catalog.now())
           )
         ) order by (mapping.status = 'archived'), mapping.created_at desc)

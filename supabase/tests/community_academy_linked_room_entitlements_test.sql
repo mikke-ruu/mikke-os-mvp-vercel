@@ -11,6 +11,7 @@ declare
   v_existing_member uuid := gen_random_uuid();
   v_other_user uuid := gen_random_uuid();
   v_suspended_user uuid := gen_random_uuid();
+  v_future_user uuid := gen_random_uuid();
   v_community uuid := gen_random_uuid();
   v_headquarters uuid := gen_random_uuid();
   v_mapping uuid := gen_random_uuid();
@@ -25,6 +26,7 @@ declare
   v_archived_invitation uuid;
   v_expired_invitation uuid;
   v_suspended_invitation uuid;
+  v_future_invitation uuid;
   v_plan_same uuid := gen_random_uuid();
   v_plan_other uuid := gen_random_uuid();
   v_suffix text := substr(replace(gen_random_uuid()::text, '-', ''), 1, 12);
@@ -52,7 +54,8 @@ begin
     (v_linked_user, 'academy-community-linked-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now()),
     (v_existing_member, 'academy-community-existing-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now()),
     (v_other_user, 'academy-community-other-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now()),
-    (v_suspended_user, 'academy-community-suspended-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now());
+    (v_suspended_user, 'academy-community-suspended-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now()),
+    (v_future_user, 'academy-community-future-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now());
 
   insert into public.academy_headquarters (
     id, owner_user_id, name, handle, plan, is_active
@@ -72,6 +75,20 @@ begin
 
   insert into public.academy_headquarters (id, owner_user_id, name, handle)
   values (v_headquarters, v_owner, 'Academy headquarters test', 'academy-hq-' || v_suffix);
+
+  perform set_config('request.jwt.claims', json_build_object(
+    'sub', v_owner, 'role', 'authenticated', 'is_anonymous', true
+  )::text, true);
+  perform set_config('request.jwt.claim.sub', v_owner::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  begin
+    perform public.academy_list_my_community_link_options(v_headquarters);
+    raise exception 'Anonymous Auth user listed Academy Community links';
+  exception when others then
+    if sqlerrm <> 'Anonymous Auth users cannot manage Academy Community links' then raise; end if;
+  end;
+  execute 'reset role';
 
   insert into public.community_safety_settings (community_id)
   values (v_community)
@@ -139,6 +156,9 @@ begin
   v_suspended_invitation := public.community_create_academy_access_invitation(
     v_mapping, v_suspended_user, 'academy-suspended:1', 'learner', now() - interval '1 hour', null, now() + interval '7 days'
   );
+  v_future_invitation := public.community_create_academy_access_invitation(
+    v_mapping, v_future_user, 'academy-future:1', 'learner', now() + interval '1 day', now() + interval '2 days', now() + interval '7 days'
+  );
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_linked_user, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', v_linked_user::text, true);
@@ -163,6 +183,22 @@ begin
     v_invitation_two, 'Linked learner', 'Linked learner', '09000000000', '',
     true, true, true
   );
+
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_future_user, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_future_user::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  perform public.community_accept_academy_access_invitation(
+    v_future_invitation, 'Future learner', 'Future learner', '09000000004', '',
+    true, true, true
+  );
+
+  execute 'reset role';
+  perform set_config('request.jwt.claims', json_build_object('sub', v_linked_user, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_linked_user::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
 
   if community_private.can_access_room(v_free_room) then
     raise exception 'linked_rooms member can access a normal free Room';
@@ -447,6 +483,25 @@ begin
     if sqlerrm = 'Anonymous Auth user accepted Academy invitation' then raise; end if;
   end;
   execute 'reset role';
+
+  perform set_config('request.jwt.claims', json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
+  perform set_config('request.jwt.claim.sub', v_owner::text, true);
+  perform set_config('request.jwt.claim.role', 'authenticated', true);
+  execute 'set local role authenticated';
+  begin
+    perform public.academy_upsert_community_room_link(
+      v_headquarters, v_community, 'course:test', 'community-paid', 'active'
+    );
+    raise exception 'Academy Room scope changed while a future accepted claim remained active';
+  exception when others then
+    if sqlerrm = 'Academy Room scope changed while a future accepted claim remained active' then raise; end if;
+  end;
+  execute 'reset role';
+
+  perform set_config('request.jwt.claim.role', 'service_role', true);
+  perform public.community_sync_academy_entitlement(
+    v_mapping, v_future_user, 'academy-future:1', 'revoked', now() + interval '1 day', now() + interval '2 days'
+  );
 
   perform set_config('request.jwt.claims', json_build_object('sub', v_owner, 'role', 'authenticated')::text, true);
   perform set_config('request.jwt.claim.sub', v_owner::text, true);
