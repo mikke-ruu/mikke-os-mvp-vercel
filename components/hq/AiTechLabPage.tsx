@@ -176,7 +176,7 @@ export function AiTechLabPage({ mode }: { mode: AiTechLabMode }) {
         </div>
       </header>
 
-      <nav className="flex gap-2 overflow-x-auto pb-1" aria-label="AI TECH LAB">
+      <nav className="grid grid-cols-2 gap-2 pb-1 sm:flex sm:overflow-x-auto" aria-label="AI TECH LAB">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const active = tab.mode === mode;
@@ -184,7 +184,7 @@ export function AiTechLabPage({ mode }: { mode: AiTechLabMode }) {
             <Link
               key={tab.mode}
               href={tab.href}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-bold ${active ? "border-indigo-700 bg-indigo-700 text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"}`}
+              className={`inline-flex min-w-0 items-center justify-center gap-2 rounded-full border px-3 py-2.5 text-sm font-bold sm:shrink-0 sm:px-4 ${active ? "border-indigo-700 bg-indigo-700 text-white" : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"}`}
             >
               <Icon size={15} /> {tab.label}
             </Link>
