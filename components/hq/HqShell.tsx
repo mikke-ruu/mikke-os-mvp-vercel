@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, BellRing, ClipboardList, History, Mail, Newspaper, Rocket } from "lucide-react";
+import { BarChart3, BellRing, BrainCircuit, ClipboardList, History, Mail, Newspaper, Rocket } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
@@ -31,7 +31,8 @@ function canSeeAudit(role: HqRole) {
 
 function buildNav(role: HqRole): MikkeShellNavItem[] {
   const items: MikkeShellNavItem[] = [
-    { label: "ホーム", href: "/hq", icon: BarChart3, section: "本部運営" }
+    { label: "ホーム", href: "/hq", icon: BarChart3, section: "本部運営" },
+    { label: "AI TECH LAB", href: "/hq/ai-tech", icon: BrainCircuit }
   ];
   if (canSeeInquiries(role)) items.push({ label: "お問い合わせ", href: "/hq/inquiries", icon: ClipboardList });
   if (canEditContent(role)) {
