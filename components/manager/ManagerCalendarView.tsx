@@ -77,7 +77,7 @@ export function ManagerCalendarView({ legacyOnly = false }: { legacyOnly?: boole
         ) : (
           <form onSubmit={handleSubmit} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
           <h2 className="text-lg font-bold tracking-normal">{editingId ? "個人予定を編集" : "個人予定を追加"}</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">この予定はManager内だけに保存され、StoryやDESKには流れません。</p>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">この予定はManager内だけに保存され、他のアプリには公開されません。</p>
           <div className="mt-4 grid gap-3">
             <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="予定名" className="rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-sm font-semibold" />
             <div className="grid grid-cols-3 gap-2">

@@ -4,9 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { useOwnedMikkeApps } from "@/components/mikkeos/useOwnedMikkeApps";
-import { collectManagerAppSuggestions } from "@/lib/manager/app-suggestions";
 import { useManagerSnapshot } from "@/lib/manager/collect-manager-items";
-import { ManagerAppSuggestions } from "./ManagerAppSuggestions";
 import { ManagerMetricCard, ManagerProgressList, ManagerScheduleList, ManagerTaskListRows } from "./ManagerCards";
 import { ManagerShell } from "./ManagerShell";
 
@@ -16,7 +14,6 @@ export function ManagerDashboard() {
   const snapshot = useManagerSnapshot(profile.id, profile.user_id);
   const todaySchedules = snapshot.schedules.filter((item) => item.urgency === "today" && item.source.appKey !== "manager");
   const urgentTasks = snapshot.tasks.filter((task) => task.urgency === "today" || task.urgency === "overdue" || task.priority === "high");
-  const suggestions = collectManagerAppSuggestions(snapshot);
   const hasMarketNote = "ownedAppKeys" in ownedAppState && Array.isArray(ownedAppState.ownedAppKeys)
     ? ownedAppState.ownedAppKeys.includes("marketnote")
     : ownedAppState.ownedApps.some((app) => app.title === "MarketNote");
@@ -38,14 +35,11 @@ export function ManagerDashboard() {
       urgentTaskTitle: urgentTasks[0]?.title,
       progressCount: snapshot.progress.length,
       progressTitle: snapshot.progress[0]?.title,
-      suggestionTitle: suggestions[0]?.id === "apps-start" ? undefined : suggestions[0]?.title
     }));
   }, [
     displayName,
     snapshot.progress.length,
     snapshot.progress[0]?.title,
-    suggestions[0]?.id,
-    suggestions[0]?.title,
     todaySchedules.length,
     todaySchedules[0]?.title,
     urgentTasks.length,
@@ -109,18 +103,13 @@ export function ManagerDashboard() {
       <section className="mt-4 sm:mt-6">
         <Panel
           title="進行中のもの"
-          helper="イベントやFundなどの進捗をまとめます。"
+          helper="各アプリで進んでいるものをまとめます。"
           action={<Link href="/manager/notifications" className="shrink-0 text-xs font-bold text-[var(--mikke-primary)]">すべて見る</Link>}
         >
           <ManagerProgressList progress={snapshot.progress.slice(0, 3)} />
         </Panel>
       </section>
 
-      <section className="mt-4 sm:mt-6">
-        <Panel title="次に使えそうなアプリ" helper="今の動きに合わせて、押しつけずに候補だけ出します。">
-          <ManagerAppSuggestions suggestions={suggestions} />
-        </Panel>
-      </section>
     </ManagerShell>
   );
 }
@@ -159,8 +148,7 @@ function createManagerWelcome({
   urgentTaskCount,
   urgentTaskTitle,
   progressCount,
-  progressTitle,
-  suggestionTitle
+  progressTitle
 }: {
   displayName: string;
   todayScheduleCount: number;
@@ -169,7 +157,6 @@ function createManagerWelcome({
   urgentTaskTitle?: string;
   progressCount: number;
   progressTitle?: string;
-  suggestionTitle?: string;
 }) {
   const now = new Date();
   const hourPart = new Intl.DateTimeFormat("ja-JP", {
@@ -224,19 +211,6 @@ function createManagerWelcome({
       note: progressCount > 1 ? `ほかの${progressCount - 1}件も、いつでもここから確認できます。` : note,
       href: "/manager/notifications#manager-progress",
       actionLabel: "進み具合を見る"
-    };
-  }
-  if (suggestionTitle) {
-    const suggestionAppName = suggestionTitle
-      .replace(/を確認$/, "")
-      .replace(/も使えます$/, "")
-      .replace(/も候補です$/, "");
-    return {
-      greeting,
-      message: `今の活動には、${suggestionAppName}も役立ちそうです。`,
-      note,
-      href: "/apps",
-      actionLabel: "アプリを見る"
     };
   }
   return {

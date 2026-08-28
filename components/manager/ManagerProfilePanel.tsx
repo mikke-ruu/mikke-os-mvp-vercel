@@ -73,7 +73,27 @@ function authErrorMessage(message: string) {
   return getJapaneseAuthError(message);
 }
 
-export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEnabled: boolean }) {
+function mikkeIdErrorMessage(error: { code?: string; message: string }) {
+  const normalized = error.message.toLowerCase();
+  if (error.code === "23505" || normalized.includes("使用されています") || normalized.includes("duplicate")) {
+    return "このmikke IDは使用されています。別のIDを選んでください。";
+  }
+  if (error.code === "22023") {
+    return error.message.includes("mikke ID") ? error.message : "入力したmikke IDは使用できません。形式をご確認ください。";
+  }
+  if (error.code === "42501" || normalized.includes("authentication required")) {
+    return "ログイン状態を確認できませんでした。ログインし直してからお試しください。";
+  }
+  if (error.code === "P0002" || normalized.includes("profile not found")) {
+    return "基本情報を確認できませんでした。画面を再読み込みしてからお試しください。";
+  }
+  if (normalized.includes("failed to fetch") || normalized.includes("network") || normalized.includes("load failed")) {
+    return "通信できませんでした。接続を確認してもう一度お試しください。";
+  }
+  return "mikke IDを変更できませんでした。時間をおいてもう一度お試しください。";
+}
+
+export function ManagerProfilePanel() {
   const router = useRouter();
   const { user, profile, refreshProfile } = useAuth();
   const [displayName, setDisplayName] = useState(profile.display_name ?? "");
@@ -138,24 +158,22 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
   async function saveMikkeId(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMikkeIdNotice(null);
-    if (!mikkeIdChangeEnabled) {
-      setMikkeIdNotice({ type: "error", text: "mikke IDの変更は、専用RPCの本番適用後に利用できます。" });
-      return;
-    }
     if (!mikkeIdConfirmed) {
       setMikkeIdNotice({ type: "error", text: "公開URLが変わることを確認してください。" });
       return;
     }
 
     setSavingMikkeId(true);
-    const { error } = await supabase.rpc("mikke_update_my_mikke_id", { p_handle: mikkeId.trim() });
+    const { data, error } = await supabase.rpc("mikke_update_my_mikke_id", { p_handle: mikkeId.trim() });
     if (error) {
-      setMikkeIdNotice({ type: "error", text: error.message || "mikke IDを変更できませんでした。" });
+      setMikkeIdNotice({ type: "error", text: mikkeIdErrorMessage(error) });
     } else {
       await refreshProfile();
+      const normalizedMikkeId = typeof data === "string" ? data : mikkeId.trim().replace(/^@/, "").toLowerCase();
+      setMikkeId(normalizedMikkeId);
       setMikkeIdConfirmed(false);
       setMikkeIdConfirmationOpen(false);
-      setMikkeIdNotice({ type: "success", text: "mikke IDを変更しました。新しい公開URLをご確認ください。" });
+      setMikkeIdNotice({ type: "success", text: `mikke IDを@${normalizedMikkeId}へ変更しました。新しい公開URLをご確認ください。` });
     }
     setSavingMikkeId(false);
   }
@@ -290,11 +308,7 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
             </button>
           </div>
 
-          {!mikkeIdChangeEnabled ? (
-            <p className="mt-3 max-w-xl rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-semibold text-[var(--mikke-muted)] sm:text-sm">
-              mikke IDの変更は準備中です。現在は表示とコピーのみ利用できます。
-            </p>
-          ) : mikkeIdConfirmationOpen ? (
+          {mikkeIdConfirmationOpen ? (
             <form onSubmit={saveMikkeId} className="mt-5 max-w-xl">
               <div className="rounded-xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] p-4">
                 <p className="flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><AlertTriangle size={17} />変更前にご確認ください</p>
@@ -329,6 +343,7 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
                 <span className="text-sm font-bold">新しいmikke ID</span>
                 <input value={mikkeId} onChange={(event) => setMikkeId(event.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} className={inputClassName} />
               </label>
+              <p className="mt-2 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">半角英数字・_・- の3〜30文字で入力してください。</p>
               <button type="submit" className={`${primaryButtonClassName} mt-4`}>変更内容を確認</button>
             </form>
           )}

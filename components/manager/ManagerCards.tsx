@@ -108,7 +108,7 @@ export function ManagerProgressList({
   initialLimit?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
-  if (progress.length === 0) return <MikkeEmptyState title={emptyTitle} helper="イベントやFundなどの進行状況がここに集まります。" />;
+  if (progress.length === 0) return <MikkeEmptyState title={emptyTitle} helper="各アプリの進行状況がここに集まります。" />;
 
   const visibleProgress = initialLimit && !expanded ? progress.slice(0, initialLimit) : progress;
 
