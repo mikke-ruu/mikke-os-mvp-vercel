@@ -12,10 +12,13 @@ assert.match(client, /通常のCommunity会員資格・閲覧範囲・有料契�
 
 assert.match(settings, /mapping\.isCurrent/);
 assert.match(settings, /mapping\.activeClaimCount/);
+assert.match(settings, /mapping\.id === communityForm\.mappingId/);
+assert.match(settings, /readOnly=\{Boolean\(currentCommunityMapping\)\}/);
 assert.match(settings, /利用中（\$\{mapping\.activeClaimCount\}件）/);
 assert.match(settings, /過去の接続/);
 assert.match(settings, /連携を停止する/);
 assert.match(settings, /communityLinkHasActiveClaims/);
+assert.match(settings, /利用権を安全に停止する操作は、現在この画面ではまだ提供していません/);
 assert.match(settings, /getAcademyCommunityLinkErrorMessage/);
 assert.doesNotMatch(settings, /catch \{\s*setMessage\("Community連携を保存できませんでした/);
 

@@ -71,16 +71,20 @@ function SettingsContent() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
-  const [communityForm, setCommunityForm] = useState({ communityId: "", entitlementKey: "", sourceProductKey: "academy-membership", status: "draft" as "draft" | "active" | "archived" });
+  const [communityForm, setCommunityForm] = useState({ communityId: "", mappingId: "", entitlementKey: "", sourceProductKey: "academy-membership", status: "draft" as "draft" | "active" | "archived" });
 
   const canManage = role === "owner" || role === "administrator";
   const selectedCommunity = useMemo(
     () => communityLinks.find((item) => item.communityId === communityForm.communityId) ?? null,
     [communityForm.communityId, communityLinks]
   );
+  const currentCommunityMappings = useMemo(
+    () => selectedCommunity?.mappings.filter((mapping) => mapping.isCurrent) ?? [],
+    [selectedCommunity]
+  );
   const currentCommunityMapping = useMemo(
-    () => selectedCommunity?.mappings.find((mapping) => mapping.isCurrent && mapping.sourceProductKey === communityForm.sourceProductKey.trim()) ?? null,
-    [communityForm.sourceProductKey, selectedCommunity]
+    () => currentCommunityMappings.find((mapping) => mapping.id === communityForm.mappingId) ?? null,
+    [communityForm.mappingId, currentCommunityMappings]
   );
   const communityLinkHasActiveClaims = (currentCommunityMapping?.activeClaimCount ?? 0) > 0;
 
@@ -128,6 +132,7 @@ function SettingsContent() {
           if (firstCommunity && (firstCurrentMapping || firstDefinition)) {
             setCommunityForm({
               communityId: firstCommunity.communityId,
+              mappingId: firstCurrentMapping?.id ?? "",
               entitlementKey: firstCurrentMapping?.entitlementKey ?? firstDefinition?.key ?? "",
               sourceProductKey: firstCurrentMapping?.sourceProductKey ?? "academy-membership",
               status: firstCurrentMapping?.status === "active" ? "active" : "draft"
@@ -410,6 +415,7 @@ function SettingsContent() {
                       const nextMapping = nextCommunity?.mappings.find((mapping) => mapping.isCurrent);
                       setCommunityForm({
                         communityId: event.target.value,
+                        mappingId: nextMapping?.id ?? "",
                         entitlementKey: nextMapping?.entitlementKey ?? nextCommunity?.definitions[0]?.key ?? "",
                         sourceProductKey: nextMapping?.sourceProductKey ?? "academy-membership",
                         status: nextMapping?.status === "active" ? "active" : "draft"
@@ -418,13 +424,31 @@ function SettingsContent() {
                       {communityLinks.map((item) => <option key={item.communityId} value={item.communityId}>{item.communityName}</option>)}
                     </select>
                   </label>
+                  {currentCommunityMappings.length ? (
+                    <label className="text-xs font-bold md:col-span-2">管理する接続
+                      <select className={inputClass} value={communityForm.mappingId} onChange={(event) => {
+                        const nextMapping = currentCommunityMappings.find((mapping) => mapping.id === event.target.value);
+                        if (!nextMapping) return;
+                        setCommunityForm({
+                          ...communityForm,
+                          mappingId: nextMapping.id,
+                          entitlementKey: nextMapping.entitlementKey,
+                          sourceProductKey: nextMapping.sourceProductKey,
+                          status: nextMapping.status === "active" ? "active" : "draft"
+                        });
+                      }}>
+                        {currentCommunityMappings.map((mapping) => <option key={mapping.id} value={mapping.id}>{mapping.sourceProductKey}</option>)}
+                      </select>
+                    </label>
+                  ) : null}
                   <label className="text-xs font-bold">利用できるRoomの範囲
                     <select className={inputClass} value={communityForm.entitlementKey} onChange={(event) => setCommunityForm({ ...communityForm, entitlementKey: event.target.value })}>
                       {(communityLinks.find((item) => item.communityId === communityForm.communityId)?.definitions ?? []).map((definition) => <option key={definition.key} value={definition.key}>{definition.name}</option>)}
                     </select>
                   </label>
                   <label className="text-xs font-bold">Academy内の区分名
-                    <input className={inputClass} value={communityForm.sourceProductKey} onChange={(event) => setCommunityForm({ ...communityForm, sourceProductKey: event.target.value })} placeholder="例: basic-learner" />
+                    <input className={inputClass} value={communityForm.sourceProductKey} readOnly={Boolean(currentCommunityMapping)} onChange={(event) => setCommunityForm({ ...communityForm, sourceProductKey: event.target.value })} placeholder="例: basic-learner" />
+                    {currentCommunityMapping ? <span className="mt-1 block text-[11px] leading-5 text-[var(--mikke-muted)]">利用中の接続を別の区分へ変更することはできません。新しい接続を追加する機能は今後対応します。</span> : null}
                   </label>
                   <label className="text-xs font-bold">状態
                     <select className={inputClass} value={communityForm.status} onChange={(event) => setCommunityForm({ ...communityForm, status: event.target.value as "draft" | "active" | "archived" })}>
@@ -436,6 +460,7 @@ function SettingsContent() {
                   {communityLinkHasActiveClaims ? (
                     <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-primary)] md:col-span-2">
                       利用中（{currentCommunityMapping?.activeClaimCount}件）です。範囲変更や停止の前に、対象者のAcademy由来のCommunity利用権を停止してください。{ACADEMY_COMMUNITY_REVOCATION_NOTICE}
+                      <span className="mt-1 block">利用権を安全に停止する操作は、現在この画面ではまだ提供していません。停止機能の準備が完了するまで範囲変更はできません。</span>
                     </p>
                   ) : null}
                   <button type="button" disabled={busy === "community-link" || !communityForm.entitlementKey || communityLinkHasActiveClaims} onClick={() => void saveCommunityLink()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40 md:col-span-2">Community連携を保存</button>
