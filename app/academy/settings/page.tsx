@@ -19,6 +19,8 @@ import {
   stopHeadquartersMember
 } from "@/lib/academy/headquarters-settings";
 import {
+  ACADEMY_COMMUNITY_REVOCATION_NOTICE,
+  getAcademyCommunityLinkErrorMessage,
   listMyAcademyCommunityLinkOptions,
   saveAcademyCommunityRoomLink,
   type AcademyCommunityLinkOption
@@ -69,9 +71,18 @@ function SettingsContent() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
-  const [communityForm, setCommunityForm] = useState({ communityId: "", entitlementKey: "", sourceProductKey: "academy-membership", status: "draft" as "draft" | "active" });
+  const [communityForm, setCommunityForm] = useState({ communityId: "", entitlementKey: "", sourceProductKey: "academy-membership", status: "draft" as "draft" | "active" | "archived" });
 
   const canManage = role === "owner" || role === "administrator";
+  const selectedCommunity = useMemo(
+    () => communityLinks.find((item) => item.communityId === communityForm.communityId) ?? null,
+    [communityForm.communityId, communityLinks]
+  );
+  const currentCommunityMapping = useMemo(
+    () => selectedCommunity?.mappings.find((mapping) => mapping.isCurrent && mapping.sourceProductKey === communityForm.sourceProductKey.trim()) ?? null,
+    [communityForm.sourceProductKey, selectedCommunity]
+  );
+  const communityLinkHasActiveClaims = (currentCommunityMapping?.activeClaimCount ?? 0) > 0;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,9 +123,15 @@ function SettingsContent() {
           const nextCommunityLinks = await listMyAcademyCommunityLinkOptions(hq.id);
           setCommunityLinks(nextCommunityLinks);
           const firstCommunity = nextCommunityLinks[0];
+          const firstCurrentMapping = firstCommunity?.mappings.find((mapping) => mapping.isCurrent);
           const firstDefinition = firstCommunity?.definitions[0];
-          if (firstCommunity && firstDefinition) {
-            setCommunityForm((current) => ({ ...current, communityId: firstCommunity.communityId, entitlementKey: firstDefinition.key }));
+          if (firstCommunity && (firstCurrentMapping || firstDefinition)) {
+            setCommunityForm({
+              communityId: firstCommunity.communityId,
+              entitlementKey: firstCurrentMapping?.entitlementKey ?? firstDefinition?.key ?? "",
+              sourceProductKey: firstCurrentMapping?.sourceProductKey ?? "academy-membership",
+              status: firstCurrentMapping?.status === "active" ? "active" : "draft"
+            });
           }
         } catch {
           setCommunityLinks([]);
@@ -221,10 +238,16 @@ function SettingsContent() {
         sourceProductKey: communityForm.sourceProductKey,
         status: communityForm.status
       });
-      setMessage(communityForm.status === "active" ? "Communityの指定Room連携を有効にしました。" : "Community連携を下書き保存しました。");
+      setMessage(
+        communityForm.status === "active"
+          ? "Communityの指定Room連携を有効にしました。"
+          : communityForm.status === "archived"
+            ? "Community連携を停止しました。過去の接続履歴は保存されています。"
+            : "Community連携を下書き保存しました。"
+      );
       setCommunityLinks(await listMyAcademyCommunityLinkOptions(headquarters.id));
-    } catch {
-      setMessage("Community連携を保存できませんでした。Academy本部とCommunityの両方の運営権限を確認してください。");
+    } catch (error) {
+      setMessage(getAcademyCommunityLinkErrorMessage(error));
     } finally {
       setBusy("");
     }
@@ -384,7 +407,13 @@ function SettingsContent() {
                   <label className="text-xs font-bold">接続するCommunity
                     <select className={inputClass} value={communityForm.communityId} onChange={(event) => {
                       const nextCommunity = communityLinks.find((item) => item.communityId === event.target.value);
-                      setCommunityForm({ ...communityForm, communityId: event.target.value, entitlementKey: nextCommunity?.definitions[0]?.key ?? "" });
+                      const nextMapping = nextCommunity?.mappings.find((mapping) => mapping.isCurrent);
+                      setCommunityForm({
+                        communityId: event.target.value,
+                        entitlementKey: nextMapping?.entitlementKey ?? nextCommunity?.definitions[0]?.key ?? "",
+                        sourceProductKey: nextMapping?.sourceProductKey ?? "academy-membership",
+                        status: nextMapping?.status === "active" ? "active" : "draft"
+                      });
                     }}>
                       {communityLinks.map((item) => <option key={item.communityId} value={item.communityId}>{item.communityName}</option>)}
                     </select>
@@ -398,12 +427,37 @@ function SettingsContent() {
                     <input className={inputClass} value={communityForm.sourceProductKey} onChange={(event) => setCommunityForm({ ...communityForm, sourceProductKey: event.target.value })} placeholder="例: basic-learner" />
                   </label>
                   <label className="text-xs font-bold">状態
-                    <select className={inputClass} value={communityForm.status} onChange={(event) => setCommunityForm({ ...communityForm, status: event.target.value as "draft" | "active" })}>
+                    <select className={inputClass} value={communityForm.status} onChange={(event) => setCommunityForm({ ...communityForm, status: event.target.value as "draft" | "active" | "archived" })}>
                       <option value="draft">下書き（まだ案内しない）</option>
-                      <option value="active">有効（招待に利用する）</option>
+                      <option value="active">連携中（招待に利用する）</option>
+                      {currentCommunityMapping ? <option value="archived">連携を停止する</option> : null}
                     </select>
                   </label>
-                  <button type="button" disabled={busy === "community-link" || !communityForm.entitlementKey} onClick={() => void saveCommunityLink()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40 md:col-span-2">Community連携を保存</button>
+                  {communityLinkHasActiveClaims ? (
+                    <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-primary)] md:col-span-2">
+                      利用中（{currentCommunityMapping?.activeClaimCount}件）です。範囲変更や停止の前に、対象者のAcademy由来のCommunity利用権を停止してください。{ACADEMY_COMMUNITY_REVOCATION_NOTICE}
+                    </p>
+                  ) : null}
+                  <button type="button" disabled={busy === "community-link" || !communityForm.entitlementKey || communityLinkHasActiveClaims} onClick={() => void saveCommunityLink()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40 md:col-span-2">Community連携を保存</button>
+                  {selectedCommunity?.mappings.length ? (
+                    <div className="space-y-2 rounded-xl border border-[var(--mikke-line)] p-4 md:col-span-2">
+                      <p className="text-sm font-bold">接続状況</p>
+                      {selectedCommunity.mappings.map((mapping) => (
+                        <div key={mapping.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span>{mapping.sourceProductKey} / {mapping.entitlementKey}</span>
+                          <span className="font-bold text-[var(--mikke-primary)]">
+                            {mapping.status === "archived"
+                              ? "過去の接続"
+                              : mapping.status === "draft"
+                                ? "下書き（まだ招待しない）"
+                                : mapping.activeClaimCount > 0
+                                  ? `利用中（${mapping.activeClaimCount}件）`
+                                  : "連携中"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">あなたが運営するCommunityと、Roomの利用範囲を先にCommunity側で作成してください。</p>
