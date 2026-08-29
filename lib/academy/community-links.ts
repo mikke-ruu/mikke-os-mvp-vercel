@@ -72,3 +72,55 @@ export async function saveAcademyCommunityRoomLink(input: {
   if (error) throw error;
   return data as string;
 }
+
+export async function stopAcademyCommunityClaimAccess(input: {
+  headquartersId: string;
+  mappingId: string;
+}) {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (sessionError || !accessToken) throw new Error("ログインが必要です。");
+
+  const response = await fetch("/academy/api/community-links/revoke", {
+    method: "POST",
+    cache: "no-store",
+    credentials: "same-origin",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(input)
+  });
+  const payload = await response.json().catch(() => null) as {
+    stoppedCount?: unknown;
+    error?: unknown;
+  } | null;
+  if (!response.ok) {
+    throw new Error(typeof payload?.error === "string" ? payload.error : "利用権を停止できませんでした。時間をおいてもう一度お試しください。");
+  }
+  if (typeof payload?.stoppedCount !== "number") {
+    throw new Error("停止結果を確認できませんでした。画面を再読み込みしてください。");
+  }
+  return { stoppedCount: payload.stoppedCount };
+}
+
+const safeClaimStopMessages = [
+  "ログインが必要です。",
+  "ログインを確認できませんでした。",
+  "登録済みのアカウントでログインしてください。",
+  "この接続を管理する権限を確認できませんでした。",
+  "この本部で管理できる現在の接続を確認できませんでした。",
+  "連携中の接続だけ利用権を停止できます。",
+  "停止対象の利用権はありません。",
+  "停止対象を確認できませんでした。",
+  "一部の利用権を停止できませんでした。",
+  "利用権の停止機能を現在利用できません。",
+  "停止結果を確認できませんでした。"
+] as const;
+
+export function getAcademyCommunityClaimStopErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  return safeClaimStopMessages.some((safeMessage) => message.startsWith(safeMessage))
+    ? message
+    : "利用権を停止できませんでした。画面を再読み込みして、残っている件数を確認してください。";
+}

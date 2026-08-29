@@ -18,7 +18,11 @@ assert.match(settings, /利用中（\$\{mapping\.activeClaimCount\}件）/);
 assert.match(settings, /過去の接続/);
 assert.match(settings, /連携を停止する/);
 assert.match(settings, /communityLinkHasActiveClaims/);
-assert.match(settings, /利用権を安全に停止する操作は、現在この画面ではまだ提供していません/);
+assert.match(settings, /Academy由来の利用権を停止/);
+assert.match(settings, /window\.confirm/);
+assert.match(settings, /listMyAcademyCommunityLinkOptions\(headquarters\.id\)/);
+assert.match(settings, /refreshedMapping\?\.activeClaimCount \?\? 0/);
+assert.match(settings, /getAcademyCommunityClaimStopErrorMessage/);
 assert.match(settings, /getAcademyCommunityLinkErrorMessage/);
 assert.doesNotMatch(settings, /catch \{\s*setMessage\("Community連携を保存できませんでした/);
 

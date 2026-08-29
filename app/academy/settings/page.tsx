@@ -20,9 +20,11 @@ import {
 } from "@/lib/academy/headquarters-settings";
 import {
   ACADEMY_COMMUNITY_REVOCATION_NOTICE,
+  getAcademyCommunityClaimStopErrorMessage,
   getAcademyCommunityLinkErrorMessage,
   listMyAcademyCommunityLinkOptions,
   saveAcademyCommunityRoomLink,
+  stopAcademyCommunityClaimAccess,
   type AcademyCommunityLinkOption
 } from "@/lib/academy/community-links";
 import type {
@@ -258,6 +260,42 @@ function SettingsContent() {
     }
   }
 
+  async function stopCommunityClaimAccess() {
+    if (!headquarters || !currentCommunityMapping || !communityLinkHasActiveClaims) return;
+    const confirmed = window.confirm(
+      `Academyから追加したCommunity利用権 ${currentCommunityMapping.activeClaimCount}件を停止します。\n\n${ACADEMY_COMMUNITY_REVOCATION_NOTICE}\n\n停止後に元へ戻す場合は、対象者へ改めて案内と同意が必要です。続けますか？`
+    );
+    if (!confirmed) return;
+
+    setBusy("community-claims");
+    setMessage("");
+    try {
+      const result = await stopAcademyCommunityClaimAccess({
+        headquartersId: headquarters.id,
+        mappingId: currentCommunityMapping.id
+      });
+      const nextCommunityLinks = await listMyAcademyCommunityLinkOptions(headquarters.id);
+      setCommunityLinks(nextCommunityLinks);
+      const refreshedMapping = nextCommunityLinks
+        .flatMap((community) => community.mappings)
+        .find((mapping) => mapping.id === currentCommunityMapping.id);
+      if ((refreshedMapping?.activeClaimCount ?? 0) === 0) {
+        setMessage(`${result.stoppedCount}件のAcademy由来の利用権を停止しました。接続範囲の変更または連携停止を行えます。`);
+      } else {
+        setMessage(`${result.stoppedCount}件を停止しましたが、新しい利用権が追加されています。残り${refreshedMapping?.activeClaimCount ?? 0}件を確認してください。`);
+      }
+    } catch (error) {
+      setMessage(getAcademyCommunityClaimStopErrorMessage(error));
+      try {
+        setCommunityLinks(await listMyAcademyCommunityLinkOptions(headquarters.id));
+      } catch {
+        // The safe message above remains visible. Never expose a raw database error.
+      }
+    } finally {
+      setBusy("");
+    }
+  }
+
   if (loading) {
     return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">本部設定を確認しています…</p>;
   }
@@ -458,10 +496,12 @@ function SettingsContent() {
                     </select>
                   </label>
                   {communityLinkHasActiveClaims ? (
-                    <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-primary)] md:col-span-2">
-                      利用中（{currentCommunityMapping?.activeClaimCount}件）です。範囲変更や停止の前に、対象者のAcademy由来のCommunity利用権を停止してください。{ACADEMY_COMMUNITY_REVOCATION_NOTICE}
-                      <span className="mt-1 block">利用権を安全に停止する操作は、現在この画面ではまだ提供していません。停止機能の準備が完了するまで範囲変更はできません。</span>
-                    </p>
+                    <div className="rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-primary)] md:col-span-2">
+                      <p>利用中（{currentCommunityMapping?.activeClaimCount}件）です。範囲変更や停止の前に、対象者のAcademy由来のCommunity利用権を停止してください。{ACADEMY_COMMUNITY_REVOCATION_NOTICE}</p>
+                      <button type="button" disabled={busy === "community-claims"} onClick={() => void stopCommunityClaimAccess()} className="mt-3 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2.5 text-sm font-bold text-[var(--mikke-primary)] disabled:opacity-40">
+                        {busy === "community-claims" ? "停止しています…" : "Academy由来の利用権を停止"}
+                      </button>
+                    </div>
                   ) : null}
                   <button type="button" disabled={busy === "community-link" || !communityForm.entitlementKey || communityLinkHasActiveClaims} onClick={() => void saveCommunityLink()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40 md:col-span-2">Community連携を保存</button>
                   {selectedCommunity?.mappings.length ? (
