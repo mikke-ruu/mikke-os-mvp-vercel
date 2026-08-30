@@ -4,12 +4,20 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
-import { RotateCw } from "lucide-react";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
+import { RotateCw, UserMinus } from "lucide-react";
 import { QrCode } from "@/components/academy/QrCode";
 import { MikkeMediaPicker } from "@/components/media/MikkeMediaPicker";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
-import { INSTRUCTOR_STATUS_LABELS, getInstructor, renewInstructor, updateInstructor } from "@/lib/academy/instructors";
+import {
+  INSTRUCTOR_REGISTRATION_STATUS_LABELS,
+  INSTRUCTOR_STATUS_LABELS,
+  getInstructor,
+  renewInstructor,
+  updateInstructor,
+  withdrawInstructor
+} from "@/lib/academy/instructors";
 import type { AcademyCourse, AcademyHeadquarters, AcademyInstructor } from "@/types/database";
 
 const inputClass =
@@ -83,8 +91,25 @@ function DetailContent({ instructorId }: { instructorId: string }) {
     }
   }
 
+  async function handleWithdraw() {
+    if (!ins) return;
+    const confirmed = window.confirm(
+      "この講師を登録解除します。翌月から課金対象外となり、Academyは利用できなくなります。認定日・講師番号などの台帳は非公開で残ります。続けますか？"
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      setIns(await withdrawInstructor(ins.id));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
   if (!hq || !ins) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">講師が見つかりません。</p>;
+
+  const isWithdrawn = ins.registration_status === "withdrawn";
 
   return (
     <div className="space-y-4">
@@ -98,9 +123,13 @@ function DetailContent({ instructorId }: { instructorId: string }) {
             {ins.instructor_number ? `講師番号 ${ins.instructor_number}` : "講師番号未設定"}
             {ins.area ? ` ・ ${ins.area}` : ""}
           </p>
-          {origin ? <p className="mt-2 truncate text-[11px] text-[var(--mikke-muted-light)]">{origin}/academy/i/{ins.id}</p> : null}
+          <p className="mt-2 text-xs font-bold text-[var(--mikke-accent-strong)]">
+            {INSTRUCTOR_REGISTRATION_STATUS_LABELS[ins.registration_status]}
+            {ins.withdrawn_at ? ` ・ ${new Date(ins.withdrawn_at).toLocaleDateString("ja-JP")}解除` : ""}
+          </p>
+          {origin && !isWithdrawn ? <p className="mt-2 truncate text-[11px] text-[var(--mikke-muted-light)]">{origin}/academy/i/{ins.id}</p> : null}
         </div>
-        {origin ? (
+        {origin && !isWithdrawn ? (
           <div className="shrink-0 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3">
             <QrCode url={`${origin}/academy/i/${ins.id}`} filename={`${course?.code ?? "academy"}-${ins.id.slice(0, 8)}`} />
           </div>
@@ -111,10 +140,10 @@ function DetailContent({ instructorId }: { instructorId: string }) {
         <p className="text-xs font-bold text-[var(--mikke-accent)]">資格・活動権限</p>
         <p className="text-[11px] text-[var(--mikke-muted)]">認定資格と活動権限は別。活動なしでも認定は残す設計です。</p>
         <div className="mt-1 divide-y divide-[var(--mikke-line-soft)]">
-          <Toggle label="認定資格あり" checked={ins.is_certified} disabled={saving} onChange={(v) => apply({ is_certified: v })} />
-          <Toggle label="活動権限あり（掲載・申込・教材閲覧）" checked={ins.is_active} disabled={saving} onChange={(v) => apply({ is_active: v })} />
-          <Toggle label="講師一覧に掲載" checked={ins.is_listed} disabled={saving} onChange={(v) => apply({ is_listed: v })} />
-          <Toggle label="この講師の受付を有効" checked={ins.accepts_applications} disabled={saving} onChange={(v) => apply({ accepts_applications: v })} />
+          <Toggle label="認定資格あり" checked={ins.is_certified} disabled={saving || isWithdrawn} onChange={(v) => apply({ is_certified: v })} />
+          <Toggle label="活動権限あり（掲載・申込・教材閲覧）" checked={ins.is_active} disabled={saving || isWithdrawn} onChange={(v) => apply({ is_active: v })} />
+          <Toggle label="講師一覧に掲載" checked={ins.is_listed} disabled={saving || isWithdrawn} onChange={(v) => apply({ is_listed: v })} />
+          <Toggle label="この講師の受付を有効" checked={ins.accepts_applications} disabled={saving || isWithdrawn} onChange={(v) => apply({ accepts_applications: v })} />
         </div>
       </section>
 
@@ -125,7 +154,7 @@ function DetailContent({ instructorId }: { instructorId: string }) {
           <select
             className={inputClass}
             value={ins.status}
-            disabled={saving}
+            disabled={saving || isWithdrawn}
             onChange={(e) => apply({ status: e.target.value as AcademyInstructor["status"] })}
           >
             {(Object.keys(INSTRUCTOR_STATUS_LABELS) as AcademyInstructor["status"][]).map((s) => (
@@ -179,7 +208,7 @@ function DetailContent({ instructorId }: { instructorId: string }) {
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <p className="text-xs font-bold text-[var(--mikke-accent)]">掲載情報（写真・紹介文）</p>
         <p className="text-[11px] text-[var(--mikke-muted)]">
-          講師ページや講師一覧など公開ページに表示されます。講師本人も講師ポータルから編集できます。
+          公開中の講師プロフィールや講師一覧に表示されます。講師本人もマイポータルから編集できます。
         </p>
         <div>
           <label className={labelClass}>講師写真</label>
@@ -202,9 +231,33 @@ function DetailContent({ instructorId }: { instructorId: string }) {
         <p className="text-[11px] text-[var(--mikke-muted)]">入力欄はフォーカスを外すと自動保存されます。</p>
       </section>
 
+      {!isWithdrawn ? (
+        <section className="space-y-2 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+          <p className="text-xs font-bold text-[var(--mikke-text-soft)]">登録契約</p>
+          <p className="text-[11px] text-[var(--mikke-muted)]">
+            登録解除するとAcademyの利用と公開を停止します。認定日・講師番号などは本部の非公開台帳として残ります。
+          </p>
+          <button
+            type="button"
+            onClick={handleWithdraw}
+            disabled={saving}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-3 text-sm font-bold text-[var(--mikke-text-soft)] disabled:opacity-60"
+          >
+            <UserMinus size={16} /> 登録解除
+          </button>
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+          <p className="text-xs font-bold text-[var(--mikke-text-soft)]">非公開の認定台帳</p>
+          <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">
+            この講師は登録解除済みです。Academyの利用・公開・受付は停止しています。認定日と講師番号は履歴として保持します。
+          </p>
+        </section>
+      )}
+
       <button
         type="button"
-        onClick={() => router.push("/academy/instructors")}
+        onClick={() => router.push(toCurrentAcademyContextHref("/academy/instructors"))}
         className="w-full rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-3 text-sm font-bold text-[var(--mikke-text-soft)]"
       >
         一覧に戻る

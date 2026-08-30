@@ -3,9 +3,10 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ExternalLink, Eye, EyeOff, GraduationCap, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ExternalLink, Eye, EyeOff, GraduationCap, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import { MATERIAL_KIND_LABELS, deleteMaterial, listMaterials, setMaterialPublished } from "@/lib/academy/materials";
@@ -40,7 +41,11 @@ function MaterialsContent() {
   }, [load]);
 
   const courseMap = Object.fromEntries(courses.map((c) => [c.id, c]));
+  const selectedCourse = courseFilter ? courseMap[courseFilter] : null;
   const shown = courseFilter ? materials.filter((m) => m.course_id === courseFilter) : materials;
+  const createHref = toCurrentAcademyContextHref(
+    `/academy/materials/new${courseFilter ? `?course=${encodeURIComponent(courseFilter)}` : ""}`
+  );
 
   async function togglePublish(m: AcademyMaterial) {
     if (!hq) return;
@@ -72,11 +77,24 @@ function MaterialsContent() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-[var(--mikke-muted)]">{hq.name}</p>
-          <h2 className="text-base font-bold text-[var(--mikke-text)]">教材・資料</h2>
+          <h2 className="text-base font-bold text-[var(--mikke-text)]">講師用ファイル</h2>
         </div>
-        <Link href="/academy/materials/new" className="flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
-          <Plus size={16} /> 教材を追加
+        <Link href={createHref} className="flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
+          <Plus size={16} /> ファイルを追加
         </Link>
+      </div>
+
+      {selectedCourse ? (
+        <div className="rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-3">
+          <Link href={toCurrentAcademyContextHref(`/academy/courses/${selectedCourse.id}`)} className="inline-flex items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]">
+            <ArrowLeft size={14} /> {selectedCourse.name}の設定に戻る
+          </Link>
+          <p className="mt-2 text-sm font-bold text-[var(--mikke-text)]">{selectedCourse.code} {selectedCourse.name}</p>
+        </div>
+      ) : null}
+
+      <div className="rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
+        講座の進め方、材料の購入先、PDF、動画、外部URLなど、認定講師にだけ見せる資料を管理します。受講者の復習内容とは別です。
       </div>
 
       {courses.length > 0 ? (
@@ -97,9 +115,9 @@ function MaterialsContent() {
       {shown.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-8 text-center">
           <GraduationCap size={28} className="mx-auto text-[var(--mikke-accent)]" />
-          <p className="mt-2 text-sm text-[var(--mikke-text-soft)]">まだ教材がありません。</p>
-          <Link href="/academy/materials/new" className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
-            教材を追加する
+          <p className="mt-2 text-sm text-[var(--mikke-text-soft)]">まだ講師用ファイルがありません。</p>
+          <Link href={createHref} className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
+            ファイルを追加する
           </Link>
         </div>
       ) : (
@@ -120,7 +138,7 @@ function MaterialsContent() {
                       <span className="truncate">{m.title}</span>
                       <ExternalLink size={12} className="shrink-0 text-[var(--mikke-muted)]" />
                     </a>
-                    <p className="mt-0.5 text-[11px] text-[var(--mikke-muted)]">{m.requires_active ? "活動中の講師のみ閲覧" : "認定講師が閲覧可"}</p>
+                    <p className="mt-1 text-xs font-bold text-[var(--mikke-text-soft)]">見せる対象：{m.requires_active ? "活動中の講師だけ" : "この講座の認定講師全員"}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <button
@@ -131,7 +149,7 @@ function MaterialsContent() {
                       }`}
                     >
                       {m.is_published ? <Eye size={12} /> : <EyeOff size={12} />}
-                      {m.is_published ? "公開" : "非公開"}
+                      {m.is_published ? "マイポータルに表示" : "下書き"}
                     </button>
                     <button onClick={() => remove(m)} disabled={busyId === m.id} className="text-[var(--mikke-danger)]">
                       <Trash2 size={15} />
@@ -149,7 +167,7 @@ function MaterialsContent() {
 
 export default function MaterialsPage() {
   return (
-    <HonbuShell title="教材・資料">
+    <HonbuShell title="講師用ファイル">
       <Suspense fallback={<p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>}>
         <MaterialsContent />
       </Suspense>

@@ -1,4 +1,10 @@
 import { supabase } from "@/lib/supabase/client";
+import {
+  academyPreviewProgram,
+  academyPreviewSections,
+  assertAcademyWritable,
+  isAcademyLocalReview
+} from "@/lib/academy/preview";
 import type {
   AcademyProgram,
   AcademyProgramSection,
@@ -11,6 +17,7 @@ export type AcademyProgramSectionWithSteps = AcademyProgramSection & {
 };
 
 export async function getCourseProgram(headquartersId: string, courseId: string) {
+  if (isAcademyLocalReview()) return courseId === academyPreviewProgram.course_id ? academyPreviewProgram : null;
   const { data, error } = await supabase
     .from("academy_programs")
     .select("*")
@@ -22,6 +29,7 @@ export async function getCourseProgram(headquartersId: string, courseId: string)
 }
 
 export async function createCourseProgram(headquartersId: string, courseId: string, title: string) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_programs")
     .insert({ headquarters_id: headquartersId, course_id: courseId, title: title.trim(), status: "draft" })
@@ -32,6 +40,7 @@ export async function createCourseProgram(headquartersId: string, courseId: stri
 }
 
 export async function listProgramSections(programId: string): Promise<AcademyProgramSectionWithSteps[]> {
+  if (isAcademyLocalReview()) return academyPreviewSections;
   const { data, error } = await supabase
     .from("academy_program_sections")
     .select("*, steps:academy_program_steps(*)")
@@ -45,6 +54,7 @@ export async function listProgramSections(programId: string): Promise<AcademyPro
 }
 
 export async function createProgramSection(programId: string, title: string, sortOrder: number) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_program_sections")
     .insert({ program_id: programId, title: title.trim(), sort_order: sortOrder })
@@ -58,6 +68,7 @@ export async function createProgramStep(
   sectionId: string,
   input: { title: string; completionGuide: string; type: AcademyProgramStepType; sortOrder: number }
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_program_steps")
     .insert({
@@ -79,6 +90,7 @@ export async function updateProgramStep(
   stepId: string,
   input: { title: string; completionGuide: string; type: AcademyProgramStepType }
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_program_steps")
     .update({
@@ -95,6 +107,16 @@ export async function updateProgramStep(
 }
 
 export async function deleteProgramStep(stepId: string) {
+  assertAcademyWritable();
   const { error } = await supabase.from("academy_program_steps").delete().eq("id", stepId);
   if (error) throw error;
+}
+
+export async function publishCourseProgram(programId: string) {
+  assertAcademyWritable();
+  const { data, error } = await supabase.rpc("academy_publish_program_version", {
+    p_program_id: programId
+  });
+  if (error) throw error;
+  return data as string;
 }

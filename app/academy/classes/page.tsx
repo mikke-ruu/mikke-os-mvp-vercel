@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarCheck } from "lucide-react";
+import Link from "next/link";
+import { CalendarCheck, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import {
@@ -11,6 +12,7 @@ import {
   listClassInstructorRequests
 } from "@/lib/academy/class-instructor-requests";
 import { listAcademyClasses } from "@/lib/academy/classes";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listInstructors } from "@/lib/academy/instructors";
 import type {
@@ -65,7 +67,7 @@ function ClassesContent() {
       setInstructors(nextInstructors.filter((item) => item.is_active));
       setRequests(nextRequests);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "クラス情報を読み込めませんでした。");
+      setMessage(error instanceof Error ? error.message : "開催日程を読み込めませんでした。");
     } finally {
       setLoading(false);
     }
@@ -125,13 +127,13 @@ function ClassesContent() {
   }
 
   if (loading) {
-    return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">クラス情報を確認しています…</p>;
+    return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">開催日程を確認しています…</p>;
   }
 
   if (!headquarters) {
     return (
       <p className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-sm text-[var(--mikke-muted)]">
-        先に本部を作成すると、クラスと講師依頼を管理できます。
+        先に本部を作成すると、講座の開催日程と講師依頼を管理できます。
       </p>
     );
   }
@@ -143,12 +145,18 @@ function ClassesContent() {
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]">
             <CalendarCheck size={19} />
           </span>
-          <div>
-            <h2 className="text-base font-bold text-[var(--mikke-text)]">クラスと担当講師</h2>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-bold text-[var(--mikke-text)]">開催日程と担当講師</h2>
             <p className="mt-1 text-sm text-[var(--mikke-muted)]">
-              既存クラスの日程を確認し、同じ講座の有効な講師へ担当を依頼できます。
+              「講座」は教える内容、「開催日程」はその講座を実際に行う日時・場所・定員の記録です。開催日ごとに認定講師へ担当を依頼できます。
             </p>
           </div>
+          <Link
+            href={toCurrentAcademyContextHref("/academy/classes/new")}
+            className="inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white"
+          >
+            <Plus size={16} /> 開催日程を作成
+          </Link>
         </div>
         {message ? <p className="mt-4 text-sm font-bold text-[var(--mikke-accent-strong)]">{message}</p> : null}
       </section>
@@ -257,9 +265,16 @@ function ClassesContent() {
           );
         })
       ) : (
-        <p className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-sm text-[var(--mikke-muted)]">
-          管理できるクラスはまだありません。
-        </p>
+        <section className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-6 text-center">
+          <p className="text-sm font-bold text-[var(--mikke-text)]">開催日程はまだありません</p>
+          <p className="mt-1 text-xs text-[var(--mikke-muted)]">講座を選び、日程・形式・定員を登録すると担当講師へ依頼できます。</p>
+          <Link
+            href={toCurrentAcademyContextHref("/academy/classes/new")}
+            className="mt-4 inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white"
+          >
+            <Plus size={16} /> 最初の開催日程を作成
+          </Link>
+        </section>
       )}
     </div>
   );
@@ -267,7 +282,7 @@ function ClassesContent() {
 
 export default function AcademyClassesPage() {
   return (
-    <HonbuShell title="クラス・担当講師">
+    <HonbuShell title="開催日程・担当講師">
       <ClassesContent />
     </HonbuShell>
   );

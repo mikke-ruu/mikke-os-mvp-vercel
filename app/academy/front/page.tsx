@@ -87,9 +87,9 @@ function FrontContent() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-[var(--mikke-muted)]">フロントページ（一般公開の講座紹介サイト）の内容を編集します。</p>
+        <p className="text-sm font-bold text-[var(--mikke-text)]">本部全体を紹介するホームページを編集します。各講座の公開講座ページとは別のページです。</p>
         <Link
-          href="/academy/site"
+          href={`/academy/site/${encodeURIComponent(hq.handle)}`}
           target="_blank"
           className="flex shrink-0 items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent)]"
         >
@@ -138,7 +138,7 @@ function FrontContent() {
       </section>
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
-        <p className="text-xs font-bold text-[var(--mikke-accent)]">フロントの自由ブロック</p>
+        <p className="text-xs font-bold text-[var(--mikke-accent)]">ホームページの自由ブロック</p>
         <p className="text-[11px] text-[var(--mikke-muted)]">
           上のヒーローエリアと講座一覧の間に表示される自由なセクションです（見出し・文章・画像・画像+文章・画像グリッド・CTA）。
         </p>
@@ -154,8 +154,8 @@ function FrontContent() {
       </section>
 
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
-        <p className="text-xs font-bold text-[var(--mikke-accent)]">講座ページの編集</p>
-        <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">フロントには公開中の講座が並びます。各講座のLPはビルダーで編集します。</p>
+        <p className="text-sm font-bold text-[var(--mikke-text)]">公開講座ページ</p>
+        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">ホームページには、公開中の講座が一覧で並びます。講座ごとの紹介と申込受付は、それぞれの公開講座ページで編集します。</p>
         <ul className="mt-3 space-y-2">
           {courses.map((c) => (
             <li key={c.id} className="flex items-center justify-between gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2.5">
@@ -169,7 +169,7 @@ function FrontContent() {
                 href={`/academy/courses/${c.id}/lp`}
                 className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--mikke-accent-soft)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent-strong)]"
               >
-                <LayoutTemplate size={13} /> LPビルダー
+                <LayoutTemplate size={13} /> 公開講座ページを編集
               </Link>
             </li>
           ))}
@@ -181,7 +181,7 @@ function FrontContent() {
 
 export default function FrontEditPage() {
   return (
-    <HonbuShell title="フロントページ編集">
+    <HonbuShell title="ホームページ編集">
       <FrontContent />
     </HonbuShell>
   );

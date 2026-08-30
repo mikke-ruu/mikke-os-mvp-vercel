@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -24,6 +25,7 @@ import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader"
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import { getInstructorPage, saveInstructorPageBlocks } from "@/lib/academy/instructor-page";
+import { getLearnerPage, saveLearnerPage } from "@/lib/academy/learner-page";
 import type { AcademyCourse, AcademyHeadquarters, AcademyPageBlock } from "@/types/database";
 
 const inputClass =
@@ -136,7 +138,7 @@ function BlockEditor({
   if (block.type === "materials-list")
     return (
       <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs text-[var(--mikke-muted)]">
-        設定項目はありません。この講座の教材・資料（公開設定にしたもの）が、ここに自動で一覧表示されます。
+        設定項目はありません。「講師用ファイル」でマイポータルに表示する設定にしたPDF・動画・リンクが、ここに自動で一覧表示されます。
       </p>
     );
 
@@ -174,7 +176,7 @@ function BlockEditor({
   );
 }
 
-function BuilderContent({ courseId }: { courseId: string }) {
+function BuilderContent({ courseId, audience }: { courseId: string; audience: "learner" | "instructor" }) {
   const { profile } = useAuth();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [course, setCourse] = useState<AcademyCourse | null>(null);
@@ -182,6 +184,7 @@ function BuilderContent({ courseId }: { courseId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isPublished, setIsPublished] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -189,13 +192,20 @@ function BuilderContent({ courseId }: { courseId: string }) {
       setHq(foundHq);
       if (foundHq) {
         setCourse(await getCourse(foundHq.id, courseId));
-        const page = await getInstructorPage(foundHq.id, courseId);
-        setBlocks(page?.blocks ?? []);
+        if (audience === "learner") {
+          const page = await getLearnerPage(foundHq.id, courseId);
+          setBlocks(page?.blocks ?? []);
+          setIsPublished(page?.is_published ?? false);
+        } else {
+          const page = await getInstructorPage(foundHq.id, courseId);
+          setBlocks(page?.blocks ?? []);
+          setIsPublished(true);
+        }
       }
       setLoading(false);
     }
     load();
-  }, [profile.user_id, courseId]);
+  }, [audience, profile.user_id, courseId]);
 
   function update(i: number, b: AcademyPageBlock) {
     setBlocks((prev) => prev.map((x, j) => (j === i ? b : x)));
@@ -224,7 +234,11 @@ function BuilderContent({ courseId }: { courseId: string }) {
     if (!hq || !course) return;
     setSaving(true);
     try {
-      await saveInstructorPageBlocks(profile, hq.id, course.id, blocks);
+      if (audience === "learner") {
+        await saveLearnerPage(profile, hq.id, course.id, blocks, isPublished);
+      } else {
+        await saveInstructorPageBlocks(profile, hq.id, course.id, blocks);
+      }
       setSaved(true);
     } finally {
       setSaving(false);
@@ -235,21 +249,40 @@ function BuilderContent({ courseId }: { courseId: string }) {
   if (!hq || !course) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">講座が見つかりません。</p>;
 
   return (
-    <AcademyCourseWorkspace course={course} activeTab="instructor">
+    <AcademyCourseWorkspace course={course} activeTab={audience}>
       <div className="space-y-4">
       <div>
         <p className="truncate text-xs text-[var(--mikke-muted)]">{course.code} {course.name}</p>
-        <h2 className="text-base font-bold text-[var(--mikke-text)]">講師専用ページ</h2>
+        <h2 className="text-base font-bold text-[var(--mikke-text)]">{audience === "learner" ? "復習ページ" : "講師用資料ページ"}</h2>
       </div>
-      <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-3 py-2 text-[11px] text-[var(--mikke-accent-strong)]">
-        認定講師の復習・共有用ページです。ここで作った内容は、この講座を取得した活動中の講師だけが「講師ホーム」で閲覧できます（受講者・部外者には見えません）。
+      <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
+        {audience === "learner"
+          ? "受講した人が、講座の振り返りや配布資料、本部からのお知らせを確認するページです。認定講師用の資料とは別です。"
+          : "講座の進め方、材料の購入先、営業方法などを、この講座の認定講師に共有するページです。受講者の復習ページとは別です。"}
       </p>
 
-      {/* AC-C4: 教材・資料タブを独立ナビから外した代わりの導線。教材データはacademy_materialsのまま。 */}
-      <div className="rounded-xl border border-dashed border-[var(--mikke-line)] bg-white p-3">
-        <p className="text-xs font-bold text-[var(--mikke-text)]">教材・資料はこの講座専用の管理画面で編集します</p>
+      {audience === "learner" ? (
+        <fieldset className="rounded-xl border border-[var(--mikke-line)] bg-white p-4">
+          <legend className="px-1 text-xs font-bold text-[var(--mikke-text)]">受講者への表示</legend>
+          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            {([
+              [false, "下書き（まだ受講者に表示しない）"],
+              [true, "受講者のマイポータルに表示"]
+            ] as const).map(([value, label]) => (
+              <label key={String(value)} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm font-bold ${isPublished === value ? "border-[var(--mikke-primary)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-primary)]" : "border-[var(--mikke-line)] text-[var(--mikke-text-soft)]"}`}>
+                <input type="radio" name="learner-page-publication" checked={isPublished === value} onChange={() => { setIsPublished(value); setSaved(false); }} />
+                {label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+
+      {/* AC-C4: academy_materials を講師用ファイルとして編集する導線。 */}
+      {audience === "instructor" ? <div className="rounded-xl border border-dashed border-[var(--mikke-line)] bg-white p-3">
+        <p className="text-xs font-bold text-[var(--mikke-text)]">PDF・動画・リンクは「講師用ファイル」で追加します</p>
         <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">
-          教材・資料を編集すると、下の「教材リスト」ブロックに自動で反映されます。
+          表示対象と表示状態を選び、講師のマイポータルに追加できます。
         </p>
         <Link
           href={`/academy/materials?course=${course.id}`}
@@ -257,7 +290,7 @@ function BuilderContent({ courseId }: { courseId: string }) {
         >
           <FolderOpen size={13} /> この講座の教材を管理する
         </Link>
-      </div>
+      </div> : null}
 
       {blocks.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-6 text-center text-sm text-[var(--mikke-muted)]">
@@ -306,14 +339,14 @@ function BuilderContent({ courseId }: { courseId: string }) {
         <button type="button" onClick={() => add("cta")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
           <MousePointerClick size={14} /> CTA
         </button>
-        <button type="button" onClick={() => add("materials-list")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
+        {audience === "instructor" ? <button type="button" onClick={() => add("materials-list")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
           <FolderOpen size={14} /> 教材リスト
-        </button>
+        </button> : null}
       </div>
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-          {saving ? "保存中…" : "講師専用ページを保存"}
+          {saving ? "保存中…" : audience === "learner" ? "復習ページを保存" : "講師用資料ページを保存"}
         </button>
         {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
       </div>
@@ -324,9 +357,11 @@ function BuilderContent({ courseId }: { courseId: string }) {
 
 export default function InstructorPageBuilder({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const searchParams = useSearchParams();
+  const audience = searchParams.get("audience") === "learner" ? "learner" : "instructor";
   return (
-    <HonbuShell title="講師専用ページ">
-      <BuilderContent courseId={id} />
+    <HonbuShell title={audience === "learner" ? "復習ページ" : "講師用資料ページ"}>
+      <BuilderContent courseId={id} audience={audience} />
     </HonbuShell>
   );
 }

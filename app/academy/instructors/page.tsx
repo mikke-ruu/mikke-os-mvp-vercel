@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Hash, Plus, Settings, Users } from "lucide-react";
+import { AlertTriangle, Hash, Plus, Settings, UserRoundCheck, Users } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
-import { INSTRUCTOR_STATUS_LABELS, getRenewalAlerts, listInstructors } from "@/lib/academy/instructors";
+import {
+  INSTRUCTOR_REGISTRATION_STATUS_LABELS,
+  INSTRUCTOR_STATUS_LABELS,
+  getRenewalAlerts,
+  listInstructors
+} from "@/lib/academy/instructors";
 import type { AcademyCourse, AcademyHeadquarters, AcademyInstructor } from "@/types/database";
 
 const RENEWAL_PRESETS = [
@@ -191,13 +196,30 @@ function InstructorsContent() {
         <InstructorNumberSettings hq={hq} onUpdated={setHq} />
       </div>
 
+      <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+        <div>
+          <p className="text-sm font-bold text-[var(--mikke-text)]">講師を登録しましょう</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">本部オーナー自身が教える場合と、既存の講師を移行する場合では登録方法が異なります。受講者から認定講師になる人は、本人の承諾後に申込情報を引き継ぎます。</p>
+        </div>
+        <div className="grid gap-2 md:grid-cols-2">
+          <Link href="/academy/instructors/new?self=1" className="rounded-xl border border-[var(--mikke-line)] p-3 hover:border-[var(--mikke-accent)]">
+            <UserRoundCheck size={18} className="text-[var(--mikke-accent)]" />
+            <p className="mt-2 text-sm font-bold text-[var(--mikke-text)]">自分を講師として登録</p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">本部オーナー自身が教える場合に使います。登録中は講師1名として利用人数に数えます。</p>
+          </Link>
+          <Link href="/academy/applications" className="rounded-xl border border-[var(--mikke-line)] p-3 hover:border-[var(--mikke-accent)]">
+            <Users size={18} className="text-[var(--mikke-accent)]" />
+            <p className="mt-2 text-sm font-bold text-[var(--mikke-text)]">受講者から登録</p>
+            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">修了・本人の活動意思・必要条件を確認し、申込情報を引き継いで登録します。</p>
+          </Link>
+        </div>
+      </section>
+
       {instructors.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-8 text-center">
           <Users size={28} className="mx-auto text-[var(--mikke-accent)]" />
           <p className="mt-2 text-sm text-[var(--mikke-text-soft)]">まだ講師がいません。</p>
-          <Link href="/academy/instructors/new" className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
-            講師を登録する
-          </Link>
+          <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">上の方法から、現在の状況に合う登録方法を選んでください。</p>
         </div>
       ) : (
         <ul className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
@@ -214,12 +236,18 @@ function InstructorsContent() {
                       <p className="mt-0.5 truncate text-xs text-[var(--mikke-muted)]">
                         {course ? `${course.code} ` : ""}
                         {ins.instructor_number ? `No.${ins.instructor_number} ・ ` : ""}
-                        {INSTRUCTOR_STATUS_LABELS[ins.status]}
+                        {ins.registration_status === "withdrawn"
+                          ? INSTRUCTOR_REGISTRATION_STATUS_LABELS.withdrawn
+                          : INSTRUCTOR_STATUS_LABELS[ins.status]}
                       </p>
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
                     <Badge on={ins.is_certified} label={ins.is_certified ? "認定済み" : "未認定"} />
+                    <Badge
+                      on={ins.registration_status === "registered"}
+                      label={INSTRUCTOR_REGISTRATION_STATUS_LABELS[ins.registration_status]}
+                    />
                     <Badge on={ins.is_active} label={ins.is_active ? "活動中" : "活動なし"} />
                     <Badge on={ins.is_listed} label={ins.is_listed ? "掲載中" : "非掲載"} />
                     {renewalDueIds.has(ins.id) ? (

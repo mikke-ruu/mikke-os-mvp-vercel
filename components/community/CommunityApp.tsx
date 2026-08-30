@@ -97,7 +97,7 @@ import {
 } from "@/lib/community/client";
 import { submitCommunityJoinApplication } from "@/lib/community/client";
 import { CommunityHelpView, CommunityRulesView, OwnerCommunityModerationView, OwnerCommunitySafetyView } from "@/components/community/CommunitySafetyViews";
-import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEvent, CommunityHomeMetric, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind, CommunitySearchResult } from "@/lib/community/types";
+import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEntitlementSource, CommunityEvent, CommunityHomeMetric, CommunityMemberEntitlement, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind, CommunitySearchResult } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
 import { ensureProfile } from "@/lib/profile";
@@ -108,6 +108,20 @@ type SessionUser = {
   id: string;
   email?: string;
 };
+
+function entitlementSourceLabel(source: CommunityEntitlementSource) {
+  if (source === "academy_subscription") return "Academy連携";
+  if (source === "subscription") return "Community有料会員";
+  if (source === "manual") return "運営付与";
+  return "招待・外部連携";
+}
+
+function isEffectiveEntitlement(item: CommunityMemberEntitlement) {
+  const now = Date.now();
+  return item.status === "active"
+    && Date.parse(item.startsAt) <= now
+    && (item.endsAt === null || Date.parse(item.endsAt) > now);
+}
 
 const COMMUNITY_CHAT_REACTIONS = ["👍", "❤️", "😂", "🎉", "👏", "🙏"] as const;
 const COMMUNITY_AVATAR_COLORS: Array<{ value: CommunityRoomColor; label: string }> = [
@@ -1351,13 +1365,35 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
       <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
         <h3 className="text-lg font-bold">会員情報</h3>
         <p className="mt-2 text-sm text-[var(--mikke-muted)]">現在の役割: {data.membership?.role ?? "未参加"}</p>
-        <div className="mt-3 flex flex-wrap gap-2">{data.entitlements.filter((item) => item.status === "active").map((item) => <MikkeStatusBadge key={item.id} tone="primary">{item.entitlementKey}</MikkeStatusBadge>)}{data.entitlements.every((item) => item.status !== "active") ? <span className="text-sm text-[var(--mikke-muted)]">追加の利用権限はありません。</span> : null}</div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {data.entitlements.filter(isEffectiveEntitlement).map((item) => <MikkeStatusBadge key={item.id} tone="primary">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)}</MikkeStatusBadge>)}
+          {data.entitlements.every((item) => !isEffectiveEntitlement(item)) ? <span className="text-sm text-[var(--mikke-muted)]">追加の利用権限はありません。</span> : null}
+        </div>
       </section>
 
       {data.membershipPlans.filter((plan) => plan.status === "active").length > 0 ? <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
         <h3 className="text-lg font-bold">有料会員プラン</h3>
         <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">決済はこのCommunityの運営者が契約する外部サービスで行います。mikkeは決済情報を保持しません。</p>
-        <div className="mt-4 grid gap-3">{data.membershipPlans.filter((plan) => plan.status === "active").map((plan) => <article key={plan.id} className="rounded-lg border border-[var(--mikke-line-soft)] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold">{plan.name}</p><p className="mt-1 text-sm text-[var(--mikke-muted)]">{plan.description}</p></div><p className="font-bold text-[var(--mikke-primary)]">¥{plan.amountYen.toLocaleString()} / {plan.billingInterval === "month" ? "月" : plan.billingInterval === "year" ? "年" : "1回"}</p></div><a href={plan.externalPaymentUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white">{plan.paymentProviderLabel}で支払う</a><div className="mt-3 grid gap-2 sm:grid-cols-2"><input value={payerName} onChange={(event) => setPayerName(event.target.value)} placeholder="決済名義" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder="決済番号（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/></div><button type="button" disabled={requesting || data.paymentClaims.some((claim) => claim.planId === plan.id && claim.status === "pending")} onClick={() => submitPaymentClaim(plan.id)} className="mt-2 rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">{data.paymentClaims.some((claim) => claim.planId === plan.id && claim.status === "pending") ? "確認待ち" : "支払い確認を申請"}</button></article>)}</div>
+        <div className="mt-4 grid gap-3">
+          {data.membershipPlans.filter((plan) => plan.status === "active").map((plan) => {
+            const matchingEntitlements = data.entitlements.filter((item) => isEffectiveEntitlement(item) && item.entitlementKey === plan.entitlementKey);
+            const isAlreadyEntitled = matchingEntitlements.length > 0;
+            return (
+              <article key={plan.id} className="rounded-lg border border-[var(--mikke-line-soft)] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold">{plan.name}</p><p className="mt-1 text-sm text-[var(--mikke-muted)]">{plan.description}</p></div><p className="font-bold text-[var(--mikke-primary)]">¥{plan.amountYen.toLocaleString()} / {plan.billingInterval === "month" ? "月" : plan.billingInterval === "year" ? "年" : "1回"}</p></div>
+                {isAlreadyEntitled ? (
+                  <div className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]">この利用範囲は利用中です（{[...new Set(matchingEntitlements.map((item) => entitlementSourceLabel(item.source)))].join("・")}）</div>
+                ) : (
+                  <>
+                    <a href={plan.externalPaymentUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white">{plan.paymentProviderLabel}で支払う</a>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2"><input value={payerName} onChange={(event) => setPayerName(event.target.value)} placeholder="決済名義" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder="決済番号（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/></div>
+                    <button type="button" disabled={requesting || data.paymentClaims.some((claim) => claim.planId === plan.id && claim.status === "pending")} onClick={() => submitPaymentClaim(plan.id)} className="mt-2 rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">{data.paymentClaims.some((claim) => claim.planId === plan.id && claim.status === "pending") ? "確認待ち" : "支払い確認を申請"}</button>
+                  </>
+                )}
+              </article>
+            );
+          })}
+        </div>
       </section> : null}
 
       <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
@@ -2174,7 +2210,7 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
   const [keyName, setKeyName] = useState(data.entitlementDefinitions[0]?.key ?? "");
   const [role, setRole] = useState(member.membership.role);
   const [savingMembership, setSavingMembership] = useState(false);
-  const active = member.entitlements.filter((item) => item.status === "active");
+  const active = member.entitlements.filter(isEffectiveEntitlement);
   const isSelf = member.membership.userId === operatorUserId;
   const isCanonicalOwner = member.membership.userId === data.community.ownerUserId;
   const operatorIsCanonicalOwner = operatorUserId === data.community.ownerUserId;
@@ -2211,7 +2247,7 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
   }
   return (
     <article className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold">{member.profile?.displayName ?? "参加者"}</p><p className="text-xs text-[var(--mikke-muted)]">{member.membership.role} / {member.membership.status}</p></div><div className="flex flex-wrap gap-2">{active.map((item) => <button key={item.id} type="button" onClick={() => revoke(item.id)} className="rounded-full border border-[var(--mikke-line)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ×</button>)}</div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold">{member.profile?.displayName ?? "参加者"}</p><p className="text-xs text-[var(--mikke-muted)]">{member.membership.role} / {member.membership.status}</p></div><div className="flex flex-wrap gap-2">{active.map((item) => item.source !== "academy_subscription" ? <button key={item.id} type="button" onClick={() => revoke(item.id)} className="rounded-full border border-[var(--mikke-line)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)} ×</button> : <span key={item.id} className="rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)}</span>)}</div></div>
       <div className="mt-3 grid gap-2 md:grid-cols-[160px_auto_auto]">
         <select value={isCanonicalOwner ? "owner" : role} disabled={isCanonicalOwner || !operatorIsCanonicalOwner} onChange={(event) => setRole(event.target.value as typeof role)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm disabled:bg-[var(--mikke-surface-soft)] disabled:text-[var(--mikke-muted)]">
           <option value="member">参加者</option>

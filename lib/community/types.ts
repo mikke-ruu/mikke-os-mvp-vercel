@@ -1,5 +1,6 @@
 export type CommunityRole = "owner" | "moderator" | "member";
 export type CommunityMembershipStatus = "active" | "suspended" | "left";
+export type CommunityMembershipAccessScope = "community" | "linked_rooms";
 export type CommunityRoomKind = "announcement" | "normal" | "question" | "event";
 export type CommunityConversationMode = "thread" | "chat";
 export type CommunityRoomAccessType = "free" | "entitlement" | "staff";
@@ -8,7 +9,8 @@ export type CommunityPostKind = "announcement" | "normal" | "question";
 export type CommunityEventStatus = "open" | "closed" | "cancelled";
 export type CommunityResourceKind = "web" | "pdf" | "video" | "other";
 export type CommunityEntitlementStatus = "active" | "revoked" | "expired";
-export type CommunityEntitlementSource = "manual" | "subscription" | "external";
+export type CommunityEntitlementSource = "manual" | "subscription" | "external" | "academy_subscription";
+export type CommunityAcademyRole = "learner" | "instructor" | "staff" | "contract_holder";
 export type CommunityInvitationStatus = "pending" | "accepted" | "declined" | "revoked" | "expired";
 export type CommunityMembershipPlanStatus = "draft" | "active" | "archived";
 export type CommunityPaymentClaimStatus = "pending" | "approved" | "rejected" | "cancelled";
@@ -40,6 +42,7 @@ export type CommunityMembership = {
   userId: string;
   role: CommunityRole;
   status: CommunityMembershipStatus;
+  accessScope: CommunityMembershipAccessScope;
   joinedAt: string;
   memo: string | null;
 };
@@ -71,6 +74,7 @@ export type CommunityMemberEntitlement = {
   userId: string;
   entitlementKey: string;
   source: CommunityEntitlementSource;
+  sourceReference: string | null;
   status: CommunityEntitlementStatus;
   startsAt: string;
   endsAt: string | null;
@@ -93,6 +97,40 @@ export type CommunityInvitation = {
   expiresAt: string | null;
   acceptedAt: string | null;
   createdAt: string;
+};
+
+export type CommunityAcademyAccessInvitation = {
+  id: string;
+  status: "pending" | "accepted" | "revoked" | "expired";
+  academyRole: CommunityAcademyRole;
+  startsAt: string;
+  endsAt: string | null;
+  expiresAt: string | null;
+  community: {
+    id: string;
+    slug: string;
+    name: string;
+    description: string | null;
+    logoUrl: string | null;
+  };
+  access: {
+    entitlementKey: string;
+    name: string;
+    description: string | null;
+    rooms: Array<{ id: string; title: string; description: string | null }>;
+  };
+  consent: {
+    requireLegalName: boolean;
+    requirePhone: boolean;
+    requireJoinReason: boolean;
+    termsVersion: number;
+    termsText: string;
+    rulesVersion: number;
+    rulesText: string;
+    privacyVersion: number;
+    privacyText: string;
+  };
+  hasNormalCommunityAccess: boolean;
 };
 
 export type CommunityMembershipPlan = {

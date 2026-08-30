@@ -1,10 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Building2, Check, ShieldCheck, UserPlus } from "lucide-react";
+import { Building2, Check, Link2, ReceiptJapaneseYen, ShieldCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
+import {
+  getMyAcademyBillingSnapshot,
+  getMyAcademyCurrentBillingEstimate,
+  type AcademyBillingSnapshot,
+  type AcademyCurrentBillingEstimate,
+} from "@/lib/academy/billing";
 import {
   getMyHeadquartersRole,
   inviteHeadquartersMember,
@@ -14,6 +20,15 @@ import {
   respondHeadquartersInvitation,
   stopHeadquartersMember
 } from "@/lib/academy/headquarters-settings";
+import {
+  ACADEMY_COMMUNITY_REVOCATION_NOTICE,
+  getAcademyCommunityClaimStopErrorMessage,
+  getAcademyCommunityLinkErrorMessage,
+  listMyAcademyCommunityLinkOptions,
+  saveAcademyCommunityRoomLink,
+  stopAcademyCommunityClaimAccess,
+  type AcademyCommunityLinkOption
+} from "@/lib/academy/community-links";
 import type {
   AcademyHeadquarters,
   AcademyHeadquartersInvitation,
@@ -34,7 +49,7 @@ const roleLabels: Record<AcademyHeadquartersRole, string> = {
 const roleDetails = [
   { role: "Owner", permissions: "本部情報、メンバー、講座、公開を含むすべての管理" },
   { role: "Administrator", permissions: "本部情報、メンバー招待、講座運営（所有権の変更を除く）" },
-  { role: "Course Editor", permissions: "講座、講座ページ、教材の編集" }
+  { role: "Course Editor", permissions: "講座、公開講座ページ、教材の編集" }
 ];
 
 function SettingsContent() {
@@ -44,6 +59,9 @@ function SettingsContent() {
   const [members, setMembers] = useState<AcademyHeadquartersMember[]>([]);
   const [invitations, setInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [myInvitations, setMyInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
+  const [billingSnapshot, setBillingSnapshot] = useState<AcademyBillingSnapshot | null>(null);
+  const [currentBillingEstimate, setCurrentBillingEstimate] = useState<AcademyCurrentBillingEstimate | null>(null);
+  const [communityLinks, setCommunityLinks] = useState<AcademyCommunityLinkOption[]>([]);
   const [form, setForm] = useState({
     name: "",
     logo_url: "",
@@ -58,8 +76,22 @@ function SettingsContent() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
+  const [communityForm, setCommunityForm] = useState({ communityId: "", mappingId: "", entitlementKey: "", sourceProductKey: "academy-membership", status: "draft" as "draft" | "active" | "archived" });
 
   const canManage = role === "owner" || role === "administrator";
+  const selectedCommunity = useMemo(
+    () => communityLinks.find((item) => item.communityId === communityForm.communityId) ?? null,
+    [communityForm.communityId, communityLinks]
+  );
+  const currentCommunityMappings = useMemo(
+    () => selectedCommunity?.mappings.filter((mapping) => mapping.isCurrent) ?? [],
+    [selectedCommunity]
+  );
+  const currentCommunityMapping = useMemo(
+    () => currentCommunityMappings.find((mapping) => mapping.id === communityForm.mappingId) ?? null,
+    [communityForm.mappingId, currentCommunityMappings]
+  );
+  const communityLinkHasActiveClaims = (currentCommunityMapping?.activeClaimCount ?? 0) > 0;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -74,6 +106,8 @@ function SettingsContent() {
         setRole(null);
         setMembers([]);
         setInvitations([]);
+        setBillingSnapshot(null);
+        setCurrentBillingEstimate(null);
         return;
       }
 
@@ -95,6 +129,35 @@ function SettingsContent() {
         ]);
         setMembers(nextMembers);
         setInvitations(nextInvitations);
+        try {
+          const nextCommunityLinks = await listMyAcademyCommunityLinkOptions(hq.id);
+          setCommunityLinks(nextCommunityLinks);
+          const firstCommunity = nextCommunityLinks[0];
+          const firstCurrentMapping = firstCommunity?.mappings.find((mapping) => mapping.isCurrent);
+          const firstDefinition = firstCommunity?.definitions[0];
+          if (firstCommunity && (firstCurrentMapping || firstDefinition)) {
+            setCommunityForm({
+              communityId: firstCommunity.communityId,
+              mappingId: firstCurrentMapping?.id ?? "",
+              entitlementKey: firstCurrentMapping?.entitlementKey ?? firstDefinition?.key ?? "",
+              sourceProductKey: firstCurrentMapping?.sourceProductKey ?? "academy-membership",
+              status: firstCurrentMapping?.status === "active" ? "active" : "draft"
+            });
+          }
+        } catch {
+          setCommunityLinks([]);
+        }
+      }
+      if (nextRole === "owner") {
+        const [snapshot, estimate] = await Promise.all([
+          getMyAcademyBillingSnapshot(hq.id),
+          getMyAcademyCurrentBillingEstimate(hq.id),
+        ]);
+        setBillingSnapshot(snapshot);
+        setCurrentBillingEstimate(estimate);
+      } else {
+        setBillingSnapshot(null);
+        setCurrentBillingEstimate(null);
       }
     } catch {
       setMessage("本部設定を読み込めませんでした。DB設定と権限を確認してください。");
@@ -177,6 +240,69 @@ function SettingsContent() {
       await load();
     } catch {
       setMessage("メンバーを停止できませんでした。Owner権限を確認してください。");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function saveCommunityLink() {
+    if (!headquarters || !canManage || !communityForm.communityId || !communityForm.entitlementKey) return;
+    setBusy("community-link");
+    setMessage("");
+    try {
+      await saveAcademyCommunityRoomLink({
+        headquartersId: headquarters.id,
+        communityId: communityForm.communityId,
+        entitlementKey: communityForm.entitlementKey,
+        sourceProductKey: communityForm.sourceProductKey,
+        status: communityForm.status
+      });
+      setMessage(
+        communityForm.status === "active"
+          ? "Communityの指定Room連携を有効にしました。"
+          : communityForm.status === "archived"
+            ? "Community連携を停止しました。過去の接続履歴は保存されています。"
+            : "Community連携を下書き保存しました。"
+      );
+      setCommunityLinks(await listMyAcademyCommunityLinkOptions(headquarters.id));
+    } catch (error) {
+      setMessage(getAcademyCommunityLinkErrorMessage(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function stopCommunityClaimAccess() {
+    if (!headquarters || !currentCommunityMapping || !communityLinkHasActiveClaims) return;
+    const confirmed = window.confirm(
+      `Academyから追加したCommunity利用権 ${currentCommunityMapping.activeClaimCount}件を停止します。\n\n${ACADEMY_COMMUNITY_REVOCATION_NOTICE}\n\n停止後に元へ戻す場合は、対象者へ改めて案内と同意が必要です。続けますか？`
+    );
+    if (!confirmed) return;
+
+    setBusy("community-claims");
+    setMessage("");
+    try {
+      const result = await stopAcademyCommunityClaimAccess({
+        headquartersId: headquarters.id,
+        mappingId: currentCommunityMapping.id
+      });
+      const nextCommunityLinks = await listMyAcademyCommunityLinkOptions(headquarters.id);
+      setCommunityLinks(nextCommunityLinks);
+      const refreshedMapping = nextCommunityLinks
+        .flatMap((community) => community.mappings)
+        .find((mapping) => mapping.id === currentCommunityMapping.id);
+      if ((refreshedMapping?.activeClaimCount ?? 0) === 0) {
+        setMessage(`${result.stoppedCount}件のAcademy由来の利用権を停止しました。接続範囲の変更または連携停止を行えます。`);
+      } else {
+        setMessage(`${result.stoppedCount}件を停止しましたが、新しい利用権が追加されています。残り${refreshedMapping?.activeClaimCount ?? 0}件を確認してください。`);
+      }
+    } catch (error) {
+      setMessage(getAcademyCommunityClaimStopErrorMessage(error));
+      try {
+        setCommunityLinks(await listMyAcademyCommunityLinkOptions(headquarters.id));
+      } catch {
+        // The safe message above remains visible. Never expose a raw database error.
+      }
     } finally {
       setBusy("");
     }
@@ -267,6 +393,165 @@ function SettingsContent() {
               <p className="mt-4 text-sm text-[var(--mikke-muted)]">Course Editorは本部情報を変更できません。</p>
             )}
           </section>
+
+          {role === "owner" ? (
+            <section className={cardClass}>
+              <h2 className="flex items-center gap-2 text-base font-bold">
+                <ReceiptJapaneseYen size={18} /> Academy利用料金
+              </h2>
+              <p className="mt-1 text-sm text-[var(--mikke-muted)]">
+                請求先の本部Ownerだけに表示しています。すべて税込です。
+              </p>
+
+              {currentBillingEstimate ? (
+                <div className="mt-4 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+                  <p className="text-xs font-bold text-[var(--mikke-muted)]">現在の登録中ユニーク人数（参考・月末未確定）</p>
+                  <p className="mt-1 text-2xl font-bold">{currentBillingEstimate.registered_instructor_count}<span className="ml-1 text-sm">名</span></p>
+                  <p className="mt-1 text-xs text-[var(--mikke-muted)]">現在の人数による通常料金は月額 {currentBillingEstimate.catalog_price_yen.toLocaleString()}円です。請求額は月末23:59（Asia/Tokyo）の確定snapshotで決まります。</p>
+                </div>
+              ) : null}
+
+              {billingSnapshot ? (
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+                    <p className="text-xs font-bold text-[var(--mikke-muted)]">{billingSnapshot.snapshot_month.slice(0, 7)} 月末の登録講師</p>
+                    <p className="mt-1 text-2xl font-bold">{billingSnapshot.registered_instructor_count}<span className="ml-1 text-sm">名</span></p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+                    <p className="text-xs font-bold text-[var(--mikke-muted)]">{Number(billingSnapshot.charge_month.slice(5, 7))}月分</p>
+                    <p className="mt-1 text-2xl font-bold">{billingSnapshot.charge_price_yen.toLocaleString()}<span className="ml-1 text-sm">円</span></p>
+                  </div>
+                  <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
+                    <p className="text-xs font-bold text-[var(--mikke-muted)]">通常料金</p>
+                    <p className="mt-1 text-2xl font-bold">{billingSnapshot.catalog_price_yen.toLocaleString()}<span className="ml-1 text-sm">円</span></p>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">
+                  最初の月末集計後に、登録講師数と次回料金を表示します。
+                </p>
+              )}
+              {billingSnapshot ? (
+                <p className="mt-2 text-[11px] text-[var(--mikke-muted)]">締め時刻: {new Date(billingSnapshot.cutoff_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}（Asia/Tokyo）</p>
+              ) : null}
+
+              {billingSnapshot?.price_notice_required ? (
+                <p className="mt-3 rounded-xl border border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold">
+                  21名または51名に到達したため、次月は現在の料金を据え置きます。人数が上限を超えたままの場合は、その次の更新月から通常料金になります。
+                </p>
+              ) : null}
+
+              <div className="mt-5 overflow-x-auto rounded-xl border border-[var(--mikke-line)] text-sm">
+                <div className="grid min-w-[640px] grid-cols-[1fr_1.4fr_1.2fr] bg-[var(--mikke-surface-soft)] px-4 py-2 text-xs font-bold">
+                  <span>登録講師数</span><span>月額</span><span>上限利用時の1名あたり</span>
+                </div>
+                {[
+                  ["20名まで", "5,000円", "250円"],
+                  ["50名まで", "10,000円", "200円"],
+                  ["200名まで", "20,000円", "100円"],
+                  ["201名以上", "20,000円＋超過1名100円", "人数により変動"],
+                ].map((row) => (
+                  <div key={row[0]} className="grid min-w-[640px] grid-cols-[1fr_1.4fr_1.2fr] gap-2 border-t border-[var(--mikke-line)] px-4 py-3">
+                    {row.map((cell) => <span key={cell}>{cell}</span>)}
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">
+                登録中の講師を数えます。活動中・休眠・停止中も登録解除までは対象です。同じ人が同一本部で複数講座を担当しても1名です。本部Ownerも講師登録している場合は1名に含まれます。登録解除は翌月分から反映します。
+              </p>
+            </section>
+          ) : null}
+
+          {canManage ? (
+            <section className={cardClass}>
+              <h2 className="flex items-center gap-2 text-base font-bold"><Link2 size={18} /> Community連携</h2>
+              <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
+                AcademyとCommunityは別商品のまま、受講者や認定講師に指定Roomだけを追加料金なしで案内します。通常のCommunity会費や契約は変更しません。
+              </p>
+              {communityLinks.length ? (
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-bold">接続するCommunity
+                    <select className={inputClass} value={communityForm.communityId} onChange={(event) => {
+                      const nextCommunity = communityLinks.find((item) => item.communityId === event.target.value);
+                      const nextMapping = nextCommunity?.mappings.find((mapping) => mapping.isCurrent);
+                      setCommunityForm({
+                        communityId: event.target.value,
+                        mappingId: nextMapping?.id ?? "",
+                        entitlementKey: nextMapping?.entitlementKey ?? nextCommunity?.definitions[0]?.key ?? "",
+                        sourceProductKey: nextMapping?.sourceProductKey ?? "academy-membership",
+                        status: nextMapping?.status === "active" ? "active" : "draft"
+                      });
+                    }}>
+                      {communityLinks.map((item) => <option key={item.communityId} value={item.communityId}>{item.communityName}</option>)}
+                    </select>
+                  </label>
+                  {currentCommunityMappings.length ? (
+                    <label className="text-xs font-bold md:col-span-2">管理する接続
+                      <select className={inputClass} value={communityForm.mappingId} onChange={(event) => {
+                        const nextMapping = currentCommunityMappings.find((mapping) => mapping.id === event.target.value);
+                        if (!nextMapping) return;
+                        setCommunityForm({
+                          ...communityForm,
+                          mappingId: nextMapping.id,
+                          entitlementKey: nextMapping.entitlementKey,
+                          sourceProductKey: nextMapping.sourceProductKey,
+                          status: nextMapping.status === "active" ? "active" : "draft"
+                        });
+                      }}>
+                        {currentCommunityMappings.map((mapping) => <option key={mapping.id} value={mapping.id}>{mapping.sourceProductKey}</option>)}
+                      </select>
+                    </label>
+                  ) : null}
+                  <label className="text-xs font-bold">利用できるRoomの範囲
+                    <select className={inputClass} value={communityForm.entitlementKey} onChange={(event) => setCommunityForm({ ...communityForm, entitlementKey: event.target.value })}>
+                      {(communityLinks.find((item) => item.communityId === communityForm.communityId)?.definitions ?? []).map((definition) => <option key={definition.key} value={definition.key}>{definition.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="text-xs font-bold">Academy内の区分名
+                    <input className={inputClass} value={communityForm.sourceProductKey} readOnly={Boolean(currentCommunityMapping)} onChange={(event) => setCommunityForm({ ...communityForm, sourceProductKey: event.target.value })} placeholder="例: basic-learner" />
+                    {currentCommunityMapping ? <span className="mt-1 block text-[11px] leading-5 text-[var(--mikke-muted)]">利用中の接続を別の区分へ変更することはできません。新しい接続を追加する機能は今後対応します。</span> : null}
+                  </label>
+                  <label className="text-xs font-bold">状態
+                    <select className={inputClass} value={communityForm.status} onChange={(event) => setCommunityForm({ ...communityForm, status: event.target.value as "draft" | "active" | "archived" })}>
+                      <option value="draft">下書き（まだ案内しない）</option>
+                      <option value="active">連携中（招待に利用する）</option>
+                      {currentCommunityMapping ? <option value="archived">連携を停止する</option> : null}
+                    </select>
+                  </label>
+                  {communityLinkHasActiveClaims ? (
+                    <div className="rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-primary)] md:col-span-2">
+                      <p>利用中（{currentCommunityMapping?.activeClaimCount}件）です。範囲変更や停止の前に、対象者のAcademy由来のCommunity利用権を停止してください。{ACADEMY_COMMUNITY_REVOCATION_NOTICE}</p>
+                      <button type="button" disabled={busy === "community-claims"} onClick={() => void stopCommunityClaimAccess()} className="mt-3 rounded-xl border border-[var(--mikke-primary)] bg-white px-4 py-2.5 text-sm font-bold text-[var(--mikke-primary)] disabled:opacity-40">
+                        {busy === "community-claims" ? "停止しています…" : "Academy由来の利用権を停止"}
+                      </button>
+                    </div>
+                  ) : null}
+                  <button type="button" disabled={busy === "community-link" || !communityForm.entitlementKey || communityLinkHasActiveClaims} onClick={() => void saveCommunityLink()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40 md:col-span-2">Community連携を保存</button>
+                  {selectedCommunity?.mappings.length ? (
+                    <div className="space-y-2 rounded-xl border border-[var(--mikke-line)] p-4 md:col-span-2">
+                      <p className="text-sm font-bold">接続状況</p>
+                      {selectedCommunity.mappings.map((mapping) => (
+                        <div key={mapping.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                          <span>{mapping.sourceProductKey} / {mapping.entitlementKey}</span>
+                          <span className="font-bold text-[var(--mikke-primary)]">
+                            {mapping.status === "archived"
+                              ? "過去の接続"
+                              : mapping.status === "draft"
+                                ? "下書き（まだ招待しない）"
+                                : mapping.activeClaimCount > 0
+                                  ? `利用中（${mapping.activeClaimCount}件）`
+                                  : "連携中"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">あなたが運営するCommunityと、Roomの利用範囲を先にCommunity側で作成してください。</p>
+              )}
+            </section>
+          ) : null}
 
           <section className={cardClass}>
             <h2 className="flex items-center gap-2 text-base font-bold"><ShieldCheck size={18} /> 役割・権限</h2>

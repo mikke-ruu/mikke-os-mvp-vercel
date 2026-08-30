@@ -1,9 +1,11 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
 import { resolveAcademyCourseFeatureSettings } from "@/lib/academy/course-feature-settings";
+import { academyPreviewCourses, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type {
   AcademyCourse,
   AcademyCourseFeatureSettings,
+  AcademyLearnerAccessMode,
   AcademyPaymentProvider,
   AcademyFaqItem,
   AcademyFormField,
@@ -33,11 +35,17 @@ export type CourseInput = {
   kitPrice: number;
   kitPaymentUrl: string;
   requiresKit: boolean;
+  learnerAccessMode: AcademyLearnerAccessMode;
+  learnerAccessDays: number | null;
+  learnerAccessFixedEndAt: string;
   featureSettings: AcademyCourseFeatureSettings;
 };
 
 function toRow(hqId: string, input: CourseInput) {
   const featureSettings = resolveAcademyCourseFeatureSettings(input.featureSettings);
+  const fixedEndAt = input.learnerAccessMode === "fixed_end" && input.learnerAccessFixedEndAt
+    ? new Date(input.learnerAccessFixedEndAt).toISOString()
+    : null;
   return {
     headquarters_id: hqId,
     code: input.code.trim(),
@@ -61,11 +69,15 @@ function toRow(hqId: string, input: CourseInput) {
     kit_price: input.kitPrice,
     kit_payment_url: input.kitPaymentUrl || null,
     requires_kit: featureSettings.kits,
+    learner_access_mode: input.learnerAccessMode,
+    learner_access_days: input.learnerAccessMode.startsWith("days_after_") ? input.learnerAccessDays : null,
+    learner_access_fixed_end_at: fixedEndAt,
     feature_settings: featureSettings
   };
 }
 
 export async function listCourses(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewCourses;
   const { data, error } = await supabase
     .from("academy_courses")
     .select("*")
@@ -78,6 +90,10 @@ export async function listCourses(headquartersId: string) {
 }
 
 export async function getCourse(headquartersId: string, id: string) {
+  if (isAcademyLocalReview()) {
+    const course = academyPreviewCourses.find((item) => item.id === id) ?? academyPreviewCourses[0];
+    return course;
+  }
   const { data, error } = await supabase
     .from("academy_courses")
     .select("*")
@@ -90,6 +106,7 @@ export async function getCourse(headquartersId: string, id: string) {
 }
 
 export async function createCourse(profile: Profile, headquartersId: string, input: CourseInput) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_courses")
     .insert({ ...toRow(headquartersId, input), user_id: profile.user_id })
@@ -119,6 +136,7 @@ export async function updateCourse(
   courseId: string,
   input: CourseInput
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_courses")
     .update(toRow(headquartersId, input))
@@ -138,6 +156,7 @@ export async function setCoursePublished(
   course: AcademyCourse,
   isPublished: boolean
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_courses")
     .update({ is_published: isPublished })

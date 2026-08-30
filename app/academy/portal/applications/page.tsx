@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ClipboardList, Package, X } from "lucide-react";
+import { ClipboardList, Mail, Package, Phone, X } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { APPLICATION_STATUS_LABELS } from "@/lib/academy/applications";
@@ -111,7 +111,7 @@ function KitIntakeModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[var(--mikke-text)]">受講日を確定してキットを仕入れる</h2>
+          <h2 className="text-sm font-bold text-[var(--mikke-text)]">受講日を確定して講座用教材を仕入れる</h2>
           <button
             type="button"
             onClick={onClose}
@@ -122,10 +122,17 @@ function KitIntakeModal({
           </button>
         </div>
         <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">
-          {application.applicant_name}さんの申込です。受講者の氏名・電話番号・申込備考は本部には送られません。
+          先に{application.applicant_name}さんへ連絡し、受講日を決めてから登録してください。連絡先は申込カードで確認できます。
         </p>
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <div className="rounded-xl bg-[var(--mikke-accent-soft)] px-3 py-2">
+            <p className="text-sm font-bold text-[var(--mikke-text)]">講師の講座仕入代（税込）</p>
+            <p className="mt-0.5 text-lg font-bold text-[var(--mikke-text)]">
+              {(course?.kit_price ?? 0).toLocaleString()}円
+            </p>
+            <p className="text-[10px] text-[var(--mikke-muted)]">金額と日程・送り先を確認してから確定してください。</p>
+          </div>
           <div>
             <label className={labelClass}>受講日*</label>
             <input
@@ -179,7 +186,7 @@ function KitIntakeModal({
           {error ? <p className="text-xs font-bold text-[var(--mikke-danger)]">{error}</p> : null}
 
           <button type="submit" disabled={saving} className="w-full rounded-xl bg-[var(--mikke-accent)] py-2.5 text-sm font-bold text-white disabled:opacity-60">
-            {saving ? "送信中…" : "キットを仕入れる"}
+            {saving ? "送信中…" : "講座用教材を仕入れる"}
           </button>
         </form>
       </div>
@@ -195,20 +202,27 @@ function MyApplicationsContent() {
   const [kitOrders, setKitOrders] = useState<AcademyKitOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalApp, setModalApp] = useState<AcademyApplication | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const myRecords = await getMyInstructorRecords(profile.user_id);
-    setRecords(myRecords);
-    const [myApps, courses, myKits] = await Promise.all([
-      listMyApplications(myRecords.map((r) => r.id)),
-      getCoursesByIds(myRecords.map((r) => r.course_id)),
-      listMyKitOrders(myRecords.map((r) => r.id))
-    ]);
-    setApps(myApps);
-    setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
-    setKitOrders(myKits);
-    setLoading(false);
+    setLoadError(null);
+    try {
+      const myRecords = await getMyInstructorRecords(profile.user_id);
+      setRecords(myRecords);
+      const [myApps, courses, myKits] = await Promise.all([
+        listMyApplications(myRecords.map((r) => r.id)),
+        getCoursesByIds(myRecords.map((r) => r.course_id)),
+        listMyKitOrders(myRecords.map((r) => r.id))
+      ]);
+      setApps(myApps);
+      setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
+      setKitOrders(myKits);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "申込を読み込めませんでした。");
+    } finally {
+      setLoading(false);
+    }
   }, [profile.user_id]);
 
   useEffect(() => {
@@ -220,6 +234,17 @@ function MyApplicationsContent() {
   }
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (loadError) {
+    return (
+      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
+        <p className="text-sm font-bold text-[var(--mikke-text)]">申込を読み込めませんでした</p>
+        <p className="mt-2 text-xs text-[var(--mikke-muted)]">{loadError}</p>
+        <button type="button" onClick={() => void load()} className="mt-3 rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white">
+          もう一度読み込む
+        </button>
+      </div>
+    );
+  }
   if (records.length === 0) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">まだ講師登録されていません。</p>;
 
   const modalInstructor = modalApp ? instructorForApp(modalApp) : null;
@@ -228,7 +253,7 @@ function MyApplicationsContent() {
     <div className="mx-auto max-w-3xl space-y-4">
       <p className="text-xs text-[var(--mikke-muted)]">
         あなたの営業用URLから入った申込（担当申込）の一覧です。ステータスの更新は本部が行います。
-        受講日が決まったら「受講日を確定してキットを仕入れる」から本部にキットを注文してください（1申込につき1回）。
+        受講日が決まったら「受講日を確定して講座用教材を仕入れる」から本部に注文してください（1申込につき1回）。
       </p>
 
       {apps.length === 0 ? (
@@ -257,9 +282,27 @@ function MyApplicationsContent() {
                     {APPLICATION_STATUS_LABELS[a.status]}
                   </span>
                 </div>
+                <div className="mt-3 space-y-2 border-t border-[var(--mikke-line-soft)] pt-3">
+                  {a.applicant_email ? (
+                    <a
+                      href={`mailto:${a.applicant_email}?subject=${encodeURIComponent(`【${courseMap[a.course_id]?.name ?? "Academy"}】受講日程のご連絡`)}`}
+                      className="flex items-center gap-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
+                    >
+                      <Mail size={13} /> メールで連絡する
+                    </a>
+                  ) : (
+                    <p className="text-[11px] text-[var(--mikke-muted)]">メールアドレスは未登録です。</p>
+                  )}
+                  {a.applicant_phone ? (
+                    <a href={`tel:${a.applicant_phone}`} className="flex items-center gap-2 text-xs text-[var(--mikke-text-soft)]">
+                      <Phone size={13} /> {a.applicant_phone}
+                    </a>
+                  ) : null}
+                  {a.applicant_note ? <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">備考: {a.applicant_note}</p> : null}
+                </div>
                 {!requiresKit ? null : existingOrder ? (
                   <p className="mt-2 text-[11px] font-bold text-[var(--mikke-accent-strong)]">
-                    キット仕入れ済み（{KIT_STATUS_LABELS[existingOrder.status]}）
+                    講座用教材の仕入れ済み（{KIT_STATUS_LABELS[existingOrder.status]}）
                   </p>
                 ) : inst ? (
                   <button
@@ -267,7 +310,7 @@ function MyApplicationsContent() {
                     onClick={() => setModalApp(a)}
                     className="mt-2 inline-flex items-center gap-1 rounded-full border border-[var(--mikke-line)] px-2.5 py-1 text-[11px] font-bold text-[var(--mikke-accent-strong)]"
                   >
-                    <Package size={12} /> 受講日を確定してキットを仕入れる
+                    <Package size={12} /> 受講日を確定して講座用教材を仕入れる
                   </button>
                 ) : null}
               </li>

@@ -8,13 +8,18 @@ import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feat
 const courseTabs = [
   { id: "settings", label: "講座設定", href: (courseId: string) => `/academy/courses/${courseId}` },
   { id: "program", label: "ステップ教材", href: (courseId: string) => `/academy/courses/${courseId}/program` },
-  { id: "page", label: "講座ページ", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
+  { id: "page", label: "公開講座ページ", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
+  {
+    id: "learner",
+    label: "復習ページ",
+    href: (courseId: string) => `/academy/courses/${courseId}/instructor-page?audience=learner`
+  },
   {
     id: "instructor",
-    label: "講師専用ページ",
+    label: "講師用資料ページ",
     href: (courseId: string) => `/academy/courses/${courseId}/instructor-page`
   },
-  { id: "materials", label: "教材・資料", href: (courseId: string) => `/academy/materials?course=${courseId}` }
+  { id: "materials", label: "講師用ファイル", href: (courseId: string) => `/academy/materials?course=${courseId}` }
 ] as const;
 
 export type AcademyCourseWorkspaceTab = (typeof courseTabs)[number]["id"];
@@ -30,7 +35,7 @@ export function AcademyCourseWorkspace({
 }) {
   const features = resolveAcademyCourseFeaturesForCourse(course);
   const visibleTabs = courseTabs.filter((tab) => {
-    if (tab.id === "program") return features.stepLearning;
+    if (tab.id === "program") return false;
     if (tab.id === "page") return features.publicCoursePage;
     return true;
   });
@@ -62,7 +67,7 @@ export function AcademyCourseWorkspace({
                     : "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]"
                 }`}
               >
-                {course.is_published ? "公開中" : "非公開"}
+                {course.is_published ? "公開講座ページ：公開中" : "公開講座ページ：下書き"}
               </span>
             </div>
           </div>
@@ -72,7 +77,7 @@ export function AcademyCourseWorkspace({
             className="inline-flex items-center gap-1 self-start rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)] lg:self-auto"
           >
             <ExternalLink size={14} />
-            公開ページを見る
+            公開講座ページを見る
           </Link>
         </div>
       </header>

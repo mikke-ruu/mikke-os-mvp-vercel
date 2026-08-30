@@ -111,6 +111,7 @@ function buildStripePaymentUrl(url: string, applicationId: string, email: string
 
 type IntakeBody = {
   course_id?: string;
+  class_id?: string | null;
   instructor_id?: string | null;
   applicant_name?: string;
   applicant_email?: string;
@@ -139,19 +140,36 @@ Deno.serve(async (request) => {
       auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const { data, error } = await admin.rpc("academy_submit_public_application", {
-      p_course_id: body.course_id,
-      p_instructor_id: null,
-      p_applicant_name: body.applicant_name ?? "",
-      p_applicant_email: body.applicant_email ?? "",
-      p_applicant_phone: body.applicant_phone ?? "",
-      p_applicant_note: body.applicant_note ?? "",
-      p_form_answers: body.form_answers ?? {},
-      p_event_date: body.event_date ?? "",
-      p_format: body.format ?? "",
-      p_diploma_name_en: body.diploma_name_en ?? "",
-      p_applicant_shipping_address: body.applicant_shipping_address ?? ""
-    });
+    const rpcName = body.class_id
+      ? "academy_submit_public_class_application"
+      : "academy_submit_public_application";
+    const rpcArgs = body.class_id
+      ? {
+          p_course_id: body.course_id,
+          p_class_id: body.class_id,
+          p_instructor_id: null,
+          p_applicant_name: body.applicant_name ?? "",
+          p_applicant_email: body.applicant_email ?? "",
+          p_applicant_phone: body.applicant_phone ?? "",
+          p_applicant_note: body.applicant_note ?? "",
+          p_form_answers: body.form_answers ?? {},
+          p_diploma_name_en: body.diploma_name_en ?? "",
+          p_applicant_shipping_address: body.applicant_shipping_address ?? ""
+        }
+      : {
+          p_course_id: body.course_id,
+          p_instructor_id: null,
+          p_applicant_name: body.applicant_name ?? "",
+          p_applicant_email: body.applicant_email ?? "",
+          p_applicant_phone: body.applicant_phone ?? "",
+          p_applicant_note: body.applicant_note ?? "",
+          p_form_answers: body.form_answers ?? {},
+          p_event_date: body.event_date ?? "",
+          p_format: body.format ?? "",
+          p_diploma_name_en: body.diploma_name_en ?? "",
+          p_applicant_shipping_address: body.applicant_shipping_address ?? ""
+        };
+    const { data, error } = await admin.rpc(rpcName, rpcArgs);
     if (error) throw error;
     const submitted = Array.isArray(data) ? data[0] : data;
     if (!submitted?.application_id) throw new Error("application result missing");
@@ -169,6 +187,7 @@ Deno.serve(async (request) => {
     const hqEmail = headquarters?.contact_email as string | null;
     const paymentNote = String(headquarters?.default_payment_note ?? "").trim();
     const applicationId = String(application.id);
+    const portalClaimUrl = `https://app.mikke-os.com/academy/claim/${encodeURIComponent(applicationId)}`;
     let paymentUrl = typeof submitted.payment_url === "string" ? submitted.payment_url : null;
     if (application.payment_provider === "stripe" && paymentUrl) {
       paymentUrl = buildStripePaymentUrl(paymentUrl, applicationId, applicantEmail);
@@ -200,7 +219,7 @@ Deno.serve(async (request) => {
         kind: "applicant",
         to: applicantEmail,
         subject: `【mikkeOS Academy】${course?.name ?? "講座"}のお申込みを受け付けました`,
-        html: `<div style="${commonStyle}"><h1 style="font-size:20px;color:#4655c7">お申込みを受け付けました</h1><p>${escapeHtml(String(application.applicant_name))} 様</p><p>${escapeHtml(course?.name ?? "講座")} のお申込みありがとうございます。本部より改めてご連絡します。</p>${paymentNote ? `<h2 style="font-size:16px">お支払いのご案内</h2><p>${textToHtml(paymentNote)}</p>` : ""}${paymentUrl ? `<p><a href="${escapeHtml(paymentUrl)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#4655c7;color:#fff;text-decoration:none;font-weight:700">お支払い手続きへ進む</a></p>` : ""}<p style="font-size:13px;color:#6f6b78">受付番号: ${escapeHtml(applicationId)}</p></div>`
+        html: `<div style="${commonStyle}"><h1 style="font-size:20px;color:#4655c7">お申込みを受け付けました</h1><p>${escapeHtml(String(application.applicant_name))} 様</p><p>${escapeHtml(course?.name ?? "講座")} のお申込みありがとうございます。本部より改めてご連絡します。</p>${paymentNote ? `<h2 style="font-size:16px">お支払いのご案内</h2><p>${textToHtml(paymentNote)}</p>` : ""}${paymentUrl ? `<p><a href="${escapeHtml(paymentUrl)}" style="display:inline-block;padding:12px 20px;border-radius:10px;background:#4655c7;color:#fff;text-decoration:none;font-weight:700">お支払い手続きへ進む</a></p>` : ""}<h2 style="font-size:16px">マイポータルのご案内</h2><p>申込時と同じメールアドレスでログインすると、この受講情報をマイポータルにつなげられます。</p><p><a href="${escapeHtml(portalClaimUrl)}" style="display:inline-block;padding:12px 20px;border-radius:10px;border:1px solid #4655c7;color:#4655c7;text-decoration:none;font-weight:700">受講情報をマイポータルにつなぐ</a></p><p style="font-size:13px;color:#6f6b78">受付番号: ${escapeHtml(applicationId)}</p></div>`
       },
       ...(hqEmail ? [{
         kind: "headquarters",

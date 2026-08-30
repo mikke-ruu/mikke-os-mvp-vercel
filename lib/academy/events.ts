@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { assertAcademyWritable } from "@/lib/academy/preview";
 
 // mikkeOS変換用ローカルイベントログ（seam）への記録ヘルパー。
 // 本接続はまだしない。ここに貯めた行を後で activity_logs へ写像する。
@@ -44,6 +45,7 @@ type LogAcademyEventInput = {
 };
 
 export async function logAcademyEvent(input: LogAcademyEventInput) {
+  assertAcademyWritable();
   const hasFinancialValue = input.hasFinancialValue ?? false;
 
   const payload = {

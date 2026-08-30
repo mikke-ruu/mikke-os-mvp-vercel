@@ -6,6 +6,7 @@ import { getPublicCourse } from "@/lib/academy/lp";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
 import { PageBlocks } from "@/components/academy/PageBlocks";
 import {
+  claimMyApplication,
   findMyApplicationsByEmail,
   getMyApplicationById,
   setCommunityInterest
@@ -36,6 +37,7 @@ function GraduateContent({ applicationId }: { applicationId: string }) {
   useEffect(() => {
     async function load() {
       setLoading(true);
+      await claimMyApplication(applicationId).catch(() => false);
       const found = await getMyApplicationById(applicationId).catch(() => null);
       const myEmail = (user.email ?? "").trim().toLowerCase();
       if (found && (found.applicant_email ?? "").trim().toLowerCase() === myEmail) {
@@ -153,7 +155,7 @@ function GraduateContent({ applicationId }: { applicationId: string }) {
         <div className="rounded-xl border border-[var(--mikke-line)] p-3">
           <p className="text-sm font-bold text-[var(--mikke-text)]">認定講師登録</p>
           <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">
-            認定完了後、本部が認定状況とmikke IDを確認して登録します。登録後に講師ポータルをご案内します。
+              認定完了後、本人の講師活動への意思と必要条件を確認します。本部が承認すると、同じマイポータルに講師用の機能が追加されます。
           </p>
         </div>
 

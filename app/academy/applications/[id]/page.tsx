@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Package } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import {
@@ -56,21 +57,28 @@ function DetailContent({ appId }: { appId: string }) {
   const [promotionError, setPromotionError] = useState<string | null>(null);
   const [promotionDone, setPromotionDone] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const foundHq = await getOwnedHeadquarters(profile.user_id);
-      setHq(foundHq);
-      if (foundHq) {
-        const found = await getApplication(foundHq.id, appId);
-        setApp(found);
-        setCourse(await getCourse(foundHq.id, found.course_id).catch(() => null as unknown as AcademyCourse));
-        setKitOrders(await listKitOrdersByApplication(foundHq.id, appId));
-        if (found.intake_source === "honbu") {
-          setNotifications(await listApplicationNotifications(appId).catch(() => []));
+      setLoadError(null);
+      try {
+        const foundHq = await getOwnedHeadquarters(profile.user_id);
+        setHq(foundHq);
+        if (foundHq) {
+          const found = await getApplication(foundHq.id, appId);
+          setApp(found);
+          setCourse(await getCourse(foundHq.id, found.course_id).catch(() => null as unknown as AcademyCourse));
+          setKitOrders(await listKitOrdersByApplication(foundHq.id, appId));
+          if (found.intake_source === "honbu") {
+            setNotifications(await listApplicationNotifications(appId).catch(() => []));
+          }
         }
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : "申込詳細を読み込めませんでした。");
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     load();
   }, [profile.user_id, appId]);
@@ -84,6 +92,22 @@ function DetailContent({ appId }: { appId: string }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function applyMilestone(milestone: "paid" | "completed" | "certified") {
+    if (milestone === "paid") {
+      await apply({ payment_status: "paid", status: "paid" });
+      return;
+    }
+    if (milestone === "completed") {
+      await apply({ payment_status: app?.payment_status === "unpaid" ? "paid" : app?.payment_status, status: "completed" });
+      return;
+    }
+    await apply({
+      payment_status: app?.payment_status === "unpaid" ? "paid" : app?.payment_status,
+      status: "certified",
+      certification_status: "certified"
+    });
   }
 
   async function retryNotifications() {
@@ -118,6 +142,19 @@ function DetailContent({ appId }: { appId: string }) {
   }
 
   if (loading) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (loadError) {
+    return (
+      <div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
+        <p className="text-sm font-bold text-[var(--mikke-text)]">申込詳細を開けませんでした</p>
+        <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">
+          権限または通信状態を確認し、もう一度お試しください。{loadError}
+        </p>
+        <button type="button" onClick={() => window.location.reload()} className="mt-3 rounded-xl bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white">
+          もう一度読み込む
+        </button>
+      </div>
+    );
+  }
   if (!hq || !app) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">申込が見つかりません。</p>;
 
   return (
@@ -133,7 +170,7 @@ function DetailContent({ appId }: { appId: string }) {
           <Row label="開催日" value={app.event_date ? formatDate(app.event_date) : ""} />
           <Row label="受講形式" value={app.format === "in_person" ? "対面" : app.format === "online" ? "オンライン" : ""} />
           <Row label="受講料" value={`${app.price.toLocaleString()}円`} />
-          <Row label="キット仕入れ" value={`${app.kit_cost.toLocaleString()}円`} />
+          <Row label="講師の講座仕入代" value={`${app.kit_cost.toLocaleString()}円（税込）`} />
           <Row label="本部売上 / 講師売上" value={`${app.honbu_revenue.toLocaleString()} / ${app.instructor_revenue.toLocaleString()}円`} />
           <Row label="決済方式" value={ACADEMY_PAYMENT_PROVIDER_LABELS[app.payment_provider ?? "manual"]} />
           <Row label="入金日" value={app.paid_at ? formatDate(app.paid_at) : ""} />
@@ -168,8 +205,8 @@ function DetailContent({ appId }: { appId: string }) {
                 <div key={item.recipient_kind} className="flex items-start justify-between gap-3 py-2 text-sm">
                   <div>
                     <p className="font-bold">{item.recipient_kind === "applicant" ? "申込者向け" : "本部向け"}</p>
-                    {item.status === "failed" && item.last_error ? (
-                      <p className="mt-1 text-[11px] text-[var(--mikke-danger)]">{item.last_error}</p>
+                    {item.status === "failed" ? (
+                      <p className="mt-1 text-[11px] text-[var(--mikke-danger)]">送信できませんでした。設定を確認して再送してください。</p>
                     ) : null}
                   </div>
                   <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${item.status === "sent" ? "bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]" : item.status === "failed" ? "bg-[var(--mikke-danger-soft)] text-[var(--mikke-danger)]" : "bg-[var(--mikke-surface-soft)]"}`}>
@@ -217,6 +254,12 @@ function DetailContent({ appId }: { appId: string }) {
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <p className="text-xs font-bold text-[var(--mikke-accent)]">ステータス管理</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <button type="button" disabled={saving} onClick={() => void applyMilestone("paid")} className="rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold disabled:opacity-60">入金済みにする</button>
+          <button type="button" disabled={saving} onClick={() => void applyMilestone("completed")} className="rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold disabled:opacity-60">受講完了にする</button>
+          <button type="button" disabled={saving} onClick={() => void applyMilestone("certified")} className="rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold disabled:opacity-60">認定済みにする</button>
+        </div>
+        <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">通常は上のボタンを使うと、申込・入金・認定の状態を矛盾なく更新できます。個別の修正が必要な場合だけ、下の項目を変更してください。</p>
         <div>
           <label className={labelClass}>申込ステータス</label>
           <select
@@ -299,7 +342,7 @@ function DetailContent({ appId }: { appId: string }) {
 
       <button
         type="button"
-        onClick={() => router.push("/academy/applications")}
+        onClick={() => router.push(toCurrentAcademyContextHref("/academy/applications"))}
         className="w-full rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-3 text-sm font-bold text-[var(--mikke-text-soft)]"
       >
         一覧に戻る

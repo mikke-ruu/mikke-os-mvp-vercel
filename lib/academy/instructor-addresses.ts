@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { academyPreviewAddresses, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyInstructorAddress } from "@/types/database";
 
 // Wave E (AC-E1): 講師の配送先住所帳。
@@ -7,6 +8,7 @@ import type { AcademyInstructorAddress } from "@/types/database";
 export const MAX_INSTRUCTOR_ADDRESSES = 5;
 
 export async function listInstructorAddresses(instructorId: string) {
+  if (isAcademyLocalReview()) return academyPreviewAddresses.filter((item) => item.instructor_id === instructorId);
   const { data, error } = await supabase
     .from("academy_instructor_addresses")
     .select("*")
@@ -17,6 +19,7 @@ export async function listInstructorAddresses(instructorId: string) {
 }
 
 export async function createInstructorAddress(instructorId: string, label: string, addressText: string) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_instructor_addresses")
     .insert({
@@ -31,6 +34,7 @@ export async function createInstructorAddress(instructorId: string, label: strin
 }
 
 export async function deleteInstructorAddress(instructorId: string, addressId: string) {
+  assertAcademyWritable();
   const { error } = await supabase
     .from("academy_instructor_addresses")
     .delete()

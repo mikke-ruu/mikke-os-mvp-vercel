@@ -1,8 +1,26 @@
 import { supabase } from "@/lib/supabase/client";
-import type { AcademyHeadquarters, AcademyLpBlock, Profile } from "@/types/database";
+import { getAcademyRouteContext, listMyAcademyContexts } from "@/lib/academy/access-context";
+import { academyPreviewHeadquarters, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
+import type { AcademyHeadquarters, AcademyLpBlock } from "@/types/database";
 
 // 現在のユーザーがオーナーの本部（MVPは1件想定）。
-export async function getOwnedHeadquarters(userId: string) {
+export async function getOwnedHeadquarters(userId: string, academyId?: string) {
+  if (isAcademyLocalReview()) return academyPreviewHeadquarters;
+  const explicitAcademyId = academyId ?? getAcademyRouteContext()?.academyId;
+  if (explicitAcademyId) {
+    const contexts = await listMyAcademyContexts();
+    const context = contexts.find((candidate) => candidate.academy_id === explicitAcademyId);
+    if (!context?.portals.includes("manage")) return null;
+
+    const { data, error } = await supabase
+      .from("academy_headquarters")
+      .select("*")
+      .eq("id", explicitAcademyId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as AcademyHeadquarters | null) ?? null;
+  }
+
   const { data, error } = await supabase
     .from("academy_headquarters")
     .select("*")
@@ -42,6 +60,7 @@ export async function updateHeadquarters(
     front_blocks: AcademyLpBlock[];
   }>
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase.rpc("academy_update_headquarters_profile", {
     p_headquarters_id: hqId,
     p_patch: patch
@@ -51,23 +70,12 @@ export async function updateHeadquarters(
   return data as AcademyHeadquarters;
 }
 
-// 本部が未登録なら1件作る（初期導入時の枠作成に相当）。
-export async function ensureHeadquarters(profile: Profile, name: string) {
-  const existing = await getOwnedHeadquarters(profile.user_id);
-  if (existing) return existing;
-
-  const handleBase = (profile.handle || "hq").toLowerCase().replace(/[^a-z0-9_-]/g, "-").slice(0, 24);
-  const { data, error } = await supabase
-    .from("academy_headquarters")
-    .insert({
-      owner_user_id: profile.user_id,
-      owner_profile_id: profile.id,
-      name,
-      handle: `${handleBase}-academy`.slice(0, 30),
-      plan: "small"
-    })
-    .select("*")
-    .single();
+// 契約確認済みの作成権を1件消費して本部を作る。直接INSERTはDB側で禁止する。
+export async function createHeadquarters(name: string) {
+  assertAcademyWritable();
+  const { data, error } = await supabase.rpc("academy_create_headquarters", {
+    p_name: name
+  });
 
   if (error) throw error;
   return data as AcademyHeadquarters;

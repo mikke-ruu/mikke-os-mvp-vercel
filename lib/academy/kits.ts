@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { academyPreviewKitOrders, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import { logAcademyEvent } from "@/lib/academy/events";
 import type { AcademyInstructor, AcademyKitOrder, Profile } from "@/types/database";
 
@@ -24,6 +25,7 @@ export const KIT_STATUS_ORDER: AcademyKitOrder["status"][] = [
 
 // 本部: 全キット注文
 export async function listKitOrders(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewKitOrders;
   const { data, error } = await supabase
     .from("academy_kit_orders")
     .select("*")
@@ -35,6 +37,7 @@ export async function listKitOrders(headquartersId: string) {
 
 // 本部: ある申込に紐づくキット注文（申込詳細画面での相互リンク表示用）
 export async function listKitOrdersByApplication(headquartersId: string, applicationId: string) {
+  if (isAcademyLocalReview()) return academyPreviewKitOrders.filter((item) => item.application_id === applicationId);
   const { data, error } = await supabase
     .from("academy_kit_orders")
     .select("*")
@@ -47,6 +50,7 @@ export async function listKitOrdersByApplication(headquartersId: string, applica
 
 // 講師: 自分の注文（RLSで自分の分だけ）
 export async function listMyKitOrders(instructorIds: string[]) {
+  if (isAcademyLocalReview()) return academyPreviewKitOrders.filter((item) => instructorIds.includes(item.instructor_id));
   if (instructorIds.length === 0) return [];
   const { data, error } = await supabase
     .from("academy_kit_orders")
@@ -77,6 +81,7 @@ export async function createKitOrder(
     paymentUrl?: string | null;
   }
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_kit_orders")
     .insert({
@@ -130,6 +135,7 @@ export async function updateKitOrder(
     amount: number;
   }>
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_kit_orders")
     .update(patch)

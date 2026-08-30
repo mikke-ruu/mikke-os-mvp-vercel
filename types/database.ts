@@ -108,6 +108,31 @@ export type AcademyHeadquarters = {
 };
 
 export type AcademyHeadquartersRole = "owner" | "administrator" | "course_editor";
+export type AcademyAccessRole = AcademyHeadquartersRole | "instructor" | "learner";
+export type AcademyPortal = "manage" | "teach";
+export type AcademyAccessContext = {
+  academy_id: string;
+  academy_name: string;
+  academy_handle: string;
+  roles: AcademyAccessRole[];
+  portals: AcademyPortal[];
+  capabilities: string[];
+};
+export type AcademyOnboardingEligibility = {
+  trial_available: boolean;
+  paid_creation_available: boolean;
+  trial_block_reason: "authentication_required" | "headquarters_already_owned" | "trial_already_used" | null;
+};
+export type AcademyHeadquartersAccess = {
+  headquarters_id: string;
+  access_kind: "trial" | "paid";
+  status: "trialing" | "active" | "past_due" | "expired" | "cancelled";
+  starts_at: string;
+  ends_at: string | null;
+  days_remaining: number;
+  can_manage_drafts: boolean;
+  can_use_live_features: boolean;
+};
 export type AcademyHeadquartersMemberStatus = "active" | "stopped";
 export type AcademyHeadquartersInvitationStatus =
   | "pending"
@@ -203,6 +228,17 @@ export type AcademyInstructorPage = {
   updated_at: string;
 };
 
+export type AcademyLearnerPage = {
+  id: string;
+  headquarters_id: string;
+  course_id: string;
+  user_id: string;
+  blocks: AcademyPageBlock[];
+  is_published: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AcademyCoursePortalFeatureSettings = {
   learning: boolean;
   applications: boolean;
@@ -227,6 +263,13 @@ export type AcademyCourseFeatureSettings = {
   publicCoursePage: boolean;
   portal: AcademyCoursePortalFeatureSettings;
 };
+
+export type AcademyLearnerAccessMode =
+  | "unlimited"
+  | "days_after_payment"
+  | "days_after_enrollment"
+  | "days_after_completion"
+  | "fixed_end";
 
 export type AcademyCourse = {
   id: string;
@@ -259,8 +302,26 @@ export type AcademyCourse = {
   // キット関連UI（発注ボタン・CourseFormのキット欄・キット系ステータス選択肢）を隠す。
   // 既存データはundefined→true扱い（デフォルトON・破壊的変更ではない）。
   requires_kit: boolean;
+  learner_access_mode: AcademyLearnerAccessMode;
+  learner_access_days: number | null;
+  learner_access_fixed_end_at: string | null;
   feature_settings: Partial<AcademyCourseFeatureSettings> | null;
   sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AcademyCourseAccessGrant = {
+  id: string;
+  headquarters_id: string;
+  course_id: string;
+  application_id: string | null;
+  learner_user_id: string;
+  source: "legacy" | "application" | "payment" | "enrollment" | "completion" | "fixed" | "manual" | "extension";
+  status: "active" | "revoked";
+  starts_at: string;
+  ends_at: string | null;
+  created_by_user_id: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -289,6 +350,7 @@ export type AcademyProgramSection = {
 
 export type AcademyProgramStepType =
   | "text"
+  | "video"
   | "external_url"
   | "download"
   | "live_session"
@@ -304,6 +366,7 @@ export type AcademyProgramStep = {
   title: string;
   content: string | null;
   external_url: string | null;
+  video_asset_id: string | null;
   sort_order: number;
   requires_previous: boolean;
   self_completion_allowed: boolean;
@@ -322,6 +385,10 @@ export type AcademyInstructor = {
   renewal_due: string | null;
   is_certified: boolean;
   is_active: boolean;
+  registration_status: "registered" | "withdrawn";
+  registered_at: string;
+  withdrawn_at: string | null;
+  withdrawn_by_user_id: string | null;
   status: "active" | "dormant" | "suspended" | "reapplying";
   memo: string | null;
   photo_url: string | null;
@@ -366,6 +433,41 @@ export type AcademyClass = {
   updated_at: string;
   course?: Pick<AcademyCourse, "id" | "code" | "name"> | null;
   instructor?: Pick<AcademyInstructor, "id" | "business_name" | "profile_id"> | null;
+};
+
+export type AcademyVideoProvider = "unconfigured" | "cloudflare_stream" | "mux";
+export type AcademyVideoAssetStatus = "draft" | "uploading" | "processing" | "ready" | "failed" | "archived";
+
+export type AcademyVideoAsset = {
+  id: string;
+  headquarters_id: string;
+  course_id: string;
+  title: string;
+  provider: AcademyVideoProvider;
+  provider_asset_id: string | null;
+  status: AcademyVideoAssetStatus;
+  duration_seconds: number | null;
+  error_message: string | null;
+  created_by_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+};
+
+export type AcademyPublicClass = Pick<
+  AcademyClass,
+  | "id"
+  | "course_id"
+  | "instructor_id"
+  | "title"
+  | "starts_at"
+  | "ends_at"
+  | "capacity"
+  | "venue_name"
+  | "schedule_mode"
+  | "format"
+> & {
+  remaining_capacity: number | null;
 };
 
 export type AcademyClassInstructorRequest = {
@@ -425,6 +527,7 @@ export type AcademyApplication = {
   id: string;
   headquarters_id: string;
   course_id: string;
+  class_id: string | null;
   user_id: string | null;
   intake_source: "honbu" | "koushi";
   instructor_id: string | null;

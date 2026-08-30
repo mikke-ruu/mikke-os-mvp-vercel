@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 import { logAcademyEvent } from "@/lib/academy/events";
+import { academyPreviewInstructors, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyInstructor, Profile } from "@/types/database";
 
 export const INSTRUCTOR_STATUS_LABELS: Record<AcademyInstructor["status"], string> = {
@@ -7,6 +8,11 @@ export const INSTRUCTOR_STATUS_LABELS: Record<AcademyInstructor["status"], strin
   dormant: "休眠",
   suspended: "停止",
   reapplying: "再開申請中"
+};
+
+export const INSTRUCTOR_REGISTRATION_STATUS_LABELS: Record<AcademyInstructor["registration_status"], string> = {
+  registered: "登録中",
+  withdrawn: "登録解除"
 };
 
 export type InstructorProfileLite = Pick<Profile, "id" | "user_id" | "display_name" | "handle">;
@@ -51,6 +57,7 @@ export function calcRenewalDue(baseDate: string, periodMonths: number): string {
 // 同一人物が既に別講座で認定されている場合、そのとき割り当てた講師番号を探す。
 // 講師番号は講座別ではなく本部単位で通し番号にするため、同じ人には同じ番号を引き継ぐ。
 export async function findExistingInstructorNumber(headquartersId: string, profileId: string) {
+  if (isAcademyLocalReview()) return academyPreviewInstructors[0].instructor_number;
   const { data, error } = await supabase
     .from("academy_instructors")
     .select("instructor_number")
@@ -67,6 +74,9 @@ export async function findExistingInstructorNumber(headquartersId: string, profi
 
 // 講師に紐づけるMikke IDをハンドルで探す（profilesは公開読み取り可）
 export async function findProfileByHandle(handle: string) {
+  if (isAcademyLocalReview()) {
+    return { id: academyPreviewInstructors[0].profile_id, user_id: academyPreviewInstructors[0].user_id!, display_name: "ローカル確認用講師", handle: normalizeMikkeHandle(handle) || "academy_preview" };
+  }
   const normalizedHandle = normalizeMikkeHandle(handle);
   if (!normalizedHandle) return null;
 
@@ -81,6 +91,7 @@ export async function findProfileByHandle(handle: string) {
 }
 
 export async function listInstructors(headquartersId: string) {
+  if (isAcademyLocalReview()) return academyPreviewInstructors;
   const { data, error } = await supabase
     .from("academy_instructors")
     .select("*")
@@ -92,6 +103,7 @@ export async function listInstructors(headquartersId: string) {
 }
 
 export async function getInstructor(headquartersId: string, id: string) {
+  if (isAcademyLocalReview()) return academyPreviewInstructors.find((item) => item.id === id) ?? academyPreviewInstructors[0];
   const { data, error } = await supabase
     .from("academy_instructors")
     .select("*")
@@ -105,7 +117,7 @@ export async function getInstructor(headquartersId: string, id: string) {
 
 export type InstructorInput = {
   courseId: string;
-  handle: string; // 講師のMikke IDハンドル
+  handle: string; // 講師のmikke ID
   instructorNumber: string;
   certifiedAt: string;
   renewalDue: string;
@@ -120,9 +132,10 @@ export type InstructorInput = {
 
 // 本部が講師を登録（アカウント発行相当）。ハンドルからMikke IDを解決して紐づける。
 export async function createInstructor(profile: Profile, headquartersId: string, input: InstructorInput) {
+  assertAcademyWritable();
   const target = await findProfileByHandle(input.handle);
   if (!target) {
-    throw new Error(`ハンドル「${input.handle}」のMikke IDが見つかりません。講師本人が先にMikke OSに登録している必要があります。`);
+    throw new Error(`mikke ID「${input.handle}」が見つかりません。講師本人が先にmikkeOSへ登録している必要があります。`);
   }
 
   const { data, error } = await supabase
@@ -183,6 +196,7 @@ export async function updateInstructor(
     self_intro: string | null;
   }>
 ) {
+  assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_instructors")
     .update(patch)
@@ -195,6 +209,16 @@ export async function updateInstructor(
   return data as AcademyInstructor;
 }
 
+export async function withdrawInstructor(instructorId: string) {
+  assertAcademyWritable();
+  const { data, error } = await supabase.rpc("academy_withdraw_instructor", {
+    p_instructor_id: instructorId
+  });
+
+  if (error) throw error;
+  return data as AcademyInstructor;
+}
+
 // 更新完了操作。現在の期限（過ぎていれば今日）を基準に、本部の更新周期分だけ次の期限を自動計算する。
 export async function renewInstructor(
   profile: Profile,
@@ -202,6 +226,7 @@ export async function renewInstructor(
   instructor: AcademyInstructor,
   periodMonths: number
 ) {
+  assertAcademyWritable();
   const today = new Date().toISOString().slice(0, 10);
   const base = instructor.renewal_due && instructor.renewal_due > today ? instructor.renewal_due : today;
   const nextDue = calcRenewalDue(base, periodMonths);
