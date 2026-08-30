@@ -1,8 +1,8 @@
 # mikkeOS database baseline / cutover plan
 
-Date: 2026-08-29  
-Owner: mikkeOS control room  
-Base: `origin/master@1cc0857cd32779fcadcf23b80f0ea415ff584a65`  
+Date: 2026-08-29
+Owner: mikkeOS control room
+Base: `origin/master@1cc0857cd32779fcadcf23b80f0ea415ff584a65`
 Branch: `codex/mikkeos-db-baseline-20260829`
 
 ## Decision
