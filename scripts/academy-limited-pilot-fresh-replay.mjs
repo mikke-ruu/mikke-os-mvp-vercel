@@ -38,6 +38,7 @@ const academySuccessSentinels = [
   "academy_seven_day_trial_rls_ok",
 ];
 const deltaSuccessSentinel = "academy_limited_pilot_access_controls_ok";
+const canonicalCatalogSchemas = ["community_private", "private", "public"];
 const timeoutSql = [
   "SET LOCAL lock_timeout = '5s';",
   "SET LOCAL statement_timeout = '180s';",
@@ -191,11 +192,14 @@ if (parsedDatabaseUrl.searchParams.get("sslmode") !== "require" || approval.sslM
 const directRefMatch = parsedDatabaseUrl.hostname === `db.${previewRef}.supabase.co` && username === "postgres";
 const poolerRefMatch = username === `postgres.${previewRef}` && /\.pooler\.supabase\.com$/.test(parsedDatabaseUrl.hostname);
 if (!directRefMatch && !poolerRefMatch) fail("Preview database project ref structure mismatch");
-if (!Array.isArray(approval.catalogSchemas) || approval.catalogSchemas.length === 0) fail("approved catalog schema list is required");
+if (!Array.isArray(approval.catalogSchemas)) fail("approved catalog schema list is required");
 for (const schema of approval.catalogSchemas) {
   if (!/^[a-z_][a-z0-9_]*$/.test(schema) || ["auth", "storage", "vault"].includes(schema)) {
     fail("approved catalog schema is invalid");
   }
+}
+if (JSON.stringify([...approval.catalogSchemas].sort()) !== JSON.stringify(canonicalCatalogSchemas)) {
+  fail("approved catalog schemas must exactly match the canonical schema set");
 }
 if (!/^[a-f0-9]{64}$/.test(approval.preflightSnapshotSha256 || "")) fail("approved preflight snapshot SHA-256 is required");
 const baseline = readFileSync(process.argv[baselineArg + 1], "utf8");
@@ -313,6 +317,11 @@ function collectSnapshot() {
   const fixtureLines = fixtureQueries.length
     ? psqlOutputOrFail(runPsql(`${sessionTimeouts}\n${fixtureQueries.join("\nunion all\n")}\norder by 1;`, true), "fixture snapshot")
     : [];
+  const authFixtureLines = psqlOutputOrFail(runPsql(`${sessionTimeouts}
+    select 'auth_fixture|users|id|' || count(*) || '|' ||
+      md5(coalesce(string_agg(id::text, '' order by id::text), ''))
+    from auth.users
+    where id = any(array[${fixtureArray}]);`, true), "auth fixture snapshot");
   const historyExists = psqlOutputOrFail(
     runPsql(`${sessionTimeouts} select to_regclass('supabase_migrations.schema_migrations') is not null;`, true),
     "migration-history existence probe"
@@ -323,13 +332,21 @@ function collectSnapshot() {
           md5(coalesce(string_agg(to_jsonb(h)::text, '' order by to_jsonb(h)::text), ''))
         from supabase_migrations.schema_migrations h;`, true), "migration-history snapshot")
     : ["history|schema_migrations|absent"];
-  const lines = [...catalogLines, ...rowLines, ...fixtureLines, ...historyLines].sort();
+  const lines = [...catalogLines, ...rowLines, ...fixtureLines, ...authFixtureLines, ...historyLines].sort();
   return { lines, sha256: sha256(lines.join("\n")) };
 }
 
 function numericTail(line) {
   const value = Number(line.split("|").at(-1));
   return Number.isFinite(value) ? value : 0;
+}
+
+function fixtureRowCount(line) {
+  if (line.startsWith("auth_fixture|")) {
+    const value = Number(line.split("|").at(-2));
+    return Number.isFinite(value) ? value : 0;
+  }
+  return numericTail(line);
 }
 
 function compareSnapshots(before, after, stage) {
@@ -346,18 +363,20 @@ function compareSnapshots(before, after, stage) {
   const historyActual = differences.filter((line) => line.startsWith("history|")).length;
   const rowCountActual = differences.filter((line) => line.startsWith("rows|")).length;
   const fixtureFingerprintActual = differences.filter((line) => line.startsWith("fixture|")).length;
+  const authFixtureFingerprintActual = differences.filter((line) => line.startsWith("auth_fixture|")).length;
   const fixtureRowsActual = after.lines
-    .filter((line) => line.startsWith("fixture|"))
-    .reduce((sum, line) => sum + numericTail(line), 0);
+    .filter((line) => line.startsWith("fixture|") || line.startsWith("auth_fixture|"))
+    .reduce((sum, line) => sum + fixtureRowCount(line), 0);
   const evidence = {
     catalog: classificationActual,
     history: { expected: 0, actual: historyActual },
     rowCounts: { expected: 0, actual: rowCountActual },
     fixtureFingerprints: { expected: 0, actual: fixtureFingerprintActual },
+    authFixtureFingerprints: { expected: 0, actual: authFixtureFingerprintActual },
     fixtureRows: { expected: 0, actual: fixtureRowsActual },
   };
   const actualTotal = Object.values(classificationActual).reduce((sum, item) => sum + item.actual, 0)
-    + historyActual + rowCountActual + fixtureFingerprintActual + fixtureRowsActual;
+    + historyActual + rowCountActual + fixtureFingerprintActual + authFixtureFingerprintActual + fixtureRowsActual;
   if (before.sha256 !== after.sha256 || differences.length || actualTotal !== 0) {
     fail(`${stage} rollback residue detected`);
   }
@@ -366,7 +385,9 @@ function compareSnapshots(before, after, stage) {
 
 const preflight = collectSnapshot();
 if (preflight.sha256 !== approval.preflightSnapshotSha256) fail("approved preflight catalog/data snapshot SHA-256 mismatch");
-if (preflight.lines.filter((line) => line.startsWith("fixture|")).reduce((sum, line) => sum + numericTail(line), 0) !== 0) {
+if (preflight.lines
+  .filter((line) => line.startsWith("fixture|") || line.startsWith("auth_fixture|"))
+  .reduce((sum, line) => sum + fixtureRowCount(line), 0) !== 0) {
   fail("fixture identities already exist before replay");
 }
 

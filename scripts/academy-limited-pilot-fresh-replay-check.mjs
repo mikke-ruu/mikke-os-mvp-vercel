@@ -26,6 +26,15 @@ if (!runnerSource.includes("input: sql")) throw new Error("psql streaming input 
 if (/writeFileSync|rollback-only\.sql|mkdtempSync/.test(runnerSource)) throw new Error("SQL must not be copied to a temporary file");
 if (/databaseUrl\.includes\(previewRef\)/.test(runnerSource)) throw new Error("substring URL allowlisting is forbidden");
 if (!runnerSource.includes("preflightSnapshotSha256")) throw new Error("approved preflight snapshot is missing");
+if (!runnerSource.includes('const canonicalCatalogSchemas = ["community_private", "private", "public"]')) {
+  throw new Error("canonical catalog schema set is not fixed");
+}
+if (!runnerSource.includes("approved catalog schemas must exactly match the canonical schema set")) {
+  throw new Error("catalog schema deep-equal guard is missing");
+}
+if (!runnerSource.includes("auth_fixture|users|id|") || !runnerSource.includes("from auth.users") || !runnerSource.includes("authFixtureFingerprints")) {
+  throw new Error("auth.users fixture count/fingerprint snapshot is missing");
+}
 if (!runnerSource.includes("assertBaselineMetaCommands")) throw new Error("baseline meta-command allowlist is missing");
 for (const forbiddenMeta of ["\\connect", "\\include", "\\ir", "\\!", "\\gexec", "\\o"]) {
   if (runnerSource.includes(`startsWith(${JSON.stringify(forbiddenMeta)})`)) throw new Error(`unsafe explicit meta-command path: ${forbiddenMeta}`);
