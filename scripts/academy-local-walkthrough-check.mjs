@@ -14,7 +14,23 @@ assert.ok(shell.includes('previewMode === "walkthrough"'), "AcademyShell must re
 assert.ok(shell.includes('preview=${preview}'), "Academy links must preserve the walkthrough query");
 assert.ok(shell.includes('portalOverride?: "manage" | "teach"'), "Portal switching must override the current portal");
 assert.ok(authGate.includes('pathname.startsWith("/academy")'), "Local auth bypass must be scoped to Academy");
-assert.ok(authGate.includes('["dashboard", "walkthrough"]'), "Local auth bypass must require an explicit preview query");
+assert.ok(authGate.includes('["dashboard", "walkthrough", "trial"]'), "Local auth bypass must require an explicit Academy preview query");
+assert.ok(
+  authGate.includes('pathname === "/community/academy-invitations/preview"'),
+  "Community invitation fixture auth bypass must be scoped to the fixed preview route"
+);
+assert.ok(
+  authGate.includes('previewMode === "walkthrough"'),
+  "Community invitation fixture auth bypass must require the walkthrough query"
+);
+assert.ok(
+  authGate.includes("if (localFixtureReview)"),
+  "Local fixtures must return before Supabase session initialization"
+);
+assert.ok(
+  authGate.includes("localFixtureUser ?? user"),
+  "Local fixtures must render from fixed auth data on the first client render"
+);
 
 const readModules = [
   "lib/academy/access-context.ts",
