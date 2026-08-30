@@ -211,7 +211,11 @@ function runPsql(sql, quiet = false) {
   const args = quiet
     ? ["-X", "-qAt", "-v", "ON_ERROR_STOP=1"]
     : ["-X", "-v", "ON_ERROR_STOP=1"];
-  return spawnSync("psql", args, {
+  const command = process.platform === "win32" ? "cmd.exe" : "psql";
+  const commandArgs = process.platform === "win32"
+    ? ["/d", "/s", "/c", "psql", ...args]
+    : args;
+  return spawnSync(command, commandArgs, {
     encoding: "utf8",
     input: sql,
     env: { ...process.env, PGDATABASE: databaseUrl },
@@ -228,7 +232,7 @@ with target_namespace as (
   select oid, nspname from pg_namespace where nspname in (${schemaSql})
 )
 select line from (
-  select 'relation|' || n.nspname || '|' || c.relname || '|' || c.relkind || '|' ||
+  select 'relation|' || n.nspname || '|' || c.relname || '|' || c.relkind::text || '|' ||
     md5(jsonb_build_array(c.relpersistence, c.relrowsecurity, c.relforcerowsecurity, c.relacl)::text) as line
   from pg_class c join target_namespace n on n.oid = c.relnamespace
   where c.relkind in ('r','p','v','m','S','f')
@@ -281,7 +285,12 @@ order by line;
 `;
 
 function psqlOutputOrFail(run, label) {
-  if (run.status !== 0) fail(`${label} failed; inspect the private runner log`);
+  if (run.status !== 0) {
+    const safeError = String(run.stderr || run.error?.message || "unknown error")
+      .replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[REDACTED_DB_URL]")
+      .slice(0, 1200);
+    fail(`${label} failed; status=${run.status}; ${safeError}`);
+  }
   return String(run.stdout || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
 }
 
@@ -384,7 +393,7 @@ function compareSnapshots(before, after, stage) {
 }
 
 const preflight = collectSnapshot();
-if (preflight.sha256 !== approval.preflightSnapshotSha256) fail("approved preflight catalog/data snapshot SHA-256 mismatch");
+if (preflight.sha256 !== approval.preflightSnapshotSha256) fail(`approved preflight catalog/data snapshot SHA-256 mismatch; actual=${preflight.sha256}`);
 if (preflight.lines
   .filter((line) => line.startsWith("fixture|") || line.startsWith("auth_fixture|"))
   .reduce((sum, line) => sum + fixtureRowCount(line), 0) !== 0) {

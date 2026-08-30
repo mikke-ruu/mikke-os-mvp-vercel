@@ -23,6 +23,11 @@ for (const classification of ["relation", "column", "function", "index", "policy
   if (!runnerSource.includes(classification)) throw new Error(`zero-residue classification missing: ${classification}`);
 }
 if (!runnerSource.includes("input: sql")) throw new Error("psql streaming input is missing");
+if (!runnerSource.includes('c.relkind::text')) throw new Error("PostgreSQL 17 relkind catalog cast is missing");
+if (!runnerSource.includes('process.platform === "win32"') || !runnerSource.includes('["/d", "/s", "/c", "psql", ...args]')) {
+  throw new Error("Windows psql wrapper compatibility is missing");
+}
+if (!runnerSource.includes("[REDACTED_DB_URL]")) throw new Error("psql diagnostic URL redaction is missing");
 if (/writeFileSync|rollback-only\.sql|mkdtempSync/.test(runnerSource)) throw new Error("SQL must not be copied to a temporary file");
 if (/databaseUrl\.includes\(previewRef\)/.test(runnerSource)) throw new Error("substring URL allowlisting is forbidden");
 if (!runnerSource.includes("preflightSnapshotSha256")) throw new Error("approved preflight snapshot is missing");
