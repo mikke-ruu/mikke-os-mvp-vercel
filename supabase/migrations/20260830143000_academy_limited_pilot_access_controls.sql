@@ -301,8 +301,10 @@ begin
   if v_headquarters.id is null or v_headquarters.owner_user_id is distinct from p_owner_user_id then
     raise exception 'academy_paid_access_owner_mismatch';
   end if;
-  select * into v_access from public.academy_headquarters_access_states
-  where headquarters_id = p_headquarters_id for update;
+  select access_state.* into v_access
+  from public.academy_headquarters_access_states as access_state
+  where access_state.headquarters_id = p_headquarters_id
+  for update;
   if v_access.headquarters_id is null or v_access.owner_user_id is distinct from p_owner_user_id then
     raise exception 'academy_paid_access_state_not_found';
   end if;
@@ -324,10 +326,10 @@ begin
   ) values (
     p_headquarters_id, p_owner_user_id, trim(p_contract_reference), v_access.access_kind, v_access.status, p_activated_at
   );
-  update public.academy_headquarters_access_states
+  update public.academy_headquarters_access_states as access_state
   set access_kind = 'paid', status = 'active', trial_ends_at = null,
       paid_started_at = p_activated_at, updated_at = p_activated_at
-  where headquarters_id = p_headquarters_id;
+  where access_state.headquarters_id = p_headquarters_id;
   update public.academy_headquarters
   set is_active = true, plan_started_at = coalesce(plan_started_at, p_activated_at::date), updated_at = p_activated_at
   where id = p_headquarters_id;

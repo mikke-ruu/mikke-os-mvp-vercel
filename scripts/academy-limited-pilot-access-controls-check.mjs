@@ -23,6 +23,8 @@ assert.match(migration, /grant select on table public\.academy_paid_access_trans
 assert.match(migration, /auth\.jwt\(\) ->> 'role'.*service_role/);
 assert.match(migration, /revoke all on function public\.academy_activate_paid_access\(uuid, uuid, text, timestamptz\) from public, anon, authenticated/);
 assert.match(migration, /grant execute on function public\.academy_activate_paid_access\(uuid, uuid, text, timestamptz\) to service_role/);
+assert.match(migration, /from public\.academy_headquarters_access_states as access_state\s+where access_state\.headquarters_id = p_headquarters_id\s+for update/);
+assert.match(migration, /update public\.academy_headquarters_access_states as access_state[\s\S]*where access_state\.headquarters_id = p_headquarters_id/);
 assert.match(migration, /count\(distinct instructor\.profile_id\)/);
 assert.match(migration, /academy_instructor_billing_exclusions/);
 assert.match(migration, /is distinct from 'owner'/);
