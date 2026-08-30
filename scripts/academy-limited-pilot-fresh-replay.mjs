@@ -29,7 +29,7 @@ const expectedSourceOrder = [
   ["community", "supabase/tests/community_academy_linked_room_entitlements_test.sql", "5fde332ecd11ee8822017e7e44c57d41a1d26b68", "test"],
 ];
 const expectedDeltaOrder = [
-  ["delta", "supabase/migrations/20260830143000_academy_limited_pilot_access_controls.sql", "07146b2f7a0492194cf0f8f15adf146bef617722", "migration"],
+  ["delta", "supabase/migrations/20260830143000_academy_limited_pilot_access_controls.sql", "3a14bf692e4fd722cc8673fd7412f997c802d3e9", "migration"],
   ["delta", "supabase/tests/academy_limited_pilot_access_controls_test.sql", "5edc54e67114f360dd14d02ff6bbc393e2a22972", "test"],
 ];
 const academySuccessSentinels = [
