@@ -21,6 +21,7 @@ import type {
   CommunityMembershipPlan,
   CommunityMembershipStatus,
   CommunityOperatorProfile,
+  CommunityPlatformSubscription,
   CommunityPaymentClaim,
   CommunityPost,
   CommunityPostAttachment,
@@ -202,6 +203,15 @@ function mapOperatorProfile(row: any): CommunityOperatorProfile {
   };
 }
 
+function mapPlatformSubscription(row: any): CommunityPlatformSubscription {
+  return {
+    communityId: row.community_id,
+    planKey: row.plan_key,
+    status: row.status,
+    currentPeriodEndsAt: row.current_period_ends_at ?? null
+  };
+}
+
 function mapRoom(row: any, requiredEntitlementKeys: string[], isLocked: boolean): CommunityRoom {
   return {
     id: row.id,
@@ -350,6 +360,12 @@ function mapResource(row: any): CommunityResource {
 export function communityErrorMessage(error: unknown, fallback: string) {
   if (!error || typeof error !== "object") return fallback;
   const message = "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
+  if (message.includes("community_platform_member_limit_reached")) {
+    return "現在のCommunity利用プランの参加人数上限に達しています。契約・料金画面で利用状況をご確認ください。";
+  }
+  if (message.includes("community_platform_plan_not_configured")) {
+    return "Community利用プランの設定を確認できませんでした。運営窓口へお問い合わせください。";
+  }
   if (message.includes("relation") || message.includes("permission denied") || message.includes("column")) {
     return "COMMUNITYのデータベース更新が必要です。最新migrationの適用後にもう一度お試しください。";
   }
@@ -485,14 +501,15 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
   const safetyError = [applicationsResult, blockedWordsResult, reportsResult, inquiriesResult].find((result) => result.error)?.error;
   if (safetyError) throw safetyError;
 
-  const [invitationsResult, membershipPlansResult, paymentClaimsResult, dataRequestsResult, operatorProfileResult] = await Promise.all([
+  const [invitationsResult, membershipPlansResult, paymentClaimsResult, dataRequestsResult, operatorProfileResult, platformSubscriptionResult] = await Promise.all([
     client.from("community_invitations").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
     client.from("community_membership_plans").select("*").eq("community_id", community.id).order("sort_order", { ascending: true }).order("created_at", { ascending: true }),
     client.from("community_payment_claims").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
     client.from("community_member_data_requests").select("*").eq("community_id", community.id).order("created_at", { ascending: false }),
-    staff ? client.from("community_operator_profiles").select("*").eq("community_id", community.id).maybeSingle() : Promise.resolve({ data: null, error: null })
+    staff ? client.from("community_operator_profiles").select("*").eq("community_id", community.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    staff ? client.from("community_platform_subscriptions").select("community_id,plan_key,status,current_period_ends_at").eq("community_id", community.id).maybeSingle() : Promise.resolve({ data: null, error: null })
   ]);
-  const commercialError = [invitationsResult, membershipPlansResult, paymentClaimsResult, dataRequestsResult, operatorProfileResult].find((result) => result.error)?.error;
+  const commercialError = [invitationsResult, membershipPlansResult, paymentClaimsResult, dataRequestsResult, operatorProfileResult, platformSubscriptionResult].find((result) => result.error)?.error;
   if (commercialError) throw commercialError;
 
   let roomsQuery = client.from("community_rooms").select("*").eq("community_id", community.id).order("is_archived", { ascending: true }).order("sort_order", { ascending: true });
@@ -709,6 +726,7 @@ export async function loadCommunityDashboard(client: DbClient, userId: string, c
     paymentClaims: (paymentClaimsResult.data ?? []).map(mapPaymentClaim),
     dataRequests: (dataRequestsResult.data ?? []).map(mapDataRequest),
     operatorProfile: operatorProfileResult.data ? mapOperatorProfile(operatorProfileResult.data) : null,
+    platformSubscription: platformSubscriptionResult.data ? mapPlatformSubscription(platformSubscriptionResult.data) : null,
     rooms,
     posts,
     events: (eventsResult.data ?? []).map(mapEvent),

@@ -20,6 +20,8 @@ export type CommunityApprovalMode = "auto" | "manual";
 export type CommunityApplicationStatus = "pending" | "approved" | "rejected" | "cancelled";
 export type CommunityReportStatus = "open" | "reviewing" | "resolved" | "dismissed";
 export type CommunityInquiryStatus = "open" | "reviewing" | "answered" | "closed";
+export type CommunityPlatformPlanKey = "trial" | "starter" | "standard" | "pro" | "enterprise";
+export type CommunityPlatformSubscriptionStatus = "trialing" | "active" | "past_due" | "cancelled" | "suspended";
 
 export type Community = {
   id: string;
@@ -184,6 +186,13 @@ export type CommunityOperatorProfile = {
   privacyPolicyUrl: string | null;
   termsUrl: string | null;
   status: "incomplete" | "submitted" | "verified";
+};
+
+export type CommunityPlatformSubscription = {
+  communityId: string;
+  planKey: CommunityPlatformPlanKey;
+  status: CommunityPlatformSubscriptionStatus;
+  currentPeriodEndsAt: string | null;
 };
 
 export type CommunitySafetySettings = {
@@ -421,6 +430,7 @@ export type CommunityDashboard = {
   paymentClaims: CommunityPaymentClaim[];
   dataRequests: CommunityMemberDataRequest[];
   operatorProfile: CommunityOperatorProfile | null;
+  platformSubscription: CommunityPlatformSubscription | null;
   rooms: CommunityRoom[];
   posts: CommunityPost[];
   events: CommunityEvent[];
