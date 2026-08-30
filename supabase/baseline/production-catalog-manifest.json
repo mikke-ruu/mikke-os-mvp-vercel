@@ -60,7 +60,9 @@
       "catalogCountsMatch": true,
       "baselineRollbackZeroResidue": true,
       "frozenPackageRollbackZeroResidue": true,
-      "limitedPilotDeltaRollbackZeroResidue": true
+      "limitedPilotDeltaRollbackZeroResidue": true,
+      "paidActivationTwoConnectionContention": true,
+      "temporaryLocalVolumeRemoved": true
     }
   },
   "gitHistoryComparison": {

@@ -25,5 +25,6 @@ Local PostgreSQL 17 replay evidence on 2026-08-30:
 - baseline-only replay rolled back with zero application-schema residue;
 - frozen Academy/Community package (13 migrations and 4 SQL tests) passed and rolled back with zero residue;
 - limited-pilot delta passed after qualifying the paid-access state column reference; the fix remains local and unpublished.
+- two simultaneous paid-activation calls produced exactly one success and one post-lock rejection; the transition ledger contained one row, then the disposable local volume was removed without backup.
 
 After approval, the old migration files are moved only after a fresh replay has passed. Until then `supabase/migrations` remains unchanged.

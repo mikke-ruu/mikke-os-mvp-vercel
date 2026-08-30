@@ -69,6 +69,8 @@ PostgreSQL 17.6 local replay matched the production catalog counts exactly: 178 
 
 Replay exposed one real P0 in the unpublished limited-pilot delta: an ambiguous `headquarters_id` reference in `academy_activate_paid_access`. It was fixed locally by qualifying the access-state table alias and the SQL negative test then passed through paid activation. No production, Preview, push, PR, deployment, or publication change has occurred.
 
+The true two-connection paid-activation gate also passed locally: session A committed the trial-to-paid transition, session B waited on the same locked state and was rejected with `academy_paid_access_trial_state_required`, and the final transition ledger contained exactly one row. The disposable Supabase local volume and all fixture data were then removed without backup.
+
 Remaining cutover gates are deterministic archive/cutover review, catalog hash evidence packaging, isolated JWT/service-role and two-connection contention tests, then separate approvals for GitHub and production history/application. The baseline is no longer blocked by CLI authorization or Docker/WSL.
 
 No production writes, Preview branch, database transaction, push, PR, deployment, publication, or Docker/WSL configuration change has been made in this work.
