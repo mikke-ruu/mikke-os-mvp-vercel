@@ -12,7 +12,9 @@ assert.match(wizard, /answers\.code\.trim\(\) \|\| automaticCourseCode\(\)/, "em
 assert.match(wizard, /講座の開催方法を選んでください/, "second question must ask course format");
 assert.match(wizard, /講座申込はどなたが受付/, "third question must ask intake ownership");
 assert.match(wizard, /教材（キット）を発送しますか/, "fourth question must ask shipping in beginner language");
-assert.match(wizard, /オンラインのステップ教材を使う/, "materials question must separately explain step learning");
+assert.match(wizard, /オンラインのステップ教材（準備中）/, "pilot must not present disconnected step learning as usable");
+assert.match(wizard, /外部URL.*復習ページ/s, "pilot must show the available learner-material alternative");
+assert.match(form, /disabled=\{feature\.key === "stepLearning"\}/, "advanced settings must not re-enable step learning during pilot");
 assert.match(wizard, /受講料（税込・円）/, "fifth question must request tax-inclusive price");
 assert.match(wizard, /どのように講座を進めますか/, "sixth question must ask the operating pattern");
 assert.match(wizard, /acceptAtHonbu: answers\.intake !== "koushi"/, "intake answer must configure headquarters intake");

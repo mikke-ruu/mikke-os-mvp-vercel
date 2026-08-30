@@ -15,7 +15,7 @@ import { DEFAULT_ACADEMY_COURSE_FEATURE_SETTINGS } from "@/lib/academy/course-fe
 const FIELD_TYPES: AcademyFormField["type"][] = ["text", "textarea", "email", "tel", "select", "checkbox"];
 
 const COURSE_FEATURES: Array<{ key: keyof Omit<AcademyCourseFeatureSettings, "portal">; label: string; description: string; location: string }> = [
-  { key: "stepLearning", label: "オンラインのステップ教材", description: "動画・文章・課題を順番に学ぶページを作ります。", location: "ステップ教材" },
+  { key: "stepLearning", label: "オンラインのステップ教材（準備中）", description: "限定pilotでは利用できません。受講者への共有は復習ページを使います。", location: "準備中" },
   { key: "materialLicenses", label: "認定講師へ資料を共有", description: "講座の進め方、PDF、動画、外部URLなどを講師のマイポータルに表示します。", location: "講師用資料ページ・講師用ファイル" },
   { key: "materialAssignments", label: "受講者に復習教材を割り当てる", description: "誰がどの復習教材を見られるかを管理します。", location: "復習ページ" },
   { key: "applications", label: "講座申込を受け付ける", description: "公開講座ページに紹介と申込フォームを表示します。", location: "公開講座ページ" },
@@ -407,7 +407,7 @@ export function CourseForm({
         <div className="grid gap-2 md:grid-cols-3">
           {([
             ["application", "講座を紹介して、申込も受け付ける", "紹介と申込フォームを表示"],
-            ["introduction", "講座の紹介だけ掲載する", "申込は電話や外部フォームなどで受付"],
+            ["introduction", "講座の紹介だけ掲載する", "申込は電話・メールなどで受付"],
             ["none", "ページを作らない", "Academy上に講座の紹介ページを出さない"]
           ] as const).map(([mode, title, description]) => {
             const selected = mode === "application"
@@ -447,7 +447,7 @@ export function CourseForm({
             {COURSE_FEATURES.map((feature) => (
               <label key={feature.key} className="flex items-start justify-between gap-3 rounded-xl border border-[var(--mikke-line)] bg-white p-3 text-sm text-[var(--mikke-text)]">
                 <span><span className="block font-bold">{feature.label}</span><span className="mt-1 block text-[11px] leading-5 text-[var(--mikke-muted)]">{feature.description}</span></span>
-                <input className="mt-1" type="checkbox" checked={form.featureSettings[feature.key]} onChange={() => toggleCourseFeature(feature.key)} />
+                <input className="mt-1" type="checkbox" disabled={feature.key === "stepLearning"} checked={feature.key === "stepLearning" ? false : form.featureSettings[feature.key]} onChange={() => toggleCourseFeature(feature.key)} />
               </label>
             ))}
           </div>

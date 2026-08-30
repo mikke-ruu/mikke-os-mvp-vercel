@@ -10,6 +10,8 @@ import { toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import { createHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getAcademyOnboardingEligibility, startAcademySevenDayTrial } from "@/lib/academy/trial";
+
+const ACADEMY_TRIAL_TERMS_VERSION = "academy-pilot-2026-08-30";
 import { listCourses } from "@/lib/academy/courses";
 import { listMaterials } from "@/lib/academy/materials";
 import { getRenewalAlerts, listInstructors } from "@/lib/academy/instructors";
@@ -76,6 +78,7 @@ function DashboardContent() {
   const [loading, setLoading] = useState(true);
   const [canCreate, setCanCreate] = useState(false);
   const [canStartTrial, setCanStartTrial] = useState(false);
+  const [trialTermsAccepted, setTrialTermsAccepted] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [localPreview, setLocalPreview] = useState(false);
 
@@ -137,10 +140,17 @@ function DashboardContent() {
   }
 
   async function startTrial() {
+    if (!trialTermsAccepted) {
+      setCreationError("7日間お試しの条件を確認し、同意してください。");
+      return;
+    }
     setLoading(true);
     setCreationError(null);
     try {
-      const created = await startAcademySevenDayTrial(`${profile.display_name}アカデミー`);
+      const created = await startAcademySevenDayTrial(
+        `${profile.display_name}アカデミー`,
+        ACADEMY_TRIAL_TERMS_VERSION
+      );
       setHq(created);
       setCanStartTrial(false);
       router.replace(toAcademyContextHref("/academy", created.id, "manage"));
@@ -167,9 +177,26 @@ function DashboardContent() {
             : "利用状況を確認できませんでした。すでに本部をお持ちの場合は、所属Academyの選択画面をご確認ください。"}
         </p>
         {canStartTrial ? (
-          <button onClick={startTrial} className="w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white">
-            7日間お試しを始める
-          </button>
+          <div className="space-y-3 text-left">
+            <label className="flex items-start gap-2 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs leading-5 text-[var(--mikke-text-soft)]">
+              <input
+                type="checkbox"
+                checked={trialTermsAccepted}
+                onChange={(event) => setTrialTermsAccepted(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                7日間は下書き作成のお試し期間です。自動課金はなく、期限後は閲覧のみになることに同意します。
+              </span>
+            </label>
+            <button
+              onClick={startTrial}
+              disabled={!trialTermsAccepted}
+              className="w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              7日間お試しを始める
+            </button>
+          </div>
         ) : null}
         {canCreate ? (
           <button onClick={initHq} className="w-full rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2.5 text-sm font-bold text-[var(--mikke-text)]">

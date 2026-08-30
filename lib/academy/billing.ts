@@ -14,6 +14,30 @@ export type AcademyBillingSnapshot = {
   pricing_rule_version: string;
 };
 
+export type AcademyCurrentBillingEstimate = {
+  registered_instructor_count: number;
+  catalog_price_yen: number;
+  observed_at: string;
+};
+
+export async function getMyAcademyCurrentBillingEstimate(headquartersId: string) {
+  if (isAcademyLocalReview()) {
+    return {
+      registered_instructor_count: 21,
+      catalog_price_yen: 10_000,
+      observed_at: "2026-08-30T03:00:00.000Z",
+    } satisfies AcademyCurrentBillingEstimate;
+  }
+  const { data, error } = await supabase.rpc("academy_get_my_current_billing_estimate", {
+    p_headquarters_id: headquartersId,
+  });
+  if (error) {
+    if (error.code === "PGRST202" || error.code === "42883") return null;
+    throw error;
+  }
+  return ((data as AcademyCurrentBillingEstimate[] | null) ?? [])[0] ?? null;
+}
+
 export async function getMyAcademyBillingSnapshot(headquartersId: string) {
   if (isAcademyLocalReview()) {
     return {

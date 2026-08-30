@@ -92,7 +92,7 @@ function NewAcademyClassContent() {
     <form onSubmit={submit} className="space-y-4">
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-accent-soft)] p-4">
         <p className="text-base font-bold text-[var(--mikke-text)]">講座開催日を作成する</p>
-        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">作成後、認定講師にこの開催日の担当を依頼できます。現在の募集状態は本部内の管理用で、公開講座ページに開催日を表示する連携はこれから追加します。</p>
+        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">作成後、認定講師にこの開催日の担当を依頼できます。「募集中」にすると公開講座ページに開催日が表示されます。</p>
         {selectedCourse ? (
           <Link
             href={toCurrentAcademyContextHref(`/academy/courses/${selectedCourse.id}/program`)}

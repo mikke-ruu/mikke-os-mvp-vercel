@@ -133,15 +133,18 @@ export function AcademyCourseSetupWizard({ onComplete }: { onComplete: (initial:
             ["digital", "発送しない・デジタル教材を使用する", "PDF、動画、外部URLなどをマイポータルで共有します。"],
             ["physical", "現物教材を発送する", "配送先を受け取り、教材の準備・発送状況を管理します。"]
           ] as const).map(([value, title, description]) => <Choice key={value} selected={answers.materialType === value} title={title} description={description} onClick={() => setAnswers({ ...answers, materialType: value })} />)}</div>
-          <div className="border-t border-[var(--mikke-line)] pt-4"><Choice selected={answers.stepLearning} title="オンラインのステップ教材を使う" description="動画・文章・課題などを順番に学ぶページを作ります。印刷テキスト、PDF、ダウンロード資料、外部URLだけを使う場合は、選ばなくて大丈夫です。" onClick={() => setAnswers({ ...answers, stepLearning: !answers.stepLearning })} /></div>
+          <div className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+            <p className="text-sm font-bold">オンラインのステップ教材（準備中）</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">限定pilotではまだ利用できません。PDF、動画の外部URL、ダウンロード資料は「復習ページ」で受講者へ共有できます。</p>
+          </div>
         </> : null}
 
         {step === 5 ? <>
           <h2 className="text-base font-bold">受講料と決済方法を決めましょう</h2>
           <p className="text-xs leading-5 text-[var(--mikke-muted)]">受講者が支払う税込金額と、受講者の決済方法を決めます。</p>
           <label className="block text-xs font-bold">受講料（税込・円）*<input type="number" min="0" className={inputClass} value={answers.price} onChange={(e) => setAnswers({ ...answers, price: e.target.value })} /></label>
-          <label className="block text-xs font-bold">決済方法<select className={inputClass} value={answers.paymentProvider} onChange={(e) => setAnswers({ ...answers, paymentProvider: e.target.value as CourseInput["paymentProvider"] })}><option value="manual">銀行振込・現金など</option><option value="stripe">Stripe</option><option value="square">Square</option><option value="paycas">PayCAS</option></select></label>
-          <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">ここでは方法だけ選びます。決済連携や公開は、詳細設定と確認が終わるまで行われません。</p>
+          <label className="block text-xs font-bold">決済方法<select className={inputClass} value={answers.paymentProvider} onChange={(e) => setAnswers({ ...answers, paymentProvider: e.target.value as CourseInput["paymentProvider"] })}><option value="manual">銀行振込・現金など</option><option value="stripe">Stripe（外部決済リンク・要事前設定）</option><option value="square">Square（外部決済リンク・要事前設定）</option><option value="paycas">PayCAS（本部で確認）</option></select></label>
+          <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">受講者の決済方法です。Academy利用料の請求とは別です。限定pilotでは自動連携せず、設定済みの外部決済リンクまたは手動案内を使います。</p>
         </> : null}
 
         {step === 6 ? <>

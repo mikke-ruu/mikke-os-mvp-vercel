@@ -94,6 +94,22 @@ function DetailContent({ appId }: { appId: string }) {
     }
   }
 
+  async function applyMilestone(milestone: "paid" | "completed" | "certified") {
+    if (milestone === "paid") {
+      await apply({ payment_status: "paid", status: "paid" });
+      return;
+    }
+    if (milestone === "completed") {
+      await apply({ payment_status: app?.payment_status === "unpaid" ? "paid" : app?.payment_status, status: "completed" });
+      return;
+    }
+    await apply({
+      payment_status: app?.payment_status === "unpaid" ? "paid" : app?.payment_status,
+      status: "certified",
+      certification_status: "certified"
+    });
+  }
+
   async function retryNotifications() {
     setSaving(true);
     setNotificationMessage("");
@@ -189,8 +205,8 @@ function DetailContent({ appId }: { appId: string }) {
                 <div key={item.recipient_kind} className="flex items-start justify-between gap-3 py-2 text-sm">
                   <div>
                     <p className="font-bold">{item.recipient_kind === "applicant" ? "申込者向け" : "本部向け"}</p>
-                    {item.status === "failed" && item.last_error ? (
-                      <p className="mt-1 text-[11px] text-[var(--mikke-danger)]">{item.last_error}</p>
+                    {item.status === "failed" ? (
+                      <p className="mt-1 text-[11px] text-[var(--mikke-danger)]">送信できませんでした。設定を確認して再送してください。</p>
                     ) : null}
                   </div>
                   <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${item.status === "sent" ? "bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]" : item.status === "failed" ? "bg-[var(--mikke-danger-soft)] text-[var(--mikke-danger)]" : "bg-[var(--mikke-surface-soft)]"}`}>
@@ -238,6 +254,12 @@ function DetailContent({ appId }: { appId: string }) {
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <p className="text-xs font-bold text-[var(--mikke-accent)]">ステータス管理</p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <button type="button" disabled={saving} onClick={() => void applyMilestone("paid")} className="rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold disabled:opacity-60">入金済みにする</button>
+          <button type="button" disabled={saving} onClick={() => void applyMilestone("completed")} className="rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold disabled:opacity-60">受講完了にする</button>
+          <button type="button" disabled={saving} onClick={() => void applyMilestone("certified")} className="rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold disabled:opacity-60">認定済みにする</button>
+        </div>
+        <p className="text-[11px] leading-5 text-[var(--mikke-muted)]">通常は上のボタンを使うと、申込・入金・認定の状態を矛盾なく更新できます。個別の修正が必要な場合だけ、下の項目を変更してください。</p>
         <div>
           <label className={labelClass}>申込ステータス</label>
           <select

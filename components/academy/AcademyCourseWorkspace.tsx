@@ -35,7 +35,7 @@ export function AcademyCourseWorkspace({
 }) {
   const features = resolveAcademyCourseFeaturesForCourse(course);
   const visibleTabs = courseTabs.filter((tab) => {
-    if (tab.id === "program") return features.stepLearning;
+    if (tab.id === "program") return false;
     if (tab.id === "page") return features.publicCoursePage;
     return true;
   });

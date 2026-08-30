@@ -117,7 +117,7 @@ export async function getInstructor(headquartersId: string, id: string) {
 
 export type InstructorInput = {
   courseId: string;
-  handle: string; // 講師のMikke IDハンドル
+  handle: string; // 講師のmikke ID
   instructorNumber: string;
   certifiedAt: string;
   renewalDue: string;
@@ -135,7 +135,7 @@ export async function createInstructor(profile: Profile, headquartersId: string,
   assertAcademyWritable();
   const target = await findProfileByHandle(input.handle);
   if (!target) {
-    throw new Error(`ハンドル「${input.handle}」のMikke IDが見つかりません。講師本人が先にMikke OSに登録している必要があります。`);
+    throw new Error(`mikke ID「${input.handle}」が見つかりません。講師本人が先にmikkeOSへ登録している必要があります。`);
   }
 
   const { data, error } = await supabase

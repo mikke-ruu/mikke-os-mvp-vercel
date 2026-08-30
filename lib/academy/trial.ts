@@ -23,8 +23,11 @@ export async function getAcademyOnboardingEligibility(): Promise<AcademyOnboardi
   }) as AcademyOnboardingEligibility;
 }
 
-export async function startAcademySevenDayTrial(name: string) {
-  const { data, error } = await supabase.rpc("academy_start_seven_day_trial", { p_name: name });
+export async function startAcademySevenDayTrial(name: string, termsVersion: string) {
+  const { data, error } = await supabase.rpc("academy_start_seven_day_trial", {
+    p_name: name,
+    p_terms_version: termsVersion,
+  });
   if (error) throw error;
   return data as AcademyHeadquarters;
 }

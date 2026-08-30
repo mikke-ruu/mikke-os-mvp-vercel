@@ -138,7 +138,7 @@ function NewInstructorContent() {
     e.preventDefault();
     setError(null);
     if (!form.courseId) return setError("講座を選択してください。");
-    if (!form.handle.trim()) return setError("講師のMikke IDハンドルを入力してください。");
+    if (!form.handle.trim()) return setError("講師のmikke IDを入力してください。");
     setSaving(true);
     try {
       await createInstructor(profile, hq!.id, form);
@@ -190,7 +190,7 @@ function NewInstructorContent() {
           {numberLookup === "loading" ? <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">講師番号を確認中…</p> : null}
           {numberLookup === "not_found" ? (
             <p className="mt-1 text-[11px] font-bold text-[var(--mikke-danger)]">
-              このハンドルのMikke IDが見つかりません。登録時にあらためて確認します。
+              このmikke IDが見つかりません。登録時にあらためて確認します。
             </p>
           ) : null}
         </div>
@@ -221,7 +221,7 @@ function NewInstructorContent() {
               </div>
             ) : (
               <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">
-                既存講師は現行の番号を手入力してください。ハンドル入力後、自動採番が有効なら次の番号を提案します。
+                既存講師は現行の番号を手入力してください。mikke ID入力後、自動採番が有効なら次の番号を提案します。
               </p>
             )}
           </div>

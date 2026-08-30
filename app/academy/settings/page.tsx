@@ -7,7 +7,9 @@ import { HonbuShell } from "@/components/academy/AcademyShell";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import {
   getMyAcademyBillingSnapshot,
+  getMyAcademyCurrentBillingEstimate,
   type AcademyBillingSnapshot,
+  type AcademyCurrentBillingEstimate,
 } from "@/lib/academy/billing";
 import {
   getMyHeadquartersRole,
@@ -58,6 +60,7 @@ function SettingsContent() {
   const [invitations, setInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [myInvitations, setMyInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [billingSnapshot, setBillingSnapshot] = useState<AcademyBillingSnapshot | null>(null);
+  const [currentBillingEstimate, setCurrentBillingEstimate] = useState<AcademyCurrentBillingEstimate | null>(null);
   const [communityLinks, setCommunityLinks] = useState<AcademyCommunityLinkOption[]>([]);
   const [form, setForm] = useState({
     name: "",
@@ -104,6 +107,7 @@ function SettingsContent() {
         setMembers([]);
         setInvitations([]);
         setBillingSnapshot(null);
+        setCurrentBillingEstimate(null);
         return;
       }
 
@@ -144,9 +148,17 @@ function SettingsContent() {
           setCommunityLinks([]);
         }
       }
-      setBillingSnapshot(
-        nextRole === "owner" ? await getMyAcademyBillingSnapshot(hq.id) : null,
-      );
+      if (nextRole === "owner") {
+        const [snapshot, estimate] = await Promise.all([
+          getMyAcademyBillingSnapshot(hq.id),
+          getMyAcademyCurrentBillingEstimate(hq.id),
+        ]);
+        setBillingSnapshot(snapshot);
+        setCurrentBillingEstimate(estimate);
+      } else {
+        setBillingSnapshot(null);
+        setCurrentBillingEstimate(null);
+      }
     } catch {
       setMessage("本部設定を読み込めませんでした。DB設定と権限を確認してください。");
     } finally {
@@ -391,10 +403,18 @@ function SettingsContent() {
                 請求先の本部Ownerだけに表示しています。すべて税込です。
               </p>
 
+              {currentBillingEstimate ? (
+                <div className="mt-4 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+                  <p className="text-xs font-bold text-[var(--mikke-muted)]">現在の登録中ユニーク人数（参考・月末未確定）</p>
+                  <p className="mt-1 text-2xl font-bold">{currentBillingEstimate.registered_instructor_count}<span className="ml-1 text-sm">名</span></p>
+                  <p className="mt-1 text-xs text-[var(--mikke-muted)]">現在の人数による通常料金は月額 {currentBillingEstimate.catalog_price_yen.toLocaleString()}円です。請求額は月末23:59（Asia/Tokyo）の確定snapshotで決まります。</p>
+                </div>
+              ) : null}
+
               {billingSnapshot ? (
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
-                    <p className="text-xs font-bold text-[var(--mikke-muted)]">月末の登録講師</p>
+                    <p className="text-xs font-bold text-[var(--mikke-muted)]">{billingSnapshot.snapshot_month.slice(0, 7)} 月末の登録講師</p>
                     <p className="mt-1 text-2xl font-bold">{billingSnapshot.registered_instructor_count}<span className="ml-1 text-sm">名</span></p>
                   </div>
                   <div className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
@@ -411,6 +431,9 @@ function SettingsContent() {
                   最初の月末集計後に、登録講師数と次回料金を表示します。
                 </p>
               )}
+              {billingSnapshot ? (
+                <p className="mt-2 text-[11px] text-[var(--mikke-muted)]">締め時刻: {new Date(billingSnapshot.cutoff_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })}（Asia/Tokyo）</p>
+              ) : null}
 
               {billingSnapshot?.price_notice_required ? (
                 <p className="mt-3 rounded-xl border border-[var(--mikke-accent)] bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold">

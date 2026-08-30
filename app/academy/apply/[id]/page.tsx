@@ -24,6 +24,8 @@ function ApplyInner({ courseId }: { courseId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState(false);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(true);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -98,6 +100,8 @@ function ApplyInner({ courseId }: { courseId: string }) {
           email
         }));
       }
+      setApplicationId(submitted.application_id);
+      setEmailSent("email_sent" in submitted ? submitted.email_sent !== false : true);
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "送信に失敗しました。時間をおいて再度お試しください。");
@@ -124,6 +128,19 @@ function ApplyInner({ courseId }: { courseId: string }) {
         <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
           {course.name} のお申込みを受け付けました。担当より折り返しご連絡いたします。
         </p>
+        {!emailSent ? (
+          <p className="mt-4 rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-text)]">
+            確認メールを送信できませんでした。下のボタンから申込をマイポータルへつないでください。
+          </p>
+        ) : null}
+        {applicationId ? (
+          <Link
+            href={`/academy/claim/${applicationId}`}
+            className="mt-5 block rounded-2xl border border-[var(--mikke-primary)] px-5 py-3 text-sm font-bold text-[var(--mikke-primary)]"
+          >
+            申込をマイポータルへつなぐ
+          </Link>
+        ) : null}
         {/* Wave F (AC-F5d): 講師受付(instructorあり)の場合は本部のcourse.payment_urlではなく
             担当講師のpayment_urlを使う。講師が未設定なら案内文言のみでボタンは出さない。 */}
         {instructor ? (

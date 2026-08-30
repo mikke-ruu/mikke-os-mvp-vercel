@@ -1,0 +1,30 @@
+{
+  "academy": {
+    "repository": "G:/Musubiプロジェクト/mikke-os-mvp-academy-ledger-20260820",
+    "commit": "fd0f00d2fedd471d5a6636252108bba2708c0948"
+  },
+  "community": {
+    "repository": "G:/Musubiプロジェクト/mikke-os-mvp-community-academy-entitlements",
+    "commit": "93325c566f806d021f841021204d8f4faf8ccd22"
+  },
+  "productionProjectRefDenylist": ["nttqpprkqbynxyldbnjs"],
+  "sources": [
+    ["academy", "supabase/migrations/20260820110909_academy_instructor_registration_ledger.sql", "512bc46e89facde00f90e9b6323057f067731e07", "migration"],
+    ["academy", "supabase/migrations/20260821043626_academy_access_context_and_creation_gate.sql", "dd22806db452f85f3a1adcbe848715adb9636dc8", "migration"],
+    ["academy", "supabase/migrations/20260821100151_academy_application_headquarters_visibility.sql", "17adf5c74b959c7e2aa4881f6687d54b7c3b67f9", "migration"],
+    ["academy", "supabase/migrations/20260821103043_academy_class_management.sql", "e848206098b8802ff7276fbae00723e3f4d5abbe", "migration"],
+    ["academy", "supabase/migrations/20260823223416_academy_learner_portal_context.sql", "1e1a6e2a0d7426dfe0ea930ddf89fb7850d51e5a", "migration"],
+    ["academy", "supabase/migrations/20260823233441_academy_public_class_scheduling.sql", "9b7c490ffdd1ab536f41c46b52d6c633baf79d71", "migration"],
+    ["academy", "supabase/migrations/20260825050958_academy_course_timed_learning_access.sql", "93daa91b60e594d2cec3d3b6406c0c0084d450eb", "migration"],
+    ["academy", "supabase/migrations/20260825062848_academy_secure_video_asset_foundation.sql", "13bc5719c5e630bc44598de6ec219ec99d343e62", "migration"],
+    ["academy", "supabase/migrations/20260825075830_academy_application_claim.sql", "d6e88a65f420d4f8e85ba77282b793c519b462ea", "migration"],
+    ["academy", "supabase/migrations/20260825161200_academy_month_end_billing_snapshots.sql", "71b5f94d87ca098f65e1d1bf9cc10243bbd03bd9", "migration"],
+    ["community", "supabase/migrations/20260825222427_community_academy_linked_room_entitlements.sql", "67c3b8d4456ccf1717b9089ad57c0aa246a1d253", "migration"],
+    ["community", "supabase/migrations/20260826011738_community_academy_link_acceptance_ui_contract.sql", "7db24b5ff1874fe47f04a53f012e092320810108", "migration"],
+    ["academy", "supabase/migrations/20260826033657_academy_seven_day_trial_foundation.sql", "ad8a35742449871a6dcf2392d12f456b7a082311", "migration"],
+    ["academy", "supabase/tests/academy_release_candidate_e2e.sql", "4ca7aacde390f5a721ba26fc49ce3cc6b4e50a3a", "test"],
+    ["academy", "supabase/tests/academy_billing_snapshot_e2e.sql", "0fb1fa4bf2b044d9d6aa51d651bd095da4fa7f9f", "test"],
+    ["academy", "supabase/tests/academy_seven_day_trial_rls.sql", "971258890d1140a97c5d11a883368b23a211d1f5", "test"],
+    ["community", "supabase/tests/community_academy_linked_room_entitlements_test.sql", "5fde332ecd11ee8822017e7e44c57d41a1d26b68", "test"]
+  ]
+}
