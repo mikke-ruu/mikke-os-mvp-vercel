@@ -3,12 +3,20 @@ import type { AcademyPlatformBillingState, AcademySubscriptionStatus } from "./p
 // Temporary, app-owned read projection of shared billing v0. No provider client,
 // endpoints, access grants or mutation fallback. Replace the DTO validation with
 // the shared decoder when its owner provides a reviewed contract.
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 const exactKeys = (value: Record<string, unknown>, keys: string[]) =>
   Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
-const isDate = (value: unknown) => value === null || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value)));
+const isDate = (value: unknown) => value === null || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value);
+const notices = {
+  AUTH_REQUIRED: "sign_in_required", RESOURCE_UNAVAILABLE: "unavailable",
+  STATE_CONFLICT: "state_conflict", INVALID_REQUEST: "invalid_request",
+  BILLING_NOT_CONFIGURED: "not_configured", POLICY_PENDING: "policy_pending",
+} as const;
+const noticeState = (code: unknown): AcademyPlatformBillingState => ({
+  kind: typeof code === "string" && Object.hasOwn(notices, code) ? notices[code as keyof typeof notices] : "unavailable",
+});
 
 /** Input must come from authenticated shared status API, not query/storage.
  * `owner` describes the intended audience only; this is not authorization.
@@ -22,16 +30,17 @@ export function projectAcademyPlatformBillingStatus(
   if (expectedResourceId !== null && !uuid.test(expectedResourceId)) return unavailable;
   if (!isRecord(payload) || !exactKeys(payload, ["version", "product", "resourceId", "availability", "subscription", "creation", "allowedActions", "noticeCode"])) return unavailable;
   if (payload.version !== 0 || payload.product !== "academy_platform" || payload.resourceId !== expectedResourceId) return unavailable;
-  // V0 has no approved notice codes yet. Do not ignore a future blocking notice.
-  if (payload.noticeCode !== null || payload.availability !== "ready") return unavailable;
+  if (!["ready", "not_configured", "policy_pending"].includes(String(payload.availability))) return unavailable;
+  if (payload.noticeCode !== null && (typeof payload.noticeCode !== "string" || !Object.hasOwn(notices, payload.noticeCode))) return unavailable;
   if (!Array.isArray(payload.allowedActions) || payload.allowedActions.some((action) => !["checkout", "portal", "create_resource"].includes(action)) || new Set(payload.allowedActions).size !== payload.allowedActions.length) return unavailable;
+  if ((payload.noticeCode !== null || payload.availability !== "ready") && payload.allowedActions.length !== 0) return unavailable;
   if (!isRecord(payload.creation) || !exactKeys(payload.creation, ["state"]) || !["none", "pending", "available", "consumed"].includes(String(payload.creation.state))) return unavailable;
   let subscriptionStatus: AcademySubscriptionStatus = "none";
   let accessEndsAt: string | null = null;
   if (payload.subscription !== null) {
     const subscription = payload.subscription;
     if (!isRecord(subscription) || !exactKeys(subscription, ["state", "planKey", "currentPeriodEndsAt", "cancelAtPeriodEnd"])) return unavailable;
-    if (typeof subscription.planKey !== "string" || !subscription.planKey.trim() || !isDate(subscription.currentPeriodEndsAt) || typeof subscription.cancelAtPeriodEnd !== "boolean") return unavailable;
+    if (typeof subscription.planKey !== "string" || !/^[a-z][a-z0-9_]{0,39}$/.test(subscription.planKey) || !isDate(subscription.currentPeriodEndsAt) || typeof subscription.cancelAtPeriodEnd !== "boolean") return unavailable;
     const states: Record<string, AcademySubscriptionStatus> = { pending: "processing", trialing: "trialing", active: "active", past_due: "past_due", ended: "ended" };
     if (typeof subscription.state !== "string" || !Object.hasOwn(states, subscription.state)) return unavailable;
     subscriptionStatus = states[subscription.state];
@@ -44,6 +53,8 @@ export function projectAcademyPlatformBillingStatus(
       accessEndsAt = subscription.currentPeriodEndsAt as string | null;
     }
   }
+  if (payload.noticeCode !== null) return noticeState(payload.noticeCode);
+  if (payload.availability !== "ready") return { kind: payload.availability === "policy_pending" ? "policy_pending" : "not_configured" };
   // Neither paid nor a consumed creation grant proves present HQ access.
   return {
     kind: "owner",
@@ -88,8 +99,14 @@ export async function readAcademyPlatformBillingStatus(
     });
     if (signal?.aborted) return unavailable;
     if (response.status === 401) return { kind: "sign_in_required" };
-    // 404 may mean absent API or inaccessible resource; do not disclose which.
-    if (!response.ok) return unavailable;
+    if (!response.ok) {
+      const error: unknown = await response.json();
+      if (!isRecord(error) || !exactKeys(error, ["error"]) || !isRecord(error.error) || !exactKeys(error.error, ["code"])) return unavailable;
+      const statuses: Record<string, number> = { RESOURCE_UNAVAILABLE: 404, STATE_CONFLICT: 409, INVALID_REQUEST: 422, BILLING_NOT_CONFIGURED: 503, POLICY_PENDING: 503 };
+      const code = error.error.code;
+      if (typeof code !== "string" || !Object.hasOwn(statuses, code) || statuses[code] !== response.status || signal?.aborted) return unavailable;
+      return noticeState(code);
+    }
     const payload: unknown = await response.json();
     if (signal?.aborted) return unavailable;
     return projectAcademyPlatformBillingStatus(payload, resourceId);

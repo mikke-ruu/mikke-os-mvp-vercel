@@ -29,7 +29,7 @@ const render = (state) => renderToStaticMarkup(React.createElement(Panel, { stat
 const hq = "10000000-0000-4000-8000-000000000001";
 const dto = {
   version: 0, product: "academy_platform", resourceId: hq, availability: "ready",
-  subscription: { state: "active", planKey: "academy", currentPeriodEndsAt: "2026-10-01T00:00:00Z", cancelAtPeriodEnd: false },
+  subscription: { state: "active", planKey: "academy", currentPeriodEndsAt: "2026-10-01T00:00:00.000Z", cancelAtPeriodEnd: false },
   creation: { state: "consumed" }, allowedActions: ["portal"], noticeCode: null,
 };
 const active = project(dto, hq);
@@ -62,7 +62,7 @@ assert.equal(project({ ...dto, subscription: { ...dto.subscription, cancelAtPeri
 assert.equal(project({ ...dto, subscription: { ...dto.subscription, state: "past_due", cancelAtPeriodEnd: true } }, hq).subscriptionStatus, "past_due");
 assert.equal(project({ ...dto, subscription: { ...dto.subscription, currentPeriodEndsAt: null, cancelAtPeriodEnd: true } }, hq).kind, "unavailable");
 
-for (const kind of ["loading", "forbidden", "unavailable", "sign_in_required"]) {
+for (const kind of ["loading", "forbidden", "unavailable", "sign_in_required", "not_configured", "policy_pending", "state_conflict", "invalid_request"]) {
   const html = render({ kind });
   assert.doesNotMatch(html, /<button|5,000|請求予定額/);
 }
@@ -125,3 +125,73 @@ assert.equal(fetchCalls, 2);
 const adapterSource = readFileSync(resolve(root, "lib/academy/platform-billing-adapter.ts"), "utf8");
 assert.doesNotMatch(adapterSource, /console\.|localStorage|sessionStorage|SERVICE_ROLE|SECRET_KEY|method: "POST"/);
 console.log("Academy platform billing UI: model + v0 rejection + rendered states + boundary checks OK");
+
+for (const [code, kind, status] of [
+  ["AUTH_REQUIRED", "sign_in_required", 401], ["RESOURCE_UNAVAILABLE", "unavailable", 404],
+  ["STATE_CONFLICT", "state_conflict", 409], ["INVALID_REQUEST", "invalid_request", 422],
+  ["BILLING_NOT_CONFIGURED", "not_configured", 503], ["POLICY_PENDING", "policy_pending", 503],
+]) {
+  assert.equal(project({ ...dto, allowedActions: [], noticeCode: code }, hq).kind, kind);
+  assert.equal(project({ ...dto, noticeCode: code }, hq).kind, "unavailable", "blocking notices cannot allow actions");
+  assert.equal((await readStatus(hq, { ...fakeTransport, fetch: async () => new Response(JSON.stringify({ error: { code } }), { status }) })).kind, kind);
+}
+for (const value of ["2026-02-30T00:00:00.000Z", "2026-10-01T00:00:00Z", "2026-10-01T00:00:00+09:00"]) {
+  assert.equal(project({ ...dto, subscription: { ...dto.subscription, currentPeriodEndsAt: value } }, hq).kind, "unavailable");
+}
+const { createAcademyBillingLoader } = load("lib/academy/platform-billing-loader.ts");
+const userA = "10000000-0000-4000-8000-000000000010";
+const userB = "10000000-0000-4000-8000-000000000020";
+let session = { access_token: "fake-only", user: { id: userA, is_anonymous: false } };
+let authListener;
+let reads = 0;
+const auth = {
+  getSession: async () => { reads++; return { data: { session }, error: null }; },
+  onAuthStateChange: (callback) => { authListener = callback; return { data: { subscription: { unsubscribe() { authListener = undefined; } } } }; },
+};
+const pending = [];
+const delayedFetch = async (_url, options) => new Promise(resolve => pending.push({ resolve, signal: options.signal }));
+const scope = { userId: userA, resourceId: hq, isGuest: false, auth, fetch: delayedFetch };
+const loader = createAcademyBillingLoader(scope);
+const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+const complete = (entry, payload = dto) => entry.resolve(new Response(JSON.stringify(payload)));
+loader.start();
+await tick();
+complete(pending[0]); await tick();
+assert.equal(loader.getSnapshot().kind, "owner");
+session = { ...session, user: { id: userB, is_anonymous: false } };
+authListener();
+assert.equal(loader.getSnapshot().kind, "loading", "auth event erases old billing synchronously");
+await tick(); await tick();
+assert.equal(loader.getSnapshot().kind, "sign_in_required");
+assert.equal(pending.length, 1, "new account token must never be sent under old account scope");
+session = { ...session, user: { id: userA, is_anonymous: false } };
+const oldReload = loader.reload(); await tick();
+const newReload = loader.reload(); await tick();
+assert.equal(pending[1].signal.aborted, true);
+complete(pending[2], { ...dto, subscription: { ...dto.subscription, state: "past_due" } });
+await newReload;
+complete(pending[1]); await oldReload;
+assert.equal(loader.getSnapshot().subscriptionStatus, "past_due", "late response cannot replace newer result");
+const nextHq = createAcademyBillingLoader({ ...scope, resourceId: "10000000-0000-4000-8000-000000000002" });
+assert.equal(nextHq.getSnapshot().kind, "loading", "new HQ starts with no invoice before effects");
+nextHq.dispose();
+loader.dispose();
+assert.equal(loader.getSnapshot().kind, "loading");
+assert.equal(authListener, undefined);
+
+for (const absent of [null, { ...session, user: { id: userA, is_anonymous: true } }]) {
+  session = absent;
+  const isolated = createAcademyBillingLoader(scope);
+  await isolated.reload();
+  assert.equal(isolated.getSnapshot().kind, "sign_in_required");
+  isolated.dispose();
+}
+assert.equal(pending.length, 3);
+const never = new Promise(() => {});
+const stuck = createAcademyBillingLoader({ ...scope, timeoutMs: 5, auth: { ...auth, getSession: () => never } });
+void stuck.reload();
+await new Promise(resolve => setTimeout(resolve, 15));
+assert.equal(stuck.getSnapshot().kind, "unavailable", "session stalls must fail closed");
+stuck.dispose();
+assert.ok(reads >= 6, "fresh session per request");
+console.log("Academy billing loader: safe notices, auth changes, HQ reset, abort, stale response and timeout OK (fake transport only)");

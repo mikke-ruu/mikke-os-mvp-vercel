@@ -36,15 +36,27 @@ Academy read adapterだけを先行作成し、共通APIのstubは作らない�
 - `Authorization: Bearer`、`cache:no-store`、`credentials:omit`、`redirect:error`。
 - tokenの独自保存/URL埋込/log出力なし。自動再送なし。
 - 呼出元はuser/HQ変更時にAbortし、旧responseを破棄する。本人/HQの最終認可はserver必須。
-- v0のversion/product/resourceId/key/state/typeを検査。追加/未知DTOとnoticeCodeは安全停止。
+- v0のversion/product/resourceId/key/state/typeを検査。追加/未知DTOと未知noticeCodeは安全停止。
+- 統制shared contracts.ts（2026-09-01読取）の6 noticeCodeを日本語allowlistへ投影。非ready/notice時のaction混在、非canonical日時・planKeyは拒否。
 - API未導入404、未知状態、未設定/条件未決、JSON/通信失敗はunavailable。401は再ログイン案内。
 - 状態projectionは権限の証拠にならない。`owner`は表示対象の型名であり認証ではない。
 - v0は請求金額を持たないためnextInvoiceはnull。本部準備/購入確認/snapshotも別の確認済み情報を統合するまで未確認。
 
+## owner loader（ローカル実装・route未接続）
+
+`platform-billing-loader.ts`と`AcademyPlatformBillingLoader.tsx`を追加。
+本人user.id/URLの本部ID/guest/auth/transportごとに独立storeを生成し、render時点で旧scopeの表示を使わない。
+認証eventでは同期で表示を破棄・Abortし、Auth callback外で再取得。毎回getSessionの本人ID/anonymousを照合してBearerを渡す。
+getSessionはtoken取得用であり認可の証拠にはしない。実APIのgetUser/所有照合が必要。
+世代番号、Abort、15秒timeout、disposeにより古い/遅いresponseを捨てる。profileや購入情報、独自storageは使わない。
+Supabase公式onAuthStateChange: https://supabase.com/docs/reference/javascript/auth-onauthstatechange
+changelog.mdはweb content-type失敗・shell接続不可のため取得未了。SDK変更/更新なし、既存getSession/onAuthStateChange形状のみ使用。
+現時点のfixture pageと本番routeには未接続。fake auth/fetchでのみ検証し、実token/DB/課金通信はしていない。
+
 ## 次に必要な接続（未実装）
 
 1. 統制の正式shared decoder・認証/請求権限付きstatusと合わせる。
-2. 本人変更/HQ切替で旧表示を即時破棄する実loaderを既存AuthGateの内側へ接続。
+2. 実装したloaderを既存AuthGateの内側へ接続（user.id、既存supabase.auth）。最終共有APIとの結合は別gate。
 3. owner用snapshotを明示HQで取得し、charge_month/適用額と次回invoiceをserver照合。
 4. 今回/次回金額・日付・規約同意を含む最終申込確認契約。price/quantity/owner/returnURLはserver固定。
 5. Checkout/Portalは統制server発行URLのみ。戻りqueryからpaidや作成権を付けない。

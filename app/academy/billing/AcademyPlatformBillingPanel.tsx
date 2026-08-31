@@ -17,6 +17,10 @@ export function AcademyPlatformBillingPanel({ state }: { state: AcademyPlatformB
       unavailable: "契約情報を取得できませんでした。未契約や0円としては扱いません。時間をおいて再度確認してください。",
       forbidden: "この本部の契約・請求は、本部オーナーだけが確認できます。",
       sign_in_required: "契約情報を確認するには、もう一度ログインしてください。",
+      not_configured: "契約・請求の接続を準備しています。まだこの画面から申し込みはできません。",
+      policy_pending: "申込条件の確認が終わるまで、契約手続きは利用できません。",
+      state_conflict: "契約の状態が変わりました。もう一度、最新の情報を確認してください。",
+      invalid_request: "契約情報の確認先を特定できません。本部を選び直してください。",
     }[state.kind];
     return <section className={card} role="status"><h2 className="font-semibold">Academy利用料</h2><p className="mt-3 leading-7">{message}</p></section>;
   }

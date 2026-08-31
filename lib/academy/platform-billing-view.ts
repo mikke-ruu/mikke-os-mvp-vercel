@@ -7,7 +7,7 @@ export type AcademySubscriptionStatus =
   | "past_due" | "cancel_scheduled" | "ended";
 
 export type AcademyPlatformBillingState =
-  | { kind: "loading" | "unavailable" | "forbidden" | "sign_in_required" }
+  | { kind: "loading" | "unavailable" | "forbidden" | "sign_in_required" | "not_configured" | "policy_pending" | "state_conflict" | "invalid_request" }
   | {
       kind: "owner";
       subscriptionStatus: AcademySubscriptionStatus;
