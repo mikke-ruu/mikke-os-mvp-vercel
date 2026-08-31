@@ -33,6 +33,8 @@ const dto = {
   creation: { state: "consumed" }, allowedActions: ["portal"], noticeCode: null,
 };
 const active = project(dto, hq);
+assert.equal(project({ ...dto, availability: ["ready"] }, hq).kind, "unavailable");
+assert.equal(project({ ...dto, creation: { state: ["consumed"] } }, hq).kind, "unavailable");
 assert.equal(active.kind, "owner");
 assert.equal(active.subscriptionStatus, "active");
 assert.equal(active.headquartersState, "unverified");
