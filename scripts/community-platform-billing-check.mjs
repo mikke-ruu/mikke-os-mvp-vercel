@@ -54,6 +54,59 @@ check("approved pricing unchanged", () => assert.deepEqual(JSON.parse(JSON.strin
 ]));
 for (const key of [undefined, null, "fake", "__proto__", "academy_platform"]) check("unknown plan never becomes Trial", () => assert.equal(plans.getCommunityPlatformPlan(key), null));
 check("catalogue is frozen", () => assert.throws(() => { plans.COMMUNITY_PLATFORM_PLANS[1].monthlyAmountYen = 0; }));
+check("approved trial policy is narrow and immutable", () => {
+  const policy = model.COMMUNITY_PLATFORM_TRIAL_POLICY;
+  assert.equal(policy.automaticBillingAtTrialEnd, false);
+  assert.equal(policy.automaticPaidTransitionAtTrialEnd, false);
+  assert.equal(policy.explicitPaidApplicationRequired, true);
+  assert.equal(policy.postTrialCapabilities, "policy_pending");
+  assert.throws(() => { policy.automaticBillingAtTrialEnd = true; });
+});
+const trialBoundary = Date.parse("2026-09-01T00:00:00Z");
+for (const offset of [-1, 0, 1]) check("deadline never synthesizes active or rights", () => {
+  const raw = dto({ subscription: { state: "trialing", planKey: "trial", currentPeriodEndsAt: new Date(trialBoundary + offset).toISOString(), cancelAtPeriodEnd: false }, allowedActions: [], creation: { state: "none" } });
+  const before = JSON.stringify(raw);
+  const decoded = model.decodeCommunityPlatformStatus(raw, resource);
+  assert.equal(decoded.subscription.state, "trialing");
+  const notice = model.communityPlatformTrialPeriodNotice(decoded.subscription, trialBoundary);
+  assert.equal(notice !== null, offset <= 0);
+  assert.equal(decoded.subscription.state, "trialing");
+  assert.equal(decoded.creation.state, "none");
+  assert.ok(model.communityPlatformActionBlock({ kind: "loaded", data: decoded }, "checkout"));
+  assert.ok(model.communityPlatformActionBlock({ kind: "loaded", data: decoded }, "create_resource"));
+  assert.equal(JSON.stringify(raw), before);
+});
+for (const ends of [null, "invalid"]) check("unknown trial end is not paid or unlimited", () => {
+  assert.equal(model.communityPlatformTrialPeriodNotice({ ...dto().subscription, planKey: "trial", state: "trialing", currentPeriodEndsAt: ends }, trialBoundary), null);
+});
+check("paid subscriptions are not changed by trial expiry notice", () => {
+  const sub = Object.freeze({ ...dto().subscription, currentPeriodEndsAt: "2000-01-01T00:00:00Z" });
+  assert.equal(model.communityPlatformTrialPeriodNotice(sub, trialBoundary), null);
+  assert.equal(sub.state, "active");
+});
+await checkAsync("expired trial status refresh only reads; no checkout or transition", async () => {
+  const raw = dto({ subscription: { ...dto().subscription, planKey: "trial", state: "trialing", currentPeriodEndsAt: "2000-01-01T00:00:00Z" }, allowedActions: [], creation: { state: "none" } });
+  let calls = 0;
+  const result = await model.loadCommunityPlatformStatus(resource, transport(async (url, init) => {
+    calls++;
+    assert.ok(url.startsWith("/api/billing/platform/status?"));
+    assert.equal(init.method, "GET");
+    return response(raw);
+  }));
+  assert.equal(calls, 1);
+  assert.equal(result.kind, "loaded");
+  assert.equal(result.data.subscription.state, "trialing");
+  assert.equal(result.data.subscription.planKey, "trial");
+  assert.equal(result.data.creation.state, "none");
+});
+check("expired trial renders explicit consent policy, not paid success or restrictions", () => {
+  const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ subscription: { ...dto().subscription, planKey: "trial", state: "trialing", currentPeriodEndsAt: "2000-01-01T00:00:00Z" } }) }));
+  assert.ok(html.includes(model.COMMUNITY_PLATFORM_TRIAL_POLICY.notice));
+  assert.ok(html.includes("最新の契約状態を再確認"));
+  assert.ok(html.includes("お試しの契約状態を再確認してください"));
+  assert.ok(!html.includes("30日間お試し · お試し期間中"));
+  assert.doesNotMatch(html, /自動課金を開始|有料契約が成立|閲覧のみになりました|データを削除しました/);
+});
 check("valid DTO", () => assert.ok(model.decodeCommunityPlatformStatus(dto(), resource)));
 for (const patch of [
   { version: 1 }, { product: "academy_platform" }, { resourceId: other }, { resourceId: null },

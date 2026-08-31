@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, CreditCard, RefreshCw, ShieldCheck } from "lucide-react";
 import {
-  COMMUNITY_PLATFORM_MESSAGES, communityPlatformActionBlock, communityPlatformLoginHref,
-  communityPlatformStatusLabel, loadCommunityPlatformStatus, openCommunityPlatformPortal,
+  COMMUNITY_PLATFORM_MESSAGES, COMMUNITY_PLATFORM_TRIAL_POLICY, communityPlatformActionBlock, communityPlatformLoginHref,
+  communityPlatformStatusLabel, communityPlatformTrialPeriodNotice, loadCommunityPlatformStatus, openCommunityPlatformPortal,
   type CommunityBillingTransport, type CommunityPlatformReadState
 } from "@/lib/community/platform-billing";
 import { COMMUNITY_PLATFORM_PLANS, communityPlatformPriceLabel, getCommunityPlatformPlan, type CommunityPlatformPlanKey } from "@/lib/community/platform-plans";
@@ -45,6 +45,7 @@ export function CommunityPlatformBillingView({
   const data = state.kind === "loaded" ? state.data : null;
   const subscription = data?.subscription ?? null;
   const currentPlan = subscription ? getCommunityPlatformPlan(subscription.planKey) : null;
+  const trialPeriodNotice = communityPlatformTrialPeriodNotice(subscription);
   const portalBlock = communityPlatformActionBlock(state, "portal");
   const checkoutBlock = communityPlatformActionBlock(state, "checkout");
   const createBlock = communityPlatformActionBlock(state, "create_resource");
@@ -74,7 +75,8 @@ export function CommunityPlatformBillingView({
             <button type="button" className={button} disabled={busy || !onRefresh} onClick={onRefresh}><RefreshCw size={16} aria-hidden="true" />状態を再確認</button>
           </div>
           {subscription ? <>
-            <p className="mt-4 font-bold text-[var(--mikke-primary)]">{currentPlan?.name} · {communityPlatformStatusLabel(subscription.state)}</p>
+            <p className="mt-4 font-bold text-[var(--mikke-primary)]">{currentPlan?.name} · {trialPeriodNotice ? "お試しの契約状態を再確認してください" : communityPlatformStatusLabel(subscription.state)}</p>
+            {trialPeriodNotice ? <p className="mt-2 text-sm leading-6">{trialPeriodNotice}</p> : null}
             <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
               <div><dt className="text-[var(--mikke-muted)]">現在の利用期間の終了日時</dt><dd className="mt-1">{dateLabel(subscription.currentPeriodEndsAt)}</dd></div>
               <div><dt className="text-[var(--mikke-muted)]">解約予約</dt><dd className="mt-1">{subscription.cancelAtPeriodEnd ? "期間終了時の解約を予約済み" : "なし"}</dd></div>
@@ -96,6 +98,7 @@ export function CommunityPlatformBillingView({
         <section aria-labelledby="community-plans-title">
           <h2 id="community-plans-title" className="text-lg font-bold">運営プランを比較</h2>
           <p className="mt-2 text-sm text-[var(--mikke-muted)]">1 Communityごとの料金です。選ぶだけでは申し込み・請求は発生しません。</p>
+          <p className="mt-3 rounded-lg border border-[var(--mikke-green)] p-3 text-sm leading-7">{COMMUNITY_PLATFORM_TRIAL_POLICY.notice}</p>
           <fieldset className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <legend className="sr-only">比較するプラン</legend>
             {COMMUNITY_PLATFORM_PLANS.map((plan) => <label key={plan.key} className={`${panel} cursor-pointer ${selectedKey === plan.key ? "border-[var(--mikke-primary)] ring-1 ring-[var(--mikke-primary)]" : ""}`}>
@@ -110,9 +113,9 @@ export function CommunityPlatformBillingView({
         <section className={panel} aria-labelledby="community-confirm-title">
           <h2 id="community-confirm-title" className="text-lg font-bold">選択中：{selected.name}</h2>
           <p className="mt-2 text-sm font-bold">{communityPlatformPriceLabel(selected)} · {selected.memberLimit === null ? "1,001名以上" : `${selected.memberLimit}名まで`}</p>
-          <p className="mt-3 text-sm leading-7">{selectedKey === "enterprise" ? "個別見積のプランです。この画面では決済しません。" : selectedKey === "trial" ? "30日間お試しの開始手続き・終了後の条件は準備中です。ここでは試用も請求も開始しません。" : checkoutBlock}</p>
+          <p className="mt-3 text-sm leading-7">{selectedKey === "enterprise" ? "個別見積のプランです。この画面では決済しません。" : selectedKey === "trial" ? `${COMMUNITY_PLATFORM_TRIAL_POLICY.pendingNotice}ここでは試用も請求も開始しません。` : checkoutBlock}</p>
           <button type="button" disabled className={`${button} mt-4`} aria-describedby="community-checkout-note">{selectedKey === "enterprise" ? "個別見積の受付準備中" : selectedKey === "trial" ? "お試しの受付準備中" : "契約条件の確認へ（準備中）"}</button>
-          <p id="community-checkout-note" className="mt-3 text-xs leading-6 text-[var(--mikke-muted)]">課金開始日、次回請求、無料期間の終了、プラン変更、解約・返金の条件を確認できる形でご案内します。</p>
+          <p id="community-checkout-note" className="mt-3 text-xs leading-6 text-[var(--mikke-muted)]">請求日、次回請求、期限後に使える機能、プラン変更、解約・返金の条件を確認できる形でご案内します。</p>
         </section>
         <p role="status" aria-live="polite" className="text-sm text-[var(--mikke-primary)]">{message}</p>
         <aside className="flex items-start gap-3 rounded-lg border border-[var(--mikke-green)] p-4 text-sm leading-7">

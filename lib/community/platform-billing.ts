@@ -3,6 +3,16 @@ import { getCommunityPlatformPlan } from "./platform-plans";
 // Community projection of the control room's platform billing UI contract v0.
 // No provider, DB, membership, Academy entitlement or authorization logic here.
 export const COMMUNITY_PLATFORM_PRODUCT = "community_platform" as const;
+// User-approved 2026-09-01. This is not approval of trial start, post-trial
+// capabilities, renewal dates or refund/cancellation rules. No state mutation.
+export const COMMUNITY_PLATFORM_TRIAL_POLICY = Object.freeze({
+  automaticBillingAtTrialEnd: false,
+  automaticPaidTransitionAtTrialEnd: false,
+  explicitPaidApplicationRequired: true,
+  postTrialCapabilities: "policy_pending",
+  notice: "30日間のお試しが終わっても、自動課金・有料プランへの自動移行はありません。本人が有料プランを申し込んだ時に課金が始まります。",
+  pendingNotice: "お試しの開始手続きや、終了後に使える機能などは準備中です。"
+} as const);
 export type CommunityPlatformSubscriptionState = "pending" | "trialing" | "active" | "past_due" | "ended";
 export type CommunityPlatformAction = "checkout" | "portal" | "create_resource";
 export type CommunityPlatformStatusV0 = {
@@ -27,7 +37,7 @@ export type CommunityPlatformReadState =
 export const COMMUNITY_PLATFORM_MESSAGES = {
   loading: "契約状態を確認しています。",
   unavailable: "契約・決済の受付準備中です。現在この画面からお申し込みはできません。",
-  policy_pending: "課金開始・無料期間終了・解約等の契約条件を準備しています。現在お申し込みはできません。",
+  policy_pending: "請求日・期限後に使える機能・解約等の未確定の契約条件を準備しています。現在お申し込みはできません。",
   auth_required: "ログインまたは新規登録して契約状態を確認してください。",
   resource_unavailable: "この契約を確認できません。契約を管理する運営者のアカウントで確認してください。",
   error: "契約状態を取得できませんでした。時間をおいて再確認してください。"
@@ -64,6 +74,17 @@ export function communityPlatformStatusLabel(status: unknown): string {
     past_due: "お支払いの確認が必要です", ended: "利用期間終了"
   };
   return typeof status === "string" && Object.hasOwn(labels, status) ? labels[status] : "契約状態を確認してください";
+}
+
+export function communityPlatformTrialPeriodNotice(
+  subscription: CommunityPlatformStatusV0["subscription"], now: number = Date.now()
+): string | null {
+  if (subscription?.planKey !== "trial" || subscription.state !== "trialing"
+    || !subscription.currentPeriodEndsAt || !Number.isFinite(now)) return null;
+  const endsAt = Date.parse(subscription.currentPeriodEndsAt);
+  return Number.isFinite(endsAt) && endsAt <= now
+    ? "お試し期間の終了日時を過ぎています。自動で有料契約にはなりません。最新の契約状態を再確認してください。"
+    : null;
 }
 
 export function communityPlatformActionBlock(state: CommunityPlatformReadState, action: CommunityPlatformAction): string | null {
