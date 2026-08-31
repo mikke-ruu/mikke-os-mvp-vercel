@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
+import { getAcademyLaunchProgress } from "@/lib/academy/launch-progress";
 import { createHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getAcademyOnboardingEligibility, startAcademySevenDayTrial } from "@/lib/academy/trial";
 
@@ -217,51 +218,12 @@ function DashboardContent() {
   const renewalAlerts = getRenewalAlerts(instructors);
 
   const publishedCourses = courses.filter((c) => c.is_published).length;
-  const firstCourse = courses[0];
-  const firstPublishedCourse = courses.find((course) => course.is_published);
-  const courseNeedingMaterial = courses.find((course) => {
-    const features = resolveAcademyCourseFeaturesForCourse(course);
-    return course.is_published && features.materialLicenses && !materials.some((material) => material.course_id === course.id);
+  const { steps: launchSteps, next: gettingStarted } = getAcademyLaunchProgress({
+    headquarters: hq,
+    courses: courses.map(course => ({ ...course, needsInstructorMaterials: resolveAcademyCourseFeaturesForCourse(course).materialLicenses })),
+    materialCourseIds: materials.map(material => material.course_id),
+    instructorCount: instructors.length,
   });
-  const gettingStarted = courses.length === 0
-    ? {
-        position: "STEP 2",
-        question: "講座を作りましょう",
-        description: "6つの質問に答えると、講座の下書きができます。この時点では公開されません。",
-        href: "/academy/courses/new",
-        action: "講座の質問へ進む"
-      }
-    : publishedCourses === 0
-      ? {
-          position: "STEP 3",
-          question: "講座の詳細を設定しましょう",
-          description: `「${firstCourse.name}」の料金、教材、開催日、申込方法を項目ごとに確認します。`,
-          href: `/academy/courses/${firstCourse.id}`,
-          action: "講座の詳細設定へ進む"
-        }
-      : courseNeedingMaterial
-        ? {
-            position: "STEP 3",
-            question: "講座の教材を登録しましょう",
-            description: `「${courseNeedingMaterial.name}」の認定講師に共有するPDF・動画・外部URLを登録します。`,
-            href: `/academy/materials/new?course=${encodeURIComponent(courseNeedingMaterial.id)}`,
-            action: "講師用ファイルを登録"
-          }
-        : instructors.length === 0
-          ? {
-              position: "STEP 5",
-              question: "講師を登録しましょう",
-              description: "本部オーナー自身が教える場合、既存講師を移行する場合、受講者から認定講師になる場合から選べます。",
-              href: "/academy/instructors",
-              action: "講師の登録方法を選ぶ"
-            }
-        : {
-            position: "STEP 6",
-            question: "公開前の最終確認をしましょう",
-            description: "公開講座ページを、受講希望者と同じ見え方で確認します。",
-            href: `/academy/c/${firstPublishedCourse!.id}`,
-            action: "公開講座ページを確認"
-          };
   const activeInstructors = instructors.filter((i) => i.is_active).length;
   const honbuIntake = monthApps.filter((a) => a.intake_source !== "koushi").length;
   const koushiIntake = monthApps.filter((a) => a.intake_source === "koushi").length;
@@ -283,14 +245,6 @@ function DashboardContent() {
 
   // 「community参加希望」= community_interest=trueの件数（本部受付分のみ。RLS上見える範囲がそもそもそれ）。
   const communityInterestCount = apps.filter((a) => a.intake_source !== "koushi" && a.community_interest).length;
-  const launchSteps = [
-    { step: 1, label: "本部を設定", description: "団体名、連絡先、ロゴなど", href: "/academy/settings", state: "complete" },
-    { step: 2, label: "講座を作成", description: "6つの質問から下書きを作成", href: "/academy/courses/new", state: courses.length > 0 ? "complete" : "current" },
-    { step: 3, label: "講座の詳細を設定", description: "申込、料金、開催日、教材、認定", href: firstCourse ? `/academy/courses/${firstCourse.id}` : "/academy/courses", state: courses.length > 0 ? "current" : "pending" },
-    { step: 4, label: "本部ホームページを作成", description: "団体全体の紹介と講座一覧", href: "/academy/front", state: "pending" },
-    { step: 5, label: "講師を登録", description: "自分、既存講師、修了した受講者から登録", href: "/academy/instructors", state: instructors.length > 0 ? "complete" : "pending" },
-    { step: 6, label: "公開前に確認", description: "公開講座ページを確認", href: firstPublishedCourse ? `/academy/c/${firstPublishedCourse.id}` : "/academy/courses", state: "pending" }
-  ] as const;
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 md:space-y-6">
@@ -303,13 +257,13 @@ function DashboardContent() {
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
         <div>
           <p className="text-sm font-bold text-[var(--mikke-text)]">Academy開講までの流れ</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">今どこを設定しているか、次に何をするかを確認できます。</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">保存内容をもとに案内します。「完了」は項目の登録済みを示します。確認履歴がないものは「未確認」です。各STEPから設定に進めます。</p>
         </div>
         <ol className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
           {launchSteps.map((item) => (
             <li key={item.step}>
-              <Link href={toCurrentAcademyContextHref(item.href)} className={`block h-full rounded-xl border p-3 ${item.state === "complete" ? "border-[var(--mikke-success)]/35 bg-[var(--mikke-success-soft)]" : item.state === "current" ? "border-[#3f4eb5] bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
-                <p className="text-[10px] font-bold text-[var(--mikke-accent-strong)]">STEP {item.step}{item.state === "complete" ? " ・ 完了" : item.state === "current" ? " ・ いまここ" : ""}</p>
+              <Link href={toCurrentAcademyContextHref(item.href)} aria-current={item.isCurrent ? "step" : undefined} className={`block h-full rounded-xl border p-3 ${item.state === "complete" ? "border-[var(--mikke-success)]/35 bg-[var(--mikke-success-soft)]" : item.isCurrent ? "border-[var(--mikke-primary)] bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
+                <p className="text-xs font-bold text-[var(--mikke-text)]">STEP {item.step} ・ {item.state === "complete" ? "完了" : item.state === "unconfirmed" ? "未確認" : "未完了"}{item.isCurrent ? " ・ いまここ" : ""}</p>
                 <p className="mt-1 text-sm font-bold text-[var(--mikke-text)]">{item.label}</p>
                 <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">{item.description}</p>
               </Link>
@@ -327,8 +281,8 @@ function DashboardContent() {
             <Sparkles size={18} />
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-bold text-[var(--mikke-accent-strong)]">次にすること ・ {gettingStarted.position}</p>
-            <h2 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{gettingStarted.question}</h2>
+            <p className="text-xs font-bold text-[var(--mikke-text)]">次にすること ・ STEP {gettingStarted.step}</p>
+            <h2 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{gettingStarted.label}</h2>
             <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{gettingStarted.description}</p>
             <Link
               href={toCurrentAcademyContextHref(gettingStarted.href)}
