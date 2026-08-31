@@ -30,11 +30,11 @@ export function projectAcademyPlatformBillingStatus(
   if (expectedResourceId !== null && !uuid.test(expectedResourceId)) return unavailable;
   if (!isRecord(payload) || !exactKeys(payload, ["version", "product", "resourceId", "availability", "subscription", "creation", "allowedActions", "noticeCode"])) return unavailable;
   if (payload.version !== 0 || payload.product !== "academy_platform" || payload.resourceId !== expectedResourceId) return unavailable;
-  if (!["ready", "not_configured", "policy_pending"].includes(String(payload.availability))) return unavailable;
+  if (typeof payload.availability !== "string" || !["ready", "not_configured", "policy_pending"].includes(payload.availability)) return unavailable;
   if (payload.noticeCode !== null && (typeof payload.noticeCode !== "string" || !Object.hasOwn(notices, payload.noticeCode))) return unavailable;
   if (!Array.isArray(payload.allowedActions) || payload.allowedActions.some((action) => !["checkout", "portal", "create_resource"].includes(action)) || new Set(payload.allowedActions).size !== payload.allowedActions.length) return unavailable;
   if ((payload.noticeCode !== null || payload.availability !== "ready") && payload.allowedActions.length !== 0) return unavailable;
-  if (!isRecord(payload.creation) || !exactKeys(payload.creation, ["state"]) || !["none", "pending", "available", "consumed"].includes(String(payload.creation.state))) return unavailable;
+  if (!isRecord(payload.creation) || !exactKeys(payload.creation, ["state"]) || typeof payload.creation.state !== "string" || !["none", "pending", "available", "consumed"].includes(payload.creation.state)) return unavailable;
   let subscriptionStatus: AcademySubscriptionStatus = "none";
   let accessEndsAt: string | null = null;
   if (payload.subscription !== null) {
