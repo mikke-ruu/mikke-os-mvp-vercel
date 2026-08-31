@@ -5,10 +5,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, CreditCard, RefreshCw, ShieldCheck } from "lucide-react";
 import {
   COMMUNITY_PLATFORM_MESSAGES, COMMUNITY_PLATFORM_TRIAL_POLICY, communityPlatformActionBlock, communityPlatformLoginHref,
-  communityPlatformStatusLabel, communityPlatformTrialPeriodNotice, loadCommunityPlatformStatus, openCommunityPlatformPortal,
+  communityPlatformStatusLabel, communityPlatformTrialPeriodNotice, openCommunityPlatformPortal,
   type CommunityBillingTransport, type CommunityPlatformReadState
 } from "@/lib/community/platform-billing";
 import { COMMUNITY_PLATFORM_PLANS, communityPlatformPriceLabel, getCommunityPlatformPlan, type CommunityPlatformPlanKey } from "@/lib/community/platform-plans";
+import { createCommunityPlatformStatusLoader } from "@/lib/community/platform-billing-loader";
 
 const transport: CommunityBillingTransport = {
   async getAccessToken() {
@@ -128,29 +129,55 @@ export function CommunityPlatformBillingView({
 }
 
 export function CommunityPlatformBilling({ resourceId = null }: { resourceId?: string | null }) {
+  // Remount before render so even the first frame cannot show another resource.
+  return <CommunityPlatformBillingSession key={resourceId ?? "new"} resourceId={resourceId} />;
+}
+
+function CommunityPlatformBillingSession({ resourceId }: { resourceId: string | null }) {
   const [state, setState] = useState<CommunityPlatformReadState>({ kind: "loading" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const pending = useRef(false);
   const request = useRef<{ resourceId: string | null; id: string } | null>(null);
-  const sequence = useRef(0);
-  const inflight = useRef<AbortController | null>(null);
+  const principal = useRef<string | null>(null);
+  const identityEpoch = useRef(0);
+  const loader = useRef<ReturnType<typeof createCommunityPlatformStatusLoader> | null>(null);
   const refresh = useCallback(async () => {
-    const current = ++sequence.current;
-    inflight.current?.abort();
-    const controller = new AbortController();
-    inflight.current = controller;
-    setState({ kind: "loading" });
-    const next = await loadCommunityPlatformStatus(resourceId, transport, controller.signal);
-    if (sequence.current === current) setState(next);
+    await loader.current?.load(resourceId);
   }, [resourceId]);
   useEffect(() => {
-    void refresh();
-    return () => { sequence.current += 1; inflight.current?.abort(); };
-  }, [refresh]);
+    const current = createCommunityPlatformStatusLoader(transport, setState);
+    loader.current = current;
+    let disposed = false;
+    let unsubscribe: (() => void) | undefined;
+    void import("@/lib/supabase/client").then(({ supabase }) => {
+      if (disposed) return;
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (disposed) return;
+        identityEpoch.current++;
+        // Token refresh/refocus is not a new operation by the same person.
+        const nextPrincipal = session?.user.id ?? null;
+        if (principal.current !== nextPrincipal) request.current = null;
+        principal.current = nextPrincipal;
+        pending.current = false;
+        setBusy(false);
+        setMessage("");
+        current.authChanged(resourceId, Boolean(session));
+      });
+      unsubscribe = () => data.subscription.unsubscribe();
+    }).catch(() => { if (!disposed) current.clear({ kind: "unavailable" }); });
+    return () => {
+      disposed = true;
+      identityEpoch.current++;
+      unsubscribe?.();
+      current.dispose();
+      loader.current = null;
+    };
+  }, [resourceId]);
 
   async function portal() {
     if (pending.current) return;
+    const epoch = identityEpoch.current;
     pending.current = true;
     setBusy(true);
     setMessage("");
@@ -158,13 +185,16 @@ export function CommunityPlatformBilling({ resourceId = null }: { resourceId?: s
       // A manual retry reuses the same ID for the same target. No auto-retry.
       if (!request.current || request.current.resourceId !== resourceId) request.current = { resourceId, id: crypto.randomUUID() };
       const result = await openCommunityPlatformPortal(state, request.current.id, transport);
+      if (identityEpoch.current !== epoch) return;
       if (result.ok) window.location.assign(result.redirectUrl);
       else {
         setMessage(result.message);
-        if (result.authRequired) setState({ kind: "auth_required" });
+        if (result.authRequired) loader.current?.clear({ kind: "auth_required" });
         else await refresh();
       }
-    } finally { pending.current = false; setBusy(false); }
+    } finally {
+      if (identityEpoch.current === epoch) { pending.current = false; setBusy(false); }
+    }
   }
 
   return <CommunityPlatformBillingView state={state} resourceId={resourceId} busy={busy || state.kind === "loading"} message={message} onRefresh={() => void refresh()} onPortal={() => void portal()} />;

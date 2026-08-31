@@ -34,6 +34,7 @@ function load(relativePath) {
   return module.exports;
 }
 const model = load("lib/community/platform-billing.ts");
+const { createCommunityPlatformStatusLoader } = load("lib/community/platform-billing-loader.ts");
 const plans = load("lib/community/platform-plans.ts");
 const { CommunityPlatformBillingView } = load("components/community/CommunityPlatformBilling.tsx");
 const resource = "ad000001-0000-4000-8000-000000000001";
@@ -48,6 +49,79 @@ const dto = (patch = {}) => ({ version: 0, product: "community_platform", resour
 const state = (patch = {}) => ({ kind: "loaded", data: dto(patch) });
 const response = (raw, status = 200) => new Response(JSON.stringify(raw), { status, headers: { "Content-Type": "application/json" } });
 const transport = (fetcher, token = "fixture-token-not-valid") => ({ getAccessToken: async () => token, fetch: fetcher });
+const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
+const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
+
+await checkAsync("resource switch aborts and clears; late old response cannot overwrite", async () => {
+  const first = deferred(); const shown = []; let firstSignal;
+  const loader = createCommunityPlatformStatusLoader(transport(async (url, init) => {
+    if (url.includes(resource)) { firstSignal = init.signal; return first.promise; }
+    return response(dto({ resourceId: other }));
+  }), value => shown.push(value));
+  const a = loader.load(resource); await flush();
+  const b = loader.load(other);
+  assert.equal(firstSignal.aborted, true); assert.equal(shown.at(-1).kind, "loading");
+  await b; assert.equal(shown.at(-1).data.resourceId, other);
+  first.resolve(response(dto())); await a;
+  assert.equal(shown.at(-1).data.resourceId, other); loader.dispose();
+});
+await checkAsync("auth signout clears loaded contract synchronously and does not fetch", async () => {
+  const shown = []; let calls = 0;
+  const loader = createCommunityPlatformStatusLoader(transport(async () => { calls++; return response(dto()); }), value => shown.push(value));
+  await loader.load(resource); assert.equal(shown.at(-1).kind, "loaded");
+  loader.authChanged(resource, false);
+  assert.equal(shown.at(-1).kind, "auth_required"); assert.equal(shown.at(-1).data, undefined);
+  await flush(); assert.equal(calls, 1); loader.dispose();
+});
+await checkAsync("auth change aborts old request; deferred reload uses new token; late result ignored", async () => {
+  const old = deferred(); const shown = []; const scheduled = []; const tokens = []; let token = "fake-a"; let signal;
+  const loader = createCommunityPlatformStatusLoader({ getAccessToken: async () => token, fetch: async (_url, init) => {
+    tokens.push(init.headers.Authorization);
+    if (tokens.length === 1) { signal = init.signal; return old.promise; }
+    return response(dto({ subscription: null, allowedActions: [] }));
+  } }, value => shown.push(value), fn => scheduled.push(fn));
+  const a = loader.load(resource); await flush(); token = "fake-b";
+  loader.authChanged(resource, true);
+  assert.equal(signal.aborted, true); assert.equal(shown.at(-1).kind, "loading"); assert.equal(tokens.length, 1);
+  scheduled.shift()(); await flush();
+  old.resolve(response(dto())); await a; await flush();
+  assert.deepEqual(tokens, ["Bearer fake-a", "Bearer fake-b"]);
+  assert.equal(shown.at(-1).data.subscription, null); loader.dispose();
+});
+await checkAsync("signout cancels queued auth reload and late GET", async () => {
+  const old = deferred(); const shown = []; const scheduled = []; let calls = 0;
+  const loader = createCommunityPlatformStatusLoader(transport(async () => { calls++; return old.promise; }), value => shown.push(value), fn => scheduled.push(fn));
+  const a = loader.load(resource); await flush();
+  loader.authChanged(resource, true); loader.authChanged(resource, false);
+  scheduled.shift()(); old.resolve(response(dto())); await a;
+  assert.equal(calls, 1); assert.equal(shown.at(-1).kind, "auth_required"); loader.dispose();
+});
+await checkAsync("abort while token pending prevents fetch", async () => {
+  const token = deferred(); const controller = new AbortController(); let calls = 0;
+  const result = model.loadCommunityPlatformStatus(resource, { getAccessToken: () => token.promise, fetch: () => { calls++; assert.fail(); } }, controller.signal);
+  controller.abort(); token.resolve("fake-old-token"); await result;
+  assert.equal(calls, 0);
+});
+await checkAsync("already aborted does not even acquire token", async () => {
+  const controller = new AbortController(); controller.abort();
+  await model.loadCommunityPlatformStatus(resource, { getAccessToken: () => assert.fail(), fetch: () => assert.fail() }, controller.signal);
+});
+await checkAsync("failed refresh discards old contract and raw error", async () => {
+  const shown = []; let calls = 0;
+  const loader = createCommunityPlatformStatusLoader(transport(async () => { if (++calls === 1) return response(dto()); throw Error("secret-details"); }), value => shown.push(value));
+  await loader.load(resource); const refresh = loader.load(resource);
+  assert.equal(shown.at(-1).kind, "loading"); await refresh;
+  assert.equal(shown.at(-1).kind, "error"); assert.equal(shown.at(-1).data, undefined);
+  assert.ok(!JSON.stringify(shown.at(-1)).includes("secret-details")); loader.dispose();
+});
+await checkAsync("unmount aborts and suppresses late results and queued auth", async () => {
+  const old = deferred(); const shown = []; const scheduled = []; let calls = 0; let signal;
+  const loader = createCommunityPlatformStatusLoader(transport(async (_url, init) => { calls++; signal = init.signal; return old.promise; }), value => shown.push(value), fn => scheduled.push(fn));
+  const a = loader.load(resource); await flush(); loader.authChanged(resource, true);
+  loader.dispose(); const count = shown.length; scheduled.shift()();
+  old.resolve(response(dto())); await a; await loader.load(other);
+  assert.equal(signal.aborted, true); assert.equal(shown.length, count); assert.equal(calls, 1);
+});
 
 check("approved pricing unchanged", () => assert.deepEqual(JSON.parse(JSON.stringify(plans.COMMUNITY_PLATFORM_PLANS.map(p => [p.key, p.monthlyAmountYen, p.memberLimit, p.trialDays]))), [
   ["trial", 0, 10, 30], ["starter", 2980, 50, null], ["standard", 4980, 200, null], ["pro", 9800, 1000, null], ["enterprise", null, null, null]
@@ -207,5 +281,9 @@ check("source boundaries", () => {
   assert.doesNotMatch(adapter, /\/api\/billing\/platform\/checkout["']/);
   assert.match(view, /pending\.current/); assert.match(view, /request\.current\.id/);
   assert.match(view, /getSession\(\)/); assert.doesNotMatch(view, /console\./);
+  assert.match(view, /onAuthStateChange/); assert.match(view, /subscription\.unsubscribe\(\)/);
+  assert.match(view, /key=\{resourceId \?\? "new"\}/);
+  assert.match(view, /identityEpoch\.current !== epoch/);
+  assert.match(view, /if \(principal\.current !== nextPrincipal\) request\.current = null/);
 });
 console.log(`community-platform-billing-check: ${checks} checks passed (fixture-only; no auth/DB/provider network)`);

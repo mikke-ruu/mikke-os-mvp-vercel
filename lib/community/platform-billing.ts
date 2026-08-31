@@ -129,7 +129,9 @@ export async function loadCommunityPlatformStatus(
 ): Promise<CommunityPlatformReadState> {
   if (resourceId !== null && !uuidPattern.test(resourceId)) return { kind: "resource_unavailable" };
   try {
+    if (signal?.aborted) return { kind: "error" };
     const token = await transport.getAccessToken();
+    if (signal?.aborted) return { kind: "error" };
     if (!token) return { kind: "auth_required" };
     const query = new URLSearchParams({ product: COMMUNITY_PLATFORM_PRODUCT });
     if (resourceId) query.set("resourceId", resourceId);

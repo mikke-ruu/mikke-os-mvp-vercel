@@ -83,3 +83,16 @@
 - カード先登録/開始起点/期限後機能/請求日/解約返金保持は引き続き未決。機能停止・データ削除・自動有料移行は追加しない。
 - 境界前/境界時/境界後、期限不明、既存有料契約不変、期限後status取得GETのみ、SSR文言の負試験を追加。本番操作なし。
 - 追補検証：fixture/SSRテスト94件成功、全体 `npm run lint` exit 0、`git diff --check` 成功。今回の文言追補について実ブラウザ/production buildは再実行していない。
+
+## 9/1追補：本人・resource切替時の旧契約破棄
+
+- 統制の専用worktreeにある共通 `lib/billing/platform/contracts.ts` / `http.ts` を読取照合。共有API/型/providerのコピーやstubは追加しない。
+- `lib/community/platform-billing-loader.ts` を新設。再読取・認証変更時は先に旧表示を破棄し、AbortControllerと世代番号で遅延レスポンスを遮断する。通信側がabortを無視しても旧契約を復元しない。
+- resourceをReact keyにして変更前の画面状態を再利用しない。Supabase認証イベントを購読し、本人切替/ログアウトで契約・メッセージを破棄。後続のGETは認証callback外へ延期する。
+- token取得前と取得直後にabortを検査。token待ち中にログアウトしても古いtokenでfetchを開始しない。unmount時は購読解除・abort・遅延publish拒否。
+- Portal応答も認証世代が変わったらredirect/表示更新を無視する。本人に権利を与える判断は引き続きserverだけで行う。
+- 追加8件は実loader/adapterと偽transportで検査（resource切替、本人切替、ログアウト、queued読取取消、token待ちabort、事前abort、失敗時破棄、unmount）。既存試験と合わせ102件成功、全体型検査成功。
+- Supabase skillの認証境界に従いcallbackを同期化し購読解除を追加。参考: https://supabase.com/docs/reference/javascript/auth-onauthstatechange 。実Auth・DB問い合わせは今回禁止のため偽transportで検証。
+- production buildはenvなしで1回のみ実施し結果を別記する。認証情報/DB/Stripe実通信、push/PR/deploy、本番変更は行わない。Checkout/Trial/作成ボタン無効、自動課金なし、通常会員/Academy権利不変を維持。
+- build結果: `npm run build -- --webpack` を1回実施。compile成功（3.3分）・build内TypeScript成功（2.5分）後、既存 `/community` と `/academy/classes` 等のprerenderで `Supabase environment variables are missing.`、exit 1。環境不足で未完走であり、本番build成功とは扱わない。envコピー/仮credential追加/再buildは行わない。
+- build後の最終差分確認で、同一本人のtoken更新ではPortalの手動retry requestIdを維持するよう補正し、失敗メッセージを再読取で消さないようにした。最終版は102件成功、全体 `npm run lint` exit 0で再検証済み。上記compile結果はこの小補正前の版であり、最終版build成功を意味しない。
