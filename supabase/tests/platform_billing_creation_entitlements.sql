@@ -142,6 +142,20 @@ select pg_temp.creation_assert(
   )->>'state' = 'available',
   'status projects available'
 );
+
+reset role;
+select set_config(
+  'test.creation_starts_at',
+  (select starts_at::text from platform_billing_private.creation_entitlements limit 1),
+  true
+);
+select set_config(
+  'test.creation_expires_at',
+  (select expires_at::text from platform_billing_private.creation_entitlements limit 1),
+  true
+);
+set local role service_role;
+
 select pg_temp.creation_assert(
   public.platform_billing_creation_entitlement_grant(
     'a9020000-0000-4000-8000-000000000001',
@@ -149,8 +163,8 @@ select pg_temp.creation_assert(
     'starter',
     'verified_trial',
     'b9020000-0000-4000-8000-000000000001',
-    (select starts_at from platform_billing_private.creation_entitlements limit 1),
-    (select expires_at from platform_billing_private.creation_entitlements limit 1),
+    current_setting('test.creation_starts_at')::timestamptz,
+    current_setting('test.creation_expires_at')::timestamptz,
     'c9020000-0000-4000-8000-000000000001'
   )->'created' = 'false'::jsonb,
   'same grant idempotent'
@@ -159,8 +173,8 @@ select pg_temp.creation_denied(
   $q$select public.platform_billing_creation_entitlement_grant(
     'a9020000-0000-4000-8000-000000000001', 'community_platform', 'standard',
     'verified_trial', 'b9020000-0000-4000-8000-000000000001',
-    (select starts_at from platform_billing_private.creation_entitlements limit 1),
-    (select expires_at from platform_billing_private.creation_entitlements limit 1),
+    current_setting('test.creation_starts_at')::timestamptz,
+    current_setting('test.creation_expires_at')::timestamptz,
     'c9020000-0000-4000-8000-000000000001'
   )$q$,
   '23505',
