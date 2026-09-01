@@ -417,7 +417,7 @@ export async function listMyManagedCommunities(client: DbClient, userId: string)
 export async function createCommunity(client: DbClient, userId: string, input: { name: string; slug: string; description: string; displayName: string }): Promise<Community> {
   if (!userId) throw new Error("ログインが必要です。");
   assertMikkeNameIsNotReserved({ slug: input.slug, displayName: input.name, label: "Community名またはURL用ID" });
-  const { data, error } = await client.rpc("community_create", {
+  const { data, error } = await client.rpc("community_create_with_platform_entitlement", {
     p_name: input.name.trim(),
     p_slug: input.slug.trim().toLowerCase(),
     p_description: input.description.trim() || null,

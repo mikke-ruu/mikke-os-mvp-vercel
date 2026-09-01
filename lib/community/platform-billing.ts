@@ -1,4 +1,8 @@
 import { getCommunityPlatformPlan } from "./platform-plans";
+import {
+  UUID_PATTERN, decodePlatformStatus, hasExactKeys, isPlatformRedirect, isRecord,
+  type PlatformAction, type PlatformStatusV0
+} from "../billing/platform/contracts";
 
 // Community projection of the control room's platform billing UI contract v0.
 // No provider, DB, membership, Academy entitlement or authorization logic here.
@@ -13,23 +17,8 @@ export const COMMUNITY_PLATFORM_TRIAL_POLICY = Object.freeze({
   notice: "30日間のお試しが終わっても、自動課金・有料プランへの自動移行はありません。本人が有料プランを申し込んだ時に課金が始まります。",
   pendingNotice: "お試しの開始手続きや、終了後に使える機能などは準備中です。"
 } as const);
-export type CommunityPlatformSubscriptionState = "pending" | "trialing" | "active" | "past_due" | "ended";
-export type CommunityPlatformAction = "checkout" | "portal" | "create_resource";
-export type CommunityPlatformStatusV0 = {
-  version: 0;
-  product: typeof COMMUNITY_PLATFORM_PRODUCT;
-  resourceId: string | null;
-  availability: "ready" | "not_configured" | "policy_pending";
-  subscription: null | {
-    state: CommunityPlatformSubscriptionState;
-    planKey: string;
-    currentPeriodEndsAt: string | null;
-    cancelAtPeriodEnd: boolean;
-  };
-  creation: { state: "none" | "pending" | "available" | "consumed" };
-  allowedActions: CommunityPlatformAction[];
-  noticeCode: string | null;
-};
+export type CommunityPlatformAction = PlatformAction;
+export type CommunityPlatformStatusV0 = Omit<PlatformStatusV0, "product"> & { product: typeof COMMUNITY_PLATFORM_PRODUCT };
 export type CommunityPlatformReadState =
   | { kind: "loading" | "unavailable" | "policy_pending" | "auth_required" | "resource_unavailable" | "error" }
   | { kind: "loaded"; data: CommunityPlatformStatusV0 };
@@ -43,29 +32,15 @@ export const COMMUNITY_PLATFORM_MESSAGES = {
   error: "契約状態を取得できませんでした。時間をおいて再確認してください。"
 } as const;
 
-const subscriptionStates = ["pending", "trialing", "active", "past_due", "ended"];
-const actions = ["checkout", "portal", "create_resource"];
-const safeNoticeCodes = ["AUTH_REQUIRED", "RESOURCE_UNAVAILABLE", "STATE_CONFLICT", "INVALID_REQUEST", "BILLING_NOT_CONFIGURED", "POLICY_PENDING"];
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-const hasKeys = (value: Record<string, unknown>, keys: string[]) => Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
-const isIsoDate = (value: unknown) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value));
+const uuidPattern = UUID_PATTERN;
+const record = isRecord;
+const hasKeys = hasExactKeys;
 
 export function decodeCommunityPlatformStatus(raw: unknown, resourceId: string | null): CommunityPlatformStatusV0 | null {
   if (resourceId !== null && !uuidPattern.test(resourceId)) return null;
-  if (!record(raw) || !hasKeys(raw, ["version", "product", "resourceId", "availability", "subscription", "creation", "allowedActions", "noticeCode"])) return null;
-  if (raw.version !== 0 || raw.product !== COMMUNITY_PLATFORM_PRODUCT || raw.resourceId !== resourceId) return null;
-  if (typeof raw.availability !== "string" || !["ready", "not_configured", "policy_pending"].includes(raw.availability)) return null;
-  if (!record(raw.creation) || !hasKeys(raw.creation, ["state"]) || typeof raw.creation.state !== "string" || !["none", "pending", "available", "consumed"].includes(raw.creation.state)) return null;
-  if (!Array.isArray(raw.allowedActions) || raw.allowedActions.some((action) => typeof action !== "string" || !actions.includes(action)) || new Set(raw.allowedActions).size !== raw.allowedActions.length) return null;
-  if (raw.noticeCode !== null && (typeof raw.noticeCode !== "string" || !safeNoticeCodes.includes(raw.noticeCode))) return null;
-  if (raw.subscription !== null) {
-    const sub = raw.subscription;
-    if (!record(sub) || !hasKeys(sub, ["state", "planKey", "currentPeriodEndsAt", "cancelAtPeriodEnd"])) return null;
-    if (typeof sub.state !== "string" || !subscriptionStates.includes(sub.state) || !getCommunityPlatformPlan(sub.planKey) || typeof sub.cancelAtPeriodEnd !== "boolean") return null;
-    if (sub.currentPeriodEndsAt !== null && !isIsoDate(sub.currentPeriodEndsAt)) return null;
-  }
-  return raw as CommunityPlatformStatusV0;
+  const decoded = decodePlatformStatus(raw, { product: COMMUNITY_PLATFORM_PRODUCT, resourceId });
+  if (!decoded || (decoded.subscription && !getCommunityPlatformPlan(decoded.subscription.planKey))) return null;
+  return decoded as CommunityPlatformStatusV0;
 }
 
 export function communityPlatformStatusLabel(status: unknown): string {
@@ -145,12 +120,7 @@ export async function loadCommunityPlatformStatus(
 }
 
 export function isCommunityPlatformProviderUrl(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" && !url.username && !url.password && !url.port
-      && ["billing.stripe.com", "checkout.stripe.com"].includes(url.hostname);
-  } catch { return false; }
+  return isPlatformRedirect(value, "portal");
 }
 
 export async function openCommunityPlatformPortal(

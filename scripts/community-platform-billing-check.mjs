@@ -44,7 +44,7 @@ let checks = 0;
 function check(name, fn) { fn(); checks++; }
 async function checkAsync(name, fn) { await fn(); checks++; }
 const dto = (patch = {}) => ({ version: 0, product: "community_platform", resourceId: resource, availability: "ready",
-  subscription: { state: "active", planKey: "starter", currentPeriodEndsAt: "2026-10-01T00:00:00Z", cancelAtPeriodEnd: false },
+  subscription: { state: "active", planKey: "starter", currentPeriodEndsAt: "2026-10-01T00:00:00.000Z", cancelAtPeriodEnd: false },
   creation: { state: "consumed" }, allowedActions: ["portal"], noticeCode: null, ...patch });
 const state = (patch = {}) => ({ kind: "loaded", data: dto(patch) });
 const response = (raw, status = 200) => new Response(JSON.stringify(raw), { status, headers: { "Content-Type": "application/json" } });
@@ -136,7 +136,7 @@ check("approved trial policy is narrow and immutable", () => {
   assert.equal(policy.postTrialCapabilities, "policy_pending");
   assert.throws(() => { policy.automaticBillingAtTrialEnd = true; });
 });
-const trialBoundary = Date.parse("2026-09-01T00:00:00Z");
+const trialBoundary = Date.parse("2026-09-01T00:00:00.000Z");
 for (const offset of [-1, 0, 1]) check("deadline never synthesizes active or rights", () => {
   const raw = dto({ subscription: { state: "trialing", planKey: "trial", currentPeriodEndsAt: new Date(trialBoundary + offset).toISOString(), cancelAtPeriodEnd: false }, allowedActions: [], creation: { state: "none" } });
   const before = JSON.stringify(raw);
@@ -154,12 +154,12 @@ for (const ends of [null, "invalid"]) check("unknown trial end is not paid or un
   assert.equal(model.communityPlatformTrialPeriodNotice({ ...dto().subscription, planKey: "trial", state: "trialing", currentPeriodEndsAt: ends }, trialBoundary), null);
 });
 check("paid subscriptions are not changed by trial expiry notice", () => {
-  const sub = Object.freeze({ ...dto().subscription, currentPeriodEndsAt: "2000-01-01T00:00:00Z" });
+  const sub = Object.freeze({ ...dto().subscription, currentPeriodEndsAt: "2000-01-01T00:00:00.000Z" });
   assert.equal(model.communityPlatformTrialPeriodNotice(sub, trialBoundary), null);
   assert.equal(sub.state, "active");
 });
 await checkAsync("expired trial status refresh only reads; no checkout or transition", async () => {
-  const raw = dto({ subscription: { ...dto().subscription, planKey: "trial", state: "trialing", currentPeriodEndsAt: "2000-01-01T00:00:00Z" }, allowedActions: [], creation: { state: "none" } });
+  const raw = dto({ subscription: { ...dto().subscription, planKey: "trial", state: "trialing", currentPeriodEndsAt: "2000-01-01T00:00:00.000Z" }, allowedActions: [], creation: { state: "none" } });
   let calls = 0;
   const result = await model.loadCommunityPlatformStatus(resource, transport(async (url, init) => {
     calls++;
@@ -174,7 +174,7 @@ await checkAsync("expired trial status refresh only reads; no checkout or transi
   assert.equal(result.data.creation.state, "none");
 });
 check("expired trial renders explicit consent policy, not paid success or restrictions", () => {
-  const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ subscription: { ...dto().subscription, planKey: "trial", state: "trialing", currentPeriodEndsAt: "2000-01-01T00:00:00Z" } }) }));
+  const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ subscription: { ...dto().subscription, planKey: "trial", state: "trialing", currentPeriodEndsAt: "2000-01-01T00:00:00.000Z" } }) }));
   assert.ok(html.includes(model.COMMUNITY_PLATFORM_TRIAL_POLICY.notice));
   assert.ok(html.includes("最新の契約状態を再確認"));
   assert.ok(html.includes("お試しの契約状態を再確認してください"));
@@ -262,9 +262,13 @@ for (const kind of ["unavailable", "auth_required", "error", "policy_pending"]) 
   assert.ok(!html.includes('href="/community/create"')); assert.ok(!html.includes("決済が完了しました"));
   assert.ok(html.includes("2,980")); assert.ok(html.includes("税込"));
 });
-check("UI keeps creation disabled despite readiness until backend guard", () => {
+check("UI links to guarded create only after authoritative readiness", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ resourceId: null, creation: { state: "available" }, allowedActions: ["create_resource"] }) }));
-  assert.ok(html.includes("Community作成への接続は準備中")); assert.ok(!html.includes('href="/community/create"'));
+  assert.ok(html.includes("1回だけ安全に消費")); assert.ok(html.includes('href="/community/create"'));
+});
+check("shared decoder rejects noncanonical dates and unsafe actions", () => {
+  assert.equal(model.decodeCommunityPlatformStatus(dto({ subscription: { ...dto().subscription, currentPeriodEndsAt: "2026-10-01T00:00:00Z" } }), resource), null);
+  assert.equal(model.decodeCommunityPlatformStatus(dto({ availability: "not_configured", allowedActions: ["create_resource"] }), resource), null);
 });
 check("null period not unlimited or zero", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ subscription: { ...dto().subscription, currentPeriodEndsAt: null } }) }));
@@ -277,13 +281,21 @@ check("queries cannot mark checkout paid", () => {
 check("source boundaries", () => {
   const adapter = readFileSync("lib/community/platform-billing.ts", "utf8");
   const view = readFileSync("components/community/CommunityPlatformBilling.tsx", "utf8");
-  assert.doesNotMatch(adapter + view, /localStorage|service_role|STRIPE_SECRET|\.rpc\(|\.from\(/);
+  const browserTransport = readFileSync("lib/community/platform-billing-browser.ts", "utf8");
+  assert.doesNotMatch(adapter + view + browserTransport, /localStorage|service_role|STRIPE_SECRET|\.rpc\(|\.from\(/);
   assert.doesNotMatch(adapter, /\/api\/billing\/platform\/checkout["']/);
   assert.match(view, /pending\.current/); assert.match(view, /request\.current\.id/);
-  assert.match(view, /getSession\(\)/); assert.doesNotMatch(view, /console\./);
+  assert.match(browserTransport, /getSession\(\)/); assert.doesNotMatch(view + browserTransport, /console\./);
   assert.match(view, /onAuthStateChange/); assert.match(view, /subscription\.unsubscribe\(\)/);
   assert.match(view, /key=\{resourceId \?\? "new"\}/);
   assert.match(view, /identityEpoch\.current !== epoch/);
   assert.match(view, /if \(principal\.current !== nextPrincipal\) request\.current = null/);
+  const hub = readFileSync("components/community/CommunityHub.tsx", "utf8");
+  const client = readFileSync("lib/community/client.ts", "utf8");
+  const migration = readFileSync("supabase/migrations/20260901130000_community_guarded_platform_creation.sql", "utf8");
+  assert.match(hub, /communityPlatformActionBlock\(platformState, "create_resource"\)/);
+  assert.match(client, /rpc\("community_create_with_platform_entitlement"/);
+  assert.doesNotMatch(client, /rpc\("community_create"/);
+  assert.match(migration, /revoke all on function public\.community_create\(text,text,text,text\)[\s\S]*from authenticated/);
 });
 console.log(`community-platform-billing-check: ${checks} checks passed (fixture-only; no auth/DB/provider network)`);

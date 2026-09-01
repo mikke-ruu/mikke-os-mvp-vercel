@@ -6,21 +6,11 @@ import { ArrowLeft, ArrowRight, CreditCard, RefreshCw, ShieldCheck } from "lucid
 import {
   COMMUNITY_PLATFORM_MESSAGES, COMMUNITY_PLATFORM_TRIAL_POLICY, communityPlatformActionBlock, communityPlatformLoginHref,
   communityPlatformStatusLabel, communityPlatformTrialPeriodNotice, openCommunityPlatformPortal,
-  type CommunityBillingTransport, type CommunityPlatformReadState
+  type CommunityPlatformReadState
 } from "@/lib/community/platform-billing";
 import { COMMUNITY_PLATFORM_PLANS, communityPlatformPriceLabel, getCommunityPlatformPlan, type CommunityPlatformPlanKey } from "@/lib/community/platform-plans";
 import { createCommunityPlatformStatusLoader } from "@/lib/community/platform-billing-loader";
-
-const transport: CommunityBillingTransport = {
-  async getAccessToken() {
-    // Session is only used to transport the token; the billing server verifies
-    // the actual user, anonymous status and billing ownership on every request.
-    const { supabase } = await import("@/lib/supabase/client");
-    const { data, error } = await supabase.auth.getSession();
-    return error ? null : data.session?.access_token ?? null;
-  },
-  fetch: (input, init) => fetch(input, init)
-};
+import { communityPlatformBrowserTransport as transport } from "@/lib/community/platform-billing-browser";
 
 const panel = "rounded-[var(--mikke-radius-card)] border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 sm:p-5";
 const button = "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[var(--mikke-line)] px-4 py-2.5 text-sm font-bold text-[var(--mikke-primary)] disabled:cursor-not-allowed disabled:opacity-50";
@@ -89,11 +79,10 @@ export function CommunityPlatformBillingView({
           </div>
           <p id="community-portal-note" className="mt-2 text-xs leading-6 text-[var(--mikke-muted)]">{portalBlock ?? "請求情報の確認画面へ進みます。プラン変更・解約の受付条件は契約管理画面で確認してください。"}</p>
           {data?.creation.state === "pending" || subscription?.state === "pending" ? <p className="mt-3 text-sm font-bold">決済・利用開始を確認中です。重複して申し込まず、状態を再確認してください。</p> : null}
-          {!createBlock ? <p className="mt-3 text-sm">利用開始の権利を確認しました。Community作成への接続は準備中です。</p> : null}
-          {/* The old /community/create endpoint has no billing consume guard yet.
-              Do not link to it until the common backend gate is implemented. */}
-          <button type="button" disabled className={`${button} mt-3`} aria-describedby="community-create-note">Communityを作成</button>
-          <p id="community-create-note" className="mt-2 text-xs leading-6 text-[var(--mikke-muted)]">{createBlock ?? "契約を確認してから作成する手続きは準備中です。"}</p>
+          {!createBlock ? <p className="mt-3 text-sm">利用開始の権利を確認しました。作成時に1回だけ安全に消費します。</p> : null}
+          {!createBlock ? <Link href="/community/create" className={`${button} mt-3`} aria-describedby="community-create-note">Communityを作成</Link>
+            : <button type="button" disabled className={`${button} mt-3`} aria-describedby="community-create-note">Communityを作成</button>}
+          <p id="community-create-note" className="mt-2 text-xs leading-6 text-[var(--mikke-muted)]">{createBlock ?? "契約の作成権をサーバーで再確認してから作成します。"}</p>
         </section>
 
         <section aria-labelledby="community-plans-title">
