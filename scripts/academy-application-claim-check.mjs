@@ -11,6 +11,7 @@ const graduate = readFileSync(join(root, "lib/academy/graduate.ts"), "utf8");
 const claimPage = readFileSync(join(root, "app/academy/claim/[applicationId]/page.tsx"), "utf8");
 const intake = readFileSync(join(root, "supabase/functions/academy-application-intake/index.ts"), "utf8");
 const dashboard = readFileSync(join(root, "app/academy/page.tsx"), "utf8");
+const launchProgress = readFileSync(join(root, "lib/academy/launch-progress.ts"), "utf8");
 
 const required = [
   [migration, "email_confirmed_at is not null"],
@@ -22,7 +23,8 @@ const required = [
   [graduate, 'supabase.rpc("academy_claim_my_application"'],
   [claimPage, "マイポータルにつなぎました"],
   [intake, "/academy/claim/"],
-  [dashboard, 'href: "/academy/front"']
+  [dashboard, "getAcademyLaunchProgress"],
+  [launchProgress, 'href: "/academy/front"']
 ];
 
 for (const [source, needle] of required) {
