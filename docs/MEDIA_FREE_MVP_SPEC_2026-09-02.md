@@ -67,12 +67,24 @@ preflight, retention/hold behavior, and versioned consent evidence are implement
 Free prohibits affiliate and sponsored content until a separate disclosure and link
 contract is approved. Paid articles and automated affiliate behavior are later gates.
 
-## Next gate: replay and client connection
+## Isolated database verification
 
-- Replay the proposed migration against a disposable local database and run RLS, grant, and concurrency tests.
-- Cover two human users plus an anonymous Auth session, direct state-column writes, published-slug races, foreign assets, unsafe blocks, draft leakage, republish/unpublish, and zero residue.
-- Connect the client to the reviewed tables and RPCs, replacing localStorage only after the local contract passes.
+- Replayed the authenticated schema-only baseline with SHA-256 `521BF5A61EB8FE572011526FAA469A679328F581E3BC291191AEF18379C97299`.
+- Ran the Media migration and negative SQL contract in PostgreSQL 17.6 with network disabled, no published ports, and a tmpfs data directory.
+- Verified anonymous Auth rejection, two-owner isolation, direct publish-column denial, immutable versions, stable published slugs, foreign-asset rejection, unsafe-block rejection, draft non-disclosure, and public projection.
+- The transaction rolled back and a separate connection found zero changes across schemas, relations, columns, functions, constraints, indexes, policies, triggers, auth fixtures, and migration history.
+- Two concurrent publish connections serialized on the site lock. They produced versions 1 and 2, two publication receipts, and one valid current version.
+- The named container and its anonymous volume were removed after the run. Production and Preview databases were not used.
+
+## Next gate: authenticated client connection
+
+- The first database adapter now calls the authoritative create/publish/unpublish RPCs and owner-scoped site read without accepting a client owner ID.
+- The Free adapter lists only `direct_owner` sites; `managed_brand` Media such as JLT stay behind their later role and approval adapter.
+- A Media slug becomes immutable after the first successful publication so canonical links remain stable even after unpublish.
+- Wire that adapter into the management UI only after the migration exists in the selected non-production environment.
+- Do not import, merge, or promote `mikke.media.free.v1`; it remains a separate local prototype.
 - Connect Mikke Media usage records without weakening asset ownership.
+- Add the approved Media terms, privacy, prohibited-content, report/takedown, retention, and publication preflight UI before any general-public route is enabled.
 - Add server metadata, canonical URLs, sitemap entries, and Article structured data from the published version.
 - Test RLS, grants, authenticated ownership, anonymous reads, draft non-disclosure, and update/publish races separately.
 

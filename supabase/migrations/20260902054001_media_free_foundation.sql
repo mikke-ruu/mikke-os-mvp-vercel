@@ -177,8 +177,24 @@ $$;
 create trigger media_article_versions_immutable before update or delete on public.media_article_versions
 for each row execute function private.media_reject_version_mutation();
 
+create or replace function private.media_reject_published_site_slug_change()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.slug is distinct from old.slug and exists (
+    select 1 from public.media_publication_outbox o
+    where o.site_id = old.id and o.event_type = 'published'
+  ) then
+    raise exception 'MEDIA_PUBLISHED_SITE_SLUG_IMMUTABLE';
+  end if;
+  return new;
+end;
+$$;
+create trigger media_sites_published_slug_immutable before update of slug on public.media_sites
+for each row execute function private.media_reject_published_site_slug_change();
+
 revoke execute on function private.media_is_human_user(), private.media_safe_url(text),
-  private.media_blocks_are_safe(jsonb,uuid), private.media_reject_version_mutation()
+  private.media_blocks_are_safe(jsonb,uuid), private.media_reject_version_mutation(),
+  private.media_reject_published_site_slug_change()
   from public,anon,authenticated;
 grant execute on function private.media_is_human_user() to authenticated;
 
@@ -197,7 +213,6 @@ revoke all on table public.media_sites, public.media_categories, public.media_ar
   public.media_terms_acceptances, public.media_article_publication_attestations,
   public.media_publication_outbox from anon, authenticated;
 grant select on public.media_sites, public.media_categories, public.media_articles, public.media_article_versions to authenticated;
-grant insert (owner_id,name,slug,description,author_name,default_locale) on public.media_sites to authenticated;
 grant update (name,slug,description,author_name,default_locale,updated_at) on public.media_sites to authenticated;
 grant delete on public.media_sites to authenticated;
 grant insert, update, delete on public.media_categories to authenticated;
@@ -207,8 +222,6 @@ grant delete on public.media_articles to authenticated;
 
 create policy "media owners select sites" on public.media_sites for select to authenticated
 using (private.media_is_human_user() and (select auth.uid()) = owner_id);
-create policy "media owners insert sites" on public.media_sites for insert to authenticated
-with check (private.media_is_human_user() and (select auth.uid()) = owner_id);
 create policy "media owners update sites" on public.media_sites for update to authenticated
 using (private.media_is_human_user() and (select auth.uid()) = owner_id)
 with check (private.media_is_human_user() and (select auth.uid()) = owner_id);
@@ -229,6 +242,32 @@ create policy "media owners delete articles" on public.media_articles for delete
 using (private.media_is_human_user() and exists (select 1 from public.media_sites s where s.id = site_id and s.owner_id = (select auth.uid())));
 create policy "media owners select versions" on public.media_article_versions for select to authenticated
 using (private.media_is_human_user() and exists (select 1 from public.media_sites s where s.id = site_id and s.owner_id = (select auth.uid())));
+
+create or replace function public.media_create_site(
+  p_name text, p_slug text, p_description text, p_author_name text, p_default_locale text default 'ja-JP'
+) returns uuid language plpgsql security definer set search_path = '' as $$
+declare
+  v_owner uuid := (select auth.uid());
+  v_site uuid;
+begin
+  if not private.media_is_human_user() then raise exception 'MEDIA_HUMAN_AUTH_REQUIRED'; end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('media-free:' || v_owner::text,0));
+  if exists (select 1 from public.media_sites s where s.owner_id=v_owner and s.publishing_policy='direct_owner') then
+    raise exception 'MEDIA_FREE_SITE_LIMIT_REACHED';
+  end if;
+  insert into public.media_sites(owner_id,name,slug,description,author_name,default_locale,publishing_policy)
+  values (v_owner,btrim(p_name),lower(btrim(p_slug)),coalesce(p_description,''),btrim(p_author_name),
+    coalesce(nullif(btrim(p_default_locale),''),'ja-JP'),'direct_owner')
+  returning id into v_site;
+  insert into public.mikke_app_entitlements(user_id,app_key,status,source,starts_at,ends_at,note,updated_at)
+  values (v_owner,'media','active','media_create',now(),null,'Media creation completed',now())
+  on conflict (user_id,app_key) do update set
+    status='active',source='media_create',
+    starts_at=coalesce(public.mikke_app_entitlements.starts_at,excluded.starts_at),
+    ends_at=null,note=excluded.note,updated_at=now();
+  return v_site;
+end;
+$$;
 
 create or replace function public.media_publish_article(
   p_article_id uuid, p_terms_version text, p_rights_confirmed boolean,
@@ -341,11 +380,13 @@ language sql stable security definer set search_path = '' as $$
     and v.locale=coalesce(p_locale,s.default_locale) limit 1;
 $$;
 
-revoke execute on function public.media_publish_article(uuid,text,boolean,boolean,boolean),
+revoke execute on function public.media_create_site(text,text,text,text,text),
+  public.media_publish_article(uuid,text,boolean,boolean,boolean),
   public.media_unpublish_article(uuid),public.media_public_site(text,text),
   public.media_public_articles(text,text,integer),public.media_public_article(text,text,text)
   from public,anon,authenticated;
-grant execute on function public.media_publish_article(uuid,text,boolean,boolean,boolean),
+grant execute on function public.media_create_site(text,text,text,text,text),
+  public.media_publish_article(uuid,text,boolean,boolean,boolean),
   public.media_unpublish_article(uuid) to authenticated;
 grant execute on function public.media_public_site(text,text),public.media_public_articles(text,text,integer),
   public.media_public_article(text,text,text) to anon,authenticated;

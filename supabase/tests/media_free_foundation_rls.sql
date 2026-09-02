@@ -44,6 +44,12 @@ begin
     raise exception 'MEDIA_ANON_CREATED_SITE';
   exception when insufficient_privilege then null; end;
   begin
+    perform public.media_create_site('Anon','anon-'||v_suffix,'','Anon','ja-JP');
+    raise exception 'MEDIA_ANON_CALLED_CREATE_RPC';
+  exception when others then
+    if sqlerrm <> 'MEDIA_HUMAN_AUTH_REQUIRED' then raise; end if;
+  end;
+  begin
     perform public.media_unpublish_article(v_article);
     raise exception 'MEDIA_ANON_CALLED_OWNER_RPC';
   exception when others then
@@ -54,13 +60,28 @@ begin
   perform set_config('request.jwt.claims',json_build_object('sub',v_owner,'role','authenticated','is_anonymous',false)::text,true);
   perform set_config('request.jwt.claim.sub',v_owner::text,true);
   execute 'set local role authenticated';
-  insert into public.media_sites(id,owner_id,name,slug,author_name,default_locale)
-    values(v_site,v_owner,'Owner Media','owner-'||v_suffix,'Owner','ja-JP');
-  insert into public.media_sites(id,owner_id,name,slug,author_name,default_locale)
-    values(v_second_site,v_owner,'JLT Media','jlt-'||v_suffix,'JLT','en-US');
-  insert into public.media_articles(id,site_id,locale,title,slug,draft_blocks)
-    values(v_article,v_site,'ja-JP','First','first-'||v_suffix,
-      jsonb_build_array(jsonb_build_object('id','p1','type','paragraph','text','hello')));
+  v_site := public.media_create_site('Owner Media','owner-'||v_suffix,'','Owner','ja-JP');
+  select count(*) into v_count from public.mikke_app_entitlements
+    where user_id=v_owner and app_key='media' and status='active' and source='media_create';
+  if v_count <> 1 then raise exception 'MEDIA_CREATE_DID_NOT_MARK_OWNED'; end if;
+  begin
+    perform public.media_create_site('Second Free','second-'||v_suffix,'','Owner','ja-JP');
+    raise exception 'MEDIA_FREE_LIMIT_BYPASSED';
+  exception when others then
+    if sqlerrm <> 'MEDIA_FREE_SITE_LIMIT_REACHED' then raise; end if;
+  end;
+  begin
+    insert into public.media_sites(owner_id,name,slug,author_name) values(v_owner,'Direct','direct-'||v_suffix,'Owner');
+    raise exception 'MEDIA_DIRECT_SITE_INSERT_WORKED';
+  exception when insufficient_privilege then null; end;
+  execute 'reset role';
+  insert into public.media_sites(owner_id,name,slug,author_name,default_locale,publishing_policy)
+    values(v_owner,'JLT Media','jlt-'||v_suffix,'JLT','en-US','managed_brand') returning id into v_second_site;
+  execute 'set local role authenticated';
+  insert into public.media_articles(site_id,locale,title,slug,draft_blocks)
+    values(v_site,'ja-JP','First','first-'||v_suffix,
+      jsonb_build_array(jsonb_build_object('id','p1','type','paragraph','text','hello')))
+    returning id into v_article;
   begin
     execute format('update public.media_articles set status=%L where id=%L','published',v_article);
     raise exception 'MEDIA_DIRECT_STATUS_UPDATE_WORKED';
@@ -72,11 +93,24 @@ begin
   v_version := public.media_publish_article(v_article,'test-terms-v1',true,true,true);
   if v_version is null then raise exception 'MEDIA_PUBLISH_DID_NOT_RETURN_VERSION'; end if;
   begin
+    update public.media_sites set slug='renamed-site-'||v_suffix where id=v_site;
+    raise exception 'MEDIA_PUBLISHED_SITE_SLUG_CHANGED';
+  exception when others then
+    if sqlerrm <> 'MEDIA_PUBLISHED_SITE_SLUG_IMMUTABLE' then raise; end if;
+  end;
+  begin
     update public.media_article_versions set title='mutated' where id=v_version;
-    raise exception 'MEDIA_VERSION_MUTATION_WORKED';
+    raise exception 'MEDIA_CLIENT_VERSION_MUTATION_WORKED';
+  exception when insufficient_privilege then null;
+  end;
+  execute 'reset role';
+  begin
+    update public.media_article_versions set title='mutated' where id=v_version;
+    raise exception 'MEDIA_OWNER_VERSION_MUTATION_WORKED';
   exception when others then
     if sqlerrm <> 'MEDIA_PUBLISHED_VERSION_IMMUTABLE' then raise; end if;
   end;
+  execute 'set local role authenticated';
   update public.media_articles set slug='renamed-'||v_suffix where id=v_article;
   begin
     perform public.media_publish_article(v_article,'test-terms-v1',true,true,true);
@@ -85,9 +119,10 @@ begin
     if sqlerrm <> 'MEDIA_PUBLISHED_SLUG_IMMUTABLE' then raise; end if;
   end;
   update public.media_articles set slug='first-'||v_suffix where id=v_article;
-  insert into public.media_articles(id,site_id,locale,title,slug,draft_blocks)
-    values(v_conflict_article,v_site,'ja-JP','Conflict','conflict-'||v_suffix,
-      jsonb_build_array(jsonb_build_object('id','p2','type','paragraph','text','conflict')));
+  insert into public.media_articles(site_id,locale,title,slug,draft_blocks)
+    values(v_site,'ja-JP','Conflict','conflict-'||v_suffix,
+      jsonb_build_array(jsonb_build_object('id','p2','type','paragraph','text','conflict')))
+    returning id into v_conflict_article;
   update public.media_articles set slug='moved-'||v_suffix where id=v_article;
   update public.media_articles set slug='first-'||v_suffix where id=v_conflict_article;
   begin
@@ -124,9 +159,9 @@ begin
   exception when others then
     if sqlerrm <> 'MEDIA_ARTICLE_NOT_AVAILABLE' then raise; end if;
   end;
-  insert into public.media_sites(owner_id,name,slug,author_name) values(v_other,'Other','other-'||v_suffix,'Other');
-  insert into public.media_articles(id,site_id,locale,title,slug,draft_blocks)
-    select v_other_article,id,'ja-JP','Other article','other-article-'||v_suffix,
+  perform public.media_create_site('Other','other-'||v_suffix,'','Other','ja-JP');
+  insert into public.media_articles(site_id,locale,title,slug,draft_blocks)
+    select id,'ja-JP','Other article','other-article-'||v_suffix,
       jsonb_build_array(jsonb_build_object('id','p3','type','paragraph','text','other'))
     from public.media_sites where owner_id=v_other;
   execute 'reset role';
@@ -137,5 +172,7 @@ begin
   if v_count <> 0 then raise exception 'MEDIA_DRAFT_LEAKED_PUBLICLY'; end if;
 end;
 $$;
+
+select 'media_free_foundation_rls_test_ok';
 
 rollback;
