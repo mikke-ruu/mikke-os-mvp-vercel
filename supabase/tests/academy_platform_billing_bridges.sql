@@ -89,7 +89,10 @@ select pg_temp.academy_bridge_prepare_subscription('ab040000-0000-4000-8000-0000
 select public.academy_create_headquarters_with_platform_entitlement('ab040000-0000-4000-8000-000000000001','Paid Academy');
 select pg_temp.academy_bridge_assert((select count(*)=1 from public.academy_headquarters where owner_user_id='ab040000-0000-4000-8000-000000000001'),'one paid HQ');
 select pg_temp.academy_bridge_assert((select access_kind='paid' and status='active' from public.academy_headquarters_access_states where owner_user_id='ab040000-0000-4000-8000-000000000001'),'paid access created');
+reset role;
 select pg_temp.academy_bridge_assert((select status='consumed' and resource_id=(select id from public.academy_headquarters where owner_user_id='ab040000-0000-4000-8000-000000000001') from platform_billing_private.creation_entitlements where actor_user_id='ab040000-0000-4000-8000-000000000001'),'common entitlement consumed once');
+set local role service_role;
+select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select pg_temp.academy_bridge_denied($q$select public.academy_create_headquarters_with_platform_entitlement('ab040000-0000-4000-8000-000000000001','Second Academy')$q$,'P0002','PLATFORM_BILLING_NOT_FOUND');
 
 insert into public.academy_trial_invitations(owner_user_id,invitation_reference,valid_until)
