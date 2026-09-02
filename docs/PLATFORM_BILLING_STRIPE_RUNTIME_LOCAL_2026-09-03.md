@@ -16,7 +16,7 @@ An explicit paid checkout is required. A free-period ending does not create a Ch
 
 Raw provider payloads, webhook secrets, provider event hashes, Stripe customer IDs, and subscription IDs are not returned to browsers. The database does not record a `paid` state from an unverified or uncertain Checkout attempt.
 
-Academy must call `platform_billing_academy_paid_activation_verify_and_consume(uuid,uuid)` from its owner-authorized paid-activation database wrapper in the same transaction. The service-only function locks and revalidates actor, scope, quote, attempt, verified event, active subscription period, and creation entitlement before binding it to that headquarters. Calling it as a separate HTTP preflight is not an atomic activation contract.
+Academy must call one service-only verifier from its owner-authorized paid-activation database wrapper in the same transaction. New HQ creation uses `platform_billing_academy_new_paid_consume(uuid,uuid)` with a generated, absent HQ id and must insert that owner HQ immediately afterwards. Existing trial upgrade uses `platform_billing_academy_existing_paid_consume(uuid,uuid)`, which also locks and revalidates the existing HQ owner. Both acquire the shared actor/scope/quote/attempt/event/subscription/entitlement chain first. Calling either as a separate HTTP preflight is not an atomic activation contract.
 
 ## Deployment order
 

@@ -52,7 +52,7 @@ const signedInvoice=signed(invoice);assert.equal(verifyStripeEvent(signedInvoice
 assert.throws(()=>readStripeRuntimeConfig({...process.env,PLATFORM_BILLING_STRIPE_MODE:'live',STRIPE_SECRET_KEY:'sk_test_wrong'}),/BILLING_NOT_CONFIGURED/);
 
 const migration=readFileSync(new URL('../supabase/migrations/20260902223651_platform_billing_subscription_runtime.sql',import.meta.url),'utf8');
-for(const phrase of ['platform_billing_verified_subscription_activate','platform_billing_subscription_event_apply','platform_billing_status_get','platform_billing_portal_context','platform_billing_academy_paid_activation_verify_and_consume','invoice_paid','invoice_failed','subscription_state','next_anchored_month'])assert.ok(migration.includes(phrase),phrase);
+for(const phrase of ['platform_billing_verified_subscription_activate','platform_billing_subscription_event_apply','platform_billing_status_get','platform_billing_portal_context','platform_billing_academy_new_paid_consume','platform_billing_academy_existing_paid_consume','invoice_paid','invoice_failed','subscription_state','next_anchored_month'])assert.ok(migration.includes(phrase),phrase);
 assert.match(migration,/create or replace function public\.platform_billing_attempt_mark_ready[\s\S]*\^cs_\(test\|live\)_/);
 const route=readFileSync(new URL('../app/api/billing/platform/webhook/stripe/route.ts',import.meta.url),'utf8');
 assert.match(route,/request\.arrayBuffer\(\)/);assert.match(route,/stripe-signature/);assert.doesNotMatch(route,/console\.|rawBody|customer_email/);

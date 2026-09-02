@@ -423,12 +423,14 @@ begin
     'providerSubscriptionId',v_subscription.provider_subscription_id);
 end $$;
 
--- Called from the Academy-owned paid-activation wrapper in the same database
--- transaction. It binds exactly one verified paid creation entitlement to the
--- existing HQ; a separate HTTP call must not be used as a preflight.
-create function public.platform_billing_academy_paid_activation_verify_and_consume(
+-- Shared implementation. Identify rows without locks, then acquire the stable
+-- common-parent order before any Academy resource lock:
+-- actor -> scope -> quote -> attempt -> verified event -> subscription ->
+-- entitlement -> generated/existing HQ.
+create function platform_billing_private.academy_paid_activation_verify_and_consume(
   p_actor_user_id uuid,
-  p_headquarters_id uuid
+  p_headquarters_id uuid,
+  p_existing_headquarters boolean
 ) returns jsonb language plpgsql security definer set search_path='' as $$
 declare
   v_entitlement platform_billing_private.creation_entitlements%rowtype;
@@ -449,9 +451,6 @@ begin
 
   perform 1 from auth.users where id=p_actor_user_id and coalesce(is_anonymous,false)=false for update;
   if not found then raise exception using errcode='42501',message='PLATFORM_BILLING_FORBIDDEN'; end if;
-  perform 1 from public.academy_headquarters
-  where id=p_headquarters_id and owner_user_id=p_actor_user_id for update;
-  if not found then raise exception using errcode='42501',message='PLATFORM_BILLING_RESOURCE_FORBIDDEN'; end if;
   select entitlement.* into v_entitlement
   from platform_billing_private.creation_entitlements entitlement
   where entitlement.actor_user_id=p_actor_user_id
@@ -492,6 +491,16 @@ begin
     or v_entitlement.status not in ('available','consumed') then
     raise exception using errcode='42501',message='PLATFORM_BILLING_VERIFICATION_FAILED';
   end if;
+  if p_existing_headquarters then
+    perform 1 from public.academy_headquarters
+    where id=p_headquarters_id and owner_user_id=p_actor_user_id for update;
+    if not found then raise exception using errcode='42501',message='PLATFORM_BILLING_RESOURCE_FORBIDDEN'; end if;
+  else
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_headquarters_id::text,0));
+    if exists(select 1 from public.academy_headquarters where id=p_headquarters_id) then
+      raise exception using errcode='23505',message='PLATFORM_BILLING_RESOURCE_ALREADY_EXISTS';
+    end if;
+  end if;
   if v_entitlement.status='available' then
     update platform_billing_private.creation_entitlements set
       status='consumed',resource_id=p_headquarters_id,consumed_at=v_now,updated_at=v_now
@@ -506,19 +515,40 @@ begin
   );
 end $$;
 
+-- Both public wrappers must be invoked inside the Academy-owned activation RPC
+-- transaction. The new-HQ wrapper permits only a generated, currently absent
+-- resource id; the Academy wrapper must insert that owner HQ immediately after
+-- this call so any failure rolls the entitlement binding back too.
+create function public.platform_billing_academy_new_paid_consume(
+  p_actor_user_id uuid,p_generated_headquarters_id uuid
+) returns jsonb language sql security definer set search_path='' as $$
+  select platform_billing_private.academy_paid_activation_verify_and_consume(
+    p_actor_user_id,p_generated_headquarters_id,false)
+$$;
+
+create function public.platform_billing_academy_existing_paid_consume(
+  p_actor_user_id uuid,p_headquarters_id uuid
+) returns jsonb language sql security definer set search_path='' as $$
+  select platform_billing_private.academy_paid_activation_verify_and_consume(
+    p_actor_user_id,p_headquarters_id,true)
+$$;
+
 revoke all on function platform_billing_private.subscription_immutable_guard() from public,anon,authenticated,service_role;
 revoke all on function platform_billing_private.next_anchored_month(timestamptz,timestamptz) from public,anon,authenticated,service_role;
+revoke all on function platform_billing_private.academy_paid_activation_verify_and_consume(uuid,uuid,boolean) from public,anon,authenticated,service_role;
 revoke all on function public.platform_billing_verified_subscription_activate(uuid,text,text,text,text,text,bigint,text,timestamptz) from public,anon,authenticated;
 revoke all on function public.platform_billing_subscription_event_apply(text,text,text,text,text,timestamptz,timestamptz,boolean,timestamptz) from public,anon,authenticated;
 revoke all on function public.platform_billing_status_get(uuid,text,uuid) from public,anon,authenticated;
 revoke all on function public.platform_billing_portal_context(uuid,text,uuid) from public,anon,authenticated;
 revoke all on function public.platform_billing_attempt_mark_ready(uuid,uuid,text,text) from public,anon,authenticated;
-revoke all on function public.platform_billing_academy_paid_activation_verify_and_consume(uuid,uuid) from public,anon,authenticated;
+revoke all on function public.platform_billing_academy_new_paid_consume(uuid,uuid) from public,anon,authenticated;
+revoke all on function public.platform_billing_academy_existing_paid_consume(uuid,uuid) from public,anon,authenticated;
 grant execute on function public.platform_billing_attempt_mark_ready(uuid,uuid,text,text) to service_role;
 grant execute on function public.platform_billing_verified_subscription_activate(uuid,text,text,text,text,text,bigint,text,timestamptz) to service_role;
 grant execute on function public.platform_billing_subscription_event_apply(text,text,text,text,text,timestamptz,timestamptz,boolean,timestamptz) to service_role;
 grant execute on function public.platform_billing_status_get(uuid,text,uuid) to service_role;
 grant execute on function public.platform_billing_portal_context(uuid,text,uuid) to service_role;
-grant execute on function public.platform_billing_academy_paid_activation_verify_and_consume(uuid,uuid) to service_role;
+grant execute on function public.platform_billing_academy_new_paid_consume(uuid,uuid) to service_role;
+grant execute on function public.platform_billing_academy_existing_paid_consume(uuid,uuid) to service_role;
 
 comment on table platform_billing_private.subscriptions is 'Server-only Stripe subscription projection; no raw events, secrets or customer PII.';
