@@ -19,7 +19,7 @@ for (const expected of [
   if (!migration.includes(expected)) throw new Error(`missing class RLS contract: ${expected}`);
 }
 
-for (const expected of ["createAcademyClass", "getCourseProgram", "現在の内容を確定してください", "created_by_user_id: profile.user_id"]) {
+for (const expected of ["createAcademyClass", "resolveAcademyCourseFeaturesForCourse", "features.stepLearning", "program?.id ?? null", "starts_at: input.startsAt || null", "created_by_user_id: profile.user_id"]) {
   if (!library.includes(expected)) throw new Error(`missing class creation contract: ${expected}`);
 }
 
@@ -34,8 +34,33 @@ if (!listPage.includes("/academy/classes/new")) throw new Error("class list must
 if (!shell.includes('href.startsWith("/academy/classes")') || !shell.includes('academy:headquarters:manage')) {
   throw new Error("class management must be hidden from course editors");
 }
-for (const expected of ["日程の決め方", "申込後に個別調整", "開催日程を作成する", "公開講座ページに開催日を表示する連携はこれから追加します"]) {
+for (const expected of ["日程の決め方", "申込後に個別調整", "開催日程を作成する", "申込者と相談して決まった後に入力できます", "ステップ教材を使わないため、そのまま開催日程を作成できます"]) {
   if (!newPage.includes(expected)) throw new Error(`missing class creation UI: ${expected}`);
+}
+
+const optionalProgramMigration = read("supabase/migrations/20260902041651_academy_optional_step_program_classes.sql");
+const optionalProgramTest = read("supabase/tests/academy_optional_step_program_classes_test.sql");
+for (const expected of [
+  "alter column program_id drop not null",
+  "alter column starts_at drop not null",
+  "academy_classes_schedule_start_check",
+  "academy_classes_program_pair_check",
+  "coalesce((course.feature_settings ->> 'stepLearning')::boolean, true) = false",
+  "academy_class_program_required",
+  "academy_class_program_version_mismatch"
+]) {
+  if (!optionalProgramMigration.includes(expected)) throw new Error(`missing optional class contract: ${expected}`);
+}
+
+for (const expected of [
+  "ステップ教材なし講座",
+  "'arranged_after_application', 'in_person', 'open'",
+  "academy_classes_schedule_start_check",
+  "academy_class_program_required",
+  "row-level security policy",
+  "academy_optional_step_program_classes_ok"
+]) {
+  if (!optionalProgramTest.includes(expected)) throw new Error(`missing optional class DB test: ${expected}`);
 }
 
 console.log("Academy class management contract: OK");

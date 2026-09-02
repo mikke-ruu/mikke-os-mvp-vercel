@@ -28,6 +28,7 @@ import {
   parseAcademyContextPath,
   toAcademyContextHref
 } from "@/lib/academy/access-context";
+import { withAcademyContextQuery } from "@/lib/academy/context-query.mjs";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getAcademyOnboardingEligibility, getMyAcademyHeadquartersAccess } from "@/lib/academy/trial";
 import { getMyInstructorRecords } from "@/lib/academy/instructor-portal";
@@ -113,6 +114,7 @@ function ShellInner({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const canonicalSearch = searchParams.toString();
   const routeContext = parseAcademyContextPath(pathname);
   const hasContextPathPrefix = pathname.startsWith("/academy/h/");
   const { profile, user } = useAuth();
@@ -240,8 +242,10 @@ function ShellInner({
       selectedContext.academy_id,
       variant === "honbu" ? "manage" : "teach"
     );
-    router.replace(previewMode === "readonly" ? `${canonicalHref}?preview=readonly` : canonicalHref);
-  }, [accessLoading, hasContextPathPrefix, hasPortalAccess, pathname, previewMode, router, selectedContext, variant]);
+    router.replace(withAcademyContextQuery(canonicalHref, canonicalSearch, {
+      readonlyPreview: previewMode === "readonly"
+    }));
+  }, [accessLoading, canonicalSearch, hasContextPathPrefix, hasPortalAccess, pathname, previewMode, router, selectedContext, variant]);
 
   useEffect(() => {
     let active = true;

@@ -174,7 +174,9 @@ function ClassesContent() {
                   </p>
                   <h3 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{classItem.title}</h3>
                   <p className="mt-2 text-sm text-[var(--mikke-muted)]">
-                    {formatDateTime(classItem.starts_at)}
+                    {classItem.schedule_mode === "arranged_after_application" && !classItem.starts_at
+                      ? "申込後に日程を相談"
+                      : formatDateTime(classItem.starts_at)}
                     {classItem.ends_at ? ` 〜 ${formatDateTime(classItem.ends_at)}` : ""}
                   </p>
                   <p className="mt-1 text-xs text-[var(--mikke-muted)]">
