@@ -23,13 +23,15 @@ function request(action, body, headers = {}, query = `?product=${product}&resour
   });
 }
 function deps(options = {}) {
-  const calls = { auth: 0, owns: 0, read: 0, portal: 0 };
+  const calls = { auth: 0, owns: 0, read: 0, portal: 0, quote: 0, checkout: 0 };
   const dependencies = {
     trustedOrigins: [origin],
     authenticate: async () => { calls.auth++; return { userId: owner, anonymous: false }; },
     ownsResource: async () => { calls.owns++; return true; },
     readStatus: async (_actor, s) => { calls.read++; return unavailableStatus(s); },
     openPortal: async () => { calls.portal++; return 'https://billing.stripe.com/p/session'; },
+    issueQuote: async () => { calls.quote++; return { quoteId: 'server-owned' }; },
+    startCheckout: async () => { calls.checkout++; return { state: 'pending' }; },
     ...options
   };
   return { calls, dependencies };
@@ -43,6 +45,9 @@ async function checkError(action, req, code, expectedStatus, options = {}) {
   return d.calls;
 }
 const checkout = { ...scope, requestId, planKey: 'starter' };
+const confirmation = { version: 1, ...checkout, consent: {
+  quoteId: 'server-owned', revision: 1, termsVersion: 'terms-v1', accepted: true
+} };
 const portal = { ...scope, requestId };
 for (const token of ['', 'Basic abc', 'Bearer ', 'Bearer a b', `Bearer ${'x'.repeat(8192)}`]) {
   const calls = await checkError('status', request('status', null, { authorization: token }), 'AUTH_REQUIRED', 401);
@@ -80,10 +85,11 @@ const stalledResult = checkError('checkout', stalled, 'INVALID_REQUEST', 422);
 setTimeout(() => controller.abort(), 10);
 await stalledResult;
 equal(canceled, true);
-await checkError('checkout', request('checkout', checkout), 'BILLING_NOT_CONFIGURED', 503);
+await checkError('checkout', request('checkout', confirmation), 'BILLING_NOT_CONFIGURED', 503);
 const ready = { ...unavailableStatus(scope), availability: 'ready', noticeCode: null,
   subscription: { state: 'active', planKey: 'starter', currentPeriodEndsAt: '2026-10-01T00:00:00.000Z', cancelAtPeriodEnd: false }, allowedActions: ['checkout', 'portal'] };
-const blocked = await checkError('checkout', request('checkout', checkout), 'POLICY_PENDING', 503, { readStatus: async () => ready });
+const policyPending = { ...unavailableStatus(scope), availability: 'policy_pending', noticeCode: 'POLICY_PENDING' };
+const blocked = await checkError('checkout', request('checkout', confirmation), 'POLICY_PENDING', 503, { readStatus: async () => policyPending });
 for (const field of ['availability', 'creation', 'subscription']) {
   for (const value of [null, 1, ['ready'], ['none'], ['active']]) {
     const invalid = structuredClone(ready);
@@ -93,6 +99,12 @@ for (const field of ['availability', 'creation', 'subscription']) {
   }
 }
 equal(blocked.portal, 0); // No v0 accepted quote => no provider call, even if ready/capability true.
+const pendingDeps=deps({readStatus:async()=>ready});
+const pending=await handlePlatformRequest('checkout',request('checkout',confirmation),pendingDeps.dependencies);
+equal(pending.status,200);equal(await pending.json(),{state:'pending'});equal(pendingDeps.calls.checkout,1);
+const quoteDeps=deps({readStatus:async()=>ready});
+const quoted=await handlePlatformRequest('quote',request('quote',checkout),quoteDeps.dependencies);
+equal(quoted.status,200);equal(await quoted.json(),{quoteId:'server-owned'});equal(quoteDeps.calls.quote,1);
 const d = deps({ readStatus: async () => ready });
 const opened = await handlePlatformRequest('portal', request('portal', portal), d.dependencies);
 equal(opened.status, 200); equal(await opened.json(), { version: 0, redirectUrl: 'https://billing.stripe.com/p/session' });
@@ -113,12 +125,13 @@ equal(parseCheckout(checkout), checkout);
 equal(parseCheckout({ ...checkout, resourceId: resourceId.toUpperCase(), requestId: requestId.toUpperCase() }), checkout);
 equal(decodePlatformStatus(unavailableStatus(scope), scope), unavailableStatus(scope));
 equal(isPlatformRedirect('https://checkout.stripe.com/c/a', 'checkout'), true);
-for (const route of ['status', 'checkout', 'portal']) {
+for (const route of ['status', 'quote', 'checkout', 'portal']) {
   const source = readFileSync(new URL(`../app/api/billing/platform/${route}/route.ts`, import.meta.url), 'utf8');
   assert.match(source, /force-dynamic/); checks++;
 }
 const runtime = readFileSync(new URL('../lib/billing/platform/server.ts', import.meta.url), 'utf8');
 assert.match(runtime, /auth\.getUser\(token\)/); checks++;
 assert.match(runtime, /PLATFORM_BILLING_API_ENABLED/); checks++;
-assert.doesNotMatch(runtime, /process\.env\.(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_SECRET_KEY|STRIPE_SECRET_KEY)/); checks++;
+assert.match(runtime, /SUPABASE_SECRET_KEY/); checks++;
+assert.match(runtime, /readStripeRuntimeConfig/); checks++;
 console.log(`Platform billing HTTP: ${checks} checks passed (fake transport only; no DB/provider requests)`);

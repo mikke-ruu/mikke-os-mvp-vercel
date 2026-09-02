@@ -74,7 +74,7 @@ await test('scope revocation between reserve and provider stops provider', async
   let calls=0; const s=setup({ selectAuthorizedContext:async()=>++calls===1 ? context : { ...context, policyRevision:2 } });
   assert.deepEqual(await s.run(), {state:'pending'}); assert.equal(s.calls.create,0); assert.equal(s.calls.uncertain,1);
 });
-for (const result of [{ ...session, id:'cs_live_unsafe' }, { ...session, url:'https://evil.invalid' }, { ...session, expiresAt:now.toISOString() }, { ...session, secret:'leak' }, null]) {
+for (const result of [{ ...session, id:'cs_prod_unsafe' }, { ...session, url:'https://evil.invalid' }, { ...session, expiresAt:now.toISOString() }, { ...session, secret:'leak' }, null]) {
   await test('reject unsafe provider result and leave uncertain', async () => {
     const s=setup({ createTestSession:async()=>result }); assert.deepEqual(await s.run(),{state:'pending'}); assert.equal(s.calls.ready,0); assert.equal(s.calls.uncertain,1);
   });

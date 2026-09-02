@@ -1,5 +1,5 @@
 import {
-  decodePlatformStatus, isPlatformRedirect, isResourceId, parseCheckout, parsePortal, parseScope
+  decodePlatformStatus, hasExactKeys, isPlatformRedirect, isRecord, isResourceId, parseCheckout, parsePortal, parseScope
 } from './contracts';
 import type { PlatformErrorCode, PlatformScope, PortalRequestV0 } from './contracts';
 
@@ -15,6 +15,8 @@ export type PlatformHttpDependencies = {
   readStatus(principal: PlatformPrincipal, scope: PlatformScope, signal: AbortSignal): Promise<unknown>;
   // Implementation must bind its persistent idempotency key to owner/product/resource/request.
   openPortal(principal: PlatformPrincipal, input: PortalRequestV0, signal: AbortSignal): Promise<string>;
+  issueQuote(principal: PlatformPrincipal, input: NonNullable<ReturnType<typeof parseCheckout>>, signal: AbortSignal): Promise<unknown>;
+  startCheckout(principal: PlatformPrincipal, input: unknown, signal: AbortSignal): Promise<unknown>;
   trustedOrigins: readonly string[];
 };
 const statusByCode: Record<PlatformErrorCode, number> = {
@@ -76,7 +78,7 @@ function getScope(request: Request): PlatformScope {
 }
 
 export async function handlePlatformRequest(
-  action: 'status' | 'checkout' | 'portal', request: Request, dependencies: PlatformHttpDependencies
+  action: 'status' | 'quote' | 'checkout' | 'portal', request: Request, dependencies: PlatformHttpDependencies
 ): Promise<Response> {
   try {
     if (request.method !== (action === 'status' ? 'GET' : 'POST')) fail('INVALID_REQUEST');
@@ -85,8 +87,13 @@ export async function handlePlatformRequest(
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(10000)]);
     const principal = await dependencies.authenticate(token, signal);
     if (!principal || principal.anonymous !== false || !isResourceId(principal.userId)) fail('AUTH_REQUIRED');
+    const rawBody = action === 'status' ? null : await boundedJson(request, signal);
     const input = action === 'status' ? getScope(request)
-      : action === 'checkout' ? parseCheckout(await boundedJson(request, signal)) : parsePortal(await boundedJson(request, signal));
+      : action === 'quote' ? parseCheckout(rawBody)
+      : action === 'checkout' && isRecord(rawBody)
+        && hasExactKeys(rawBody, ['version', 'product', 'resourceId', 'planKey', 'requestId', 'consent'])
+        ? parseCheckout({product:rawBody.product,resourceId:rawBody.resourceId,planKey:rawBody.planKey,requestId:rawBody.requestId})
+        : parsePortal(rawBody);
     if (!input) fail('INVALID_REQUEST');
     const scope: PlatformScope = { product: input.product, resourceId: input.resourceId };
     if (scope.resourceId !== null && !(await dependencies.ownsResource(principal, scope, signal))) fail('RESOURCE_UNAVAILABLE');
@@ -95,8 +102,17 @@ export async function handlePlatformRequest(
     if (action === 'status') return json(status);
     if (status.availability === 'not_configured') fail('BILLING_NOT_CONFIGURED');
     if (status.availability === 'policy_pending') fail('POLICY_PENDING');
-    // v0 has no accepted immutable quote/legal revision. No caller can bypass final consent.
-    if (action === 'checkout') fail('POLICY_PENDING');
+    if (action === 'quote') {
+      if (!status.allowedActions.includes('checkout')) fail('STATE_CONFLICT');
+      return json(await dependencies.issueQuote(principal, input as NonNullable<ReturnType<typeof parseCheckout>>, signal));
+    }
+    if (action === 'checkout') {
+      if (!status.allowedActions.includes('checkout')) fail('STATE_CONFLICT');
+      const result:unknown=await dependencies.startCheckout(principal,rawBody,signal);
+      if (!isRecord(result) || (result.state!=='pending' && (result.state!=='redirect' || !isPlatformRedirect(result.redirectUrl,'checkout'))))
+        fail('BILLING_NOT_CONFIGURED');
+      return json(result);
+    }
     if (status.noticeCode !== null || !status.allowedActions.includes('portal') || !status.subscription) fail('STATE_CONFLICT');
     const portal = parsePortal(input);
     if (!portal) fail('INVALID_REQUEST');

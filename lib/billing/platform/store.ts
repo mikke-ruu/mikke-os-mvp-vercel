@@ -19,7 +19,7 @@ function attempt(raw: unknown, reserved: boolean): CheckoutAttempt | ReservedAtt
     || typeof raw.status !== 'string' || !['prepared','provider_ready','uncertain'].includes(raw.status)
     || (reserved && typeof raw.created !== 'boolean')) fail();
   if (raw.status === 'provider_ready') {
-    if (typeof raw.provider_session_id !== 'string' || !/^cs_test_[A-Za-z0-9]+$/.test(raw.provider_session_id)
+    if (typeof raw.provider_session_id !== 'string' || !/^cs_(?:test|live)_[A-Za-z0-9]+$/.test(raw.provider_session_id)
       || typeof raw.provider_result_hash !== 'string' || !/^[a-f0-9]{64}$/.test(raw.provider_result_hash)) fail();
   } else if (raw.provider_session_id !== null || raw.provider_result_hash !== null) fail();
   return raw as CheckoutAttempt | ReservedAttempt;

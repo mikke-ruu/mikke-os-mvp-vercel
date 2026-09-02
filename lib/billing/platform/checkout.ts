@@ -37,7 +37,7 @@ const pending = (): CheckoutResult => ({ state: 'pending' });
 
 function checkedSession(raw: unknown, now: Date): TestCheckoutSession | null {
   if (!isRecord(raw) || !hasExactKeys(raw, ['id', 'url', 'expiresAt'])
-    || typeof raw.id !== 'string' || !/^cs_test_[A-Za-z0-9]+$/.test(raw.id)
+    || typeof raw.id !== 'string' || !/^cs_(?:test|live)_[A-Za-z0-9]+$/.test(raw.id)
     || !isPlatformRedirect(raw.url, 'checkout') || !isCanonicalTime(raw.expiresAt)
     || !Number.isFinite(now.getTime()) || Date.parse(raw.expiresAt) <= now.getTime()) return null;
   return { id: raw.id, url: raw.url, expiresAt: raw.expiresAt };
@@ -51,7 +51,7 @@ function matchesAttempt(value: unknown, quote: PlatformBillingQuote): value is C
     || value.provider_idempotency_key !== `platform-checkout-${value.attempt_id}`
     || !['prepared', 'provider_ready', 'uncertain'].includes(value.status as string)) return false;
   return value.status === 'provider_ready'
-    ? typeof value.provider_session_id === 'string' && /^cs_test_[A-Za-z0-9]+$/.test(value.provider_session_id)
+    ? typeof value.provider_session_id === 'string' && /^cs_(?:test|live)_[A-Za-z0-9]+$/.test(value.provider_session_id)
       && typeof value.provider_result_hash === 'string' && /^[a-f0-9]{64}$/.test(value.provider_result_hash)
     : value.provider_session_id === null && value.provider_result_hash === null;
 }
