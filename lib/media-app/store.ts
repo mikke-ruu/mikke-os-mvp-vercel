@@ -1,6 +1,8 @@
 "use client";
 
 import type { MediaArticle, MediaBlock, MediaBlockType, MediaSite, MediaStoreState } from "./types";
+export { isSafeMediaUrl, normalizeMediaSlug } from "./validation.js";
+import { isSafeMediaUrl, normalizeMediaSlug } from "./validation.js";
 
 export const MEDIA_APP_STORAGE_KEY = "mikke.media.free.v1";
 
@@ -12,20 +14,6 @@ function clone<T>(value: T): T {
 
 function createId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
-export function normalizeMediaSlug(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/-{2,}/g, "-").replace(/^-|-$/g, "").slice(0, 80);
-}
-
-export function isSafeMediaUrl(value: string) {
-  if (!value) return true;
-  if (value.startsWith("/") && !value.startsWith("//")) return true;
-  try {
-    return ["http:", "https:"].includes(new URL(value).protocol);
-  } catch {
-    return false;
-  }
 }
 
 export function createMediaBlock(type: MediaBlockType): MediaBlock {

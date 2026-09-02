@@ -1,17 +1,12 @@
 import { supabase } from "@/lib/supabase/client";
+import type {
+  MediaCreateInput,
+  MediaDirectOwnerSite,
+  MediaManagementTransport,
+  MediaSession
+} from "@/lib/media-app/integration";
 
-export type MediaSiteDatabaseRow = {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  author_name: string;
-  default_locale: string;
-  publishing_policy: "direct_owner" | "managed_brand";
-  is_published: boolean;
-  created_at: string;
-  updated_at: string;
-};
+export type MediaSiteDatabaseRow = MediaDirectOwnerSite;
 
 export type CreateMediaSiteInput = {
   name: string;
@@ -74,3 +69,22 @@ export async function unpublishMediaArticleInDatabase(articleId: string) {
   const { error } = await supabase.rpc("media_unpublish_article", { p_article_id: articleId });
   if (error) throw error;
 }
+
+async function readDatabaseSession(): Promise<MediaSession | null> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) return null;
+  return {
+    subject: data.user.id,
+    isAnonymous: Boolean(data.user.is_anonymous)
+  };
+}
+
+export const mediaDatabaseTransport: MediaManagementTransport = {
+  readSession: readDatabaseSession,
+  subscribeSessionChange(listener) {
+    const { data } = supabase.auth.onAuthStateChange(() => listener());
+    return () => data.subscription.unsubscribe();
+  },
+  listDirectOwnerSites: listMyMediaSitesFromDatabase,
+  createDirectOwnerSite: (input: MediaCreateInput) => createMediaSiteInDatabase(input)
+};

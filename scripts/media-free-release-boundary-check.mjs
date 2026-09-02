@@ -5,6 +5,13 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf
 const apps = read("lib/mikkeos/apps.ts");
 const managementLayout = read("app/apps/media/layout.tsx");
 const publicLayout = read("app/media/layout.tsx");
+const publicLoader = read("lib/media-app/public-loader.ts");
+const publicContract = read("lib/media-app/public-contract.ts");
+const publicHome = read("components/media-app/PublicMediaHome.tsx");
+const publicArticle = read("components/media-app/PublicMediaArticle.tsx");
+const publicSitePage = read("app/media/[mediaSlug]/page.tsx");
+const publicArticlePage = read("app/media/[mediaSlug]/[articleSlug]/page.tsx");
+const authGate = read("components/AuthGate.tsx");
 const sqlTest = read("supabase/tests/media_free_foundation_rls.sql");
 
 assert.match(apps, /hiddenCatalogAppKeys[^\n]*\[[^\]]*"media"/);
@@ -12,6 +19,18 @@ for (const layout of [managementLayout, publicLayout]) {
   assert.match(layout, /process\.env\.NODE_ENV !== "development"/);
   assert.match(layout, /notFound\(\)/);
 }
+assert.match(publicLoader, /import "server-only"/);
+assert.match(publicLoader, /process\.env\.NODE_ENV === "development"/);
+for (const page of [publicSitePage, publicArticlePage]) {
+  assert.match(page, /process\.env\.NODE_ENV !== "development"/);
+  assert.match(page, /notFound\(\)/);
+  assert.match(page, /generateMetadata/);
+  assert.match(page, /mediaCanonicalUrl/);
+}
+assert.doesNotMatch(`${publicHome}\n${publicArticle}\n${publicContract}`, /localStorage|getMediaSiteBySlug|getPublishedMediaArticle|listMediaArticles/);
+assert.doesNotMatch(publicContract, /imageAssetId/);
+assert.match(publicContract, /https:\/\/app\.mikke-os\.com/);
+assert.match(authGate, /pathname\.startsWith\("\/apps\/media"\)[\s\S]*previewMode === "integration"/);
 for (const sentinel of [
   "MEDIA_ANON_CREATED_SITE",
   "MEDIA_ANON_CALLED_CREATE_RPC",

@@ -88,4 +88,14 @@ contract is approved. Paid articles and automated affiliate behavior are later g
 - Add server metadata, canonical URLs, sitemap entries, and Article structured data from the published version.
 - Test RLS, grants, authenticated ownership, anonymous reads, draft non-disclosure, and update/publish races separately.
 
+## Local Auth and public-loader integration slice
+
+- `MediaSessionBoundary` accepts no client owner ID. It reads the authenticated subject before and after each request and invalidates every in-flight generation on every Auth session event, including logout and same-subject return.
+- Null and anonymous sessions do not call management operations. Results from a prior user or invalidated request are returned as stale and must not update UI ownership state.
+- The database adapter remains unwired. The localStorage pilot remains separate and is never imported or promoted.
+- Public routes are async Server Components that receive only validated public DTOs from a `server-only` loader. Internal IDs, draft fields, status, asset IDs, unknown keys, and unsafe URLs fail closed.
+- Until a reviewed public RPC transport is connected, the loader uses a development-only fake transport. The layout, loader, pages, and metadata preserve production 404/noindex behavior.
+- Canonical metadata is development-tested as `https://app.mikke-os.com/media/{mediaSlug}` and its article path. No sitemap entry is added at this gate.
+- Development previews for the management empty/create state and public site/article were checked at 320x568, 390x844, and 1440x900 with no horizontal overflow.
+
 No migration, production database change, deploy, catalog/menu entitlement, billing, external publication, AI, affiliate automation, or paid article behavior is included in this slice.

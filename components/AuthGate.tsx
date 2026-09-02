@@ -88,6 +88,23 @@ const academyLocalReviewProfile: Profile = {
   updated_at: "2026-08-22T00:00:00.000Z"
 };
 
+const mediaLocalReviewUser = {
+  ...academyLocalReviewUser,
+  id: "00000000-0000-4000-8000-000000009101",
+  created_at: "2026-09-03T00:00:00.000Z"
+} as User;
+
+const mediaLocalReviewProfile: Profile = {
+  ...academyLocalReviewProfile,
+  id: "00000000-0000-4000-8000-000000009102",
+  user_id: mediaLocalReviewUser.id,
+  display_name: "Media確認用",
+  handle: "media_preview",
+  joined_at: "2026-09-03T00:00:00.000Z",
+  created_at: "2026-09-03T00:00:00.000Z",
+  updated_at: "2026-09-03T00:00:00.000Z"
+};
+
 function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; allowGuest: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -103,12 +120,20 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
     process.env.NODE_ENV === "development" &&
     pathname === "/community/academy-invitations/preview" &&
     previewMode === "walkthrough";
-  const localFixtureUser = localAcademyReview
+  const localMediaReview =
+    process.env.NODE_ENV === "development" &&
+    pathname.startsWith("/apps/media") &&
+    previewMode === "integration";
+  const localFixtureUser = localMediaReview
+    ? mediaLocalReviewUser
+    : localAcademyReview
     ? academyLocalReviewUser
     : localCommunityAcademyInvitationReview
       ? marketNoteGuestUser
       : null;
-  const localFixtureProfile = localAcademyReview
+  const localFixtureProfile = localMediaReview
+    ? mediaLocalReviewProfile
+    : localAcademyReview
     ? academyLocalReviewProfile
     : localCommunityAcademyInvitationReview
       ? marketNoteGuestProfile
