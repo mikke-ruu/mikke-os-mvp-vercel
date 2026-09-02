@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase/client";
 import { getAcademyRouteContext, listMyAcademyContexts } from "@/lib/academy/access-context";
 import { academyPreviewHeadquarters, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
+import { readAcademyPlatformBillingStatus } from "@/lib/academy/platform-billing-adapter";
 import type { AcademyHeadquarters, AcademyLpBlock } from "@/types/database";
 
 // 現在のユーザーがオーナーの本部（MVPは1件想定）。
@@ -73,10 +74,42 @@ export async function updateHeadquarters(
 // 契約確認済みの作成権を1件消費して本部を作る。直接INSERTはDB側で禁止する。
 export async function createHeadquarters(name: string) {
   assertAcademyWritable();
-  const { data, error } = await supabase.rpc("academy_create_headquarters", {
-    p_name: name
-  });
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData.session?.access_token;
+  if (!token) throw new Error("ACADEMY_CREATE_AUTH_REQUIRED");
 
-  if (error) throw error;
-  return data as AcademyHeadquarters;
+  const response = await fetch("/academy/api/headquarters/create", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    },
+    cache: "no-store",
+    credentials: "omit",
+    redirect: "error",
+    body: JSON.stringify({ name })
+  });
+  const payload = await response.json().catch(() => null) as {
+    ok?: unknown;
+    headquarters?: unknown;
+    error?: unknown;
+  } | null;
+  if (!response.ok || payload?.ok !== true || !payload.headquarters) {
+    throw new Error(typeof payload?.error === "string" ? payload.error : "ACADEMY_CREATE_FAILED");
+  }
+  return payload.headquarters as AcademyHeadquarters;
+}
+
+export async function hasAvailablePlatformHeadquartersCreation() {
+  if (isAcademyLocalReview()) return false;
+  const state = await readAcademyPlatformBillingStatus(null, {
+    fetch: globalThis.fetch,
+    getAccessToken: async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || data.session?.user.is_anonymous) return null;
+      return data.session?.access_token ?? null;
+    }
+  });
+  return state.kind === "owner" && state.allowedActions.includes("create_resource");
 }

@@ -9,7 +9,11 @@ import { HonbuShell } from "@/components/academy/AcademyShell";
 import { toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import { getAcademyLaunchProgress } from "@/lib/academy/launch-progress";
-import { createHeadquarters, getOwnedHeadquarters } from "@/lib/academy/headquarters";
+import {
+  createHeadquarters,
+  getOwnedHeadquarters,
+  hasAvailablePlatformHeadquartersCreation
+} from "@/lib/academy/headquarters";
 import { getAcademyOnboardingEligibility, startAcademySevenDayTrial } from "@/lib/academy/trial";
 
 const ACADEMY_TRIAL_TERMS_VERSION = "academy-pilot-2026-08-30";
@@ -99,12 +103,13 @@ function DashboardContent() {
         setLoading(false);
         return;
       }
-      const [foundHq, eligibility] = await Promise.all([
+      const [foundHq, eligibility, platformCreationAvailable] = await Promise.all([
         getOwnedHeadquarters(profile.user_id),
-        getAcademyOnboardingEligibility()
+        getAcademyOnboardingEligibility(),
+        hasAvailablePlatformHeadquartersCreation()
       ]);
       setHq(foundHq);
-      setCanCreate(eligibility.paid_creation_available);
+      setCanCreate(platformCreationAvailable);
       setCanStartTrial(eligibility.trial_available);
       if (foundHq) {
         const [c, i, a, k, m] = await Promise.all([

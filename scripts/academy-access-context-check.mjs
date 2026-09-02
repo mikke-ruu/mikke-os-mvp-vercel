@@ -9,6 +9,10 @@ const migration = readFileSync(
   "utf8"
 );
 const headquarters = readFileSync(join(root, "lib/academy/headquarters.ts"), "utf8");
+const guardedCreation = readFileSync(
+  join(root, "supabase/migrations/20260902231854_academy_guarded_platform_creation.sql"),
+  "utf8"
+);
 const shell = readFileSync(join(root, "components/academy/AcademyShell.tsx"), "utf8");
 const dashboard = readFileSync(join(root, "app/academy/page.tsx"), "utf8");
 
@@ -25,7 +29,9 @@ assert.doesNotMatch(
   /limit 1/
 );
 assert.doesNotMatch(headquarters, /\.from\("academy_headquarters"\)[\s\S]*?\.insert\(/);
-assert.match(headquarters, /academy_create_headquarters/);
+assert.match(headquarters, /\/academy\/api\/headquarters\/create/);
+assert.doesNotMatch(headquarters, /rpc\("academy_create_headquarters"/);
+assert.match(guardedCreation, /revoke execute on function public\.academy_create_headquarters\(text\)/);
 assert.match(shell, /hasPortalAccess/);
 assert.match(shell, /canSwitchPortal \?/);
 assert.match(shell, /contextCount > 1/);
