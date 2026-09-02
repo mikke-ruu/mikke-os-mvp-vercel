@@ -112,6 +112,17 @@ export const mikkeApps: MikkeAppDefinition[] = [
     accent: "slate"
   },
   {
+    key: "media",
+    name: "Media",
+    shortName: "Media",
+    role: "記事を書き、公開し、自分の発信を積み重ねる入口。",
+    status: "prototype",
+    activityExamples: ["Mediaを作成", "記事を下書き", "記事を公開"],
+    storyOutputs: [],
+    deskOutputs: [],
+    accent: "blue"
+  },
+  {
     key: "library",
     name: "Library",
     shortName: "Library",
