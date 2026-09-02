@@ -37,12 +37,18 @@ This slice uses `localStorage` key `mikke.media.free.v1`. It is a local usabilit
 
 The store keeps editable article data separate from `publishedSnapshot`. Editing a published article does not alter the visible snapshot until the owner publishes again. Unpublish removes the snapshot while retaining the editable draft.
 
-## Next gate: Auth, DB, and RLS
+## Proposed DB foundation (not applied)
 
-- Add `media_sites`, `media_categories`, `media_articles`, and immutable `media_article_versions` through a reviewed migration.
+- Migration `20260902054001_media_free_foundation.sql` proposes `media_sites`, `media_categories`, `media_articles`, and immutable `media_article_versions`.
 - Allow the authenticated owner to manage only their own Media and drafts.
 - Allow anonymous access only to explicitly published versions.
 - Add transactional publish and unpublish RPCs, unique slug guards, and narrow grants.
+- Public readers receive only published snapshot fields through narrow RPCs; base article and version tables are not granted to `anon`.
+
+## Next gate: replay and client connection
+
+- Replay the proposed migration against a disposable local database and run RLS, grant, and concurrency tests.
+- Connect the client to the reviewed tables and RPCs, replacing localStorage only after the local contract passes.
 - Connect Mikke Media usage records without weakening asset ownership.
 - Add server metadata, canonical URLs, sitemap entries, and Article structured data from the published version.
 - Test RLS, grants, authenticated ownership, anonymous reads, draft non-disclosure, and update/publish races separately.
