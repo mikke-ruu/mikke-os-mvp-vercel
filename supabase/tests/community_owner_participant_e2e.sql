@@ -230,5 +230,26 @@ select pg_temp.community_e2e_denied(
 );
 reset role;
 
+select set_config('request.jwt.claims', '{"role":"anon"}', true);
+select set_config('request.jwt.claim.sub', '', true);
+set local role anon;
+select pg_temp.community_e2e_denied(
+  $$select id from public.community_rooms
+    where id = 'e9040000-0000-4000-8000-000000000010'$$,
+  '42501'
+);
+select pg_temp.community_e2e_denied(
+  $$insert into public.community_posts (
+      community_id, room_id, author_user_id, title, body, kind
+    ) values (
+      'e9040000-0000-4000-8000-000000000099',
+      'e9040000-0000-4000-8000-000000000010',
+      'e9040000-0000-4000-8000-000000000003',
+      'Anonymous post', 'Must be denied', 'normal'
+    )$$,
+  '42501'
+);
+reset role;
+
 select 'community_owner_participant_e2e_test_ok';
 rollback;

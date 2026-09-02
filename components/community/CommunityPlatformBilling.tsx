@@ -72,7 +72,7 @@ export function CommunityPlatformBillingView({
               <div><dt className="text-[var(--mikke-muted)]">現在の利用期間の終了日時</dt><dd className="mt-1">{dateLabel(subscription.currentPeriodEndsAt)}</dd></div>
               <div><dt className="text-[var(--mikke-muted)]">解約予約</dt><dd className="mt-1">{subscription.cancelAtPeriodEnd ? "期間終了時の解約を予約済み" : "なし"}</dd></div>
             </dl>
-          </> : <p className="mt-4 text-sm text-[var(--mikke-muted)]">{data ? "表示できる契約はありません。既存契約がある場合は運営者のアカウントで再確認してください。" : "契約情報はまだ取得できていません。"}</p>}
+          </> : <p className="mt-4 text-sm text-[var(--mikke-muted)]">{data?.creation.state === "available" ? "Communityの利用開始確認が完了しています。下のボタンから作成できます。" : data ? "表示できる契約はありません。既存契約がある場合は運営者のアカウントで再確認してください。" : "契約情報はまだ取得できていません。"}</p>}
           <p className="mt-3 text-sm text-[var(--mikke-muted)]">今回・次回の請求額と請求日は未取得です。下の料金表はプラン料金であり、あなたへの確定請求ではありません。</p>
           <div className="mt-4 flex flex-wrap gap-3">
             <button type="button" className={button} disabled={busy || Boolean(portalBlock) || !onPortal} onClick={onPortal} aria-describedby="community-portal-note"><CreditCard size={16} aria-hidden="true" />請求・契約管理</button>

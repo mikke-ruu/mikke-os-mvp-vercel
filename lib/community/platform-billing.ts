@@ -74,7 +74,6 @@ export function communityPlatformActionBlock(state: CommunityPlatformReadState, 
   // This is a display hint, not a grant. The actual create API must atomically
   // consume the entitlement. No inference from URL, plan or local storage.
   return data.resourceId === null && data.creation.state === "available"
-    && data.subscription && ["trialing", "active"].includes(data.subscription.state)
     ? null : "利用開始の確認ができるまで、Communityは作成できません。";
 }
 

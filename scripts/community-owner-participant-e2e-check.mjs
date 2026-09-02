@@ -18,6 +18,7 @@ for (const marker of [
   "outsider cannot read rooms",
   "outsider cannot read posts",
   "outsider cannot read chat",
+  "Anonymous post",
   "creation entitlement consumed by created Community",
   "community_owner_participant_e2e_test_ok",
 ]) {
@@ -26,6 +27,7 @@ for (const marker of [
 
 assert.match(sql, /set local role service_role/);
 assert.ok((sql.match(/set local role authenticated/g) ?? []).length >= 4);
+assert.match(sql, /set local role anon/);
 assert.match(sql, /"is_anonymous":false/);
 assert.match(sql, /begin;/i);
 assert.match(sql, /rollback;/i);

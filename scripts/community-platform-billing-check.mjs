@@ -34,6 +34,7 @@ function load(relativePath) {
   return module.exports;
 }
 const model = load("lib/community/platform-billing.ts");
+const creation = load("lib/billing/platform/creation.ts");
 const { createCommunityPlatformStatusLoader } = load("lib/community/platform-billing-loader.ts");
 const plans = load("lib/community/platform-plans.ts");
 const { CommunityPlatformBillingView } = load("components/community/CommunityPlatformBilling.tsx");
@@ -201,10 +202,21 @@ check("v0 checkout always blocked even with capability", () => assert.ok(model.c
 check("portal requires existing target", () => assert.ok(model.communityPlatformActionBlock(state({ resourceId: null }), "portal")));
 check("portal requires server capability", () => assert.ok(model.communityPlatformActionBlock(state({ allowedActions: [] }), "portal")));
 check("portal available for server-confirmed scope", () => assert.equal(model.communityPlatformActionBlock(state(), "portal"), null));
-check("active alone never grants creation", () => assert.ok(model.communityPlatformActionBlock(state({ resourceId: null }), "create_resource")));
-check("explicit server creation readiness", () => assert.equal(model.communityPlatformActionBlock(state({ resourceId: null, creation: { state: "available" }, allowedActions: ["create_resource"] }), "create_resource"), null));
-for (const subState of ["pending", "past_due", "ended"]) check("non-active cannot create", () => assert.ok(model.communityPlatformActionBlock(state({ resourceId: null, creation: { state: "available" }, allowedActions: ["create_resource"], subscription: { ...dto().subscription, state: subState } }), "create_resource")));
-
+check("subscription display state alone never grants creation", () => {
+  for (const subState of ["pending", "trialing", "active", "past_due", "ended"]) {
+    assert.ok(model.communityPlatformActionBlock(state({ resourceId: null, subscription: { ...dto().subscription, state: subState } }), "create_resource"));
+  }
+});
+check("canonical creation projection enables guarded create without synthesizing subscription", () => {
+  const projected = creation.projectCreationEntitlementStatus(
+    { product: "community_platform", resourceId: null },
+    { state: "available", planKey: "starter", resourceId: null, expiresAt: "2026-10-01T00:00:00.000Z" }
+  );
+  assert.equal(projected.subscription, null);
+  const decoded = model.decodeCommunityPlatformStatus(projected, null);
+  assert.ok(decoded);
+  assert.equal(model.communityPlatformActionBlock({ kind: "loaded", data: decoded }, "create_resource"), null);
+});
 await checkAsync("no token means no fetch", async () => {
   const result = await model.loadCommunityPlatformStatus(null, transport(() => { assert.fail("must not fetch"); }, null));
   assert.equal(result.kind, "auth_required");
@@ -263,8 +275,9 @@ for (const kind of ["unavailable", "auth_required", "error", "policy_pending"]) 
   assert.ok(html.includes("2,980")); assert.ok(html.includes("税込"));
 });
 check("UI links to guarded create only after authoritative readiness", () => {
-  const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ resourceId: null, creation: { state: "available" }, allowedActions: ["create_resource"] }) }));
+  const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ resourceId: null, subscription: null, creation: { state: "available" }, allowedActions: ["create_resource"] }) }));
   assert.ok(html.includes("1回だけ安全に消費")); assert.ok(html.includes('href="/community/create"'));
+  assert.ok(html.includes("利用開始確認が完了"));
 });
 check("shared decoder rejects noncanonical dates and unsafe actions", () => {
   assert.equal(model.decodeCommunityPlatformStatus(dto({ subscription: { ...dto().subscription, currentPeriodEndsAt: "2026-10-01T00:00:00Z" } }), resource), null);
