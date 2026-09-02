@@ -22,6 +22,8 @@ export default async function AcademyBillingDevelopmentPage({ searchParams }: { 
       headquartersState: scenario === "none" ? "not_created" : scenario === "processing" ? "preparing" : "ready",
       nextInvoice: null,
       accessEndsAt: null,
+      allowedActions: scenario === "active" || scenario === "past_due" || scenario === "cancel_scheduled" ? ["portal"] : [],
+      planKey: scenario === "none" ? null : "fixture_only",
       snapshot: null,
     };
   return <main className="mx-auto max-w-3xl space-y-5 px-4 py-8">

@@ -23,7 +23,12 @@ function load(path) {
 }
 
 const model = load("lib/academy/platform-billing-view.ts");
-const { projectAcademyPlatformBillingStatus: project, readAcademyPlatformBillingStatus: readStatus } = load("lib/academy/platform-billing-adapter.ts");
+const {
+  projectAcademyPlatformBillingStatus: project,
+  readAcademyPlatformBillingStatus: readStatus,
+  beginAcademyPlatformCheckout: beginCheckout,
+  openAcademyPlatformBillingPortal: openPortal,
+} = load("lib/academy/platform-billing-adapter.ts");
 const { AcademyPlatformBillingPanel: Panel } = load("app/academy/billing/AcademyPlatformBillingPanel.tsx");
 const render = (state) => renderToStaticMarkup(React.createElement(Panel, { state }));
 const hq = "10000000-0000-4000-8000-000000000001";
@@ -42,6 +47,8 @@ assert.equal(active.nextInvoice, null);
 assert.equal(active.snapshot, null);
 assert.equal(active.constructionPurchase, "unverified");
 assert.equal(active.accessEndsAt, null, "renewal date is not an end date");
+assert.deepEqual(active.allowedActions, ["portal"]);
+assert.equal(active.planKey, "academy");
 
 for (const value of [null, undefined, -1, NaN, Infinity, 1.5]) assert.equal(model.formatAcademyBillingYen(value), "未確定");
 assert.equal(model.formatAcademyBillingYen(0), "0円");
@@ -70,8 +77,8 @@ for (const kind of ["loading", "forbidden", "unavailable", "sign_in_required", "
 }
 for (const subscriptionStatus of ["none", "trialing", "processing", "active", "past_due", "cancel_scheduled", "ended"]) {
   const html = render({ ...active, subscriptionStatus });
-  assert.equal((html.match(/<button /g) ?? []).length, 4);
-  assert.equal((html.match(/disabled=""/g) ?? []).length, 4);
+  assert.equal((html.match(/<button /g) ?? []).length, 2);
+  assert.equal((html.match(/disabled=""/g) ?? []).length, 2);
   assert.doesNotMatch(html, /<form|https:\/\/.*stripe|cus_|sub_/);
   assert.match(html, /未確定/);
 }
@@ -84,6 +91,10 @@ assert.match(purchaseHtml, /購入確認済み/);
 assert.match(purchaseHtml, /利用開始前/);
 assert.doesNotMatch(purchaseHtml, />契約中</);
 assert.match(render({ ...active, subscriptionStatus: "trialing" }), /自動課金はありません/);
+const actionable = renderToStaticMarkup(React.createElement(Panel, { state: active, compact: true, onOpenPortal() {} }));
+assert.equal((actionable.match(/<button /g) ?? []).length, 2);
+assert.equal((actionable.match(/disabled=""/g) ?? []).length, 1, "only server-authorized portal becomes actionable");
+assert.doesNotMatch(actionable, /構築コースを購入された方へ|Academyの月額料金（税込）/);
 
 const page = readFileSync(resolve(root, "app/academy/billing/page.tsx"), "utf8");
 assert.equal(ts.createSourceFile("page.tsx", page, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX).parseDiagnostics.length, 0);
@@ -125,7 +136,54 @@ aborted.abort();
 assert.equal((await readStatus(hq, fakeTransport, aborted.signal)).kind, "unavailable");
 assert.equal(fetchCalls, 2);
 const adapterSource = readFileSync(resolve(root, "lib/academy/platform-billing-adapter.ts"), "utf8");
-assert.doesNotMatch(adapterSource, /console\.|localStorage|sessionStorage|SERVICE_ROLE|SECRET_KEY|method: "POST"/);
+assert.doesNotMatch(adapterSource, /console\.|localStorage|sessionStorage|SERVICE_ROLE|SECRET_KEY|NEXT_PUBLIC/);
+const requestId = "10000000-0000-4000-8000-000000000099";
+let mutationCalls = 0;
+const mutationTransport = {
+  getAccessToken: async () => "fresh-mutation-token",
+  fetch: async (url, options) => {
+    mutationCalls++;
+    assert.equal(options.method, "POST");
+    assert.equal(options.headers.Authorization, "Bearer fresh-mutation-token");
+    assert.equal(options.cache, "no-store");
+    assert.equal(options.credentials, "omit");
+    assert.equal(options.redirect, "error");
+    if (url.endsWith("/portal")) {
+      assert.deepEqual(JSON.parse(options.body), { product: "academy_platform", resourceId: hq, requestId });
+      return Response.json({ version: 0, redirectUrl: "https://billing.stripe.com/p/session_fixture" });
+    }
+    assert.deepEqual(JSON.parse(options.body), { product: "academy_platform", resourceId: hq, planKey: "small", requestId });
+    return Response.json({ version: 0, redirectUrl: "https://checkout.stripe.com/c/pay/session_fixture" });
+  },
+};
+assert.deepEqual(await openPortal(hq, requestId, mutationTransport), { kind: "redirect", url: "https://billing.stripe.com/p/session_fixture" });
+assert.deepEqual(await beginCheckout(hq, "small", requestId, mutationTransport), { kind: "redirect", url: "https://checkout.stripe.com/c/pay/session_fixture" });
+assert.equal(mutationCalls, 2);
+const newHqCheckout = await beginCheckout(null, "small", requestId, {
+  ...mutationTransport,
+  fetch: async (url, options) => {
+    assert.equal(url, "/api/billing/platform/checkout");
+    assert.deepEqual(JSON.parse(options.body), { product: "academy_platform", resourceId: null, planKey: "small", requestId });
+    return Response.json({ version: 0, redirectUrl: "https://checkout.stripe.com/c/pay/new_hq_fixture" });
+  },
+});
+assert.deepEqual(newHqCheckout, { kind: "redirect", url: "https://checkout.stripe.com/c/pay/new_hq_fixture" });
+for (const unsafe of ["http://billing.stripe.com/p/x", "https://evil.example/x", "https://user@billing.stripe.com/x", "https://billing.stripe.com:444/x"]) {
+  assert.equal((await openPortal(hq, requestId, { ...mutationTransport, fetch: async () => Response.json({ version: 0, redirectUrl: unsafe }) })).kind, "unavailable");
+}
+assert.equal((await beginCheckout(hq, "Bad Plan", requestId, mutationTransport)).kind, "invalid_request");
+assert.equal(mutationCalls, 2, "invalid checkout never reads auth or calls fetch");
+assert.equal((await openPortal(hq, requestId, { ...mutationTransport, getAccessToken: async () => null })).kind, "sign_in_required");
+assert.equal(mutationCalls, 2, "missing token never calls mutation API");
+for (const [code, status, kind] of [["AUTH_REQUIRED", 401, "sign_in_required"], ["RESOURCE_UNAVAILABLE", 404, "unavailable"], ["STATE_CONFLICT", 409, "state_conflict"], ["INVALID_REQUEST", 422, "invalid_request"], ["BILLING_NOT_CONFIGURED", 503, "not_configured"], ["POLICY_PENDING", 503, "policy_pending"]]) {
+  const result = await openPortal(hq, requestId, { ...mutationTransport, fetch: async () => Response.json({ error: { code } }, { status }) });
+  assert.equal(result.kind, kind);
+}
+const settingsSource = readFileSync(resolve(root, "app/academy/settings/page.tsx"), "utf8");
+assert.match(settingsSource, /<AcademyPlatformBillingLoader/);
+assert.match(settingsSource, /userId=\{user\.id\}/);
+assert.match(settingsSource, /resourceId=\{headquarters\.id\}/);
+assert.doesNotMatch(settingsSource, /planKey=|構築コース.*契約中/);
 console.log("Academy platform billing UI: model + v0 rejection + rendered states + boundary checks OK");
 
 for (const [code, kind, status] of [

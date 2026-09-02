@@ -20,7 +20,8 @@ const noticeState = (code: unknown): AcademyPlatformBillingState => ({
 
 /** Input must come from authenticated shared status API, not query/storage.
  * `owner` describes the intended audience only; this is not authorization.
- * All actions remain disabled in this slice, even if v0 lists allowedActions.
+ * Listed actions are only UI capabilities. The shared API must re-authorize every
+ * mutation and remains the authority for subscription and access state.
  */
 export function projectAcademyPlatformBillingStatus(
   payload: unknown,
@@ -37,6 +38,7 @@ export function projectAcademyPlatformBillingStatus(
   if (!isRecord(payload.creation) || !exactKeys(payload.creation, ["state"]) || typeof payload.creation.state !== "string" || !["none", "pending", "available", "consumed"].includes(payload.creation.state)) return unavailable;
   let subscriptionStatus: AcademySubscriptionStatus = "none";
   let accessEndsAt: string | null = null;
+  let planKey: string | null = null;
   if (payload.subscription !== null) {
     const subscription = payload.subscription;
     if (!isRecord(subscription) || !exactKeys(subscription, ["state", "planKey", "currentPeriodEndsAt", "cancelAtPeriodEnd"])) return unavailable;
@@ -44,6 +46,7 @@ export function projectAcademyPlatformBillingStatus(
     const states: Record<string, AcademySubscriptionStatus> = { pending: "processing", trialing: "trialing", active: "active", past_due: "past_due", ended: "ended" };
     if (typeof subscription.state !== "string" || !Object.hasOwn(states, subscription.state)) return unavailable;
     subscriptionStatus = states[subscription.state];
+    planKey = subscription.planKey;
     if (subscription.cancelAtPeriodEnd) {
       if (!["active", "trialing", "past_due"].includes(subscription.state) || subscription.currentPeriodEndsAt === null) return unavailable;
       // Payment failure must remain visible even when cancellation is scheduled.
@@ -63,6 +66,8 @@ export function projectAcademyPlatformBillingStatus(
     headquartersState: "unverified",
     nextInvoice: null,
     accessEndsAt,
+    allowedActions: [...payload.allowedActions] as Array<"checkout" | "portal" | "create_resource">,
+    planKey,
     snapshot: null,
   };
 }
@@ -71,6 +76,76 @@ export type AcademyBillingReadTransport = {
   getAccessToken: () => Promise<string | null>;
   fetch: typeof globalThis.fetch;
 };
+
+export type AcademyBillingMutationResult =
+  | { kind: "redirect"; url: string }
+  | { kind: "sign_in_required" | "unavailable" | "not_configured" | "policy_pending" | "state_conflict" | "invalid_request" };
+
+function isApprovedBillingRedirect(value: unknown, action: "checkout" | "portal"): value is string {
+  if (typeof value !== "string" || value.length > 4096) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !url.port
+      && url.hostname === (action === "checkout" ? "checkout.stripe.com" : "billing.stripe.com");
+  } catch {
+    return false;
+  }
+}
+
+async function mutateAcademyPlatformBilling(
+  action: "checkout" | "portal",
+  resourceId: string | null,
+  requestId: string,
+  transport: AcademyBillingReadTransport,
+  planKey?: string,
+  signal?: AbortSignal,
+): Promise<AcademyBillingMutationResult> {
+  const unavailable = { kind: "unavailable" } as const;
+  if ((action === "portal" && (resourceId === null || !uuid.test(resourceId)))
+    || (action === "checkout" && resourceId !== null && !uuid.test(resourceId))
+    || !uuid.test(requestId)) return { kind: "invalid_request" };
+  if (action === "checkout" && (typeof planKey !== "string" || !/^[a-z][a-z0-9_]{0,39}$/.test(planKey))) return { kind: "invalid_request" };
+  if (signal?.aborted) return unavailable;
+  try {
+    const token = await transport.getAccessToken();
+    if (!token?.trim()) return { kind: "sign_in_required" };
+    const body = action === "checkout"
+      ? { product: "academy_platform", resourceId, planKey, requestId }
+      : { product: "academy_platform", resourceId, requestId };
+    const response = await transport.fetch(`/api/billing/platform/${action}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "error",
+      signal,
+    });
+    if (signal?.aborted) return unavailable;
+    const payload: unknown = await response.json();
+    if (!response.ok) {
+      if (!isRecord(payload) || !exactKeys(payload, ["error"]) || !isRecord(payload.error) || !exactKeys(payload.error, ["code"])) return unavailable;
+      const code = payload.error.code;
+      if (response.status === 401 && code === "AUTH_REQUIRED") return { kind: "sign_in_required" };
+      const statuses: Record<string, number> = { RESOURCE_UNAVAILABLE: 404, STATE_CONFLICT: 409, INVALID_REQUEST: 422, BILLING_NOT_CONFIGURED: 503, POLICY_PENDING: 503 };
+      if (typeof code !== "string" || !Object.hasOwn(statuses, code) || statuses[code] !== response.status) return unavailable;
+      return noticeState(code) as AcademyBillingMutationResult;
+    }
+    if (!isRecord(payload) || !exactKeys(payload, ["version", "redirectUrl"]) || payload.version !== 0
+      || !isApprovedBillingRedirect(payload.redirectUrl, action)) return unavailable;
+    return { kind: "redirect", url: payload.redirectUrl };
+  } catch {
+    return unavailable;
+  }
+}
+
+export function beginAcademyPlatformCheckout(resourceId: string | null, planKey: string, requestId: string, transport: AcademyBillingReadTransport, signal?: AbortSignal) {
+  return mutateAcademyPlatformBilling("checkout", resourceId, requestId, transport, planKey, signal);
+}
+
+export function openAcademyPlatformBillingPortal(resourceId: string, requestId: string, transport: AcademyBillingReadTransport, signal?: AbortSignal) {
+  return mutateAcademyPlatformBilling("portal", resourceId, requestId, transport, undefined, signal);
+}
 
 /** Read only. Request-local token; no cookie auth, external URLs or retry loop.
  * Caller must discard this response when account/HQ changes or signal aborts.

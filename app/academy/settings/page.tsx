@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Building2, Check, Link2, ReceiptJapaneseYen, ShieldCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyPlatformBillingLoader } from "@/app/academy/billing/AcademyPlatformBillingLoader";
+import { supabase } from "@/lib/supabase/client";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import {
   getMyAcademyBillingSnapshot,
@@ -53,7 +55,7 @@ const roleDetails = [
 ];
 
 function SettingsContent() {
-  const { profile } = useAuth();
+  const { user, profile, isGuest } = useAuth();
   const [headquarters, setHeadquarters] = useState<AcademyHeadquarters | null>(null);
   const [role, setRole] = useState<AcademyHeadquartersRole | null>(null);
   const [members, setMembers] = useState<AcademyHeadquartersMember[]>([]);
@@ -459,6 +461,15 @@ function SettingsContent() {
               <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">
                 登録中の講師を数えます。活動中・休眠・停止中も登録解除までは対象です。同じ人が同一本部で複数講座を担当しても1名です。本部Ownerも講師登録している場合は1名に含まれます。登録解除は翌月分から反映します。
               </p>
+              <div className="mt-5 border-t border-[var(--mikke-line)] pt-5">
+                <AcademyPlatformBillingLoader
+                  userId={user.id}
+                  resourceId={headquarters.id}
+                  isGuest={isGuest}
+                  auth={supabase.auth}
+                  fetch={globalThis.fetch}
+                />
+              </div>
             </section>
           ) : null}
 

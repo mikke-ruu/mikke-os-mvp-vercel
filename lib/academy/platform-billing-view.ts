@@ -15,6 +15,8 @@ export type AcademyPlatformBillingState =
       headquartersState: "unverified" | "not_created" | "preparing" | "ready";
       nextInvoice: { amountYen: number | null; date: string | null } | null;
       accessEndsAt: string | null;
+      allowedActions: Array<"checkout" | "portal" | "create_resource">;
+      planKey: string | null;
       snapshot: {
         cutoffAt: string;
         registeredCount: number;

@@ -8,9 +8,15 @@ import {
 
 const card = "min-w-0 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-5";
 const disabledButton = "min-h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-semibold text-[var(--mikke-muted)] disabled:cursor-not-allowed";
+const actionButton = "min-h-11 w-full rounded-xl bg-[var(--mikke-primary)] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50";
 
-/** No network or mutation handlers. Actions stay disabled until shared billing is approved. */
-export function AcademyPlatformBillingPanel({ state }: { state: AcademyPlatformBillingState }) {
+export function AcademyPlatformBillingPanel({ state, compact = false, onOpenPortal, portalBusy = false, actionMessage = "" }: {
+  state: AcademyPlatformBillingState;
+  compact?: boolean;
+  onOpenPortal?: () => void;
+  portalBusy?: boolean;
+  actionMessage?: string;
+}) {
   if (state.kind !== "owner") {
     const message = {
       loading: "契約情報を確認しています。",
@@ -27,21 +33,22 @@ export function AcademyPlatformBillingPanel({ state }: { state: AcademyPlatformB
 
   const status = describeAcademySubscription(state.subscriptionStatus);
   const snapshot = state.snapshot;
+  const canOpenPortal = state.allowedActions.includes("portal") && Boolean(onOpenPortal);
   return (
     <div className="space-y-5 text-[var(--mikke-text)]">
-      <header>
+      {!compact ? <header>
         <p className="text-sm font-semibold text-[var(--mikke-primary)]">本部オーナーの契約・請求</p>
         <h1 className="mt-2 text-2xl font-bold">Academy利用料</h1>
         <p className="mt-3 leading-7">本部の運営に使うアプリの月額料金です。受講者から受け取る受講料、スキルビジネス構築コースの購入代とは別です。</p>
-      </header>
+      </header> : null}
 
-      <section className={card}>
+      {!compact ? <section className={card}>
         <h2 className="font-bold">構築コースを購入された方へ</h2>
         <p className="mt-2 leading-7">{state.constructionPurchase === "confirmed_awaiting_monthly_contract"
           ? "構築コースの購入確認済みです。Academy月額利用の開始手続きはまだ完了していません。"
           : "構築コースの購入状況は、この画面ではまだ確認していません。"}</p>
         <p className="mt-2 leading-7">構築コースの購入確認と、Academyの月額契約・本部作成は別の手続きです。</p>
-      </section>
+      </section> : null}
 
       <section className={card} aria-labelledby="academy-contract-title">
         <h2 id="academy-contract-title" className="text-lg font-bold">{status.title}</h2>
@@ -61,7 +68,7 @@ export function AcademyPlatformBillingPanel({ state }: { state: AcademyPlatformB
         <p className="mt-4 leading-7">下の人数記録は請求の根拠です。人数から求めた金額と、決済サービスの請求予定額は分けて表示します。</p>
       </section>
 
-      <section className={card} aria-labelledby="academy-snapshot-title">
+      {!compact ? <section className={card} aria-labelledby="academy-snapshot-title">
         <h2 id="academy-snapshot-title" className="text-lg font-bold">月末の登録人数と料金記録</h2>
         {snapshot ? <>
           <dl className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -74,18 +81,23 @@ export function AcademyPlatformBillingPanel({ state }: { state: AcademyPlatformB
           <p className="mt-4 font-semibold" role="status">{{ pending: "請求内容との照合待ちです。請求確定ではありません。", matched: "請求内容と料金記録の一致を確認済みです。", mismatch: "請求内容と料金記録が一致していません。運営による確認が必要です。" }[snapshot.reconciliation]}</p>
         </> : <p className="mt-3 leading-7">月末の人数記録はまだ確認できません。登録人数を0名とはみなしません。</p>}
         <p className="mt-4 leading-7">本部オーナーも講師登録していれば1名に数えます。休眠・活動停止中も登録中は対象です。招待中の未登録者は数えず、同じ本部の同一人物は1名です。</p>
-      </section>
+      </section> : null}
 
       <section className={card} aria-labelledby="academy-actions-title">
         <h2 id="academy-actions-title" className="text-lg font-bold">申込・請求管理</h2>
-        <p id="academy-billing-unavailable" className="mt-3 leading-7 font-semibold">決済・契約管理との接続は準備中です。この画面から申込・支払方法の変更・解約はできません。</p>
+        <p id="academy-billing-unavailable" className="mt-3 leading-7 font-semibold">有料申込は、料金と契約条件を確認して明示的に申し込んだ場合だけ開始します。7日間のお試し終了だけで自動課金されることはありません。</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {["料金・条件を確認して申し込む", "請求履歴を確認する", "支払方法を変更する", "Academyを解約する"].map((label) => <button key={label} type="button" disabled aria-describedby="academy-billing-unavailable" className={disabledButton}>{label}</button>)}
+          <button type="button" disabled aria-describedby="academy-checkout-pending" className={disabledButton}>料金・条件を確認して申し込む</button>
+          <button type="button" disabled={!canOpenPortal || portalBusy} onClick={onOpenPortal} className={canOpenPortal ? actionButton : disabledButton}>
+            {portalBusy ? "請求管理を開いています…" : "請求・支払方法・解約を管理する"}
+          </button>
         </div>
+        <p id="academy-checkout-pending" className="mt-3 text-sm leading-6 text-[var(--mikke-muted)]">申込前の確定金額・次回請求日・規約同意を表示する共通画面が接続されるまで、有料申込は開始できません。</p>
+        {actionMessage ? <p className="mt-3 rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold" role="status">{actionMessage}</p> : null}
         <p className="mt-4 leading-7">ここで扱うのはAcademy利用料のみです。Communityの通常契約や、受講料・構築コース購入代の返金や解約は変更しません。</p>
       </section>
 
-      <section className={card} aria-labelledby="academy-prices-title">
+      {!compact ? <section className={card} aria-labelledby="academy-prices-title">
         <h2 id="academy-prices-title" className="text-lg font-bold">Academyの月額料金（税込）</h2>
         <div className="mt-4 space-y-3">
           {ACADEMY_PLATFORM_PRICE_ROWS.map((row) => <div key={row.limit} className="rounded-xl bg-[var(--mikke-surface-soft)] p-4">
@@ -95,7 +107,7 @@ export function AcademyPlatformBillingPanel({ state }: { state: AcademyPlatformB
           </div>)}
         </div>
         <p className="mt-4 leading-7">請求先は本部オーナーです。講師個人にAcademy利用料は請求しません。Communityは任意の別サービスで、この月額料金には含みません。</p>
-      </section>
+      </section> : null}
     </div>
   );
 }
