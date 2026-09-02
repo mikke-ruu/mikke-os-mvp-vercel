@@ -9,8 +9,9 @@ const client = fs.readFileSync("lib/academy/headquarters.ts", "utf8");
 const dashboard = fs.readFileSync("app/academy/page.tsx", "utf8");
 
 assert.match(migration, /academy_create_headquarters_with_platform_entitlement\(\s*p_actor_user_id uuid,\s*p_name text/);
-assert.match(migration, /platform_billing_academy_paid_activation_verify_and_consume\(\s*v_actor,\s*v_headquarters_id/);
-assert.match(migration, /platform_billing_academy_paid_activation_verify_and_consume\(\s*v_owner_user_id,\s*p_headquarters_id/);
+assert.match(migration, /platform_billing_academy_new_paid_consume\(\s*v_actor,\s*v_headquarters_id/);
+assert.match(migration, /platform_billing_academy_existing_paid_consume\(\s*v_owner_user_id,\s*p_headquarters_id/);
+assert.doesNotMatch(migration, /platform_billing_academy_(?:new_|existing_)?paid_activation_verify_and_consume/);
 assert.match(migration, /revoke execute on function public\.academy_create_headquarters\(text\)\s+from authenticated/);
 assert.match(migration, /revoke all on function public\.academy_create_headquarters_with_platform_entitlement\(uuid, text\)\s+from public, anon, authenticated/);
 assert.match(migration, /grant execute on function public\.academy_create_headquarters_with_platform_entitlement\(uuid, text\)\s+to service_role/);

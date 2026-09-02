@@ -65,6 +65,17 @@ select pg_temp.academy_bridge_assert(
   not has_function_privilege('authenticated','public.academy_activate_paid_access_from_platform_subscription(uuid)','execute')
   and has_function_privilege('service_role','public.academy_activate_paid_access_from_platform_subscription(uuid)','execute'),
   'paid bridge is service only');
+select pg_temp.academy_bridge_assert(
+  not has_function_privilege('authenticated','public.platform_billing_academy_new_paid_consume(uuid,uuid)','execute')
+  and has_function_privilege('service_role','public.platform_billing_academy_new_paid_consume(uuid,uuid)','execute')
+  and not has_function_privilege('authenticated','public.platform_billing_academy_existing_paid_consume(uuid,uuid)','execute')
+  and has_function_privilege('service_role','public.platform_billing_academy_existing_paid_consume(uuid,uuid)','execute'),
+  'split platform verifiers are service only');
+select pg_temp.academy_bridge_assert(
+  to_regprocedure('public.platform_billing_academy_paid_activation_verify_and_consume(uuid,uuid)') is null
+  and to_regprocedure('public.platform_billing_academy_new_paid_activation_verify_and_consume(uuid,uuid)') is null
+  and to_regprocedure('public.platform_billing_academy_existing_paid_activation_verify_and_consume(uuid,uuid)') is null,
+  'obsolete verifier signatures are absent');
 
 set local role authenticated;
 select set_config('request.jwt.claims','{"role":"authenticated","is_anonymous":false,"sub":"ab040000-0000-4000-8000-000000000004"}',true);

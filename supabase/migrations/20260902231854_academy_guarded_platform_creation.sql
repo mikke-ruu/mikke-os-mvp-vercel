@@ -3,7 +3,8 @@
 --   * the Academy access/trial migrations through 20260830143000
 --   * platform_billing_private.creation_entitlements
 --   * platform_billing_private.verified_provider_events
---   * public.platform_billing_academy_paid_activation_verify_and_consume(uuid, uuid)
+--   * public.platform_billing_academy_new_paid_consume(uuid, uuid)
+--   * public.platform_billing_academy_existing_paid_consume(uuid, uuid)
 --
 -- A construction-course purchase, a legacy Academy invitation, or expiry of a
 -- free trial is not enough to call this RPC. Only an unbound, current,
@@ -40,11 +41,21 @@ begin
     raise exception 'ACADEMY_CREATE_INVALID_NAME' using errcode = '22023';
   end if;
 
+  -- Read the immutable actor/profile binding before the common lock chain.
+  -- If the profile disappears concurrently, the later HQ insert fails and the
+  -- entitlement consumption rolls back with this transaction.
+  select profile.* into v_profile
+  from public.profiles profile
+  where profile.user_id = v_actor;
+  if v_profile.id is null then
+    raise exception 'ACADEMY_CREATE_PROFILE_REQUIRED' using errcode = '42501';
+  end if;
+
   -- The common verifier owns the stable auth -> scope -> quote -> attempt ->
   -- event -> subscription -> entitlement lock order. Binding the generated HQ
   -- id before inserting Academy rows keeps consumption and creation atomic;
   -- any later failure rolls the binding back with this transaction.
-  v_proof := public.platform_billing_academy_paid_activation_verify_and_consume(
+  v_proof := public.platform_billing_academy_new_paid_consume(
     v_actor,
     v_headquarters_id
   );
@@ -66,14 +77,6 @@ begin
      or v_current_period_ends_at is null
      or v_current_period_ends_at <= statement_timestamp() then
     raise exception 'ACADEMY_CREATE_INVALID_SUBSCRIPTION_PROOF' using errcode = '22023';
-  end if;
-
-  select profile.* into v_profile
-  from public.profiles profile
-  where profile.user_id = v_actor
-  for update;
-  if v_profile.id is null then
-    raise exception 'ACADEMY_CREATE_PROFILE_REQUIRED' using errcode = '42501';
   end if;
 
   v_handle_base := left(
@@ -159,7 +162,7 @@ begin
     raise exception 'ACADEMY_PAID_BRIDGE_HEADQUARTERS_NOT_FOUND' using errcode = 'P0002';
   end if;
 
-  v_proof := public.platform_billing_academy_paid_activation_verify_and_consume(
+  v_proof := public.platform_billing_academy_existing_paid_consume(
     v_owner_user_id,
     p_headquarters_id
   );
