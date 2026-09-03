@@ -35,14 +35,23 @@ if (!shell.includes("[&_input]:text-base") || !shell.includes("overflow-x-hidden
 if (!dashboard.includes("aria-expanded={launchGuideOpen}") || !dashboard.includes("grid-cols-2")) {
   throw new Error("mobile launch guide must be collapsible and compact");
 }
+for (const href of ["/academy/courses", "/academy/instructors", "/academy/applications"]) {
+  if (!dashboard.includes(`href=\"${href}\"`)) throw new Error(`dashboard stat target missing: ${href}`);
+}
 if (instructors.includes("自分を講師として登録") || instructors.includes("受講者から登録")) {
   throw new Error("instructor registration choices must not be split into competing routes");
+}
+if ((instructors.match(/講師を登録/g) ?? []).length !== 2) {
+  throw new Error("instructor list must show one actionable registration route plus one empty-state reference");
 }
 if ((classes.match(/開催日程を作成/g) ?? []).length !== 2 || classes.includes("最初の開催日程を作成")) {
   throw new Error("classes page must have one actionable create link and one explanatory reference");
 }
 if (!applications.includes("本部が直接受け付けた申込") || !applications.includes("各講師のページから届いた申込")) {
   throw new Error("application intake tabs must explain both intake sources");
+}
+if (!applications.includes("koushiPendingCount") || !applications.includes("countUnattendedInstructorOrders")) {
+  throw new Error("instructor intake tab must expose its unattended count before opening");
 }
 for (const marker of ["本部責任者", "本部運営担当", "講座編集担当"]) {
   if (!settings.includes(marker)) throw new Error(`Japanese role label missing: ${marker}`);

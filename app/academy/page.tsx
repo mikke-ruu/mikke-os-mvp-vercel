@@ -47,7 +47,8 @@ function StatCard({
   value,
   sub,
   detail,
-  alert
+  alert,
+  href
 }: {
   icon: typeof BookOpen;
   label: string;
@@ -55,9 +56,10 @@ function StatCard({
   sub?: string;
   detail?: string;
   alert?: boolean;
+  href?: string;
 }) {
-  return (
-    <div className={`rounded-2xl border p-3.5 md:p-4 ${alert ? "border-[var(--mikke-accent)]/40 bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
+  const content = (
+    <>
       <div className="flex items-center gap-2">
         <span className={`flex h-8 w-8 items-center justify-center rounded-full ${alert ? "bg-white text-[var(--mikke-accent)]" : "bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]"}`}>
           <Icon size={16} />
@@ -68,8 +70,20 @@ function StatCard({
         {value.toLocaleString()}
         <span className="ml-1 text-xs font-bold text-[var(--mikke-muted-light)]">{sub}</span>
       </p>
-      {detail ? <p className="mt-1 truncate text-[11px] text-[var(--mikke-muted)]">{detail}</p> : null}
-    </div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        {detail ? <p className="min-w-0 truncate text-[11px] text-[var(--mikke-muted)]">{detail}</p> : <span />}
+        {href ? <span className="shrink-0 text-[10px] font-bold text-[var(--mikke-accent-strong)]">見る →</span> : null}
+      </div>
+    </>
+  );
+  const className = `block rounded-2xl border p-3.5 transition md:p-4 ${alert ? "border-[var(--mikke-accent)]/40 bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"} ${href ? "hover:border-[var(--mikke-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mikke-primary)]" : ""}`;
+
+  return href ? (
+    <Link href={toCurrentAcademyContextHref(href)} className={className} aria-label={`${label} ${value}${sub ?? ""}を見る`}>
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 
@@ -337,10 +351,11 @@ function DashboardContent() {
       ) : null}
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">
-        <StatCard icon={BookOpen} label="講座数" value={courses.length} sub="件" detail={`公開中 ${publishedCourses}件`} />
-        <StatCard icon={Users} label="認定講師" value={instructors.length} sub="名" detail={`活動中 ${activeInstructors}名`} />
-        <StatCard icon={ClipboardList} label="今月の申込" value={monthApps.length} sub="件" detail={`本部${honbuIntake}・講師${koushiIntake}`} />
+        <StatCard href="/academy/courses" icon={BookOpen} label="講座数" value={courses.length} sub="件" detail={`公開中 ${publishedCourses}件`} />
+        <StatCard href="/academy/instructors" icon={Users} label="認定講師" value={instructors.length} sub="名" detail={`活動中 ${activeInstructors}名`} />
+        <StatCard href="/academy/applications" icon={ClipboardList} label="今月の申込" value={monthApps.length} sub="件" detail={`本部${honbuIntake}・講師${koushiIntake}`} />
         <StatCard
+          href="/academy/applications"
           icon={ClipboardList}
           label="未対応の申込"
           value={pendingApps.length}

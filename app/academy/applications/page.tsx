@@ -27,6 +27,10 @@ import type {
 const inputClass =
   "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 
+function countUnattendedInstructorOrders(orders: AcademyKitOrder[]) {
+  return orders.filter((order) => order.status === "received").length;
+}
+
 function StatusChip({ status }: { status: AcademyApplication["status"] }) {
   const tone =
     status === "cancelled"
@@ -140,7 +144,7 @@ function HonbuTab({ hq }: { hq: AcademyHeadquarters }) {
 // AC-F1: 講師受付タブ = 旧app/academy/kits/page.tsxの中身をそのまま移植。
 // RLS設計上、本部はkoushi申込の生データを見られないため、本部にとっての
 // 「講師受付の申込」= academy_kit_orders（プライバシー安全な部分集合）がそのまま実体になる。
-function KoushiTab({ hq }: { hq: AcademyHeadquarters }) {
+function KoushiTab({ hq, onPendingCountChange }: { hq: AcademyHeadquarters; onPendingCountChange: (count: number) => void }) {
   const { profile } = useAuth();
   const [orders, setOrders] = useState<AcademyKitOrder[]>([]);
   const [instructorMap, setInstructorMap] = useState<Record<string, AcademyInstructor>>({});
@@ -151,9 +155,10 @@ function KoushiTab({ hq }: { hq: AcademyHeadquarters }) {
     setLoading(true);
     const [list, instructors] = await Promise.all([listKitOrders(hq.id), listInstructors(hq.id)]);
     setOrders(list);
+    onPendingCountChange(countUnattendedInstructorOrders(list));
     setInstructorMap(Object.fromEntries(instructors.map((i) => [i.id, i])));
     setLoading(false);
-  }, [hq.id]);
+  }, [hq.id, onPendingCountChange]);
 
   useEffect(() => {
     load();
@@ -163,7 +168,11 @@ function KoushiTab({ hq }: { hq: AcademyHeadquarters }) {
     setBusyId(order.id);
     try {
       const next = await updateKitOrder(profile, hq.id, order, patch);
-      setOrders((prev) => prev.map((o) => (o.id === next.id ? next : o)));
+      setOrders((prev) => {
+        const updated = prev.map((o) => (o.id === next.id ? next : o));
+        onPendingCountChange(countUnattendedInstructorOrders(updated));
+        return updated;
+      });
     } finally {
       setBusyId(null);
     }
@@ -277,10 +286,16 @@ function ApplicationsContent() {
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"honbu" | "koushi">("honbu");
+  const [koushiPendingCount, setKoushiPendingCount] = useState(0);
 
   useEffect(() => {
     async function load() {
-      setHq(await getOwnedHeadquarters(profile.user_id));
+      const foundHq = await getOwnedHeadquarters(profile.user_id);
+      setHq(foundHq);
+      if (foundHq) {
+        const orders = await listKitOrders(foundHq.id);
+        setKoushiPendingCount(countUnattendedInstructorOrders(orders));
+      }
       setLoading(false);
     }
     load();
@@ -313,7 +328,12 @@ function ApplicationsContent() {
                 : "border-transparent text-[var(--mikke-muted)]"
             }`}
           >
-            {t.label}
+            <span>{t.label}</span>
+            {t.key === "koushi" && koushiPendingCount > 0 ? (
+              <span className="ml-1 inline-flex min-w-5 items-center justify-center rounded-full bg-[var(--mikke-accent)] px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {koushiPendingCount}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
@@ -321,7 +341,7 @@ function ApplicationsContent() {
         本部のページから届いた申込と、各講師のページから届いた申込を切り替えて確認できます。
       </p>
 
-      {tab === "honbu" ? <HonbuTab hq={hq} /> : <KoushiTab hq={hq} />}
+      {tab === "honbu" ? <HonbuTab hq={hq} /> : <KoushiTab hq={hq} onPendingCountChange={setKoushiPendingCount} />}
     </div>
   );
 }

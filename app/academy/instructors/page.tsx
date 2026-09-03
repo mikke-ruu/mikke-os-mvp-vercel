@@ -181,14 +181,11 @@ function InstructorsContent() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div>
         <div>
           <p className="text-xs text-[var(--mikke-muted)]">{hq.name}</p>
           <h2 className="text-base font-bold text-[var(--mikke-text)]">講師管理</h2>
         </div>
-        <Link href="/academy/instructors/new" className="flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
-          <Plus size={16} /> 講師を登録
-        </Link>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -199,7 +196,7 @@ function InstructorsContent() {
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <div className="min-w-0">
           <p className="text-sm font-bold text-[var(--mikke-text)]">講師を追加する</p>
-          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">mikke IDから登録できます。受講者は、申込詳細で修了・認定を確認した後に講師へ追加できます。</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">講師情報を登録します。受講者は、申込詳細で修了・認定を確認した後に講師へ追加できます。</p>
         </div>
         <Link href="/academy/instructors/new" className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white sm:w-auto">
           <Plus size={16} /> 講師を登録
