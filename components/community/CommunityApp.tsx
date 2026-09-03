@@ -2381,7 +2381,7 @@ function CommunityAuthForm({ audience, community, defaultNext, signupNext = defa
 }
 
 export function CommunityOrganizerAuthPage() {
-  return <CommunityAuthForm audience="organizer" defaultNext="/community/manage" signupNext="/community/create" />;
+  return <CommunityAuthForm audience="organizer" defaultNext="/community/manage" signupNext="/community/start" />;
 }
 
 export function CommunityParticipantAuthPage({ communitySlug }: { communitySlug?: string }) {
@@ -2430,7 +2430,7 @@ export function LegacyCommunityAuthRedirect() {
       return;
     }
     if (rawNext === "/community/create") {
-      router.replace(`/community/for-organizers${mode || "?mode=signup"}`);
+      router.replace("/community/start");
       return;
     }
     router.replace(`/community/participant-login${mode}`);

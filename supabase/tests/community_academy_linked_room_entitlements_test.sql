@@ -57,6 +57,9 @@ begin
     (v_suspended_user, 'academy-community-suspended-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now()),
     (v_future_user, 'academy-community-future-' || v_suffix || '@example.invalid', '{}'::jsonb, '{}'::jsonb, now(), now());
 
+  insert into public.community_communities (id, slug, name, join_mode, status, owner_user_id)
+  values (v_community, 'academy-community-' || v_suffix, 'Academy Community test', 'invite_only', 'active', v_owner);
+
   insert into public.academy_headquarters (
     id, owner_user_id, name, handle, plan, is_active
   ) values (
@@ -69,12 +72,6 @@ begin
   ) values (
     v_headquarters, v_owner, 'paid', 'active', now(), now()
   );
-
-  insert into public.community_communities (id, slug, name, join_mode, status, owner_user_id)
-  values (v_community, 'academy-community-' || v_suffix, 'Academy Community test', 'invite_only', 'active', v_owner);
-
-  insert into public.academy_headquarters (id, owner_user_id, name, handle)
-  values (v_headquarters, v_owner, 'Academy headquarters test', 'academy-hq-' || v_suffix);
 
   perform set_config('request.jwt.claims', json_build_object(
     'sub', v_owner, 'role', 'authenticated', 'is_anonymous', true

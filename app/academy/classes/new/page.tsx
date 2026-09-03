@@ -8,6 +8,7 @@ import { HonbuShell } from "@/components/academy/AcademyShell";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { createAcademyClass, type AcademyClassInput } from "@/lib/academy/classes";
 import { listCourses } from "@/lib/academy/courses";
+import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 
@@ -65,7 +66,8 @@ function NewAcademyClassContent() {
     setError(null);
     if (!headquarters || !selectedCourse) return setError("講座を選択してください。");
     if (!form.title.trim()) return setError("開催名を入力してください。");
-    if (!form.startsAt) return setError("開始日時を入力してください。");
+    if (form.scheduleMode === "fixed" && !form.startsAt) return setError("開始日時を入力してください。");
+    if (form.endsAt && !form.startsAt) return setError("終了日時を入力する場合は、予定日時も入力してください。");
     if (form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) {
       return setError("終了日時は開始日時より後にしてください。");
     }
@@ -74,7 +76,7 @@ function NewAcademyClassContent() {
     try {
       await createAcademyClass(profile, headquarters.id, selectedCourse, {
         ...form,
-        startsAt: new Date(form.startsAt).toISOString(),
+        startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : "",
         endsAt: form.endsAt ? new Date(form.endsAt).toISOString() : null
       });
       router.push(toCurrentAcademyContextHref("/academy/classes"));
@@ -93,13 +95,15 @@ function NewAcademyClassContent() {
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-accent-soft)] p-4">
         <p className="text-base font-bold text-[var(--mikke-text)]">講座開催日を作成する</p>
         <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">作成後、認定講師にこの開催日の担当を依頼できます。「募集中」にすると公開講座ページに開催日が表示されます。</p>
-        {selectedCourse ? (
+        {selectedCourse && resolveAcademyCourseFeaturesForCourse(selectedCourse).stepLearning ? (
           <Link
             href={toCurrentAcademyContextHref(`/academy/courses/${selectedCourse.id}/program`)}
             className="mt-2 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]"
           >
             ステップ教材を作成・確定する
           </Link>
+        ) : selectedCourse ? (
+          <p className="mt-2 text-xs font-bold text-[var(--mikke-text-soft)]">この講座はステップ教材を使わないため、そのまま開催日程を作成できます。</p>
         ) : null}
       </section>
 
@@ -122,8 +126,9 @@ function NewAcademyClassContent() {
             <option value="arranged_after_application">申込後に個別調整</option>
           </select>
         </label>
-        <label className={labelClass}>{form.scheduleMode === "fixed" ? "開始日時*" : "管理上の予定日時*"}
+        <label className={labelClass}>{form.scheduleMode === "fixed" ? "開始日時*" : "予定日時（後から入力）"}
           <input type="datetime-local" className={inputClass} value={form.startsAt} onChange={(event) => set("startsAt", event.target.value)} />
+          {form.scheduleMode === "arranged_after_application" ? <span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">申込者と相談して決まった後に入力できます。</span> : null}
         </label>
         <label className={labelClass}>終了日時（任意）
           <input type="datetime-local" className={inputClass} value={form.endsAt ?? ""} onChange={(event) => set("endsAt", event.target.value || null)} />

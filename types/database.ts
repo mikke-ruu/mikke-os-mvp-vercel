@@ -415,11 +415,11 @@ export type AcademyClass = {
   id: string;
   headquarters_id: string;
   course_id: string;
-  program_id: string;
+  program_id: string | null;
   program_version_id: string | null;
   instructor_id: string | null;
   title: string;
-  starts_at: string;
+  starts_at: string | null;
   ends_at: string | null;
   capacity: number | null;
   venue_name: string | null;

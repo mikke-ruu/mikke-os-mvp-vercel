@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const m=readFileSync(new URL('../supabase/migrations/20260903201500_platform_billing_subscription_recontract_selection.sql',import.meta.url),'utf8');
+for(const p of ['drop constraint if exists attempts_scope_id_key','platform_billing_attempt_scope_idx','prior.status<>\'provider_ready\'','s.status=\'ended\'','resource_access_window','resource_subscription_select','PLATFORM_BILLING_MULTIPLE_CURRENT_SUBSCRIPTIONS','PLATFORM_BILLING_AMBIGUOUS_STALE_SUBSCRIPTION','PLATFORM_BILLING_AMBIGUOUS_ENDED_SUBSCRIPTION','subscription_event_occurred_idx','security definer set search_path=\'\'']) assert.ok(m.includes(p),p);
+assert.match(m,/s\.status in \('active','past_due'\)/);
+assert.match(m,/n>1 then return/);
+assert.match(m,/ended_at\+interval '90 days'/);
+assert.match(m,/A stale active\/past_due projection remains owner-readable/);
+assert.match(m,/return query select v\.actor_user_id,v\.status,v\.current_period_start,v\.current_period_end,false,null::timestamptz,null::timestamptz/);
+assert.match(m,/source_kind='verified_trial'/);
+assert.match(m,/p_existing_headquarters and a\.resource_id=p_headquarters_id::text and \(\(e\.status='consumed'.+or \(e\.status='available' and e\.resource_id is null\)\)\)/s);
+assert.match(m,/if v_entitlement\.status='available' and v_entitlement\.resource_id is null then[\s\S]+status='consumed',resource_id=p_headquarters_id/);
+assert.match(m,/create or replace function public\.platform_billing_status_get/);
+assert.match(m,/create or replace function public\.platform_billing_portal_context/);
+assert.match(m,/revoke all on function platform_billing_private\.resource_access_window/);
+console.log('platform_billing_recontract_selection_contract_ok');

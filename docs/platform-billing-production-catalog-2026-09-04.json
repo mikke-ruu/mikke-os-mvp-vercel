@@ -1,0 +1,44 @@
+{
+  "approvalId": "ojas-platform-legal-2026-09-04-v1",
+  "revision": 1,
+  "merchant": {
+    "merchantId": "ojas",
+    "legalName": "株式会社OJAS",
+    "address": "〒111-0053 東京都台東区浅草橋5-2-3 鈴和ビル2階",
+    "contactUrl": "https://app.mikke-os.com/legal/commercial-disclosure/2026-09-04-v1"
+  },
+  "policies": {
+    "academy_platform": {
+      "approved": true,
+      "approvalId": "ojas-platform-legal-2026-09-04-v1",
+      "revision": 1,
+      "terms": { "version": "academy-terms-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/academy/terms/2026-09-04-v1" },
+      "privacy": { "version": "mikkeos-privacy-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/privacy/2026-09-04-v1" },
+      "refund": { "version": "academy-billing-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/academy/billing/2026-09-04-v1" },
+      "cancellation": { "version": "academy-billing-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/academy/billing/2026-09-04-v1" },
+      "proration": { "version": "academy-billing-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/academy/billing/2026-09-04-v1" },
+      "renewal": { "version": "academy-billing-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/academy/billing/2026-09-04-v1" },
+      "commercialDisclosure": { "version": "mikkeos-commerce-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/commercial-disclosure/2026-09-04-v1" }
+    },
+    "community_platform": {
+      "approved": true,
+      "approvalId": "ojas-platform-legal-2026-09-04-v1",
+      "revision": 1,
+      "terms": { "version": "community-terms-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/community/terms/2026-09-04-v1" },
+      "privacy": { "version": "mikkeos-privacy-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/privacy/2026-09-04-v1" },
+      "refund": { "version": "community-billing-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/community/billing/2026-09-04-v1" },
+      "cancellation": { "version": "community-billing-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/community/billing/2026-09-04-v1" },
+      "proration": { "version": "community-billing-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/community/billing/2026-09-04-v1" },
+      "renewal": { "version": "community-billing-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/community/billing/2026-09-04-v1" },
+      "commercialDisclosure": { "version": "mikkeos-commerce-2026-09-04-v1", "url": "https://app.mikke-os.com/legal/commercial-disclosure/2026-09-04-v1" }
+    }
+  },
+  "plans": {
+    "academy_platform:small": { "totalYen": 5000 },
+    "academy_platform:medium": { "totalYen": 10000 },
+    "academy_platform:large": { "totalYen": 20000 },
+    "community_platform:starter": { "totalYen": 2980 },
+    "community_platform:standard": { "totalYen": 4980 },
+    "community_platform:pro": { "totalYen": 9800 }
+  }
+}

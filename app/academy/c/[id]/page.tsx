@@ -146,7 +146,7 @@ function PublicLpInner({ courseId }: { courseId: string }) {
               <div className="mt-5 space-y-3">
                 {classes.map((academyClass) => {
                   const fixed = academyClass.schedule_mode === "fixed";
-                  const startsAt = new Intl.DateTimeFormat("ja-JP", {
+                  const startsAt = academyClass.starts_at ? new Intl.DateTimeFormat("ja-JP", {
                     timeZone: "Asia/Tokyo",
                     year: "numeric",
                     month: "long",
@@ -154,7 +154,7 @@ function PublicLpInner({ courseId }: { courseId: string }) {
                     weekday: "short",
                     hour: "2-digit",
                     minute: "2-digit"
-                  }).format(new Date(academyClass.starts_at));
+                  }).format(new Date(academyClass.starts_at)) : "";
                   return (
                     <article key={academyClass.id} className="rounded-2xl border border-[var(--mikke-line)] p-4 md:p-5">
                       <p className="text-base font-bold text-[var(--mikke-text)]">{academyClass.title}</p>

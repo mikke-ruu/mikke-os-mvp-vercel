@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import { getCourseProgram } from "@/lib/academy/programs";
 import { academyPreviewClasses, assertAcademyWritable, isAcademyLocalReview } from "@/lib/academy/preview";
 import type { AcademyClass, AcademyCourse, Profile } from "@/types/database";
@@ -38,8 +39,11 @@ export async function createAcademyClass(
   input: AcademyClassInput
 ) {
   assertAcademyWritable();
-  let program = await getCourseProgram(headquartersId, course.id);
-  if (!program) {
+  const features = resolveAcademyCourseFeaturesForCourse(course);
+  const program = features.stepLearning
+    ? await getCourseProgram(headquartersId, course.id)
+    : null;
+  if (features.stepLearning && !program) {
     throw new Error("先に講座のステップ教材を作成し、現在の内容を確定してください。");
   }
 
@@ -48,11 +52,11 @@ export async function createAcademyClass(
     .insert({
       headquarters_id: headquartersId,
       course_id: course.id,
-      program_id: program.id,
+      program_id: program?.id ?? null,
       program_version_id: null,
       instructor_id: null,
       title: input.title.trim(),
-      starts_at: input.startsAt,
+      starts_at: input.startsAt || null,
       ends_at: input.endsAt,
       format: input.format,
       capacity: input.capacity,

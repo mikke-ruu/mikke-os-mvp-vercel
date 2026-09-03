@@ -86,7 +86,7 @@ function ApplyInner({ courseId }: { courseId: string }) {
         applicantEmail: email,
         applicantPhone: phone,
         applicantNote: note,
-        eventDate: selectedClass?.schedule_mode === "fixed" ? selectedClass.starts_at.slice(0, 10) : "",
+        eventDate: selectedClass?.schedule_mode === "fixed" && selectedClass.starts_at ? selectedClass.starts_at.slice(0, 10) : "",
         format: selectedClass?.format ?? format,
         formAnswers: answers,
         diplomaNameEn: features.certification ? diplomaNameEn : "",
@@ -216,7 +216,7 @@ function ApplyInner({ courseId }: { courseId: string }) {
             <div className="mt-2 space-y-2">
               {classes.map((academyClass) => {
                 const fixed = academyClass.schedule_mode === "fixed";
-                const startsAt = new Intl.DateTimeFormat("ja-JP", {
+                const startsAt = academyClass.starts_at ? new Intl.DateTimeFormat("ja-JP", {
                   timeZone: "Asia/Tokyo",
                   year: "numeric",
                   month: "long",
@@ -224,7 +224,7 @@ function ApplyInner({ courseId }: { courseId: string }) {
                   weekday: "short",
                   hour: "2-digit",
                   minute: "2-digit"
-                }).format(new Date(academyClass.starts_at));
+                }).format(new Date(academyClass.starts_at)) : "";
                 const checked = selectedClassId === academyClass.id;
                 return (
                   <label
