@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict'; import {readFileSync} from 'node:fs';
+const s=readFileSync(new URL('../supabase/migrations/20260903210000_platform_billing_internal_resource_grants.sql',import.meta.url),'utf8');
+for(const x of ['internal_resource_grants','official-academy-community','mikkeos','ayumitest','official_operations','test_only',"interval '30 days'",'PLATFORM_BILLING_INTERNAL_GRANT_PREFLIGHT','PLATFORM_BILLING_INTERNAL_GRANT_HAS_CUSTOMER_BINDING',"'internal_grant'::text","g.expires_at+interval '90 days'",'resource_access_window_customer_legacy','platform_billing_internal_grant_revoke','community_apply_platform_retention_anonymization','enable row level security']) assert.ok(s.includes(x),x);
+assert.match(s,/if found and v\.status in \('active','past_due'\) then/);
+assert.match(s,/revoke all on platform_billing_private\.internal_resource_grants from public,anon,authenticated,service_role/);
+assert.match(s,/old\.actor_user_id is distinct from new\.actor_user_id/);
+assert.match(s,/v_now,case when c\.slug='ayumitest' then v_now\+interval '30 days'/);
+assert.match(s,/platform_billing_internal_grant_revoke\(p_resource_id uuid,p_revoked_by uuid,p_reason text\)/);
+assert.match(s,/internal_resource_grants[^;]+for update/);
+assert.match(s,/v_access\.status is distinct from 'ended'/);
+console.log('platform_billing_internal_resource_grants_contract_ok');
