@@ -4,7 +4,7 @@ import { ManagerProfilePanel } from "@/components/manager/ManagerProfilePanel";
 export default function ManagerAccountPage() {
   return (
     <AuthGate>
-      <ManagerProfilePanel mikkeIdChangeEnabled={false} />
+      <ManagerProfilePanel />
     </AuthGate>
   );
 }
