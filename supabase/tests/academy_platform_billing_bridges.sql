@@ -40,7 +40,17 @@ begin
   perform public.platform_billing_quote_save(actor,pg_temp.academy_bridge_quote(actor,qid,request_id));
   attempt_id:=(public.platform_billing_attempt_reserve(actor,qid,jsonb_build_object('quoteId',qid,'revision',1,'termsVersion','fixture-v1','accepted',true))->>'attempt_id')::uuid;
   perform public.platform_billing_attempt_mark_ready(actor,attempt_id,session_id,repeat('a',64));
-  perform public.platform_billing_verified_subscription_activate(attempt_id,event_id,repeat('b',64),session_id,customer_id,subscription_id,5000,'jpy',paid_at);
+  perform public.platform_billing_verified_subscription_activate(
+    attempt_id,
+    event_id,
+    md5(event_id) || md5('academy:' || event_id),
+    session_id,
+    customer_id,
+    subscription_id,
+    5000,
+    'jpy',
+    paid_at
+  );
 end $$;
 
 insert into auth.users(id,is_anonymous) values
