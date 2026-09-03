@@ -10,6 +10,7 @@ import { getMonthlyBillingPeriod } from './schedule';
 import { validatePlatformBillingQuote } from './quote';
 import type { BillingSelection, PlatformBillingQuote } from './quote';
 import { createStripeProvider, readStripeRuntimeConfig } from './stripe';
+import { resolveAcademyBillingPlan } from './academy-plan';
 
 type Catalog = Readonly<{ approvalId:string;revision:number;merchant:PlatformBillingQuote['merchant'];policies:PlatformBillingQuote['policies'];plans:Readonly<Record<string,Readonly<{totalYen:number}>>> }>;
 const TOKEN=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
@@ -40,8 +41,24 @@ function requestDependencies():PlatformHttpDependencies{
     const{data,error}=await userClient.from(table).select('id,owner_user_id').eq('id',scope.resourceId).eq('owner_user_id',principal.userId).abortSignal(signal).maybeSingle();
     const row:unknown=data;return !error&&isRecord(row)&&row.id===scope.resourceId&&row.owner_user_id===principal.userId;
   }
-  const selection=(principal:PlatformPrincipal,input:{product:string;resourceId:string|null;planKey:string;requestId:string}):BillingSelection=>{
-    const current=catalog();if(!Object.hasOwn(current.plans,`${input.product}:${input.planKey}`))throw new PlatformApiError('POLICY_PENDING');
+  const selection=async(principal:PlatformPrincipal,input:{product:string;resourceId:string|null;planKey:string;requestId:string},signal:AbortSignal):Promise<BillingSelection>=>{
+    const current=catalog();
+    if(input.product==='academy_platform'){
+      let estimate:unknown=null;
+      if(input.resourceId!==null){
+        if(!userClient||principal.userId!==verifiedUserId)throw new PlatformApiError('AUTH_REQUIRED');
+        signal.throwIfAborted();
+        const{data,error}=await userClient.rpc('academy_get_my_current_billing_estimate' as never,{p_headquarters_id:input.resourceId} as never);
+        signal.throwIfAborted();
+        if(error)throw new PlatformApiError('RESOURCE_UNAVAILABLE');
+        estimate=data as unknown;
+      }
+      const resolved=resolveAcademyBillingPlan(input.resourceId,input.planKey,estimate,new Date());
+      if(!resolved.ok)throw new PlatformApiError(resolved.reason==='conflict'?'STATE_CONFLICT':'POLICY_PENDING');
+      const approved=current.plans[`academy_platform:${resolved.planKey}`];
+      if(!approved||approved.totalYen!==resolved.totalYen)throw new PlatformApiError('POLICY_PENDING');
+    }
+    if(!Object.hasOwn(current.plans,`${input.product}:${input.planKey}`))throw new PlatformApiError('POLICY_PENDING');
     return{ownerUserId:principal.userId,productKey:input.product,resourceId:input.resourceId,planKey:input.planKey,requestId:input.requestId,policyApprovalId:current.approvalId,policyRevision:current.revision};
   };
   return{trustedOrigins,
@@ -50,7 +67,7 @@ function requestDependencies():PlatformHttpDependencies{
     async readStatus(principal,scope,signal){const result=await rpc('platform_billing_status_get',{p_actor_user_id:principal.userId,p_product_key:scope.product,p_resource_id:scope.resourceId},signal);if(result.error)throw new PlatformApiError('BILLING_NOT_CONFIGURED');return result.data;},
     async issueQuote(principal,input,signal){
       if(input.resourceId&&!await owns(principal,input,signal))throw new PlatformApiError('RESOURCE_UNAVAILABLE');
-      const expected=selection(principal,input),current=catalog(),plan=current.plans[`${input.product}:${input.planKey}`];
+      const expected=await selection(principal,input,signal),current=catalog(),plan=current.plans[`${input.product}:${input.planKey}`];
       if(!plan||!Number.isSafeInteger(plan.totalYen)||plan.totalYen<0)throw new PlatformApiError('POLICY_PENDING');
       const now=new Date(),day=jstDay(now),period=getMonthlyBillingPeriod(day,0);if(!period)throw new PlatformApiError('BILLING_NOT_CONFIGURED');
       const quote:PlatformBillingQuote={quoteId:`quote-${randomUUID()}`,revision:1,purchaseIntent:'explicit_paid_start',scope:{ownerUserId:principal.userId,productKey:input.product,resourceId:input.resourceId,planKey:input.planKey,requestId:input.requestId},currency:'JPY',taxIncluded:true,dueNow:{totalYen:plan.totalYen,dueOn:day},nextPayment:{totalYen:plan.totalYen,dueOn:period.nextRenewalOn},merchant:current.merchant,policies:current.policies,issuedAt:now.toISOString(),expiresAt:new Date(now.getTime()+15*60000).toISOString()};
@@ -58,7 +75,7 @@ function requestDependencies():PlatformHttpDependencies{
     },
     async startCheckout(principal,input,signal){
       const stripe=createStripeProvider(readStripeRuntimeConfig()),checkoutStore=store();
-      return executeTestCheckout(input,{...checkoutStore,now:()=>new Date(),selectAuthorizedContext:async(raw,nextSignal)=>{if(raw.resourceId&&!await owns(principal,raw,nextSignal))throw new PlatformApiError('RESOURCE_UNAVAILABLE');return selection(principal,raw);},createTestSession:(quote,key,nextSignal)=>stripe.createCheckout({attemptId:key.slice('platform-checkout-'.length),productKey:quote.scope.productKey,planKey:quote.scope.planKey,idempotencyKey:key},nextSignal),retrieveTestSession:(sessionId,_quote,nextSignal)=>stripe.retrieveCheckout(sessionId,nextSignal)},signal);
+      return executeTestCheckout(input,{...checkoutStore,now:()=>new Date(),selectAuthorizedContext:async(raw,nextSignal)=>{if(raw.resourceId&&!await owns(principal,raw,nextSignal))throw new PlatformApiError('RESOURCE_UNAVAILABLE');return await selection(principal,raw,nextSignal);},createTestSession:(quote,key,nextSignal)=>stripe.createCheckout({attemptId:key.slice('platform-checkout-'.length),productKey:quote.scope.productKey,planKey:quote.scope.planKey,idempotencyKey:key},nextSignal),retrieveTestSession:(sessionId,_quote,nextSignal)=>stripe.retrieveCheckout(sessionId,nextSignal)},signal);
     },
     async openPortal(principal,input,signal){const result=await rpc('platform_billing_portal_context',{p_actor_user_id:principal.userId,p_product_key:input.product,p_resource_id:input.resourceId},signal);const context:unknown=result.data;if(result.error||!isRecord(context)||typeof context.providerCustomerId!=='string')throw new PlatformApiError('STATE_CONFLICT');return createStripeProvider(readStripeRuntimeConfig()).createPortal(context.providerCustomerId,signal);},
   };

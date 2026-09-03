@@ -14,6 +14,8 @@ An explicit paid checkout is required. A free-period ending does not create a Ch
 4. Invoice and subscription events update the projection idempotently. Renewal uses the original paid-at day, with month-end fallback.
 5. `GET /api/billing/platform/status` exposes only the narrow customer status. `POST /api/billing/platform/portal` obtains the server-only Stripe customer reference and creates a Billing Portal Session.
 
+For Academy, a new-HQ quote permits only the `small` plan. An existing HQ is owner-checked and its authenticated `academy_get_my_current_billing_estimate` result determines `small` (0-20), `medium` (21-50), or `large` (51-200); the client cannot choose a different tier. The calculation is repeated when the quote is issued and immediately before Checkout. Counts above 200 remain fail-closed until the approved variable amount can be represented safely.
+
 Raw provider payloads, webhook secrets, provider event hashes, Stripe customer IDs, and subscription IDs are not returned to browsers. The database does not record a `paid` state from an unverified or uncertain Checkout attempt.
 
 The webhook parser accepts both Stripe's legacy subscription references/period fields and the Basil shapes (`invoice.parent.subscription_details.subscription` and subscription-item periods). When legacy and Basil values disagree, or subscription items contain no period or conflicting periods, it fails closed. This compatibility does not pin or change the Stripe account API version.
