@@ -157,11 +157,21 @@ insert into public.community_academy_entitlement_claims(
 select set_config('request.jwt.claims','{"sub":"ae070000-0000-4000-8000-000000000001","role":"authenticated","is_anonymous":false}',true);
 select set_config('request.jwt.claim.sub','ae070000-0000-4000-8000-000000000001',true);
 set local role authenticated;
-insert into public.community_rooms(id, community_id, title, kind, access_type)
-values ('ce070000-0000-4000-8000-000000000031', 'ce070000-0000-4000-8000-000000000001', 'Active room', 'normal', 'free');
+insert into public.community_rooms(id, community_id, title, kind, access_type, conversation_mode) values
+  ('ce070000-0000-4000-8000-000000000031', 'ce070000-0000-4000-8000-000000000001', 'Active thread room', 'normal', 'free', 'thread'),
+  ('ce070000-0000-4000-8000-000000000032', 'ce070000-0000-4000-8000-000000000001', 'Active chat room', 'normal', 'free', 'chat');
+insert into public.community_events(id, community_id, title, starts_at)
+values (
+  'ce070000-0000-4000-8000-000000000033', 'ce070000-0000-4000-8000-000000000001',
+  'Participant attendance fixture', statement_timestamp() + interval '1 day'
+);
 reset role;
 select pg_temp.retention_assert(
-  exists(select 1 from public.community_rooms where id='ce070000-0000-4000-8000-000000000031'),
+  (select count(*)=2 from public.community_rooms where id in (
+    'ce070000-0000-4000-8000-000000000031',
+    'ce070000-0000-4000-8000-000000000032'
+  ))
+  and exists(select 1 from public.community_events where id='ce070000-0000-4000-8000-000000000033'),
   'active owner can write'
 );
 
@@ -202,7 +212,36 @@ values (
   'ce070000-0000-4000-8000-000000000031', 'ae070000-0000-4000-8000-000000000002',
   'Participant post', 'Participant record remains writable'
 );
+insert into public.community_comments(id, post_id, author_user_id, body)
+values (
+  'ce070000-0000-4000-8000-000000000042', 'ce070000-0000-4000-8000-000000000041',
+  'ae070000-0000-4000-8000-000000000002', 'Participant comment remains writable'
+);
+insert into public.community_chat_messages(id, community_id, room_id, author_user_id, body)
+values (
+  'ce070000-0000-4000-8000-000000000043', 'ce070000-0000-4000-8000-000000000001',
+  'ce070000-0000-4000-8000-000000000032', 'ae070000-0000-4000-8000-000000000002',
+  'Participant chat remains writable'
+);
+insert into public.community_post_reactions(id, community_id, room_id, post_id, user_id, emoji)
+values (
+  'ce070000-0000-4000-8000-000000000044', 'ce070000-0000-4000-8000-000000000001',
+  'ce070000-0000-4000-8000-000000000031', 'ce070000-0000-4000-8000-000000000041',
+  'ae070000-0000-4000-8000-000000000002', '👍'
+);
+insert into public.community_event_attendees(id, event_id, user_id, status)
+values (
+  'ce070000-0000-4000-8000-000000000045', 'ce070000-0000-4000-8000-000000000033',
+  'ae070000-0000-4000-8000-000000000002', 'going'
+);
 select pg_temp.retention_assert(community_private.is_active_member('ce070000-0000-4000-8000-000000000001'), 'ordinary participant remains active');
+select pg_temp.retention_assert(
+  exists(select 1 from public.community_comments where id='ce070000-0000-4000-8000-000000000042')
+  and exists(select 1 from public.community_chat_messages where id='ce070000-0000-4000-8000-000000000043')
+  and exists(select 1 from public.community_post_reactions where id='ce070000-0000-4000-8000-000000000044')
+  and exists(select 1 from public.community_event_attendees where id='ce070000-0000-4000-8000-000000000045'),
+  'participant comment chat reaction and attendance remain writable'
+);
 reset role;
 
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
@@ -215,11 +254,28 @@ select public.platform_billing_subscription_event_apply(
 );
 reset role;
 
+select set_config(
+  'test.retention_owner_read_until',
+  (select owner_read_until::text
+   from community_private.community_platform_access_window(
+     'ce070000-0000-4000-8000-000000000001', statement_timestamp()
+   )),
+  true
+);
+select set_config(
+  'test.retention_anonymize_after',
+  (select anonymize_after::text
+   from community_private.community_platform_access_window(
+     'ce070000-0000-4000-8000-000000000001', statement_timestamp()
+   )),
+  true
+);
+
 select set_config('request.jwt.claims','{"sub":"ae070000-0000-4000-8000-000000000001","role":"authenticated","is_anonymous":false}',true);
 select set_config('request.jwt.claim.sub','ae070000-0000-4000-8000-000000000001',true);
 set local role authenticated;
 select pg_temp.retention_assert(
-  community_private.community_owner_read_allowed('ce070000-0000-4000-8000-000000000001','ae070000-0000-4000-8000-000000000001',statement_timestamp())
+  community_private.community_current_actor_owner_read_allowed('ce070000-0000-4000-8000-000000000001')
   and public.community_export_owner_archive('ce070000-0000-4000-8000-000000000001')#>>'{community,slug}'='retention-community',
   'ended owner can read and export during 90 days'
 );
@@ -228,7 +284,7 @@ reset role;
 select pg_temp.retention_assert(
   not community_private.community_owner_read_allowed(
     'ce070000-0000-4000-8000-000000000001', 'ae070000-0000-4000-8000-000000000001',
-    (select owner_read_until + interval '1 second' from community_private.community_platform_access_window('ce070000-0000-4000-8000-000000000001', statement_timestamp()))
+    current_setting('test.retention_owner_read_until')::timestamptz + interval '1 second'
   ),
   'ended owner cannot read or export after 90 days'
 );
@@ -257,14 +313,14 @@ set local role service_role;
 select pg_temp.retention_assert(pg_temp.retention_denied(
   format(
     $q$select public.community_apply_platform_retention_anonymization('ce070000-0000-4000-8000-000000000001',%L::timestamptz)$q$,
-    (select anonymize_after - interval '1 second' from community_private.community_platform_access_window('ce070000-0000-4000-8000-000000000001', statement_timestamp()))
+    current_setting('test.retention_anonymize_after')::timestamptz - interval '1 second'
   ), '55000', 'COMMUNITY_RETENTION_NOT_DUE'
 ), 'anonymization before deadline is rejected');
 
 select pg_temp.retention_assert(
   public.community_apply_platform_retention_anonymization(
     'ce070000-0000-4000-8000-000000000001',
-    (select anonymize_after + interval '1 second' from community_private.community_platform_access_window('ce070000-0000-4000-8000-000000000001', statement_timestamp()))
+    current_setting('test.retention_anonymize_after')::timestamptz + interval '1 second'
   ),
   'worker changes allowlisted operator fields only'
 );
@@ -280,7 +336,7 @@ select pg_temp.retention_assert(
 select pg_temp.retention_assert(
   not public.community_apply_platform_retention_anonymization(
     'ce070000-0000-4000-8000-000000000001',
-    (select anonymize_after + interval '2 seconds' from community_private.community_platform_access_window('ce070000-0000-4000-8000-000000000001', statement_timestamp()))
+    current_setting('test.retention_anonymize_after')::timestamptz + interval '2 seconds'
   ),
   'worker is idempotent'
 );
