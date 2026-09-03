@@ -479,7 +479,10 @@ function ShellInner({
       showSharedUtilities={variant === "koushi"}
       footerLabel="Academy by mikke"
     >
-      <div onClickCapture={captureAcademyLink}>
+      <div
+        onClickCapture={captureAcademyLink}
+        className="min-w-0 overflow-x-hidden [&_input]:max-w-full [&_input]:text-base [&_select]:max-w-full [&_select]:text-base [&_textarea]:max-w-full [&_textarea]:text-base sm:[&_input]:text-sm sm:[&_select]:text-sm sm:[&_textarea]:text-sm"
+      >
       {previewMode === "dashboard" || previewMode === "walkthrough" ? (
         <div className="mb-4 rounded-xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
           ローカル確認用のサンプル表示です。本部運営者が認定講師も兼ねる例のため、本部画面とマイポータルの両方を確認できます。実データの保存や本番DBの変更は行いません。

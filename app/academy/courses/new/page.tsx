@@ -34,10 +34,10 @@ function NewCourseContent() {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3">
-        <div><p className="text-xs font-bold text-[var(--mikke-accent-strong)]">講座の基本設定が終わりました</p><p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">質問の回答から必要な機能を設定しました。この講座はまだ公開されていません。内容を確認して下書きを作成してください。</p></div>
-        <button type="button" onClick={() => setGuidedInitial(null)} className="shrink-0 rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold">質問に戻る</button>
+    <div className="min-w-0 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3">
+        <div className="min-w-0"><p className="text-xs font-bold text-[var(--mikke-accent-strong)]">講座の基本設定が終わりました</p><p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">質問の回答から必要な機能を設定しました。この講座はまだ公開されていません。内容を確認して下書きを作成してください。</p></div>
+        <button type="button" onClick={() => setGuidedInitial(null)} className="w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold sm:w-auto">質問に戻る</button>
       </div>
       <CourseForm
         initial={guidedInitial}
@@ -54,7 +54,7 @@ function NewCourseContent() {
 export default function NewCoursePage() {
   return (
     <HonbuShell title="講座を作成">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto min-w-0 max-w-2xl">
         <NewCourseContent />
       </div>
     </HonbuShell>

@@ -31,7 +31,7 @@ import type {
 } from "@/types/database";
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 
 function Row({ label, value }: { label: string; value: string }) {

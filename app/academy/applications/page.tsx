@@ -25,7 +25,7 @@ import type {
 } from "@/types/database";
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 
 function StatusChip({ status }: { status: AcademyApplication["status"] }) {
   const tone =
@@ -296,27 +296,30 @@ function ApplicationsContent() {
         <h2 className="text-base font-bold text-[var(--mikke-text)]">申込管理</h2>
       </div>
 
-      <div className="flex gap-2 border-b border-[var(--mikke-line)]">
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-[var(--mikke-surface-soft)] p-1.5">
         {(
           [
-            { key: "honbu", label: "本部受付" },
-            { key: "koushi", label: "講師受付" }
+            { key: "honbu", label: "本部で受けた申込" },
+            { key: "koushi", label: "講師経由の申込" }
           ] as const
         ).map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-sm font-bold ${
+            className={`rounded-xl border px-2 py-2.5 text-sm font-bold ${
               tab === t.key
-                ? "border-b-2 border-[var(--mikke-accent)] text-[var(--mikke-accent-strong)]"
-                : "text-[var(--mikke-muted)]"
+                ? "border-[var(--mikke-accent)] bg-white text-[var(--mikke-accent-strong)] shadow-sm"
+                : "border-transparent text-[var(--mikke-muted)]"
             }`}
           >
             {t.label}
           </button>
         ))}
       </div>
+      <p className="text-xs leading-5 text-[var(--mikke-muted)]">
+        本部のページから届いた申込と、各講師のページから届いた申込を切り替えて確認できます。
+      </p>
 
       {tab === "honbu" ? <HonbuTab hq={hq} /> : <KoushiTab hq={hq} />}
     </div>

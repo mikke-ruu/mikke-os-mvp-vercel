@@ -19,7 +19,7 @@ import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader"
 import type { AcademyLpBlock } from "@/types/database";
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 
 export const LP_BLOCK_LABEL: Record<AcademyLpBlock["type"], string> = {
   heading: "見出し",
@@ -67,7 +67,7 @@ export function LpBlockEditor({ block, onChange }: { block: AcademyLpBlock; onCh
     return (
       <div className="space-y-2">
         {block.images.map((img, i) => (
-          <div key={i} className="space-y-1 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-2">
+          <div key={i} className="min-w-0 space-y-1 overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-2">
             <AcademyImageUploader
               compact
               currentUrl={img.url || undefined}
@@ -144,7 +144,7 @@ export function LpBlocksEditor({ blocks, onChange }: { blocks: AcademyLpBlock[];
       ) : (
         <ul className="space-y-2">
           {blocks.map((block, i) => (
-            <li key={i} className="space-y-2 rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+            <li key={i} className="min-w-0 space-y-2 overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
               <div className="flex items-center justify-between">
                 <span className="rounded-full bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">
                   {LP_BLOCK_LABEL[block.type]}
@@ -161,7 +161,7 @@ export function LpBlocksEditor({ blocks, onChange }: { blocks: AcademyLpBlock[];
         </ul>
       )}
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {ADD_BUTTONS.map(({ type, icon: Icon }) => (
           <button
             key={type}

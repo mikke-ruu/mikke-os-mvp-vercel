@@ -17,7 +17,7 @@ import {
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 
 function NewInstructorContent() {
@@ -198,7 +198,7 @@ function NewInstructorContent() {
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <p className="text-xs font-bold text-[var(--mikke-accent)]">認定情報（本部管理）</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           <div>
             <label className={labelClass}>講師番号</label>
             <input

@@ -19,7 +19,7 @@ type WizardAnswers = {
   certification: boolean;
 };
 
-const inputClass = "mt-1 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+const inputClass = "mt-1 min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 const initialAnswers: WizardAnswers = {
   code: "", name: "", formats: [], durationText: "", intake: "honbu", materialType: "none",
   stepLearning: false, price: "", paymentProvider: "manual", progression: "scheduled", certification: false
@@ -96,14 +96,14 @@ export function AcademyCourseSetupWizard({ onComplete }: { onComplete: (initial:
   const canContinue = step === 1 ? Boolean(answers.name.trim()) : step === 2 ? answers.formats.length > 0 : step === 5 ? answers.price !== "" && Number(answers.price) >= 0 : true;
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4">
       <div className="rounded-2xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] p-4">
         <p className="text-xs font-bold text-[var(--mikke-accent-strong)]">講座づくり {step}/6</p>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-[var(--mikke-accent)] transition-all" style={{ width: `${(step / 6) * 100}%` }} /></div>
         <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">質問に答えると、講座が出来上がります。下書きのため、まだ公開にはなりません。</p>
       </div>
 
-      <section className="min-h-80 space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+      <section className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 sm:min-h-80 sm:p-5">
         {step === 1 ? <>
           <h2 className="text-base font-bold">講座名を決めましょう</h2>
           <label className="block text-xs font-bold">講座名*<input className={inputClass} value={answers.name} onChange={(e) => setAnswers({ ...answers, name: e.target.value })} placeholder="スキルビジネス構築コース" /><span className="mt-1 block font-normal leading-5 text-[var(--mikke-muted)]">講座名を入力してください。後から変更できます。</span></label>
