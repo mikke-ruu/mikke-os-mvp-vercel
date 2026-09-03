@@ -18,13 +18,19 @@ for (const phrase of [
   "academy_export_my_headquarters",
   "academy_anonymize_ended_headquarters",
   "academy_retention_anonymization_runs",
-  "academy-retention:",
+  "for update of subscription",
+  "for update;",
   "about:blank#retained-record",
   "app.academy_retention_worker",
 ]) assert.ok(migration.includes(phrase), phrase);
 
-assert.match(migration, /window\.write_allowed/);
-assert.match(migration, /window\.actor_user_id\s*=\s*headquarters\.owner_user_id/);
+assert.doesNotMatch(migration, /\bwindow\s*\./);
+assert.match(migration, /access_window\.write_allowed/);
+assert.match(migration, /access_window\.actor_user_id\s*=\s*headquarters\.owner_user_id/);
+assert.match(migration, /platform_billing_private\.subscriptions subscription[\s\S]*for update of subscription/);
+assert.match(migration, /platform_billing_private\.creation_entitlements entitlement[\s\S]*for update;/);
+assert.match(migration, /for update of subscription;[\s\S]*from platform_billing_private\.creation_entitlements entitlement[\s\S]*for update;[\s\S]*select access_window\.\* into strict v_window/);
+assert.doesNotMatch(migration, /academy-retention:/);
 assert.match(migration, /current_setting\('role', true\) = 'service_role'/);
 assert.match(migration, /v_window\.owner_read_until is distinct from v_window\.anonymize_after/);
 assert.match(migration, /revoke all on function public\.academy_anonymize_ended_headquarters\(uuid\)[\s\S]*grant execute[^;]+service_role/);
@@ -39,6 +45,9 @@ for (const phrase of [
   "ended owner export after 90 days denied",
   "reactivated write succeeds",
   "anonymization before boundary denied",
+  "retention worker must lock the authoritative subscription",
+  "platform_billing_private.subscriptions",
+  "platform_billing_private.creation_entitlements",
   "history rows retained",
   "anonymous export denied",
   "academy_platform_access_lifecycle_test_ok",

@@ -56,13 +56,13 @@ stable
 security definer
 set search_path = ''
 as $$
-  select window.actor_user_id,
-         window.status,
-         window.current_period_start,
-         window.current_period_end,
-         window.write_allowed,
-         window.owner_read_until,
-         window.anonymize_after
+  select access_window.actor_user_id,
+         access_window.status,
+         access_window.current_period_start,
+         access_window.current_period_end,
+         access_window.write_allowed,
+         access_window.owner_read_until,
+         access_window.anonymize_after
   from public.academy_headquarters headquarters
   join public.academy_headquarters_access_states access
     on access.headquarters_id = headquarters.id
@@ -71,9 +71,9 @@ as $$
    and access.status = 'active'
   cross join lateral platform_billing_private.resource_access_window(
     'academy_platform', headquarters.id, p_at
-  ) window
+  ) access_window
   where headquarters.id = p_headquarters_id
-    and window.actor_user_id = headquarters.owner_user_id;
+    and access_window.actor_user_id = headquarters.owner_user_id;
 $$;
 
 revoke all on function private.academy_paid_access_window(uuid,timestamptz)
@@ -115,9 +115,9 @@ begin
     return 'paid';
   end if;
 
-  select count(*), coalesce(bool_and(window.write_allowed), false)
+  select count(*), coalesce(bool_and(access_window.write_allowed), false)
   into v_window_count, v_write_allowed
-  from private.academy_paid_access_window(p_headquarters_id, statement_timestamp()) window;
+  from private.academy_paid_access_window(p_headquarters_id, statement_timestamp()) access_window;
 
   if v_window_count = 1 and v_write_allowed then return 'paid'; end if;
   return 'paid_readonly';
@@ -153,9 +153,9 @@ begin
   if v_kind = 'trial' then return true; end if;
   if v_kind is distinct from 'paid' then return false; end if;
 
-  select count(*), min(window.status), min(window.owner_read_until)
+  select count(*), min(access_window.status), min(access_window.owner_read_until)
   into v_count, v_status, v_owner_read_until
-  from private.academy_paid_access_window(p_headquarters_id, p_at) window;
+  from private.academy_paid_access_window(p_headquarters_id, p_at) access_window;
 
   if v_count <> 1 then return false; end if;
   if v_status in ('active', 'past_due') then return true; end if;
@@ -374,11 +374,11 @@ as $$
          case
            when access.access_kind = 'trial' and access.status = 'trialing'
              and statement_timestamp() >= access.trial_ends_at then 'expired'
-           when access.access_kind = 'paid' then coalesce(window.status, 'unavailable')
+           when access.access_kind = 'paid' then coalesce(access_window.status, 'unavailable')
            else access.status
          end,
          access.starts_at,
-         case when access.access_kind = 'paid' then window.current_period_end
+         case when access.access_kind = 'paid' then access_window.current_period_end
               else access.trial_ends_at end,
          case when access.access_kind = 'trial' and access.status = 'trialing'
                    and statement_timestamp() < access.trial_ends_at
@@ -390,7 +390,7 @@ as $$
   join public.academy_headquarters_access_states access
     on access.headquarters_id = headquarters.id
    and access.owner_user_id = headquarters.owner_user_id
-  left join lateral private.academy_paid_access_window(headquarters.id, statement_timestamp()) window
+  left join lateral private.academy_paid_access_window(headquarters.id, statement_timestamp()) access_window
     on access.access_kind = 'paid'
   where headquarters.id = p_headquarters_id
     and private.academy_headquarters_role(headquarters.id, (select auth.uid())) is not null;
@@ -461,14 +461,45 @@ set search_path = ''
 as $$
 declare
   v_window record;
+  v_subscription_id uuid;
+  v_source_attempt_id uuid;
+  v_subscription_actor uuid;
+  v_entitlement_id uuid;
   v_owner uuid;
   v_counts jsonb := '{}'::jsonb;
   v_count integer;
 begin
-  perform pg_advisory_xact_lock(hashtextextended('academy-retention:' || p_headquarters_id::text, 0));
+  -- Lock the authoritative common subscription before its consumed creation
+  -- entitlement. Subscription event application also locks this row, while the
+  -- paid activation verifiers use the same subscription -> entitlement order.
+  -- Holding both locks through the final window recheck prevents anonymization
+  -- from racing a renewal/reactivation into an active state.
+  select subscription.id, subscription.source_attempt_id, subscription.actor_user_id
+  into strict v_subscription_id, v_source_attempt_id, v_subscription_actor
+  from platform_billing_private.subscriptions subscription
+  join platform_billing_private.creation_entitlements entitlement
+    on entitlement.source_attempt_id = subscription.source_attempt_id
+   and entitlement.actor_user_id = subscription.actor_user_id
+   and entitlement.product_key = subscription.product_key
+   and entitlement.plan_key = subscription.plan_key
+  where subscription.product_key = 'academy_platform'
+    and entitlement.source_kind = 'verified_paid'
+    and entitlement.status = 'consumed'
+    and entitlement.resource_id = p_headquarters_id
+  for update of subscription;
 
-  select window.* into strict v_window
-  from private.academy_paid_access_window(p_headquarters_id, p_at) window;
+  select entitlement.id into strict v_entitlement_id
+  from platform_billing_private.creation_entitlements entitlement
+  where entitlement.source_attempt_id = v_source_attempt_id
+    and entitlement.actor_user_id = v_subscription_actor
+    and entitlement.product_key = 'academy_platform'
+    and entitlement.source_kind = 'verified_paid'
+    and entitlement.status = 'consumed'
+    and entitlement.resource_id = p_headquarters_id
+  for update;
+
+  select access_window.* into strict v_window
+  from private.academy_paid_access_window(p_headquarters_id, p_at) access_window;
   if v_window.status <> 'ended' or v_window.anonymize_after is null
     or p_at < v_window.anonymize_after
     or v_window.owner_read_until is distinct from v_window.anonymize_after then

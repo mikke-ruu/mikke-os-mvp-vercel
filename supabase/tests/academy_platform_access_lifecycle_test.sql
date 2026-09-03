@@ -45,6 +45,50 @@ insert into public.academy_headquarters_access_states(headquarters_id,owner_user
  ('cc030000-0000-4000-8000-000000000001','ac030000-0000-4000-8000-000000000001','paid','active',now()-interval'1 day',now()-interval'1 day'),
  ('cc030000-0000-4000-8000-000000000002','ac030000-0000-4000-8000-000000000002','paid','active',now()-interval'1 day',now()-interval'1 day'),
  ('cc030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003','paid','active',now()-interval'100 days',now()-interval'100 days');
+
+-- The retention worker must lock the authoritative subscription and its
+-- consumed entitlement before its final access-window recheck. These rows are
+-- deliberately real common-ledger fixtures even though the projection below
+-- is replaced with a deterministic test double.
+insert into platform_billing_private.scopes(id,owner_user_id,product_key,resource_id) values
+ ('fc030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003','academy_platform','cc030000-0000-4000-8000-000000000003');
+insert into platform_billing_private.quotes(
+ quote_id,scope_id,owner_user_id,product_key,resource_id,plan_key,request_id,revision,payload,issued_at,expires_at
+) values (
+ 'academy-lifecycle-ended','fc030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003',
+ 'academy_platform','cc030000-0000-4000-8000-000000000003','small','gc030000-0000-4000-8000-000000000003',1,
+ jsonb_build_object(
+   'quoteId','academy-lifecycle-ended','revision',1,
+   'scope',jsonb_build_object('ownerUserId','ac030000-0000-4000-8000-000000000003','productKey','academy_platform',
+     'resourceId','cc030000-0000-4000-8000-000000000003','planKey','small','requestId','gc030000-0000-4000-8000-000000000003'),
+   'issuedAt',to_char((statement_timestamp()-interval'121 days') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+   'expiresAt',to_char((statement_timestamp()-interval'120 days') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+ ), statement_timestamp()-interval'121 days',statement_timestamp()-interval'120 days'
+ );
+insert into platform_billing_private.attempts(
+ id,scope_id,owner_user_id,product_key,resource_id,plan_key,request_id,quote_id,quote_revision,consent,
+ status,provider_idempotency_key,provider_session_id,provider_result_hash
+) values (
+ 'fd030000-0000-4000-8000-000000000003','fc030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003',
+ 'academy_platform','cc030000-0000-4000-8000-000000000003','small','gc030000-0000-4000-8000-000000000003',
+ 'academy-lifecycle-ended',1,'{}'::jsonb,'provider_ready',
+ 'platform-checkout-fd030000-0000-4000-8000-000000000003','cs_test_AcademyLifecycleEnded',repeat('a',64)
+ );
+insert into platform_billing_private.subscriptions(
+ id,actor_user_id,product_key,plan_key,source_attempt_id,provider_customer_id,provider_subscription_id,
+ initial_amount_yen,currency,status,original_paid_at,current_period_start,current_period_end
+) values (
+ 'fe030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003','academy_platform','small',
+ 'fd030000-0000-4000-8000-000000000003','cus_AcademyLifecycleEnded','sub_AcademyLifecycleEnded',5000,'jpy','ended',
+ statement_timestamp()-interval'120 days',statement_timestamp()-interval'120 days',statement_timestamp()-interval'100 days'
+ );
+insert into platform_billing_private.creation_entitlements(
+ id,actor_user_id,product_key,plan_key,source_kind,source_attempt_id,idempotency_key,status,starts_at,expires_at,resource_id,consumed_at
+) values (
+ 'ff030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003','academy_platform','small','verified_paid',
+ 'fd030000-0000-4000-8000-000000000003','fa030000-0000-4000-8000-000000000003','consumed',
+ statement_timestamp()-interval'120 days',statement_timestamp()-interval'100 days','cc030000-0000-4000-8000-000000000003',statement_timestamp()-interval'120 days'
+ );
 insert into pg_temp.academy_lifecycle_windows values
  ('cc030000-0000-4000-8000-000000000001','ac030000-0000-4000-8000-000000000001','active',now()-interval'1 day',now()+interval'29 days',true,null,null),
  ('cc030000-0000-4000-8000-000000000002','ac030000-0000-4000-8000-000000000002','active',now()-interval'1 day',now()+interval'29 days',true,null,null),
