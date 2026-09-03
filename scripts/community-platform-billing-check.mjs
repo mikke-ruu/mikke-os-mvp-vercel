@@ -41,6 +41,7 @@ const { CommunityPlatformBillingView } = load("components/community/CommunityPla
 const resource = "ad000001-0000-4000-8000-000000000001";
 const other = "ad000002-0000-4000-8000-000000000002";
 const requestId = "ad000003-0000-4000-8000-000000000003";
+const owner = "ad000004-0000-4000-8000-000000000004";
 let checks = 0;
 function check(name, fn) { fn(); checks++; }
 async function checkAsync(name, fn) { await fn(); checks++; }
@@ -50,6 +51,18 @@ const dto = (patch = {}) => ({ version: 0, product: "community_platform", resour
 const state = (patch = {}) => ({ kind: "loaded", data: dto(patch) });
 const response = (raw, status = 200) => new Response(JSON.stringify(raw), { status, headers: { "Content-Type": "application/json" } });
 const transport = (fetcher, token = "fixture-token-not-valid") => ({ getAccessToken: async () => token, fetch: fetcher });
+const quoteDto = (patch = {}) => ({
+  quoteId: "quote-community-1", revision: 1, purchaseIntent: "explicit_paid_start",
+  scope: { ownerUserId: owner, productKey: "community_platform", resourceId: resource, planKey: "starter", requestId },
+  currency: "JPY", taxIncluded: true, dueNow: { totalYen: 2980, dueOn: "2026-09-04" }, nextPayment: { totalYen: 2980, dueOn: "2026-10-04" },
+  merchant: { merchantId: "ojas", legalName: "株式会社OJAS", address: "東京都 テスト住所", contactUrl: "https://example.com/contact" },
+  policies: { approved: true, approvalId: "community-policy", revision: 1,
+    terms: { version: "terms-v1", url: "https://example.com/terms" }, privacy: { version: "privacy-v1", url: "https://example.com/privacy" },
+    refund: { version: "refund-v1", url: "https://example.com/refund" }, cancellation: { version: "cancel-v1", url: "https://example.com/cancel" },
+    proration: { version: "proration-v1", url: "https://example.com/proration" }, renewal: { version: "renewal-v1", url: "https://example.com/renewal" },
+    commercialDisclosure: { version: "commerce-v1", url: "https://example.com/commerce" } },
+  issuedAt: "2026-09-03T00:00:00.000Z", expiresAt: "2026-09-03T00:15:00.000Z", ...patch
+});
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const flush = async () => { for (let i = 0; i < 12; i++) await Promise.resolve(); };
 
@@ -198,7 +211,7 @@ for (const kind of ["unavailable", "policy_pending", "auth_required", "resource_
 for (const availability of ["not_configured", "policy_pending"]) {
   check("not ready blocks portal", () => assert.ok(model.communityPlatformActionBlock(state({ availability }), "portal")));
 }
-check("v0 checkout always blocked even with capability", () => assert.ok(model.communityPlatformActionBlock(state({ allowedActions: ["checkout"] }), "checkout")));
+check("server capability enables quote checkout flow", () => assert.equal(model.communityPlatformActionBlock(state({ allowedActions: ["checkout"] }), "checkout"), null));
 check("portal requires existing target", () => assert.ok(model.communityPlatformActionBlock(state({ resourceId: null }), "portal")));
 check("portal requires server capability", () => assert.ok(model.communityPlatformActionBlock(state({ allowedActions: [] }), "portal")));
 check("portal available for server-confirmed scope", () => assert.equal(model.communityPlatformActionBlock(state(), "portal"), null));
@@ -268,6 +281,48 @@ await checkAsync("portal does not retry automatically", async () => {
 });
 await checkAsync("portal rejects unsafe redirect", async () => assert.equal((await model.openCommunityPlatformPortal(state(), requestId, transport(async () => response({ version: 0, redirectUrl: "https://evil.test" })))).ok, false));
 
+check("strict quote decoder binds scope plan resource and request", () => assert.ok(model.decodeCommunityPlatformQuote(quoteDto(), resource, "starter", requestId)));
+for (const raw of [
+  quoteDto({ currency: "USD" }), quoteDto({ amount: 1 }), quoteDto({ scope: { ...quoteDto().scope, resourceId: other } }),
+  quoteDto({ scope: { ...quoteDto().scope, planKey: "standard" } }), quoteDto({ dueNow: { totalYen: -1, dueOn: "2026-09-04" } }),
+  quoteDto({ merchant: { ...quoteDto().merchant, contactUrl: "javascript:alert(1)" } }),
+  quoteDto({ policies: { ...quoteDto().policies, terms: { version: "terms-v1", url: "http://example.com" } } })
+]) check("unsafe or mismatched quote fails closed", () => assert.equal(model.decodeCommunityPlatformQuote(raw, resource, "starter", requestId), null));
+await checkAsync("quote request uses narrow authenticated scope", async () => {
+  let calls = 0;
+  const result = await model.requestCommunityPlatformQuote(state({ allowedActions: ["checkout"] }), "starter", requestId, transport(async (url, init) => {
+    calls++; assert.equal(url, "/api/billing/platform/quote"); assert.equal(init.method, "POST");
+    assert.equal(init.credentials, "omit"); assert.equal(init.redirect, "error"); assert.equal(init.cache, "no-store");
+    assert.deepEqual(JSON.parse(init.body), { product: "community_platform", resourceId: resource, planKey: "starter", requestId });
+    return response(quoteDto());
+  }));
+  assert.equal(calls, 1); assert.equal(result.ok, true); assert.equal(result.quote.dueNow.totalYen, 2980);
+});
+for (const key of ["trial", "enterprise"]) await checkAsync("non-paid catalogue plans never call quote API", async () => {
+  const result = await model.requestCommunityPlatformQuote(state({ allowedActions: ["checkout"] }), key, requestId, transport(() => assert.fail()));
+  assert.equal(result.ok, false);
+});
+await checkAsync("no explicit acceptance never calls checkout", async () => {
+  const result = await model.startCommunityPlatformCheckout(state({ allowedActions: ["checkout"] }), quoteDto(), false, transport(() => assert.fail()));
+  assert.equal(result.ok, false);
+});
+await checkAsync("accepted checkout sends consent only and allows canonical Stripe", async () => {
+  let body;
+  const result = await model.startCommunityPlatformCheckout(state({ allowedActions: ["checkout"] }), quoteDto(), true, transport(async (url, init) => {
+    assert.equal(url, "/api/billing/platform/checkout"); body = JSON.parse(init.body);
+    return response({ state: "redirect", redirectUrl: "https://checkout.stripe.com/c/pay_fixture" });
+  }));
+  assert.equal(result.ok, true); assert.equal(result.state, "redirect");
+  assert.deepEqual(body, { version: 1, product: "community_platform", resourceId: resource, planKey: "starter", requestId,
+    consent: { quoteId: "quote-community-1", revision: 1, termsVersion: "terms-v1", accepted: true } });
+  assert.ok(!JSON.stringify(body).includes("2980")); assert.ok(!JSON.stringify(body).includes(owner));
+});
+await checkAsync("checkout rejects unsafe redirect", async () => {
+  const result = await model.startCommunityPlatformCheckout(state({ allowedActions: ["checkout"] }), quoteDto(), true,
+    transport(async () => response({ state: "redirect", redirectUrl: "https://checkout.stripe.com.evil.test/x" })));
+  assert.equal(result.ok, false);
+});
+
 for (const kind of ["unavailable", "auth_required", "error", "policy_pending"]) check("UI empty state honest", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: { kind } }));
   assert.ok(html.includes("請求額と請求日は未取得")); assert.ok(html.includes("disabled"));
@@ -278,6 +333,15 @@ check("UI links to guarded create only after authoritative readiness", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ resourceId: null, subscription: null, creation: { state: "available" }, allowedActions: ["create_resource"] }) }));
   assert.ok(html.includes("1回だけ安全に消費")); assert.ok(html.includes('href="/community/create"'));
   assert.ok(html.includes("利用開始確認が完了"));
+});
+check("SSR quote is responsive and still requires explicit consent", () => {
+  const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, {
+    state: state({ allowedActions: ["checkout"] }), selectedKey: "starter", quote: quoteDto()
+  }));
+  assert.ok(html.includes("今回のお支払い（税込）")); assert.ok(html.includes("2,980円")); assert.ok(html.includes("株式会社OJAS"));
+  assert.ok(html.includes("利用規約")); assert.ok(html.includes("terms-v1")); assert.ok(html.includes("sm:grid-cols-2"));
+  assert.match(html, /type="checkbox"/); assert.match(html, /disabled=""/);
+  assert.ok(!html.includes(owner)); assert.ok(!html.includes("quote-community-1"));
 });
 check("shared decoder rejects noncanonical dates and unsafe actions", () => {
   assert.equal(model.decodeCommunityPlatformStatus(dto({ subscription: { ...dto().subscription, currentPeriodEndsAt: "2026-10-01T00:00:00Z" } }), resource), null);
@@ -296,13 +360,14 @@ check("source boundaries", () => {
   const view = readFileSync("components/community/CommunityPlatformBilling.tsx", "utf8");
   const browserTransport = readFileSync("lib/community/platform-billing-browser.ts", "utf8");
   assert.doesNotMatch(adapter + view + browserTransport, /localStorage|service_role|STRIPE_SECRET|\.rpc\(|\.from\(/);
-  assert.doesNotMatch(adapter, /\/api\/billing\/platform\/checkout["']/);
-  assert.match(view, /pending\.current/); assert.match(view, /request\.current\.id/);
+  assert.match(adapter, /\/api\/billing\/platform\/quote/);
+  assert.match(adapter, /\/api\/billing\/platform\/checkout/);
+  assert.match(view, /pending\.current/); assert.match(view, /quoteRequest\.current\.id/);
   assert.match(browserTransport, /getSession\(\)/); assert.doesNotMatch(view + browserTransport, /console\./);
   assert.match(view, /onAuthStateChange/); assert.match(view, /subscription\.unsubscribe\(\)/);
   assert.match(view, /key=\{resourceId \?\? "new"\}/);
   assert.match(view, /identityEpoch\.current !== epoch/);
-  assert.match(view, /if \(principal\.current !== nextPrincipal\) request\.current = null/);
+  assert.match(view, /principal\.current !== nextPrincipal/); assert.match(view, /setQuote\(null\)/);
   const hub = readFileSync("components/community/CommunityHub.tsx", "utf8");
   const client = readFileSync("lib/community/client.ts", "utf8");
   const migration = readFileSync("supabase/migrations/20260901130000_community_guarded_platform_creation.sql", "utf8");

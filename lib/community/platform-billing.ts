@@ -1,6 +1,6 @@
 import { getCommunityPlatformPlan } from "./platform-plans";
 import {
-  UUID_PATTERN, decodePlatformStatus, hasExactKeys, isPlatformRedirect, isRecord,
+  UUID_PATTERN, decodePlatformStatus, hasExactKeys, isCanonicalTime, isPlatformRedirect, isRecord,
   type PlatformAction, type PlatformStatusV0
 } from "../billing/platform/contracts";
 
@@ -67,9 +67,8 @@ export function communityPlatformActionBlock(state: CommunityPlatformReadState, 
   const data = state.data;
   if (data.availability !== "ready") return COMMUNITY_PLATFORM_MESSAGES[data.availability === "policy_pending" ? "policy_pending" : "unavailable"];
   if (data.noticeCode !== null) return "契約状態を再確認してください。";
-  // v0 has no final amount/date/legal-consent contract. Shared v1 is required.
-  if (action === "checkout") return "お支払い金額・請求日・契約条件の最終確認は準備中です。まだ決済できません。";
   if (!data.allowedActions.includes(action)) return "現在この操作は利用できません。";
+  if (action === "checkout") return null;
   if (action === "portal") return data.resourceId && data.subscription ? null : "請求・契約管理の対象を確認できません。";
   // This is a display hint, not a grant. The actual create API must atomically
   // consume the entitlement. No inference from URL, plan or local storage.
@@ -120,6 +119,115 @@ export async function loadCommunityPlatformStatus(
 
 export function isCommunityPlatformProviderUrl(value: unknown): value is string {
   return isPlatformRedirect(value, "portal");
+}
+
+export type CommunityBillingPolicyName = "terms" | "privacy" | "refund" | "cancellation" | "proration" | "renewal" | "commercialDisclosure";
+export type CommunityPlatformQuote = Readonly<{
+  quoteId: string;
+  revision: number;
+  purchaseIntent: "explicit_paid_start";
+  scope: Readonly<{ ownerUserId: string; productKey: typeof COMMUNITY_PLATFORM_PRODUCT; resourceId: string | null; planKey: string; requestId: string }>;
+  currency: "JPY";
+  taxIncluded: true;
+  dueNow: Readonly<{ totalYen: number; dueOn: string }>;
+  nextPayment: Readonly<{ totalYen: number; dueOn: string }>;
+  merchant: Readonly<{ merchantId: string; legalName: string; address: string; contactUrl: string }>;
+  policies: Readonly<{ approved: true; approvalId: string; revision: number } & Record<CommunityBillingPolicyName, Readonly<{ version: string; url: string }>>>;
+  issuedAt: string;
+  expiresAt: string;
+}>;
+export type CommunityCheckoutResult =
+  | { ok: true; state: "pending" }
+  | { ok: true; state: "redirect"; redirectUrl: string }
+  | { ok: false; message: string; authRequired?: boolean };
+
+const policyNames: readonly CommunityBillingPolicyName[] = ["terms", "privacy", "refund", "cancellation", "proration", "renewal", "commercialDisclosure"];
+const token = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(value);
+const text = (value: unknown, limit = 500) => typeof value === "string" && value.length > 0 && value.length <= limit && value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value);
+const httpsUrl = (value: unknown) => {
+  if (!text(value, 2048)) return false;
+  try { const url = new URL(value as string); return url.protocol === "https:" && !url.username && !url.password && Boolean(url.hostname); } catch { return false; }
+};
+const day = (value: unknown) => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;
+};
+const payment = (value: unknown) => record(value) && hasKeys(value, ["totalYen", "dueOn"])
+  && typeof value.totalYen === "number" && Number.isSafeInteger(value.totalYen) && value.totalYen >= 0 && day(value.dueOn);
+
+export function decodeCommunityPlatformQuote(raw: unknown, resourceId: string | null, planKey: string, requestId: string): CommunityPlatformQuote | null {
+  if (!record(raw) || !hasKeys(raw, ["quoteId", "revision", "purchaseIntent", "scope", "currency", "taxIncluded", "dueNow", "nextPayment", "merchant", "policies", "issuedAt", "expiresAt"])
+    || !token(raw.quoteId) || !Number.isSafeInteger(raw.revision) || (raw.revision as number) < 1 || raw.purchaseIntent !== "explicit_paid_start"
+    || raw.currency !== "JPY" || raw.taxIncluded !== true || !payment(raw.dueNow) || !payment(raw.nextPayment)
+    || !isCanonicalTime(raw.issuedAt) || !isCanonicalTime(raw.expiresAt) || raw.expiresAt <= raw.issuedAt) return null;
+  const scope = raw.scope;
+  if (!record(scope) || !hasKeys(scope, ["ownerUserId", "productKey", "resourceId", "planKey", "requestId"])
+    || !UUID_PATTERN.test(String(scope.ownerUserId)) || scope.productKey !== COMMUNITY_PLATFORM_PRODUCT || scope.resourceId !== resourceId
+    || scope.planKey !== planKey || scope.requestId !== requestId) return null;
+  const merchant = raw.merchant;
+  if (!record(merchant) || !hasKeys(merchant, ["merchantId", "legalName", "address", "contactUrl"])
+    || !token(merchant.merchantId) || !text(merchant.legalName, 300) || !text(merchant.address) || !httpsUrl(merchant.contactUrl)) return null;
+  const policies = raw.policies;
+  if (!record(policies) || !hasKeys(policies, ["approved", "approvalId", "revision", ...policyNames]) || policies.approved !== true
+    || !token(policies.approvalId) || !Number.isSafeInteger(policies.revision) || (policies.revision as number) < 1) return null;
+  for (const name of policyNames) {
+    const policy = policies[name];
+    if (!record(policy) || !hasKeys(policy, ["version", "url"]) || !token(policy.version) || !httpsUrl(policy.url)) return null;
+  }
+  return raw as CommunityPlatformQuote;
+}
+
+async function postCommunityBilling(path: string, body: unknown, transport: CommunityBillingTransport, signal?: AbortSignal) {
+  if (signal?.aborted) return { response: null, raw: null, authRequired: false };
+  const accessToken = await transport.getAccessToken();
+  if (signal?.aborted) return { response: null, raw: null, authRequired: false };
+  if (!accessToken) return { response: null, raw: null, authRequired: true };
+  const timeout = AbortSignal.timeout(15000);
+  const response = await transport.fetch(path, { method: "POST", credentials: "omit", redirect: "error", cache: "no-store",
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    headers: { "Content-Type": "application/json", Accept: "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify(body) });
+  const raw: unknown = await response.json().catch(() => null);
+  return { response, raw, authRequired: response.status === 401 };
+}
+
+export async function requestCommunityPlatformQuote(
+  state: CommunityPlatformReadState, planKey: string, requestId: string, transport: CommunityBillingTransport, signal?: AbortSignal
+): Promise<{ ok: true; quote: CommunityPlatformQuote } | { ok: false; message: string; authRequired?: boolean }> {
+  const blocked = communityPlatformActionBlock(state, "checkout");
+  const plan = getCommunityPlatformPlan(planKey);
+  if (blocked || state.kind !== "loaded" || !plan || plan.key === "trial" || plan.key === "enterprise" || !UUID_PATTERN.test(requestId))
+    return { ok: false, message: blocked ?? "このプランはこの画面から申し込めません。" };
+  try {
+    const { response, raw, authRequired } = await postCommunityBilling("/api/billing/platform/quote", {
+      product: COMMUNITY_PLATFORM_PRODUCT, resourceId: state.data.resourceId, planKey, requestId
+    }, transport, signal);
+    if (authRequired) return { ok: false, message: COMMUNITY_PLATFORM_MESSAGES.auth_required, authRequired: true };
+    if (!response?.ok) return { ok: false, message: "契約条件を取得できませんでした。状態を再確認してください。" };
+    const quote = decodeCommunityPlatformQuote(raw, state.data.resourceId, planKey, requestId);
+    return quote ? { ok: true, quote } : { ok: false, message: "契約条件を安全に確認できませんでした。状態を再確認してください。" };
+  } catch { return { ok: false, message: "通信できませんでした。状態を再確認してください。" }; }
+}
+
+export async function startCommunityPlatformCheckout(
+  state: CommunityPlatformReadState, quote: CommunityPlatformQuote, accepted: boolean, transport: CommunityBillingTransport, signal?: AbortSignal
+): Promise<CommunityCheckoutResult> {
+  const blocked = communityPlatformActionBlock(state, "checkout");
+  if (blocked || state.kind !== "loaded" || accepted !== true
+    || !decodeCommunityPlatformQuote(quote, state.data.resourceId, quote.scope.planKey, quote.scope.requestId))
+    return { ok: false, message: blocked ?? "契約条件への同意を確認してください。" };
+  try {
+    const { response, raw, authRequired } = await postCommunityBilling("/api/billing/platform/checkout", {
+      version: 1, product: COMMUNITY_PLATFORM_PRODUCT, resourceId: state.data.resourceId, planKey: quote.scope.planKey,
+      requestId: quote.scope.requestId, consent: { quoteId: quote.quoteId, revision: quote.revision, termsVersion: quote.policies.terms.version, accepted: true }
+    }, transport, signal);
+    if (authRequired) return { ok: false, message: COMMUNITY_PLATFORM_MESSAGES.auth_required, authRequired: true };
+    if (!response?.ok || !record(raw)) return { ok: false, message: "お申し込みを開始できませんでした。状態を再確認してください。" };
+    if (hasKeys(raw, ["state"]) && raw.state === "pending") return { ok: true, state: "pending" };
+    if (hasKeys(raw, ["state", "redirectUrl"]) && raw.state === "redirect" && isPlatformRedirect(raw.redirectUrl, "checkout"))
+      return { ok: true, state: "redirect", redirectUrl: raw.redirectUrl };
+    return { ok: false, message: "安全な決済画面を確認できませんでした。状態を再確認してください。" };
+  } catch { return { ok: false, message: "通信できませんでした。状態を再確認してください。" }; }
 }
 
 export async function openCommunityPlatformPortal(
