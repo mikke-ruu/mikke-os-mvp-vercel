@@ -17,6 +17,16 @@ if (!/^community_capacity_isolated_[a-z0-9_]+$/.test(database)) {
   throw new Error("A dedicated community_capacity_isolated_* database is required");
 }
 const psql = process.env.PSQL_PATH || "psql";
+const dockerContainer = process.env.COMMUNITY_CAPACITY_PSQL_DOCKER_CONTAINER || "";
+if (dockerContainer && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(dockerContainer)) {
+  throw new Error("Invalid disposable Docker container name");
+}
+if (dockerContainer && !/(^|[\\/])docker(?:\.exe)?$/i.test(psql)) {
+  throw new Error("PSQL_PATH must be the Docker executable when the Docker adapter is enabled");
+}
+if (!dockerContainer && process.platform === "win32" && /\.(?:cmd|bat)$/i.test(psql)) {
+  throw new Error("Windows command shims are not executable with shell:false; use psql.exe or the Docker adapter");
+}
 const pgEnv = {
   ...process.env,
   PGHOST: url.hostname,
@@ -28,15 +38,41 @@ const pgEnv = {
 };
 delete pgEnv.COMMUNITY_CAPACITY_TEST_DATABASE_URL;
 const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=sqlstate"];
+const dockerPrefix = dockerContainer
+  ? [
+      "exec", "-i",
+      "--env", "PGHOST", "--env", "PGPORT", "--env", "PGUSER",
+      "--env", "PGPASSWORD", "--env", "PGDATABASE", "--env", "PGSSLMODE",
+      dockerContainer, "psql",
+    ]
+  : [];
+
+if (dockerContainer) {
+  const inspected = spawnSync(psql, ["inspect", dockerContainer], {
+    env: pgEnv,
+    encoding: "utf8",
+    timeout: 10_000,
+    shell: false,
+  });
+  if (inspected.status !== 0) throw new Error("Disposable Docker container inspection failed");
+  const info = JSON.parse(inspected.stdout)[0];
+  if (info?.HostConfig?.NetworkMode !== "none" || Object.keys(info?.HostConfig?.PortBindings ?? {}).length !== 0) {
+    throw new Error("Docker adapter requires network=none and no published ports");
+  }
+}
 
 function sync(sql) {
-  const result = spawnSync(psql, args, { env: pgEnv, input: sql, encoding: "utf8", timeout: 60_000 });
+  const result = spawnSync(psql, [...dockerPrefix, ...args], {
+    env: pgEnv, input: sql, encoding: "utf8", timeout: 60_000, shell: false,
+  });
   if (result.status !== 0) throw new Error(`isolated psql failed: ${result.stderr?.trim() || result.error?.message || "unknown"}`);
   return result.stdout.trim();
 }
 function asyncSql(sql) {
   return new Promise((resolve) => {
-    const child = spawn(psql, args, { env: pgEnv, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(psql, [...dockerPrefix, ...args], {
+      env: pgEnv, stdio: ["pipe", "pipe", "pipe"], shell: false,
+    });
     let stdout = "";
     let stderr = "";
     child.stdout.setEncoding("utf8").on("data", (chunk) => { stdout += chunk; });

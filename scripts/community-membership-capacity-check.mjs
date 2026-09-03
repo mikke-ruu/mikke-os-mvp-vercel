@@ -72,6 +72,11 @@ assert.ok(test.includes("community_membership_capacity_enforcement_test_ok"));
 
 assert.ok(concurrency.includes("--run-isolated"));
 assert.ok(concurrency.includes("COMMUNITY_CAPACITY_TEST_DATABASE_URL"));
+assert.ok(concurrency.includes("COMMUNITY_CAPACITY_PSQL_DOCKER_CONTAINER"));
+assert.ok(concurrency.includes('NetworkMode !== "none"'));
+assert.ok(concurrency.includes("Object.keys(info?.HostConfig?.PortBindings ?? {}).length !== 0"));
+assert.ok(concurrency.includes('dockerContainer, "psql"'));
+assert.ok(concurrency.includes("shell: false"));
 assert.ok(concurrency.includes("Promise.all"));
 assert.ok(concurrency.includes("COMMUNITY_MEMBER_CAPACITY_REACHED"));
 assert.ok(concurrency.includes("community_membership_capacity_concurrency_test_ok"));
