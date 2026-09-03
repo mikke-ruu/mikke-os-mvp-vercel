@@ -37,7 +37,7 @@ const pgEnv = {
   PGSSLMODE: "disable",
 };
 delete pgEnv.COMMUNITY_CAPACITY_TEST_DATABASE_URL;
-const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=sqlstate"];
+const args = ["-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=default"];
 const dockerPrefix = dockerContainer
   ? [
       "exec", "-i",
