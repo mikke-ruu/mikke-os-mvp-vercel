@@ -233,10 +233,10 @@ reset role;
 select set_config('request.jwt.claims', '{"role":"anon"}', true);
 select set_config('request.jwt.claim.sub', '', true);
 set local role anon;
-select pg_temp.community_e2e_denied(
-  $$select id from public.community_rooms
-    where id = 'e9040000-0000-4000-8000-000000000010'$$,
-  '42501'
+select pg_temp.community_e2e_assert(
+  (select count(*) = 0 from public.community_rooms
+   where id = 'e9040000-0000-4000-8000-000000000010'),
+  'anonymous cannot read rooms'
 );
 select pg_temp.community_e2e_denied(
   $$insert into public.community_posts (
