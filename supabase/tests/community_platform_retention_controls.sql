@@ -54,11 +54,17 @@ insert into auth.users(id, email, is_anonymous) values
   ('ae070000-0000-4000-8000-000000000001', 'retention-owner@example.invalid', false),
   ('ae070000-0000-4000-8000-000000000002', 'retention-member@example.invalid', false),
   ('ae070000-0000-4000-8000-000000000003', 'retention-academy@example.invalid', false),
-  ('ae070000-0000-4000-8000-000000000004', 'retention-anon@example.invalid', true);
+  ('ae070000-0000-4000-8000-000000000004', 'retention-anon@example.invalid', true),
+  ('ae070000-0000-4000-8000-000000000005', 'retention-trial-active@example.invalid', false),
+  ('ae070000-0000-4000-8000-000000000006', 'retention-trial-ended@example.invalid', false),
+  ('ae070000-0000-4000-8000-000000000007', 'retention-trial-retained@example.invalid', false);
 insert into public.profiles(user_id, handle, display_name) values
   ('ae070000-0000-4000-8000-000000000001', 'retention-owner', 'Retention owner'),
   ('ae070000-0000-4000-8000-000000000002', 'retention-member', 'Retention member'),
-  ('ae070000-0000-4000-8000-000000000003', 'retention-academy', 'Retention Academy');
+  ('ae070000-0000-4000-8000-000000000003', 'retention-academy', 'Retention Academy'),
+  ('ae070000-0000-4000-8000-000000000005', 'retention-trial-active', 'Trial active owner'),
+  ('ae070000-0000-4000-8000-000000000006', 'retention-trial-ended', 'Trial ended owner'),
+  ('ae070000-0000-4000-8000-000000000007', 'retention-trial-retained', 'Trial retained owner');
 
 select set_config('request.jwt.claims','{"role":"service_role"}',true);
 select set_config('request.jwt.claim.sub','',true);
@@ -85,15 +91,31 @@ reset role;
 
 insert into public.community_communities(
   id, slug, name, description, join_mode, status, owner_user_id, logo_url, banner_url
-) values (
-  'ce070000-0000-4000-8000-000000000001', 'retention-community', 'Retention Community',
-  'operator metadata', 'invite_only', 'active', 'ae070000-0000-4000-8000-000000000001',
-  'https://example.invalid/logo.png', 'https://example.invalid/banner.png'
-);
+) values
+  (
+    'ce070000-0000-4000-8000-000000000001', 'retention-community', 'Retention Community',
+    'operator metadata', 'invite_only', 'active', 'ae070000-0000-4000-8000-000000000001',
+    'https://example.invalid/logo.png', 'https://example.invalid/banner.png'
+  ),
+  (
+    'ce070000-0000-4000-8000-000000000101', 'retention-trial-active', 'Active trial Community',
+    null, 'invite_only', 'active', 'ae070000-0000-4000-8000-000000000005', null, null
+  ),
+  (
+    'ce070000-0000-4000-8000-000000000201', 'retention-trial-ended', 'Ended trial Community',
+    null, 'invite_only', 'active', 'ae070000-0000-4000-8000-000000000006', null, null
+  ),
+  (
+    'ce070000-0000-4000-8000-000000000301', 'retention-trial-retained', 'Retained trial Community',
+    null, 'invite_only', 'active', 'ae070000-0000-4000-8000-000000000007', null, null
+  );
 insert into public.community_memberships(id, community_id, user_id, role, status, access_scope) values
   ('ce070000-0000-4000-8000-000000000011', 'ce070000-0000-4000-8000-000000000001', 'ae070000-0000-4000-8000-000000000001', 'owner', 'active', 'community'),
   ('ce070000-0000-4000-8000-000000000012', 'ce070000-0000-4000-8000-000000000001', 'ae070000-0000-4000-8000-000000000002', 'member', 'active', 'community'),
-  ('ce070000-0000-4000-8000-000000000013', 'ce070000-0000-4000-8000-000000000001', 'ae070000-0000-4000-8000-000000000003', 'member', 'active', 'linked_rooms');
+  ('ce070000-0000-4000-8000-000000000013', 'ce070000-0000-4000-8000-000000000001', 'ae070000-0000-4000-8000-000000000003', 'member', 'active', 'linked_rooms'),
+  ('ce070000-0000-4000-8000-000000000111', 'ce070000-0000-4000-8000-000000000101', 'ae070000-0000-4000-8000-000000000005', 'owner', 'active', 'community'),
+  ('ce070000-0000-4000-8000-000000000211', 'ce070000-0000-4000-8000-000000000201', 'ae070000-0000-4000-8000-000000000006', 'owner', 'active', 'community'),
+  ('ce070000-0000-4000-8000-000000000311', 'ce070000-0000-4000-8000-000000000301', 'ae070000-0000-4000-8000-000000000007', 'owner', 'active', 'community');
 insert into public.community_member_profiles(community_id, user_id, display_name) values
   ('ce070000-0000-4000-8000-000000000001', 'ae070000-0000-4000-8000-000000000001', 'Owner'),
   ('ce070000-0000-4000-8000-000000000001', 'ae070000-0000-4000-8000-000000000002', 'Member'),
@@ -153,6 +175,84 @@ insert into public.community_academy_entitlement_claims(
   'ae070000-0000-4000-8000-000000000003', 'academy-access', 'fixture-academy',
   'learner', 'active', statement_timestamp()
 );
+
+insert into platform_billing_private.creation_entitlements(
+  id, actor_user_id, product_key, plan_key, source_kind, source_attempt_id,
+  idempotency_key, status, starts_at, expires_at, resource_id, consumed_at
+) values
+  (
+    'be070000-0000-4000-8000-000000000101', 'ae070000-0000-4000-8000-000000000005',
+    'community_platform', 'trial', 'verified_trial', 'be070000-0000-4000-8000-000000000111',
+    'be070000-0000-4000-8000-000000000121', 'consumed',
+    statement_timestamp() - interval '1 second', statement_timestamp() + interval '29 days 23 hours 59 minutes 59 seconds',
+    'ce070000-0000-4000-8000-000000000101', statement_timestamp() - interval '1 second'
+  ),
+  (
+    'be070000-0000-4000-8000-000000000201', 'ae070000-0000-4000-8000-000000000006',
+    'community_platform', 'trial', 'verified_trial', 'be070000-0000-4000-8000-000000000211',
+    'be070000-0000-4000-8000-000000000221', 'consumed',
+    statement_timestamp() - interval '30 days 1 second', statement_timestamp() - interval '1 second',
+    'ce070000-0000-4000-8000-000000000201', statement_timestamp() - interval '30 days 1 second'
+  ),
+  (
+    'be070000-0000-4000-8000-000000000301', 'ae070000-0000-4000-8000-000000000007',
+    'community_platform', 'trial', 'verified_trial', 'be070000-0000-4000-8000-000000000311',
+    'be070000-0000-4000-8000-000000000321', 'consumed',
+    statement_timestamp() - interval '120 days 1 second', statement_timestamp() - interval '90 days 1 second',
+    'ce070000-0000-4000-8000-000000000301', statement_timestamp() - interval '120 days 1 second'
+  );
+
+select pg_temp.retention_assert(
+  (select status='trialing' and write_allowed and owner_read_until is null and anonymize_after is null
+   from community_private.community_platform_access_window(
+     'ce070000-0000-4000-8000-000000000101', statement_timestamp()
+   )),
+  'active verified trial projects trialing write access'
+);
+
+select set_config('request.jwt.claims','{"sub":"ae070000-0000-4000-8000-000000000005","role":"authenticated","is_anonymous":false}',true);
+select set_config('request.jwt.claim.sub','ae070000-0000-4000-8000-000000000005',true);
+set local role authenticated;
+insert into public.community_rooms(id, community_id, title, kind, access_type)
+values (
+  'ce070000-0000-4000-8000-000000000131', 'ce070000-0000-4000-8000-000000000101',
+  'Trial owner active room', 'normal', 'free'
+);
+select pg_temp.retention_assert(
+  exists(select 1 from public.community_rooms where id='ce070000-0000-4000-8000-000000000131'),
+  'active trial owner can write'
+);
+reset role;
+
+select set_config('request.jwt.claims','{"sub":"ae070000-0000-4000-8000-000000000006","role":"authenticated","is_anonymous":false}',true);
+select set_config('request.jwt.claim.sub','ae070000-0000-4000-8000-000000000006',true);
+set local role authenticated;
+select pg_temp.retention_assert(
+  community_private.community_current_actor_owner_read_allowed('ce070000-0000-4000-8000-000000000201')
+  and public.community_export_owner_archive('ce070000-0000-4000-8000-000000000201')#>>'{community,slug}'='retention-trial-ended',
+  'expired trial owner can read and export during 90 days'
+);
+select pg_temp.retention_assert(pg_temp.retention_denied(
+  $q$insert into public.community_rooms(community_id,title,kind,access_type) values ('ce070000-0000-4000-8000-000000000201','Blocked ended trial room','normal','free')$q$,
+  '42501', 'new row violates row-level security policy for table "community_rooms"'
+) or pg_temp.retention_denied(
+  $q$insert into public.community_rooms(community_id,title,kind,access_type) values ('ce070000-0000-4000-8000-000000000201','Blocked ended trial room','normal','free')$q$,
+  '55000', 'COMMUNITY_PLATFORM_OWNER_READ_ONLY'
+), 'expired trial owner cannot write');
+reset role;
+
+select set_config('request.jwt.claims','{"sub":"ae070000-0000-4000-8000-000000000007","role":"authenticated","is_anonymous":false}',true);
+select set_config('request.jwt.claim.sub','ae070000-0000-4000-8000-000000000007',true);
+set local role authenticated;
+select pg_temp.retention_assert(
+  not community_private.community_current_actor_owner_read_allowed('ce070000-0000-4000-8000-000000000301')
+  and pg_temp.retention_denied(
+    $q$select public.community_export_owner_archive('ce070000-0000-4000-8000-000000000301')$q$,
+    '42501', 'COMMUNITY_OWNER_EXPORT_NOT_AVAILABLE'
+  ),
+  'trial owner cannot read or export after 90 days'
+);
+reset role;
 
 select set_config('request.jwt.claims','{"sub":"ae070000-0000-4000-8000-000000000001","role":"authenticated","is_anonymous":false}',true);
 select set_config('request.jwt.claim.sub','ae070000-0000-4000-8000-000000000001',true);

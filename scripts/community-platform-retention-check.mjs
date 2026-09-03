@@ -41,6 +41,11 @@ for (const protectedTable of [
 
 for (const label of [
   "active owner can write",
+  "active verified trial projects trialing write access",
+  "active trial owner can write",
+  "expired trial owner cannot write",
+  "expired trial owner can read and export during 90 days",
+  "trial owner cannot read or export after 90 days",
   "past due owner is read only",
   "ended owner can read and export during 90 days",
   "ended owner cannot read or export after 90 days",
@@ -52,6 +57,9 @@ for (const label of [
   "worker changes allowlisted operator fields only",
   "worker is idempotent",
 ]) assert.ok(test.includes(label), `missing SQL assertion: ${label}`);
+
+assert.match(test, /'community_platform', 'trial', 'verified_trial'/);
+assert.match(test, /status='trialing' and write_allowed/);
 
 assert.ok(test.includes("community_platform_retention_controls_test_ok"));
 console.log("community_platform_retention_contract_ok");
