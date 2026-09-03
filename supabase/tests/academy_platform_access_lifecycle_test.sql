@@ -66,9 +66,9 @@ insert into platform_billing_private.quotes(
    'quoteId','academy-lifecycle-ended','revision',1,
    'scope',jsonb_build_object('ownerUserId','ac030000-0000-4000-8000-000000000003','productKey','academy_platform',
      'resourceId','cc030000-0000-4000-8000-000000000003','planKey','small','requestId','gc030000-0000-4000-8000-000000000003'),
-   'issuedAt',to_char((statement_timestamp()-interval'121 days') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-   'expiresAt',to_char((statement_timestamp()-interval'120 days') at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
- ), statement_timestamp()-interval'121 days',statement_timestamp()-interval'120 days'
+   'issuedAt','2026-01-01T00:00:00.000Z',
+   'expiresAt','2026-01-01T01:00:00.000Z'
+ ), '2026-01-01T00:00:00.000Z'::timestamptz, '2026-01-01T01:00:00.000Z'::timestamptz
  );
 insert into platform_billing_private.attempts(
  id,scope_id,owner_user_id,product_key,resource_id,plan_key,request_id,quote_id,quote_revision,consent,
