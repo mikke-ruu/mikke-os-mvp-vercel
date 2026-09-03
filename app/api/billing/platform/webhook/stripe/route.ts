@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { readStripeRuntimeConfig, verifyStripeEvent } from '@/lib/billing/platform/stripe';
+import { applyVerifiedStripeEvent } from '@/lib/billing/platform/webhook-runtime';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -28,22 +29,10 @@ export async function POST(request:Request) {
       return response(400,{received:false});
     }
     const client=adminClient();
-    const call=event.kind==='activation'
-      ? client.rpc('platform_billing_verified_subscription_activate',{
-          p_attempt_id:event.attemptId,p_provider_event_id:event.eventId,p_provider_event_hash:event.eventHash,
-          p_provider_session_id:event.sessionId,p_provider_customer_id:event.customerId,
-          p_provider_subscription_id:event.subscriptionId,p_amount_total:event.amountTotal,
-          p_currency:event.currency,p_paid_at:event.paidAt,
-        })
-      : client.rpc('platform_billing_subscription_event_apply',{
-          p_provider_subscription_id:event.subscriptionId,p_provider_event_id:event.eventId,
-          p_provider_event_hash:event.eventHash,p_event_kind:event.kind,p_projected_status:event.status,
-          p_period_start:event.periodStart,p_period_end:event.periodEnd,
-          p_cancel_at_period_end:event.kind==='subscription_state'?event.cancelAtPeriodEnd:null,
-          p_occurred_at:event.occurredAt,
-        });
-    const { error }=await call;
-    if (error) return response(500,{received:false});
+    await applyVerifiedStripeEvent(event, async (name,args) => {
+      const { data,error }=await client.rpc(name as never,args as never);
+      return { data:data as unknown,error };
+    });
     return response(200,{received:true});
   } catch { return response(503,{received:false}); }
 }
