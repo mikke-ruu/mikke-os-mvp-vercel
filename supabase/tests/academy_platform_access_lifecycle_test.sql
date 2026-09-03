@@ -20,13 +20,18 @@ create temporary table academy_lifecycle_windows(
   write_allowed boolean not null, owner_read_until timestamptz, anonymize_after timestamptz
 );
 
-create or replace function platform_billing_private.resource_access_window(text,uuid,timestamptz)
+create or replace function platform_billing_private.resource_access_window(
+  p_product_key text,
+  p_resource_id uuid,
+  p_at timestamptz
+)
 returns table(actor_user_id uuid,status text,current_period_start timestamptz,current_period_end timestamptz,
   write_allowed boolean,owner_read_until timestamptz,anonymize_after timestamptz)
 language sql stable security definer set search_path='' as $$
   select fixture.actor_user_id,fixture.status,fixture.period_start,fixture.period_end,
     fixture.write_allowed,fixture.owner_read_until,fixture.anonymize_after
-  from pg_temp.academy_lifecycle_windows fixture where $1='academy_platform' and fixture.resource_id=$2
+  from pg_temp.academy_lifecycle_windows fixture
+  where p_product_key='academy_platform' and fixture.resource_id=p_resource_id
 $$;
 
 insert into auth.users(id,is_anonymous) values
