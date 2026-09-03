@@ -79,20 +79,31 @@ insert into platform_billing_private.attempts(
  'academy-lifecycle-ended',1,'{}'::jsonb,'provider_ready',
  'platform-checkout-fd030000-0000-4000-8000-000000000003','cs_test_AcademyLifecycleEnded',repeat('a',64)
  );
+insert into platform_billing_private.verified_provider_events(
+ provider_event_id,provider_event_hash,provider_session_id,attempt_id,actor_user_id,
+ product_key,plan_key,quote_id,quote_revision,paid_at,entitlement_expires_at
+) values (
+ 'evt_AcademyLifecycleEnded',repeat('b',64),'cs_test_AcademyLifecycleEnded',
+ 'fd030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003',
+ 'academy_platform','small','academy-lifecycle-ended',1,
+ '2026-01-02T00:00:00.000Z'::timestamptz,'2026-02-02T00:00:00.000Z'::timestamptz
+ );
 insert into platform_billing_private.subscriptions(
  id,actor_user_id,product_key,plan_key,source_attempt_id,provider_customer_id,provider_subscription_id,
  initial_amount_yen,currency,status,original_paid_at,current_period_start,current_period_end
 ) values (
  'fe030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003','academy_platform','small',
  'fd030000-0000-4000-8000-000000000003','cus_AcademyLifecycleEnded','sub_AcademyLifecycleEnded',5000,'jpy','ended',
- statement_timestamp()-interval'120 days',statement_timestamp()-interval'120 days',statement_timestamp()-interval'100 days'
+ '2026-01-02T00:00:00.000Z'::timestamptz,'2026-01-02T00:00:00.000Z'::timestamptz,
+ '2026-02-02T00:00:00.000Z'::timestamptz
  );
 insert into platform_billing_private.creation_entitlements(
  id,actor_user_id,product_key,plan_key,source_kind,source_attempt_id,idempotency_key,status,starts_at,expires_at,resource_id,consumed_at
 ) values (
  'ff030000-0000-4000-8000-000000000003','ac030000-0000-4000-8000-000000000003','academy_platform','small','verified_paid',
  'fd030000-0000-4000-8000-000000000003','fa030000-0000-4000-8000-000000000003','consumed',
- statement_timestamp()-interval'120 days',statement_timestamp()-interval'100 days','cc030000-0000-4000-8000-000000000003',statement_timestamp()-interval'120 days'
+ '2026-01-02T00:00:00.000Z'::timestamptz,'2026-02-02T00:00:00.000Z'::timestamptz,
+ 'cc030000-0000-4000-8000-000000000003','2026-01-02T00:00:00.000Z'::timestamptz
  );
 insert into pg_temp.academy_lifecycle_windows values
  ('cc030000-0000-4000-8000-000000000001','ac030000-0000-4000-8000-000000000001','active',now()-interval'1 day',now()+interval'29 days',true,null,null),
