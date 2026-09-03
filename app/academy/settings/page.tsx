@@ -5,6 +5,7 @@ import { Building2, Check, Link2, ReceiptJapaneseYen, ShieldCheck, UserPlus } fr
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyPlatformBillingLoader } from "@/app/academy/billing/AcademyPlatformBillingLoader";
+import { academyCheckoutPlanForCatalogPrice } from "@/lib/academy/platform-billing-view";
 import { supabase } from "@/lib/supabase/client";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import {
@@ -468,6 +469,7 @@ function SettingsContent() {
                   isGuest={isGuest}
                   auth={supabase.auth}
                   fetch={globalThis.fetch}
+                  checkoutPlanKey={academyCheckoutPlanForCatalogPrice(currentBillingEstimate?.catalog_price_yen)}
                 />
               </div>
             </section>

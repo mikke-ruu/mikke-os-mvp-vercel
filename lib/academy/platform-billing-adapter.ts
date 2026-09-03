@@ -77,9 +77,92 @@ export type AcademyBillingReadTransport = {
   fetch: typeof globalThis.fetch;
 };
 
+const policyNames = ["terms", "privacy", "refund", "cancellation", "proration", "renewal", "commercialDisclosure"] as const;
+export type AcademyBillingPolicyName = typeof policyNames[number];
+export type AcademyBillingQuote = Readonly<{
+  quoteId: string;
+  revision: number;
+  scope: Readonly<{ ownerUserId: string; resourceId: string | null; planKey: string; requestId: string }>;
+  dueNow: Readonly<{ totalYen: number; dueOn: string }>;
+  nextPayment: Readonly<{ totalYen: number; dueOn: string }>;
+  merchant: Readonly<{ legalName: string; address: string; contactUrl: string }>;
+  policies: Readonly<Record<AcademyBillingPolicyName, Readonly<{ version: string; url: string }>>>;
+  expiresAt: string;
+}>;
+
+const token = (value: unknown) => typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/.test(value);
+const integer = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+const validDay = (value: unknown) => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value;
+};
+const canonicalTime = (value: unknown) => typeof value === "string"
+  && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+  && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+const safeText = (value: unknown, limit = 500) => typeof value === "string" && value.length > 0
+  && value.length <= limit && value.trim() === value && !/[\u0000-\u001f\u007f]/.test(value);
+const safeHttps = (value: unknown) => {
+  if (!safeText(value, 2048)) return false;
+  try {
+    const url = new URL(value as string);
+    return url.protocol === "https:" && !url.username && !url.password && Boolean(url.hostname);
+  } catch { return false; }
+};
+
+export function decodeAcademyBillingQuote(payload: unknown, expected: {
+  userId: string; resourceId: string | null; planKey: string; requestId: string; now?: Date;
+}): AcademyBillingQuote | null {
+  const now = expected.now ?? new Date();
+  if (!uuid.test(expected.userId) || (expected.resourceId !== null && !uuid.test(expected.resourceId))
+    || !/^[a-z][a-z0-9_]{0,39}$/.test(expected.planKey) || !uuid.test(expected.requestId)
+    || !Number.isFinite(now.getTime()) || !isRecord(payload)
+    || !exactKeys(payload, ["quoteId", "revision", "purchaseIntent", "scope", "currency", "taxIncluded", "dueNow", "nextPayment", "merchant", "policies", "issuedAt", "expiresAt"])) return null;
+  if (!token(payload.quoteId) || !Number.isSafeInteger(payload.revision) || Number(payload.revision) < 1
+    || payload.purchaseIntent !== "explicit_paid_start" || payload.currency !== "JPY" || payload.taxIncluded !== true
+    || !canonicalTime(payload.issuedAt) || !canonicalTime(payload.expiresAt)
+    || Date.parse(payload.issuedAt as string) > now.getTime() || Date.parse(payload.expiresAt as string) <= now.getTime()) return null;
+  const scope = payload.scope;
+  if (!isRecord(scope) || !exactKeys(scope, ["ownerUserId", "productKey", "resourceId", "planKey", "requestId"])
+    || scope.ownerUserId !== expected.userId || scope.productKey !== "academy_platform" || scope.resourceId !== expected.resourceId
+    || scope.planKey !== expected.planKey || scope.requestId !== expected.requestId) return null;
+  const dueNow = payload.dueNow;
+  const nextPayment = payload.nextPayment;
+  if (!isRecord(dueNow) || !exactKeys(dueNow, ["totalYen", "dueOn"]) || !integer(dueNow.totalYen) || !validDay(dueNow.dueOn)
+    || !isRecord(nextPayment) || !exactKeys(nextPayment, ["totalYen", "dueOn"]) || !integer(nextPayment.totalYen) || !validDay(nextPayment.dueOn)
+    || String(nextPayment.dueOn) <= String(dueNow.dueOn)) return null;
+  const merchant = payload.merchant;
+  if (!isRecord(merchant) || !exactKeys(merchant, ["merchantId", "legalName", "address", "contactUrl"])
+    || !token(merchant.merchantId) || !safeText(merchant.legalName, 300) || !safeText(merchant.address)
+    || !safeHttps(merchant.contactUrl)) return null;
+  const policies = payload.policies;
+  if (!isRecord(policies) || !exactKeys(policies, ["approved", "approvalId", "revision", ...policyNames])
+    || policies.approved !== true || !token(policies.approvalId) || !Number.isSafeInteger(policies.revision) || Number(policies.revision) < 1) return null;
+  const decodedPolicies = {} as Record<AcademyBillingPolicyName, { version: string; url: string }>;
+  for (const name of policyNames) {
+    const policy = policies[name];
+    if (!isRecord(policy) || !exactKeys(policy, ["version", "url"]) || !token(policy.version) || !safeHttps(policy.url)) return null;
+    decodedPolicies[name] = { version: policy.version as string, url: policy.url as string };
+  }
+  return Object.freeze({
+    quoteId: payload.quoteId as string,
+    revision: payload.revision as number,
+    scope: Object.freeze({ ownerUserId: expected.userId, resourceId: expected.resourceId, planKey: expected.planKey, requestId: expected.requestId }),
+    dueNow: Object.freeze({ totalYen: dueNow.totalYen as number, dueOn: dueNow.dueOn as string }),
+    nextPayment: Object.freeze({ totalYen: nextPayment.totalYen as number, dueOn: nextPayment.dueOn as string }),
+    merchant: Object.freeze({ legalName: merchant.legalName as string, address: merchant.address as string, contactUrl: merchant.contactUrl as string }),
+    policies: Object.freeze(decodedPolicies),
+    expiresAt: payload.expiresAt as string,
+  });
+}
+
 export type AcademyBillingMutationResult =
   | { kind: "redirect"; url: string }
+  | { kind: "pending" }
   | { kind: "sign_in_required" | "unavailable" | "not_configured" | "policy_pending" | "state_conflict" | "invalid_request" };
+
+export type AcademyBillingQuoteResult = { kind: "quote"; quote: AcademyBillingQuote }
+  | Exclude<AcademyBillingMutationResult, { kind: "redirect" | "pending" }>;
 
 function isApprovedBillingRedirect(value: unknown, action: "checkout" | "portal"): value is string {
   if (typeof value !== "string" || value.length > 4096) return false;
@@ -93,25 +176,19 @@ function isApprovedBillingRedirect(value: unknown, action: "checkout" | "portal"
 }
 
 async function mutateAcademyPlatformBilling(
-  action: "checkout" | "portal",
+  action: "portal",
   resourceId: string | null,
   requestId: string,
   transport: AcademyBillingReadTransport,
-  planKey?: string,
   signal?: AbortSignal,
 ): Promise<AcademyBillingMutationResult> {
   const unavailable = { kind: "unavailable" } as const;
-  if ((action === "portal" && (resourceId === null || !uuid.test(resourceId)))
-    || (action === "checkout" && resourceId !== null && !uuid.test(resourceId))
-    || !uuid.test(requestId)) return { kind: "invalid_request" };
-  if (action === "checkout" && (typeof planKey !== "string" || !/^[a-z][a-z0-9_]{0,39}$/.test(planKey))) return { kind: "invalid_request" };
+  if (resourceId === null || !uuid.test(resourceId) || !uuid.test(requestId)) return { kind: "invalid_request" };
   if (signal?.aborted) return unavailable;
   try {
     const token = await transport.getAccessToken();
     if (!token?.trim()) return { kind: "sign_in_required" };
-    const body = action === "checkout"
-      ? { product: "academy_platform", resourceId, planKey, requestId }
-      : { product: "academy_platform", resourceId, requestId };
+    const body = { product: "academy_platform", resourceId, requestId };
     const response = await transport.fetch(`/api/billing/platform/${action}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },
@@ -139,12 +216,62 @@ async function mutateAcademyPlatformBilling(
   }
 }
 
-export function beginAcademyPlatformCheckout(resourceId: string | null, planKey: string, requestId: string, transport: AcademyBillingReadTransport, signal?: AbortSignal) {
-  return mutateAcademyPlatformBilling("checkout", resourceId, requestId, transport, planKey, signal);
+async function billingError(response: Response): Promise<AcademyBillingMutationResult> {
+  try {
+    const payload: unknown = await response.json();
+    if (!isRecord(payload) || !exactKeys(payload, ["error"]) || !isRecord(payload.error) || !exactKeys(payload.error, ["code"])) return { kind: "unavailable" };
+    const code = payload.error.code;
+    if (response.status === 401 && code === "AUTH_REQUIRED") return { kind: "sign_in_required" };
+    const statuses: Record<string, number> = { RESOURCE_UNAVAILABLE: 404, STATE_CONFLICT: 409, INVALID_REQUEST: 422, BILLING_NOT_CONFIGURED: 503, POLICY_PENDING: 503 };
+    if (typeof code !== "string" || !Object.hasOwn(statuses, code) || statuses[code] !== response.status) return { kind: "unavailable" };
+    return noticeState(code) as AcademyBillingMutationResult;
+  } catch { return { kind: "unavailable" }; }
+}
+
+export async function requestAcademyPlatformBillingQuote(userId: string, resourceId: string | null, planKey: string, requestId: string, transport: AcademyBillingReadTransport, signal?: AbortSignal): Promise<AcademyBillingQuoteResult> {
+  if (!uuid.test(userId) || (resourceId !== null && !uuid.test(resourceId)) || !/^[a-z][a-z0-9_]{0,39}$/.test(planKey) || !uuid.test(requestId)) return { kind: "invalid_request" };
+  if (signal?.aborted) return { kind: "unavailable" };
+  try {
+    const accessToken = await transport.getAccessToken();
+    if (!accessToken?.trim()) return { kind: "sign_in_required" };
+    const response = await transport.fetch("/api/billing/platform/quote", {
+      method: "POST", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ product: "academy_platform", resourceId, planKey, requestId }),
+      cache: "no-store", credentials: "omit", redirect: "error", signal,
+    });
+    if (!response.ok) return await billingError(response) as AcademyBillingQuoteResult;
+    const quote = decodeAcademyBillingQuote(await response.json(), { userId, resourceId, planKey, requestId });
+    return quote ? { kind: "quote", quote } : { kind: "unavailable" };
+  } catch { return { kind: "unavailable" }; }
+}
+
+export async function confirmAcademyPlatformCheckout(quote: AcademyBillingQuote, transport: AcademyBillingReadTransport, signal?: AbortSignal): Promise<AcademyBillingMutationResult> {
+  if (signal?.aborted) return { kind: "unavailable" };
+  try {
+    const accessToken = await transport.getAccessToken();
+    if (!accessToken?.trim()) return { kind: "sign_in_required" };
+    const response = await transport.fetch("/api/billing/platform/checkout", {
+      method: "POST", headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        version: 1, product: "academy_platform", resourceId: quote.scope.resourceId,
+        planKey: quote.scope.planKey, requestId: quote.scope.requestId,
+        consent: { quoteId: quote.quoteId, revision: quote.revision, termsVersion: quote.policies.terms.version, accepted: true },
+      }),
+      cache: "no-store", credentials: "omit", redirect: "error", signal,
+    });
+    if (!response.ok) return await billingError(response);
+    const payload: unknown = await response.json();
+    if (!isRecord(payload)) return { kind: "unavailable" };
+    if (exactKeys(payload, ["state"]) && payload.state === "pending") return { kind: "pending" };
+    if (exactKeys(payload, ["state", "redirectUrl"]) && payload.state === "redirect" && isApprovedBillingRedirect(payload.redirectUrl, "checkout")) {
+      return { kind: "redirect", url: payload.redirectUrl as string };
+    }
+    return { kind: "unavailable" };
+  } catch { return { kind: "unavailable" }; }
 }
 
 export function openAcademyPlatformBillingPortal(resourceId: string, requestId: string, transport: AcademyBillingReadTransport, signal?: AbortSignal) {
-  return mutateAcademyPlatformBilling("portal", resourceId, requestId, transport, undefined, signal);
+  return mutateAcademyPlatformBilling("portal", resourceId, requestId, transport, signal);
 }
 
 /** Read only. Request-local token; no cookie auth, external URLs or retry loop.

@@ -55,6 +55,15 @@ export function formatAcademyBillingDate(value: string | null | undefined) {
     : "未確定";
 }
 
+/** UI hint only. Shared billing must recalculate the tier from authoritative
+ * Academy headcount both when issuing a quote and before checkout. */
+export function academyCheckoutPlanForCatalogPrice(value: number | null | undefined): "small" | "medium" | "large" | null {
+  if (value === 5000) return "small";
+  if (value === 10000) return "medium";
+  if (value === 20000) return "large";
+  return null;
+}
+
 export const ACADEMY_PLATFORM_PRICE_ROWS = [
   { limit: "20名まで", monthly: "5,000円", perPerson: "250円" },
   { limit: "50名まで", monthly: "10,000円", perPerson: "200円" },

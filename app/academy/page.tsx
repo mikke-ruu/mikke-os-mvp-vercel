@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowRight, BookOpen, ClipboardList, GraduationCap, Heart, JapaneseYen, Package, Sparkles, Users } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyPlatformBillingLoader } from "@/app/academy/billing/AcademyPlatformBillingLoader";
 import { toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
+import { supabase } from "@/lib/supabase/client";
 import { getAcademyLaunchProgress } from "@/lib/academy/launch-progress";
 import {
   createHeadquarters,
@@ -73,7 +75,7 @@ function StatCard({
 
 function DashboardContent() {
   const router = useRouter();
-  const { profile } = useAuth();
+  const { user, profile, isGuest } = useAuth();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
   const [instructors, setInstructors] = useState<AcademyInstructor[]>([]);
@@ -208,6 +210,19 @@ function DashboardContent() {
           <button onClick={initHq} className="w-full rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-2.5 text-sm font-bold text-[var(--mikke-text)]">
             契約確認済みの本部を作成する
           </button>
+        ) : null}
+        {!canCreate ? (
+          <div className="mt-4 border-t border-[var(--mikke-line)] pt-4 text-left">
+            <p className="mb-3 text-xs font-bold text-[var(--mikke-text)]">有料で新しい本部を始める場合</p>
+            <AcademyPlatformBillingLoader
+              userId={user.id}
+              resourceId={null}
+              isGuest={isGuest}
+              auth={supabase.auth}
+              fetch={globalThis.fetch}
+              checkoutPlanKey="small"
+            />
+          </div>
         ) : null}
         {creationError ? <p className="text-xs font-bold text-red-600">{creationError}</p> : null}
       </div>

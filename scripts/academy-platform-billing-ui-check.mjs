@@ -25,13 +25,16 @@ function load(path) {
 const model = load("lib/academy/platform-billing-view.ts");
 const {
   projectAcademyPlatformBillingStatus: project,
+  decodeAcademyBillingQuote: decodeQuote,
   readAcademyPlatformBillingStatus: readStatus,
-  beginAcademyPlatformCheckout: beginCheckout,
+  requestAcademyPlatformBillingQuote: requestQuote,
+  confirmAcademyPlatformCheckout: confirmCheckout,
   openAcademyPlatformBillingPortal: openPortal,
 } = load("lib/academy/platform-billing-adapter.ts");
 const { AcademyPlatformBillingPanel: Panel } = load("app/academy/billing/AcademyPlatformBillingPanel.tsx");
 const render = (state) => renderToStaticMarkup(React.createElement(Panel, { state }));
 const hq = "10000000-0000-4000-8000-000000000001";
+const billingUser = "10000000-0000-4000-8000-000000000010";
 const dto = {
   version: 0, product: "academy_platform", resourceId: hq, availability: "ready",
   subscription: { state: "active", planKey: "academy", currentPeriodEndsAt: "2026-10-01T00:00:00.000Z", cancelAtPeriodEnd: false },
@@ -55,6 +58,10 @@ assert.equal(model.formatAcademyBillingYen(0), "0円");
 assert.equal(model.formatAcademyBillingYen(5000), "5,000円");
 assert.equal(model.formatAcademyBillingDate("not a date"), "未確定");
 assert.match(model.formatAcademyBillingDate("2026-08-31T15:00:00Z"), /2026年9月1日/);
+assert.equal(model.academyCheckoutPlanForCatalogPrice(5000), "small");
+assert.equal(model.academyCheckoutPlanForCatalogPrice(10000), "medium");
+assert.equal(model.academyCheckoutPlanForCatalogPrice(20000), "large");
+for (const unresolved of [null, 0, 20100, 30000]) assert.equal(model.academyCheckoutPlanForCatalogPrice(unresolved), null);
 
 for (const bad of [null, [], {}, { ...dto, version: 1 }, { ...dto, product: "community_platform" }, { ...dto, resourceId: null }, { ...dto, availability: "policy_pending" }, { ...dto, availability: "not_configured" }, { ...dto, noticeCode: "UNKNOWN" }, { ...dto, amount: 0 }, { ...dto, allowedActions: ["create_anything"] }, { ...dto, allowedActions: ["portal", "portal"] }, { ...dto, creation: { state: "unknown" } }, { ...dto, subscription: { ...dto.subscription, state: "unknown" } }, { ...dto, subscription: { ...dto.subscription, currentPeriodEndsAt: "tomorrow" } }, { ...dto, subscription: { ...dto.subscription, cancelAtPeriodEnd: "true" } }]) {
   assert.deepEqual(project(bad, hq), { kind: "unavailable" });
@@ -138,6 +145,39 @@ assert.equal(fetchCalls, 2);
 const adapterSource = readFileSync(resolve(root, "lib/academy/platform-billing-adapter.ts"), "utf8");
 assert.doesNotMatch(adapterSource, /console\.|localStorage|sessionStorage|SERVICE_ROLE|SECRET_KEY|NEXT_PUBLIC/);
 const requestId = "10000000-0000-4000-8000-000000000099";
+const quotePayload = (resourceId = hq) => ({
+  quoteId: "quote-academy-fixture", revision: 1, purchaseIntent: "explicit_paid_start",
+  scope: { ownerUserId: billingUser, productKey: "academy_platform", resourceId, planKey: "small", requestId },
+  currency: "JPY", taxIncluded: true,
+  dueNow: { totalYen: 5000, dueOn: "2026-09-03" },
+  nextPayment: { totalYen: 5000, dueOn: "2026-10-03" },
+  merchant: { merchantId: "ojas", legalName: "株式会社OJAS", address: "東京都 テスト住所", contactUrl: "https://example.com/contact" },
+  policies: {
+    approved: true, approvalId: "academy-approved", revision: 2,
+    ...Object.fromEntries(["terms", "privacy", "refund", "cancellation", "proration", "renewal", "commercialDisclosure"].map(name => [name, { version: `${name}-v1`, url: `https://example.com/${name}` }])),
+  },
+  issuedAt: new Date(Date.now() - 60_000).toISOString(),
+  expiresAt: new Date(Date.now() + 600_000).toISOString(),
+});
+const decodedQuote = decodeQuote(quotePayload(), { userId: billingUser, resourceId: hq, planKey: "small", requestId });
+assert.ok(decodedQuote);
+for (const bad of [
+  { ...quotePayload(), amount: 5000 },
+  { ...quotePayload(), scope: { ...quotePayload().scope, ownerUserId: "10000000-0000-4000-8000-000000000020" } },
+  { ...quotePayload(), scope: { ...quotePayload().scope, planKey: "trial" } },
+  { ...quotePayload(), dueNow: { totalYen: 0, dueOn: "2026-02-30" } },
+  { ...quotePayload(), merchant: { ...quotePayload().merchant, contactUrl: "http://example.com/contact" } },
+  { ...quotePayload(), policies: { ...quotePayload().policies, terms: { version: "terms-v1", url: "javascript:alert(1)" } } },
+]) assert.equal(decodeQuote(bad, { userId: billingUser, resourceId: hq, planKey: "small", requestId }), null);
+
+const checkoutState = project({ ...dto, subscription: null, creation: { state: "none" }, allowedActions: ["checkout"] }, hq);
+const quoteHtml = renderToStaticMarkup(React.createElement(Panel, {
+  state: checkoutState, quote: decodedQuote, quoteAccepted: true,
+  onRequestQuote() {}, onQuoteAccepted() {}, onConfirmCheckout() {},
+}));
+for (const expected of ["5,000円", "2026年9月3日", "2026年10月3日", "株式会社OJAS", "利用規約", "特定商取引法に基づく表記", "同意して決済画面へ進む"]) assert.match(quoteHtml, new RegExp(expected));
+assert.doesNotMatch(quoteHtml, /quote-academy-fixture|10000000-0000-4000-8000-000000000010|academy-approved/);
+assert.match(quoteHtml, /sm:grid-cols-2/);
 let mutationCalls = 0;
 const mutationTransport = {
   getAccessToken: async () => "fresh-mutation-token",
@@ -152,29 +192,48 @@ const mutationTransport = {
       assert.deepEqual(JSON.parse(options.body), { product: "academy_platform", resourceId: hq, requestId });
       return Response.json({ version: 0, redirectUrl: "https://billing.stripe.com/p/session_fixture" });
     }
-    assert.deepEqual(JSON.parse(options.body), { product: "academy_platform", resourceId: hq, planKey: "small", requestId });
-    return Response.json({ version: 0, redirectUrl: "https://checkout.stripe.com/c/pay/session_fixture" });
+    if (url.endsWith("/quote")) {
+      assert.deepEqual(JSON.parse(options.body), { product: "academy_platform", resourceId: hq, planKey: "small", requestId });
+      return Response.json(quotePayload());
+    }
+    assert.equal(url, "/api/billing/platform/checkout");
+    assert.deepEqual(JSON.parse(options.body), {
+      version: 1, product: "academy_platform", resourceId: hq, planKey: "small", requestId,
+      consent: { quoteId: "quote-academy-fixture", revision: 1, termsVersion: "terms-v1", accepted: true },
+    });
+    return Response.json({ state: "redirect", redirectUrl: "https://checkout.stripe.com/c/pay/session_fixture" });
   },
 };
 assert.deepEqual(await openPortal(hq, requestId, mutationTransport), { kind: "redirect", url: "https://billing.stripe.com/p/session_fixture" });
-assert.deepEqual(await beginCheckout(hq, "small", requestId, mutationTransport), { kind: "redirect", url: "https://checkout.stripe.com/c/pay/session_fixture" });
-assert.equal(mutationCalls, 2);
-const newHqCheckout = await beginCheckout(null, "small", requestId, {
+const quoteResult = await requestQuote(billingUser, hq, "small", requestId, mutationTransport);
+assert.equal(quoteResult.kind, "quote");
+assert.deepEqual(await confirmCheckout(quoteResult.quote, mutationTransport), { kind: "redirect", url: "https://checkout.stripe.com/c/pay/session_fixture" });
+assert.equal(mutationCalls, 3);
+const newHqQuote = await requestQuote(billingUser, null, "small", requestId, {
+  ...mutationTransport,
+  fetch: async (url, options) => {
+    assert.equal(url, "/api/billing/platform/quote");
+    assert.deepEqual(JSON.parse(options.body), { product: "academy_platform", resourceId: null, planKey: "small", requestId });
+    return Response.json(quotePayload(null));
+  },
+});
+assert.equal(newHqQuote.kind, "quote");
+const newHqCheckout = await confirmCheckout(newHqQuote.quote, {
   ...mutationTransport,
   fetch: async (url, options) => {
     assert.equal(url, "/api/billing/platform/checkout");
-    assert.deepEqual(JSON.parse(options.body), { product: "academy_platform", resourceId: null, planKey: "small", requestId });
-    return Response.json({ version: 0, redirectUrl: "https://checkout.stripe.com/c/pay/new_hq_fixture" });
+    assert.equal(JSON.parse(options.body).resourceId, null);
+    return Response.json({ state: "pending" });
   },
 });
-assert.deepEqual(newHqCheckout, { kind: "redirect", url: "https://checkout.stripe.com/c/pay/new_hq_fixture" });
+assert.deepEqual(newHqCheckout, { kind: "pending" });
 for (const unsafe of ["http://billing.stripe.com/p/x", "https://evil.example/x", "https://user@billing.stripe.com/x", "https://billing.stripe.com:444/x"]) {
   assert.equal((await openPortal(hq, requestId, { ...mutationTransport, fetch: async () => Response.json({ version: 0, redirectUrl: unsafe }) })).kind, "unavailable");
 }
-assert.equal((await beginCheckout(hq, "Bad Plan", requestId, mutationTransport)).kind, "invalid_request");
-assert.equal(mutationCalls, 2, "invalid checkout never reads auth or calls fetch");
+assert.equal((await requestQuote(billingUser, hq, "Bad Plan", requestId, mutationTransport)).kind, "invalid_request");
+assert.equal(mutationCalls, 3, "invalid quote never reads auth or calls fetch");
 assert.equal((await openPortal(hq, requestId, { ...mutationTransport, getAccessToken: async () => null })).kind, "sign_in_required");
-assert.equal(mutationCalls, 2, "missing token never calls mutation API");
+assert.equal(mutationCalls, 3, "missing token never calls mutation API");
 for (const [code, status, kind] of [["AUTH_REQUIRED", 401, "sign_in_required"], ["RESOURCE_UNAVAILABLE", 404, "unavailable"], ["STATE_CONFLICT", 409, "state_conflict"], ["INVALID_REQUEST", 422, "invalid_request"], ["BILLING_NOT_CONFIGURED", 503, "not_configured"], ["POLICY_PENDING", 503, "policy_pending"]]) {
   const result = await openPortal(hq, requestId, { ...mutationTransport, fetch: async () => Response.json({ error: { code } }, { status }) });
   assert.equal(result.kind, kind);
@@ -183,7 +242,16 @@ const settingsSource = readFileSync(resolve(root, "app/academy/settings/page.tsx
 assert.match(settingsSource, /<AcademyPlatformBillingLoader/);
 assert.match(settingsSource, /userId=\{user\.id\}/);
 assert.match(settingsSource, /resourceId=\{headquarters\.id\}/);
-assert.doesNotMatch(settingsSource, /planKey=|構築コース.*契約中/);
+assert.match(settingsSource, /checkoutPlanKey=\{academyCheckoutPlanForCatalogPrice\(currentBillingEstimate\?\.catalog_price_yen\)\}/);
+assert.doesNotMatch(settingsSource, /構築コース.*契約中/);
+const billingLoaderSource = readFileSync(resolve(root, "app/academy/billing/AcademyPlatformBillingLoader.tsx"), "utf8");
+assert.match(billingLoaderSource, /actionController\.current\?\.abort\(\)/);
+assert.match(billingLoaderSource, /quote\?\.scope\.ownerUserId === userId && quote\.scope\.resourceId === resourceId/);
+assert.match(billingLoaderSource, /setQuote\(null\)/);
+assert.doesNotMatch(billingLoaderSource, /state\.planKey|\?\?\s*["']small["']/);
+const dashboardSource = readFileSync(resolve(root, "app/academy/page.tsx"), "utf8");
+assert.match(dashboardSource, /<AcademyPlatformBillingLoader[\s\S]*?resourceId=\{null\}/);
+assert.match(dashboardSource, /resourceId=\{null\}[\s\S]*?checkoutPlanKey="small"/);
 console.log("Academy platform billing UI: model + v0 rejection + rendered states + boundary checks OK");
 
 for (const [code, kind, status] of [

@@ -5,14 +5,31 @@ import {
   formatAcademyBillingYen,
   type AcademyPlatformBillingState,
 } from "@/lib/academy/platform-billing-view";
+import type { AcademyBillingPolicyName, AcademyBillingQuote } from "@/lib/academy/platform-billing-adapter";
 
 const card = "min-w-0 rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-5";
 const disabledButton = "min-h-11 w-full rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-semibold text-[var(--mikke-muted)] disabled:cursor-not-allowed";
 const actionButton = "min-h-11 w-full rounded-xl bg-[var(--mikke-primary)] px-4 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50";
 
-export function AcademyPlatformBillingPanel({ state, compact = false, onOpenPortal, portalBusy = false, actionMessage = "" }: {
+const policyLabels: Record<AcademyBillingPolicyName, string> = {
+  terms: "利用規約", privacy: "プライバシーポリシー", refund: "返金について",
+  cancellation: "解約について", proration: "日割りについて", renewal: "契約更新について",
+  commercialDisclosure: "特定商取引法に基づく表記",
+};
+
+export function AcademyPlatformBillingPanel({
+  state, compact = false, quote = null, quoteAccepted = false, quoteBusy = false, checkoutBusy = false,
+  onRequestQuote, onQuoteAccepted, onConfirmCheckout, onOpenPortal, portalBusy = false, actionMessage = "",
+}: {
   state: AcademyPlatformBillingState;
   compact?: boolean;
+  quote?: AcademyBillingQuote | null;
+  quoteAccepted?: boolean;
+  quoteBusy?: boolean;
+  checkoutBusy?: boolean;
+  onRequestQuote?: () => void;
+  onQuoteAccepted?: (accepted: boolean) => void;
+  onConfirmCheckout?: () => void;
   onOpenPortal?: () => void;
   portalBusy?: boolean;
   actionMessage?: string;
@@ -33,6 +50,7 @@ export function AcademyPlatformBillingPanel({ state, compact = false, onOpenPort
 
   const status = describeAcademySubscription(state.subscriptionStatus);
   const snapshot = state.snapshot;
+  const canRequestQuote = state.allowedActions.includes("checkout") && Boolean(onRequestQuote);
   const canOpenPortal = state.allowedActions.includes("portal") && Boolean(onOpenPortal);
   return (
     <div className="space-y-5 text-[var(--mikke-text)]">
@@ -87,12 +105,47 @@ export function AcademyPlatformBillingPanel({ state, compact = false, onOpenPort
         <h2 id="academy-actions-title" className="text-lg font-bold">申込・請求管理</h2>
         <p id="academy-billing-unavailable" className="mt-3 leading-7 font-semibold">有料申込は、料金と契約条件を確認して明示的に申し込んだ場合だけ開始します。7日間のお試し終了だけで自動課金されることはありません。</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <button type="button" disabled aria-describedby="academy-checkout-pending" className={disabledButton}>料金・条件を確認して申し込む</button>
+          <button type="button" disabled={!canRequestQuote || quoteBusy || checkoutBusy} onClick={onRequestQuote} aria-describedby="academy-checkout-guidance" className={canRequestQuote ? actionButton : disabledButton}>
+            {quoteBusy ? "料金・条件を確認しています…" : quote ? "料金・条件を再確認する" : "料金・条件を確認して申し込む"}
+          </button>
           <button type="button" disabled={!canOpenPortal || portalBusy} onClick={onOpenPortal} className={canOpenPortal ? actionButton : disabledButton}>
             {portalBusy ? "請求管理を開いています…" : "請求・支払方法・解約を管理する"}
           </button>
         </div>
-        <p id="academy-checkout-pending" className="mt-3 text-sm leading-6 text-[var(--mikke-muted)]">申込前の確定金額・次回請求日・規約同意を表示する共通画面が接続されるまで、有料申込は開始できません。</p>
+        <p id="academy-checkout-guidance" className="mt-3 text-sm leading-6 text-[var(--mikke-muted)]">決済前に、共通の契約情報から今回と次回の金額・日付、販売者、適用規約を表示します。</p>
+        {quote ? (
+          <div className="mt-5 min-w-0 rounded-2xl border border-[var(--mikke-primary)]/35 bg-[var(--mikke-surface-soft)] p-4 sm:p-5" aria-labelledby="academy-quote-title">
+            <h3 id="academy-quote-title" className="text-base font-bold">Academy利用料のお申し込み内容</h3>
+            <dl className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2">
+              <div><dt className="text-xs font-semibold text-[var(--mikke-muted)]">今回のお支払い（税込）</dt><dd className="mt-1 break-words text-xl font-bold">{formatAcademyBillingYen(quote.dueNow.totalYen)}</dd><dd className="mt-1 text-sm">{formatAcademyBillingDate(quote.dueNow.dueOn)}</dd></div>
+              <div><dt className="text-xs font-semibold text-[var(--mikke-muted)]">次回のお支払い予定（税込）</dt><dd className="mt-1 break-words text-xl font-bold">{formatAcademyBillingYen(quote.nextPayment.totalYen)}</dd><dd className="mt-1 text-sm">{formatAcademyBillingDate(quote.nextPayment.dueOn)}</dd></div>
+            </dl>
+            <div className="mt-4 rounded-xl bg-white p-4">
+              <p className="text-sm font-bold">販売者</p>
+              <p className="mt-2 break-words text-sm leading-6">{quote.merchant.legalName}<br />{quote.merchant.address}</p>
+              <a href={quote.merchant.contactUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block break-all text-sm font-semibold text-[var(--mikke-primary)] underline">お問い合わせ先を確認</a>
+            </div>
+            <div className="mt-4">
+              <p className="text-sm font-bold">適用される規約・方針</p>
+              <ul className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2">
+                {(Object.entries(quote.policies) as Array<[AcademyBillingPolicyName, { version: string; url: string }]>).map(([name, policy]) => (
+                  <li key={name} className="min-w-0 rounded-xl bg-white px-3 py-2 text-sm">
+                    <a href={policy.url} target="_blank" rel="noreferrer" className="block break-words font-semibold text-[var(--mikke-primary)] underline">{policyLabels[name]}</a>
+                    <span className="mt-1 block break-all text-xs text-[var(--mikke-muted)]">版：{policy.version}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl bg-white p-4 text-sm font-semibold leading-6">
+              <input type="checkbox" checked={quoteAccepted} onChange={(event) => onQuoteAccepted?.(event.target.checked)} disabled={checkoutBusy} className="mt-1 h-5 w-5 shrink-0" />
+              <span>今回・次回のお支払い内容と、上記の規約・方針を確認し、Academyの月額利用を申し込みます。</span>
+            </label>
+            <button type="button" disabled={!quoteAccepted || checkoutBusy || !onConfirmCheckout} onClick={onConfirmCheckout} className={`${actionButton} mt-4`}>
+              {checkoutBusy ? "決済画面を準備しています…" : "同意して決済画面へ進む"}
+            </button>
+            <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">この操作はAcademy利用料の有料申込です。無料期間の終了や構築コースの購入だけで、この申込が自動実行されることはありません。</p>
+          </div>
+        ) : null}
         {actionMessage ? <p className="mt-3 rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold" role="status">{actionMessage}</p> : null}
         <p className="mt-4 leading-7">ここで扱うのはAcademy利用料のみです。Communityの通常契約や、受講料・構築コース購入代の返金や解約は変更しません。</p>
       </section>
