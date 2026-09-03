@@ -12,7 +12,14 @@ import type { BillingSelection, PlatformBillingQuote } from './quote';
 import { createStripeProvider, readStripeRuntimeConfig } from './stripe';
 import { resolveAcademyBillingPlan } from './academy-plan';
 
-type Catalog = Readonly<{ approvalId:string;revision:number;merchant:PlatformBillingQuote['merchant'];policies:PlatformBillingQuote['policies'];plans:Readonly<Record<string,Readonly<{totalYen:number}>>> }>;
+type PolicySet = PlatformBillingQuote['policies'];
+type Catalog = Readonly<{
+  approvalId:string;
+  revision:number;
+  merchant:PlatformBillingQuote['merchant'];
+  policies:Readonly<Record<string,PolicySet>> | PolicySet;
+  plans:Readonly<Record<string,Readonly<{totalYen:number}>>>;
+}>;
 const TOKEN=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 function environment(){
   if(process.env.PLATFORM_BILLING_API_ENABLED!=='1')throw new PlatformApiError('BILLING_NOT_CONFIGURED');
@@ -23,8 +30,15 @@ function environment(){
 }
 function catalog():Catalog{
   let raw:unknown;try{raw=JSON.parse(process.env.PLATFORM_BILLING_CATALOG_JSON??'');}catch{throw new PlatformApiError('BILLING_NOT_CONFIGURED');}
-  if(!isRecord(raw)||!TOKEN.test(String(raw.approvalId))||!Number.isSafeInteger(raw.revision)||!isRecord(raw.merchant)||!isRecord(raw.policies)||raw.policies.approved!==true||!isRecord(raw.plans))throw new PlatformApiError('BILLING_NOT_CONFIGURED');
+  if(!isRecord(raw)||!TOKEN.test(String(raw.approvalId))||!Number.isSafeInteger(raw.revision)||!isRecord(raw.merchant)||!isRecord(raw.policies)||!isRecord(raw.plans))throw new PlatformApiError('BILLING_NOT_CONFIGURED');
   return raw as unknown as Catalog;
+}
+function policiesFor(current:Catalog,productKey:string):PolicySet{
+  const configured=current.policies;
+  const configuredRecord=configured as unknown as Record<string,unknown>;
+  const selected=isRecord(configured)&&configured.approved===true?configured:configuredRecord[productKey];
+  if(!isRecord(selected)||selected.approved!==true||selected.approvalId!==current.approvalId||selected.revision!==current.revision)throw new PlatformApiError('POLICY_PENDING');
+  return selected as unknown as PolicySet;
 }
 const jstDay=(date:Date)=>new Date(date.getTime()+9*3600000).toISOString().slice(0,10);
 
@@ -59,6 +73,7 @@ function requestDependencies():PlatformHttpDependencies{
       if(!approved||approved.totalYen!==resolved.totalYen)throw new PlatformApiError('POLICY_PENDING');
     }
     if(!Object.hasOwn(current.plans,`${input.product}:${input.planKey}`))throw new PlatformApiError('POLICY_PENDING');
+    policiesFor(current,input.product);
     return{ownerUserId:principal.userId,productKey:input.product,resourceId:input.resourceId,planKey:input.planKey,requestId:input.requestId,policyApprovalId:current.approvalId,policyRevision:current.revision};
   };
   return{trustedOrigins,
@@ -70,7 +85,7 @@ function requestDependencies():PlatformHttpDependencies{
       const expected=await selection(principal,input,signal),current=catalog(),plan=current.plans[`${input.product}:${input.planKey}`];
       if(!plan||!Number.isSafeInteger(plan.totalYen)||plan.totalYen<0)throw new PlatformApiError('POLICY_PENDING');
       const now=new Date(),day=jstDay(now),period=getMonthlyBillingPeriod(day,0);if(!period)throw new PlatformApiError('BILLING_NOT_CONFIGURED');
-      const quote:PlatformBillingQuote={quoteId:`quote-${randomUUID()}`,revision:1,purchaseIntent:'explicit_paid_start',scope:{ownerUserId:principal.userId,productKey:input.product,resourceId:input.resourceId,planKey:input.planKey,requestId:input.requestId},currency:'JPY',taxIncluded:true,dueNow:{totalYen:plan.totalYen,dueOn:day},nextPayment:{totalYen:plan.totalYen,dueOn:period.nextRenewalOn},merchant:current.merchant,policies:current.policies,issuedAt:now.toISOString(),expiresAt:new Date(now.getTime()+15*60000).toISOString()};
+      const quote:PlatformBillingQuote={quoteId:`quote-${randomUUID()}`,revision:1,purchaseIntent:'explicit_paid_start',scope:{ownerUserId:principal.userId,productKey:input.product,resourceId:input.resourceId,planKey:input.planKey,requestId:input.requestId},currency:'JPY',taxIncluded:true,dueNow:{totalYen:plan.totalYen,dueOn:day},nextPayment:{totalYen:plan.totalYen,dueOn:period.nextRenewalOn},merchant:current.merchant,policies:policiesFor(current,input.product),issuedAt:now.toISOString(),expiresAt:new Date(now.getTime()+15*60000).toISOString()};
       if(!validatePlatformBillingQuote(quote,expected,now).ok)throw new PlatformApiError('POLICY_PENDING');await store().saveQuote(quote,expected,now,signal);return quote;
     },
     async startCheckout(principal,input,signal){
