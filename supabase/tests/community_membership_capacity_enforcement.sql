@@ -62,6 +62,24 @@ insert into public.profiles(user_id, handle, display_name) values
   ('ca060000-0000-4000-8000-000000000013', 'capacity-positive', 'Capacity positive'),
   ('ca060000-0000-4000-8000-000000000014', 'capacity-owner2', 'Capacity owner 2');
 
+-- Academy-origin access must point to one real, paid Academy headquarters.
+-- Keep this as one fixture pair: the Community mapping guard rejects an
+-- arbitrary provider owner key and trial/non-active Academy access.
+insert into public.academy_headquarters(
+  id, owner_user_id, name, handle, plan, is_active
+) values (
+  'c6060000-0000-4000-8000-000000000001',
+  'ca060000-0000-4000-8000-000000000001',
+  'Capacity Academy headquarters', 'capacity-academy-hq', 'small', true
+);
+insert into public.academy_headquarters_access_states(
+  headquarters_id, owner_user_id, access_kind, status, starts_at, paid_started_at
+) values (
+  'c6060000-0000-4000-8000-000000000001',
+  'ca060000-0000-4000-8000-000000000001',
+  'paid', 'active', statement_timestamp(), statement_timestamp()
+);
+
 insert into public.community_communities(id, slug, name, join_mode, owner_user_id) values
   ('cb060000-0000-4000-8000-000000000001', 'capacity-full', 'Capacity full', 'open_free', 'ca060000-0000-4000-8000-000000000001'),
   ('cb060000-0000-4000-8000-000000000002', 'capacity-open', 'Capacity open', 'open_free', 'ca060000-0000-4000-8000-000000000014');
@@ -116,7 +134,7 @@ insert into public.community_access_source_mappings(
   id,community_id,provider_type,provider_owner_key,source_product_key,entitlement_key,status,created_by_user_id
 ) values (
   'd0060000-0000-4000-8000-000000000001','cb060000-0000-4000-8000-000000000001','academy_subscription',
-  'hq-capacity','academy-capacity','academy:test','active','ca060000-0000-4000-8000-000000000001'
+  'c6060000-0000-4000-8000-000000000001','course:test','academy:test','active','ca060000-0000-4000-8000-000000000001'
 );
 insert into public.community_academy_access_invitations(
   id,mapping_id,community_id,user_id,entitlement_key,source_reference,academy_role,status,starts_at,ends_at,expires_at
