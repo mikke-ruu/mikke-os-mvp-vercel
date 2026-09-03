@@ -15,7 +15,7 @@ import { AcademyPlatformBillingPanel } from "./AcademyPlatformBillingPanel";
  * existing supabase.auth.
  * Transport injection permits local tests without session/DB/provider traffic.
  */
-export function AcademyPlatformBillingLoader({ userId, resourceId, isGuest, auth, fetch: fetcher }: {
+export function AcademyPlatformBillingLoader({ userId, resourceId, isGuest, auth, fetch: fetcher, checkoutPlanKey }: {
   userId: string | null; resourceId: string | null; isGuest: boolean;
   auth: AcademyBillingAuth; fetch: typeof globalThis.fetch;
   checkoutPlanKey: "small" | "medium" | "large" | null;
