@@ -49,6 +49,32 @@ for(const change of [{payment_status:'unpaid'},{amount_total:'5000'},{currency:'
 }
 const invoice={id:'evt_Invoice',livemode:false,type:'invoice.paid',created:timestamp,data:{object:{subscription:'sub_Fixture',period_start:timestamp,period_end:timestamp+2678400}}};
 const signedInvoice=signed(invoice);assert.equal(verifyStripeEvent(signedInvoice.raw,signedInvoice.header,config,now).kind,'invoice_paid');
+const basilInvoice=structuredClone(invoice);basilInvoice.id='evt_BasilInvoice';delete basilInvoice.data.object.subscription;
+basilInvoice.data.object.parent={type:'subscription_details',subscription_details:{subscription:'sub_Fixture'}};
+const signedBasilInvoice=signed(basilInvoice);assert.equal(verifyStripeEvent(signedBasilInvoice.raw,signedBasilInvoice.header,config,now).subscriptionId,'sub_Fixture');
+for(const mutate of [
+  event=>{delete event.data.object.subscription;},
+  event=>{event.data.object.parent={type:'subscription_details',subscription_details:{subscription:'sub_Other'}};},
+  event=>{event.data.object.parent={subscription_details:{subscription:'sub_Fixture'}};},
+  event=>{event.data.object.parent={type:'invoice_details',subscription_details:{subscription:'sub_Fixture'}};},
+  event=>{event.data.object.parent={type:'subscription_details',subscription_details:{subscription:{id:'sub_Fixture'}}};delete event.data.object.subscription;},
+]){const event=structuredClone(invoice);event.id='evt_InvalidInvoice';mutate(event);const item=signed(event);assert.throws(()=>verifyStripeEvent(item.raw,item.header,config,now),/INVALID_EVENT/);}
+const subscription={id:'evt_Subscription',livemode:false,type:'customer.subscription.updated',created:timestamp,data:{object:{
+  id:'sub_Fixture',status:'active',cancel_at_period_end:false,current_period_start:timestamp,current_period_end:timestamp+2678400
+}}};
+const signedSubscription=signed(subscription);assert.equal(verifyStripeEvent(signedSubscription.raw,signedSubscription.header,config,now).periodEnd,'2026-10-04T00:00:00.000Z');
+const basilSubscription=structuredClone(subscription);basilSubscription.id='evt_BasilSubscription';
+delete basilSubscription.data.object.current_period_start;delete basilSubscription.data.object.current_period_end;
+basilSubscription.data.object.items={data:[
+  {current_period_start:timestamp,current_period_end:timestamp+2678400},
+  {current_period_start:timestamp,current_period_end:timestamp+2678400},
+]};
+const signedBasilSubscription=signed(basilSubscription);assert.equal(verifyStripeEvent(signedBasilSubscription.raw,signedBasilSubscription.header,config,now).periodStart,'2026-09-03T00:00:00.000Z');
+for(const object of [
+  {id:'sub_Fixture',status:'active',cancel_at_period_end:false,items:{data:[]}},
+  {id:'sub_Fixture',status:'active',cancel_at_period_end:false,items:{data:[{current_period_start:timestamp,current_period_end:timestamp+100},{current_period_start:timestamp,current_period_end:timestamp+200}]}},
+  {id:'sub_Fixture',status:'active',cancel_at_period_end:false,current_period_start:timestamp,current_period_end:timestamp+100,items:{data:[{current_period_start:timestamp,current_period_end:timestamp+200}]}},
+]){const event={...subscription,id:'evt_InvalidSubscription',data:{object}};const item=signed(event);assert.throws(()=>verifyStripeEvent(item.raw,item.header,config,now),/INVALID_EVENT/);}
 assert.throws(()=>readStripeRuntimeConfig({...process.env,PLATFORM_BILLING_STRIPE_MODE:'live',STRIPE_SECRET_KEY:'sk_test_wrong'}),/BILLING_NOT_CONFIGURED/);
 
 const migration=readFileSync(new URL('../supabase/migrations/20260902223651_platform_billing_subscription_runtime.sql',import.meta.url),'utf8');

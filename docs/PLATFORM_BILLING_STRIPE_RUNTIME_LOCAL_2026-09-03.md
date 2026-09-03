@@ -16,6 +16,8 @@ An explicit paid checkout is required. A free-period ending does not create a Ch
 
 Raw provider payloads, webhook secrets, provider event hashes, Stripe customer IDs, and subscription IDs are not returned to browsers. The database does not record a `paid` state from an unverified or uncertain Checkout attempt.
 
+The webhook parser accepts both Stripe's legacy subscription references/period fields and the Basil shapes (`invoice.parent.subscription_details.subscription` and subscription-item periods). When legacy and Basil values disagree, or subscription items contain no period or conflicting periods, it fails closed. This compatibility does not pin or change the Stripe account API version.
+
 Academy must call one service-only verifier from its owner-authorized paid-activation database wrapper in the same transaction. New HQ creation uses `platform_billing_academy_new_paid_consume(uuid,uuid)` with a generated, absent HQ id and must insert that owner HQ immediately afterwards. Existing trial upgrade uses `platform_billing_academy_existing_paid_consume(uuid,uuid)`, which also locks and revalidates the existing HQ owner. Both acquire the shared actor/scope/quote/attempt/event/subscription/entitlement chain first. Calling either as a separate HTTP preflight is not an atomic activation contract.
 
 ## Deployment order

@@ -49,6 +49,41 @@ function parseJsonObject(value: string): Record<string, unknown> {
   return parsed;
 }
 
+function invoiceSubscription(object: Record<string, unknown>): string | null {
+  const legacy = safeId(object.subscription, SUBSCRIPTION) ? object.subscription : null;
+  const parent = isRecord(object.parent) ? object.parent : null;
+  const declaresSubscription = parent && ('subscription_details' in parent || parent.type === 'subscription_details');
+  if (declaresSubscription && (parent.type !== 'subscription_details' || !isRecord(parent.subscription_details))) return null;
+  const details = parent?.type === 'subscription_details' && isRecord(parent.subscription_details) ? parent.subscription_details : null;
+  const basil = details && safeId(details.subscription, SUBSCRIPTION) ? details.subscription : null;
+  if (legacy && basil && legacy !== basil) return null;
+  return legacy ?? basil;
+}
+
+function subscriptionPeriod(object: Record<string, unknown>): readonly [string, string] | null {
+  const legacyStart = seconds(object.current_period_start);
+  const legacyEnd = seconds(object.current_period_end);
+  const legacy = legacyStart && legacyEnd && legacyEnd > legacyStart ? `${legacyStart}|${legacyEnd}` : null;
+  const items = isRecord(object.items) && Array.isArray(object.items.data) ? object.items.data : null;
+  let basil: string | null = null;
+  if (items) {
+    if (items.length < 1 || items.some((item) => !isRecord(item))) return null;
+    const periods = new Set<string>();
+    for (const item of items as Record<string, unknown>[]) {
+      const start = seconds(item.current_period_start), end = seconds(item.current_period_end);
+      if (!start || !end || end <= start) return null;
+      periods.add(`${start}|${end}`);
+    }
+    if (periods.size !== 1) return null;
+    basil = [...periods][0];
+  }
+  if (legacy && basil && legacy !== basil) return null;
+  const period = legacy ?? basil;
+  if (!period) return null;
+  const [start, end] = period.split('|');
+  return start && end ? [start, end] : null;
+}
+
 export function readStripeRuntimeConfig(env: NodeJS.ProcessEnv = process.env): StripeRuntimeConfig {
   const mode = env.PLATFORM_BILLING_STRIPE_MODE;
   const secretKey = env.STRIPE_SECRET_KEY ?? '';
@@ -166,15 +201,17 @@ export function verifyStripeEvent(
   }
   if (event.type === 'invoice.paid' || event.type === 'invoice.payment_failed') {
     const periodStart=seconds(object.period_start), periodEnd=seconds(object.period_end);
-    if (!safeId(object.subscription,SUBSCRIPTION) || !periodStart || !periodEnd || periodEnd<=periodStart) throw new Error('INVALID_EVENT');
+    const subscriptionId=invoiceSubscription(object);
+    if (!subscriptionId || !periodStart || !periodEnd || periodEnd<=periodStart) throw new Error('INVALID_EVENT');
     return Object.freeze({ kind:event.type==='invoice.paid'?'invoice_paid':'invoice_failed',eventId:event.id,eventHash,
-      subscriptionId:object.subscription,status:event.type==='invoice.paid'?'active':'past_due',periodStart,periodEnd,
+      subscriptionId,status:event.type==='invoice.paid'?'active':'past_due',periodStart,periodEnd,
       cancelAtPeriodEnd:false,occurredAt });
   }
   if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-    const periodStart=seconds(object.current_period_start), periodEnd=seconds(object.current_period_end);
-    if (!safeId(object.id,SUBSCRIPTION) || !periodStart || !periodEnd || periodEnd<=periodStart
+    const period=subscriptionPeriod(object);
+    if (!safeId(object.id,SUBSCRIPTION) || !period
       || typeof object.cancel_at_period_end!=='boolean') throw new Error('INVALID_EVENT');
+    const [periodStart,periodEnd]=period;
     const status=event.type==='customer.subscription.deleted'?'ended':object.status==='active'?'active':object.status==='past_due'?'past_due':null;
     if (!status) throw new Error('INVALID_EVENT');
     return Object.freeze({ kind:'subscription_state',eventId:event.id,eventHash,subscriptionId:object.id,status,
