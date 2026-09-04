@@ -9,9 +9,11 @@ const source = fs.readFileSync(
 const required = [
   'headquartersAccess?.access_kind === "trial"',
   "7日間お試し ・ あと${headquartersAccess.days_remaining}日",
-  "開始日時:",
-  "終了日時:",
   "自動課金はされません",
+  "詳細を見る →",
+  "Academy利用状態のお知らせを閉じる",
+  'window.sessionStorage.setItem("academy-access-banner-dismissed", "1")',
+  'href={contextHref("/academy/settings")}',
   'headquartersAccess?.access_kind === "paid" && !accessNotice',
   "Academyを利用できます",
   "Academy有料プランを利用中です",

@@ -103,20 +103,6 @@ function manageHrefForCapabilityCheck(pathname: string) {
   return canonical ? `/academy${canonical[1] ?? ""}` : pathname;
 }
 
-function formatTrialDateTime(value: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleString("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  });
-}
-
 function ShellInner({
   variant,
   title,
@@ -142,6 +128,7 @@ function ShellInner({
   const [contextCount, setContextCount] = useState(0);
   const [selectedContext, setSelectedContext] = useState<AcademyAccessContext | null>(null);
   const [headquartersAccess, setHeadquartersAccess] = useState<AcademyHeadquartersAccess | null>(null);
+  const [accessBannerDismissed, setAccessBannerDismissed] = useState(false);
   const [previewMode, setPreviewMode] = useState<"checking" | "dashboard" | "walkthrough" | "trial" | "readonly" | "off">("checking");
 
   useEffect(() => {
@@ -152,6 +139,7 @@ function ShellInner({
         ? requestedPreview
         : "off"
     );
+    setAccessBannerDismissed(window.sessionStorage.getItem("academy-access-banner-dismissed") === "1");
   }, []);
 
   useEffect(() => {
@@ -325,6 +313,11 @@ function ShellInner({
   const accessNotice = getAcademyAccessNotice(headquartersAccess);
   const accessLocked = accessNotice !== null;
   const trialLocked = headquartersAccess?.access_kind === "trial" && accessLocked;
+
+  function dismissAccessBanner() {
+    window.sessionStorage.setItem("academy-access-banner-dismissed", "1");
+    setAccessBannerDismissed(true);
+  }
 
   function captureAcademyLink(event: React.MouseEvent<HTMLDivElement>) {
     if (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough" || previewMode === "trial" || accessLocked) {
@@ -505,28 +498,27 @@ function ShellInner({
           ローカル確認用のサンプル表示です。本部運営者が認定講師も兼ねる例のため、本部画面とマイポータルの両方を確認できます。実データの保存や本番DBの変更は行いません。
         </div>
       ) : null}
-      {headquartersAccess?.access_kind === "trial" ? (
-        <div className="mb-4 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)]/20 px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
-          <p className="font-bold">
-            {trialLocked ? "7日間お試しは終了しました" : `7日間お試し ・ あと${headquartersAccess.days_remaining}日`}
-          </p>
-          <p className="mt-1 text-xs font-medium">
-            {trialLocked
-              ? "作成した下書きは残っています。有料利用を開始すると編集を再開できます。自動課金はされていません。"
-              : "本部設定や講座の下書きを作れます。公開、実際の申込受付、講師登録、Community連携は有料利用の開始後に使えます。外部動画URLは利用できますが、Academy内の動画配信は準備中です。自動課金はされません。"}
-          </p>
-          {formatTrialDateTime(headquartersAccess.starts_at) && formatTrialDateTime(headquartersAccess.ends_at) ? (
-            <dl className="mt-2 grid gap-x-5 gap-y-1 text-xs sm:grid-cols-2">
-              <div className="flex flex-wrap gap-1"><dt className="font-bold">開始日時:</dt><dd>{formatTrialDateTime(headquartersAccess.starts_at)}</dd></div>
-              <div className="flex flex-wrap gap-1"><dt className="font-bold">終了日時:</dt><dd>{formatTrialDateTime(headquartersAccess.ends_at)}</dd></div>
-            </dl>
-          ) : (
-            <p className="mt-2 text-xs font-bold">開始日時・終了日時を確認しています。</p>
-          )}
-          <p className="mt-2 text-xs font-medium">有料利用は、本部設定で料金と規約を確認し、同意して決済画面へ進んだ場合だけ申し込みが始まります。</p>
+      {headquartersAccess?.access_kind === "trial" && !accessBannerDismissed ? (
+        <div className="relative mb-4 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)]/20 text-[var(--mikke-text)]">
+          <button
+            type="button"
+            aria-label="Academy利用状態のお知らせを閉じる"
+            onClick={dismissAccessBanner}
+            className="absolute right-2 top-2 z-10 grid size-8 place-items-center rounded-full text-lg font-bold text-[var(--mikke-muted)] hover:bg-white/70"
+          >
+            ×
+          </button>
+          <Link href={contextHref("/academy/settings")} className="block px-4 py-3 pr-12">
+            <p className="text-sm font-bold">
+              {trialLocked ? "7日間お試しは終了しました" : `7日間お試し ・ あと${headquartersAccess.days_remaining}日`}
+            </p>
+            <p className="mt-0.5 text-xs font-medium">
+              自動課金はされません。詳細を見る →
+            </p>
+          </Link>
         </div>
       ) : null}
-      {headquartersAccess?.access_kind === "paid" && accessNotice ? (
+      {headquartersAccess?.access_kind === "paid" && accessNotice && !accessBannerDismissed ? (
         <div className="mb-4 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)]/20 px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
           <p className="font-bold">{accessNotice.title}</p>
           <p className="mt-1 text-xs font-medium">{accessNotice.description}</p>
@@ -535,7 +527,7 @@ function ShellInner({
           </Link>
         </div>
       ) : null}
-      {headquartersAccess?.access_kind === "paid" && !accessNotice ? (
+      {headquartersAccess?.access_kind === "paid" && !accessNotice && !accessBannerDismissed ? (
         <div className="mb-4 rounded-xl border border-[var(--mikke-green)] bg-[var(--mikke-green)]/15 px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
           <p className="font-bold">
             {headquartersAccess.status === "internal_grant"
