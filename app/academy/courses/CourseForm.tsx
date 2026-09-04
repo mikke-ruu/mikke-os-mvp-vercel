@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
 import type {
@@ -11,6 +11,7 @@ import type {
 } from "@/types/database";
 import type { CourseInput } from "@/lib/academy/courses";
 import { DEFAULT_ACADEMY_COURSE_FEATURE_SETTINGS } from "@/lib/academy/course-feature-settings";
+import { getAcademyCourseSaveErrorMessage } from "@/lib/academy/course-save-errors";
 
 const FIELD_TYPES: AcademyFormField["type"][] = ["text", "textarea", "email", "tel", "select", "checkbox"];
 
@@ -51,7 +52,7 @@ const LEARNER_ACCESS_MODES: Array<{
 ];
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 
 function emptyInput(): CourseInput {
@@ -115,6 +116,15 @@ export function CourseForm({
   const [form, setForm] = useState<CourseInput>({ ...emptyInput(), ...initial });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  function showError(message: string) {
+    setError(message);
+    requestAnimationFrame(() => {
+      errorRef.current?.focus({ preventScroll: true });
+      errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
 
   function set<K extends keyof CourseInput>(key: K, value: CourseInput[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -182,15 +192,15 @@ export function CourseForm({
     e.preventDefault();
     setError(null);
     if (!form.name.trim()) {
-      setError("講座名は必須です。");
+      showError("講座名は必須です。");
       return;
     }
     if (form.learnerAccessMode.startsWith("days_after_") && (!form.learnerAccessDays || form.learnerAccessDays < 1 || form.learnerAccessDays > 3650)) {
-      setError("教材を見られる日数は、1日から3650日の間で入力してください。");
+      showError("教材を見られる日数は、1日から3650日の間で入力してください。");
       return;
     }
     if (form.learnerAccessMode === "fixed_end" && (!form.learnerAccessFixedEndAt || Number.isNaN(new Date(form.learnerAccessFixedEndAt).getTime()))) {
-      setError("教材の閲覧終了日時を入力してください。");
+      showError("教材の閲覧終了日時を入力してください。");
       return;
     }
     setSaving(true);
@@ -200,21 +210,27 @@ export function CourseForm({
         code: form.code.trim() || `COURSE-${Date.now().toString().slice(-8)}`
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存に失敗しました。");
+      showError(getAcademyCourseSaveErrorMessage(err));
       setSaving(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="min-w-0 space-y-4">
+      {error ? (
+        <div ref={errorRef} tabIndex={-1} role="alert" aria-live="assertive" className="rounded-xl border border-[var(--mikke-danger)] bg-red-50 px-4 py-3 outline-none">
+          <p className="text-sm font-bold text-[var(--mikke-danger)]">講座を保存できませんでした</p>
+          <p className="mt-1 text-sm leading-6 text-[var(--mikke-text)]">原因: {error}</p>
+        </div>
+      ) : null}
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
-        <div className="grid grid-cols-3 gap-2">
-          <div className="col-span-1">
+        <div className="grid gap-3 sm:grid-cols-3 sm:gap-2">
+          <div className="min-w-0 sm:col-span-1">
             <label className={labelClass}>管理用コード（任意）</label>
             <input className={inputClass} value={form.code} onChange={(e) => set("code", e.target.value)} placeholder="CACM" />
             <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">本部内で講座を区別する番号です。英数字とハイフンを推奨します。空欄なら自動で作成します。</p>
           </div>
-          <div className="col-span-2">
+          <div className="min-w-0 sm:col-span-2">
             <label className={labelClass}>講座名*</label>
             <input className={inputClass} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="コンテナアロマキャンドル認定講座" />
             <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">講座名を入力してください。後から変更できます。</p>
@@ -313,7 +329,7 @@ export function CourseForm({
               <label className={labelClass}>仕入れる教材の内容</label>
               <textarea className={`${inputClass} min-h-16`} value={form.kitContents} onChange={(e) => set("kitContents", e.target.value)} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               <div>
                 <label className={labelClass}>講師の講座仕入代（税込）</label>
                 <input type="number" min={0} className={inputClass} value={form.kitPrice} onChange={(e) => set("kitPrice", Number(e.target.value) || 0)} />
@@ -482,7 +498,7 @@ export function CourseForm({
         </label>
       </section>
 
-      {error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">{error}</p> : null}
+      {error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">保存できなかった原因は、この画面の上部にも表示しています。</p> : null}
 
       <button
         type="submit"

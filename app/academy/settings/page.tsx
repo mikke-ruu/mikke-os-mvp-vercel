@@ -40,19 +40,19 @@ import type {
 } from "@/types/database";
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
-const cardClass = "rounded-2xl border border-[var(--mikke-line)] bg-white p-5";
+  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
+const cardClass = "min-w-0 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5";
 
 const roleLabels: Record<AcademyHeadquartersRole, string> = {
-  owner: "Owner",
-  administrator: "Administrator",
-  course_editor: "Course Editor"
+  owner: "本部責任者",
+  administrator: "本部運営担当",
+  course_editor: "講座編集担当"
 };
 
 const roleDetails = [
-  { role: "Owner", permissions: "本部情報、メンバー、講座、公開を含むすべての管理" },
-  { role: "Administrator", permissions: "本部情報、メンバー招待、講座運営（所有権の変更を除く）" },
-  { role: "Course Editor", permissions: "講座、公開講座ページ、教材の編集" }
+  { role: "本部責任者", permissions: "本部情報、メンバー、講座、公開を含むすべての管理" },
+  { role: "本部運営担当", permissions: "本部情報、メンバー招待、講座運営（所有権の変更を除く）" },
+  { role: "講座編集担当", permissions: "講座、公開講座ページ、教材の編集" }
 ];
 
 function SettingsContent() {
@@ -242,7 +242,7 @@ function SettingsContent() {
       setMessage("本部メンバーの利用を停止しました。");
       await load();
     } catch {
-      setMessage("メンバーを停止できませんでした。Owner権限を確認してください。");
+      setMessage("メンバーを停止できませんでした。本部責任者の権限を確認してください。");
     } finally {
       setBusy("");
     }
@@ -360,7 +360,7 @@ function SettingsContent() {
       ) : null}
 
       {!headquarters ? (
-        <p className={cardClass}>管理できる本部はありません。本部Ownerからの招待を確認してください。</p>
+        <p className={cardClass}>管理できる本部はありません。本部責任者からの招待を確認してください。</p>
       ) : (
         <>
           <section className={cardClass}>
@@ -393,7 +393,11 @@ function SettingsContent() {
                 </button>
               </div>
             ) : (
-              <p className="mt-4 text-sm text-[var(--mikke-muted)]">Course Editorは本部情報を変更できません。</p>
+              <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-muted)]">
+                {role === "course_editor"
+                  ? "講座編集担当は本部情報を変更できません。本部責任者または本部運営担当へ依頼してください。"
+                  : "この本部の利用状態または編集権限を確認できませんでした。画面を再読み込みし、直らない場合は運営へお知らせください。"}
+              </p>
             )}
           </section>
 
@@ -403,7 +407,7 @@ function SettingsContent() {
                 <ReceiptJapaneseYen size={18} /> Academy利用料金
               </h2>
               <p className="mt-1 text-sm text-[var(--mikke-muted)]">
-                請求先の本部Ownerだけに表示しています。すべて税込です。
+                請求先の本部責任者だけに表示しています。すべて税込です。
               </p>
 
               {currentBillingEstimate ? (
@@ -460,7 +464,7 @@ function SettingsContent() {
                 ))}
               </div>
               <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">
-                登録中の講師を数えます。活動中・休眠・停止中も登録解除までは対象です。同じ人が同一本部で複数講座を担当しても1名です。本部Ownerも講師登録している場合は1名に含まれます。登録解除は翌月分から反映します。
+                登録中の講師を数えます。活動中・休眠・停止中も登録解除までは対象です。同じ人が同一本部で複数講座を担当しても1名です。本部責任者も講師登録している場合は1名に含まれます。登録解除は翌月分から反映します。
               </p>
               <div className="mt-5 border-t border-[var(--mikke-line)] pt-5">
                 <AcademyPlatformBillingLoader
@@ -585,8 +589,8 @@ function SettingsContent() {
               <div className="mt-4 grid gap-2 md:grid-cols-[1fr_12rem_auto]">
                 <input className={inputClass} value={inviteMikkeId} onChange={(e) => setInviteMikkeId(e.target.value)} placeholder="mikke ID" />
                 <select className={inputClass} value={inviteRole} onChange={(e) => setInviteRole(e.target.value as Exclude<AcademyHeadquartersRole, "owner">)}>
-                  <option value="administrator">Administrator</option>
-                  <option value="course_editor">Course Editor</option>
+                  <option value="administrator">本部運営担当</option>
+                  <option value="course_editor">講座編集担当</option>
                 </select>
                 <button type="button" disabled={!inviteMikkeId.trim() || busy === "invite"} onClick={() => void inviteMember()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
                   招待
@@ -596,7 +600,7 @@ function SettingsContent() {
               <div className="mt-5 space-y-2">
                 <div className="flex items-center gap-2 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3">
                   <Check size={16} />
-                  <div><p className="text-sm font-bold">本部Owner</p><p className="text-xs text-[var(--mikke-muted)]">Owner ・ 利用中</p></div>
+                  <div><p className="text-sm font-bold">本部責任者</p><p className="text-xs text-[var(--mikke-muted)]">本部責任者・利用中</p></div>
                 </div>
                 {activeMembers.map((member) => (
                   <div key={member.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--mikke-line)] px-4 py-3">

@@ -12,7 +12,7 @@ import { listCourses } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters, AcademyLpBlock } from "@/types/database";
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 
 function FrontContent() {
@@ -85,9 +85,9 @@ function FrontContent() {
   if (!hq) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">先に本部を作成してください。</p>;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-bold text-[var(--mikke-text)]">本部全体を紹介するホームページを編集します。各講座の公開講座ページとは別のページです。</p>
+    <div className="mx-auto min-w-0 max-w-2xl space-y-4 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="min-w-0 text-sm font-bold leading-6 text-[var(--mikke-text)]">本部全体を紹介するホームページを編集します。各講座の公開講座ページとは別のページです。</p>
         <Link
           href={`/academy/site/${encodeURIComponent(hq.handle)}`}
           target="_blank"
@@ -158,7 +158,7 @@ function FrontContent() {
         <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">ホームページには、公開中の講座が一覧で並びます。講座ごとの紹介と申込受付は、それぞれの公開講座ページで編集します。</p>
         <ul className="mt-3 space-y-2">
           {courses.map((c) => (
-            <li key={c.id} className="flex items-center justify-between gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2.5">
+            <li key={c.id} className="flex min-w-0 flex-col items-stretch gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-[var(--mikke-text)]">
                   {c.code} {c.name}
@@ -167,7 +167,7 @@ function FrontContent() {
               </div>
               <Link
                 href={`/academy/courses/${c.id}/lp`}
-                className="flex shrink-0 items-center gap-1 rounded-full bg-[var(--mikke-accent-soft)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent-strong)]"
+                className="flex shrink-0 items-center justify-center gap-1 rounded-full bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
               >
                 <LayoutTemplate size={13} /> 公開講座ページを編集
               </Link>

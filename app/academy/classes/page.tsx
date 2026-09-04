@@ -23,7 +23,7 @@ import type {
 } from "@/types/database";
 
 const fieldClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 
 function formatDateTime(value: string | null) {
   if (!value) return "未設定";
@@ -140,20 +140,20 @@ function ClassesContent() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-        <div className="flex items-start gap-3">
+      <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
+        <div className="flex flex-wrap items-start gap-3">
           <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]">
             <CalendarCheck size={19} />
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-bold text-[var(--mikke-text)]">開催日程と担当講師</h2>
             <p className="mt-1 text-sm text-[var(--mikke-muted)]">
-              「講座」は教える内容、「開催日程」はその講座を実際に行う日時・場所・定員の記録です。開催日ごとに認定講師へ担当を依頼できます。
+              講座ごとの日時・形式・定員・担当講師を管理します。
             </p>
           </div>
           <Link
             href={toCurrentAcademyContextHref("/academy/classes/new")}
-            className="inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white"
+            className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white sm:w-auto"
           >
             <Plus size={16} /> 開催日程を作成
           </Link>
@@ -267,15 +267,9 @@ function ClassesContent() {
           );
         })
       ) : (
-        <section className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-6 text-center">
+        <section className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-5 text-center">
           <p className="text-sm font-bold text-[var(--mikke-text)]">開催日程はまだありません</p>
-          <p className="mt-1 text-xs text-[var(--mikke-muted)]">講座を選び、日程・形式・定員を登録すると担当講師へ依頼できます。</p>
-          <Link
-            href={toCurrentAcademyContextHref("/academy/classes/new")}
-            className="mt-4 inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white"
-          >
-            <Plus size={16} /> 最初の開催日程を作成
-          </Link>
+          <p className="mt-1 text-xs text-[var(--mikke-muted)]">上の「開催日程を作成」から、講座・日程・形式・定員を登録できます。</p>
         </section>
       )}
     </div>

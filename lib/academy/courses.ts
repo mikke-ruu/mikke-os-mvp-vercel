@@ -116,16 +116,22 @@ export async function createCourse(profile: Profile, headquartersId: string, inp
   if (error) throw error;
   const course = data as AcademyCourse;
 
-  await logAcademyEvent({
-    headquartersId,
-    actorUserId: profile.user_id,
-    actorProfileId: profile.id,
-    ownerUserId: profile.user_id,
-    eventType: "course_created",
-    idempotencyKey: `academy:course_created:${course.id}`,
-    courseId: course.id,
-    title: `講座「${course.name}」を作成しました`
-  });
+  // Activity Log連携用の補助記録で講座本体の保存結果を失敗扱いにしない。
+  // 本体保存後にこの補助記録だけ失敗しても、作成済み講座を再送で重複させないため。
+  try {
+    await logAcademyEvent({
+      headquartersId,
+      actorUserId: profile.user_id,
+      actorProfileId: profile.id,
+      ownerUserId: profile.user_id,
+      eventType: "course_created",
+      idempotencyKey: `academy:course_created:${course.id}`,
+      courseId: course.id,
+      title: `講座「${course.name}」を作成しました`
+    });
+  } catch {
+    // academy_activity_events is a non-authoritative seam. Course creation succeeded.
+  }
 
   return course;
 }

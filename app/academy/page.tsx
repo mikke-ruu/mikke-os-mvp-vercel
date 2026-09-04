@@ -47,7 +47,8 @@ function StatCard({
   value,
   sub,
   detail,
-  alert
+  alert,
+  href
 }: {
   icon: typeof BookOpen;
   label: string;
@@ -55,9 +56,10 @@ function StatCard({
   sub?: string;
   detail?: string;
   alert?: boolean;
+  href?: string;
 }) {
-  return (
-    <div className={`rounded-2xl border p-3.5 md:p-4 ${alert ? "border-[var(--mikke-accent)]/40 bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
+  const content = (
+    <>
       <div className="flex items-center gap-2">
         <span className={`flex h-8 w-8 items-center justify-center rounded-full ${alert ? "bg-white text-[var(--mikke-accent)]" : "bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]"}`}>
           <Icon size={16} />
@@ -68,8 +70,20 @@ function StatCard({
         {value.toLocaleString()}
         <span className="ml-1 text-xs font-bold text-[var(--mikke-muted-light)]">{sub}</span>
       </p>
-      {detail ? <p className="mt-1 truncate text-[11px] text-[var(--mikke-muted)]">{detail}</p> : null}
-    </div>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        {detail ? <p className="min-w-0 truncate text-[11px] text-[var(--mikke-muted)]">{detail}</p> : <span />}
+        {href ? <span className="shrink-0 text-[10px] font-bold text-[var(--mikke-accent-strong)]">見る →</span> : null}
+      </div>
+    </>
+  );
+  const className = `block rounded-2xl border p-3.5 transition md:p-4 ${alert ? "border-[var(--mikke-accent)]/40 bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"} ${href ? "hover:border-[var(--mikke-accent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mikke-primary)]" : ""}`;
+
+  return href ? (
+    <Link href={toCurrentAcademyContextHref(href)} className={className} aria-label={`${label} ${value}${sub ?? ""}を見る`}>
+      {content}
+    </Link>
+  ) : (
+    <div className={className}>{content}</div>
   );
 }
 
@@ -88,6 +102,7 @@ function DashboardContent() {
   const [trialTermsAccepted, setTrialTermsAccepted] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [localPreview, setLocalPreview] = useState(false);
+  const [launchGuideOpen, setLaunchGuideOpen] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -98,6 +113,7 @@ function DashboardContent() {
         setLocalPreview(true);
         setHq(academyPreviewHeadquarters);
         setCourses(academyPreviewCourses);
+        setLaunchGuideOpen(!academyPreviewCourses.some((course) => course.is_published));
         setInstructors(academyPreviewInstructors);
         setApps(academyPreviewApplications);
         setKits(academyPreviewKitOrders);
@@ -122,6 +138,7 @@ function DashboardContent() {
           listMaterials(foundHq.id)
         ]);
         setCourses(c);
+        setLaunchGuideOpen(!c.some((course) => course.is_published));
         setInstructors(i);
         setApps(a);
         setKits(k);
@@ -274,18 +291,28 @@ function DashboardContent() {
         </p>
       </div>
 
-      <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
-        <div>
-          <p className="text-sm font-bold text-[var(--mikke-text)]">Academy開講までの流れ</p>
-          <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">保存内容をもとに案内します。「完了」は項目の登録済みを示します。確認履歴がないものは「未確認」です。各STEPから設定に進めます。</p>
+      <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-3 md:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-[var(--mikke-text)]">Academy開講までの流れ</p>
+            <p className="mt-1 hidden text-sm leading-6 text-[var(--mikke-muted)] sm:block">保存内容から、次に行う設定を案内します。</p>
+          </div>
+          <button
+            type="button"
+            aria-expanded={launchGuideOpen}
+            onClick={() => setLaunchGuideOpen((open) => !open)}
+            className="shrink-0 rounded-full border border-[var(--mikke-line)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--mikke-text-soft)] md:hidden"
+          >
+            {launchGuideOpen ? "閉じる" : "開く"}
+          </button>
         </div>
-        <ol className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+        <ol className={`${launchGuideOpen ? "grid" : "hidden md:grid"} mt-3 grid-cols-2 gap-2`}>
           {launchSteps.map((item) => (
             <li key={item.step}>
-              <Link href={toCurrentAcademyContextHref(item.href)} aria-current={item.isCurrent ? "step" : undefined} className={`block h-full rounded-xl border p-3 ${item.state === "complete" ? "border-[var(--mikke-success)]/35 bg-[var(--mikke-success-soft)]" : item.isCurrent ? "border-[var(--mikke-primary)] bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
+              <Link href={toCurrentAcademyContextHref(item.href)} aria-current={item.isCurrent ? "step" : undefined} className={`block h-full rounded-xl border p-2.5 md:p-3 ${item.state === "complete" ? "border-[var(--mikke-success)]/35 bg-[var(--mikke-success-soft)]" : item.isCurrent ? "border-[var(--mikke-primary)] bg-[var(--mikke-accent-soft)]" : "border-[var(--mikke-line)] bg-white"}`}>
                 <p className="text-xs font-bold text-[var(--mikke-text)]">STEP {item.step} ・ {item.state === "complete" ? "完了" : item.state === "unconfirmed" ? "未確認" : "未完了"}{item.isCurrent ? " ・ いまここ" : ""}</p>
                 <p className="mt-1 text-sm font-bold text-[var(--mikke-text)]">{item.label}</p>
-                <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">{item.description}</p>
+                <p className="mt-1 hidden text-[11px] leading-5 text-[var(--mikke-muted)] sm:block">{item.description}</p>
               </Link>
             </li>
           ))}
@@ -324,10 +351,11 @@ function DashboardContent() {
       ) : null}
 
       <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">
-        <StatCard icon={BookOpen} label="講座数" value={courses.length} sub="件" detail={`公開中 ${publishedCourses}件`} />
-        <StatCard icon={Users} label="認定講師" value={instructors.length} sub="名" detail={`活動中 ${activeInstructors}名`} />
-        <StatCard icon={ClipboardList} label="今月の申込" value={monthApps.length} sub="件" detail={`本部${honbuIntake}・講師${koushiIntake}`} />
+        <StatCard href="/academy/courses" icon={BookOpen} label="講座数" value={courses.length} sub="件" detail={`公開中 ${publishedCourses}件`} />
+        <StatCard href="/academy/instructors" icon={Users} label="認定講師" value={instructors.length} sub="名" detail={`活動中 ${activeInstructors}名`} />
+        <StatCard href="/academy/applications" icon={ClipboardList} label="今月の申込" value={monthApps.length} sub="件" detail={`本部${honbuIntake}・講師${koushiIntake}`} />
         <StatCard
+          href="/academy/applications"
           icon={ClipboardList}
           label="未対応の申込"
           value={pendingApps.length}
