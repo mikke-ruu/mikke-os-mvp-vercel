@@ -3,6 +3,7 @@ import type { MikkeOwnerMenuItem } from "@/components/mikkeos/MikkeOwnerMenu";
 
 export const marketNoteApp: MikkeOwnerMenuItem = { title: "MarketNote", href: "/marketnote", icon: CalendarDays, tone: "orange" };
 export const storyApp: MikkeOwnerMenuItem = { title: "Story", href: "/story", icon: BookOpenText, tone: "blue" };
+export const academyApp: MikkeOwnerMenuItem = { title: "Academy", href: "/academy", icon: GraduationCap, tone: "pink" };
 export const communityApp: MikkeOwnerMenuItem = { title: "Community", href: "/community", icon: Users, tone: "yellow" };
 
 /**
@@ -17,4 +18,4 @@ export const ninteiKozaApp: MikkeOwnerMenuItem = {
 };
 
 /** Public release catalog. Do not use this list as proof that a user owns every app. */
-export const releasedApps: MikkeOwnerMenuItem[] = [marketNoteApp, storyApp, communityApp];
+export const releasedApps: MikkeOwnerMenuItem[] = [marketNoteApp, storyApp, academyApp, communityApp];
