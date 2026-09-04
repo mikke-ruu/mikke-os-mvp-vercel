@@ -93,8 +93,8 @@ function requestDependencies():PlatformHttpDependencies{
     },
     async startCheckout(principal,input,signal){
       requirePaidBillingEnabled();
-      const stripe=createStripeProvider(readStripeRuntimeConfig()),checkoutStore=store();
-      return executeTestCheckout(input,{...checkoutStore,now:()=>new Date(),selectAuthorizedContext:async(raw,nextSignal)=>{if(raw.resourceId&&!await owns(principal,raw,nextSignal))throw new PlatformApiError('RESOURCE_UNAVAILABLE');return await selection(principal,raw,nextSignal);},createTestSession:(quote,key,nextSignal)=>stripe.createCheckout({attemptId:key.slice('platform-checkout-'.length),productKey:quote.scope.productKey,planKey:quote.scope.planKey,idempotencyKey:key},nextSignal),retrieveTestSession:(sessionId,_quote,nextSignal)=>stripe.retrieveCheckout(sessionId,nextSignal)},signal);
+      const stripeConfig=readStripeRuntimeConfig(),stripe=createStripeProvider(stripeConfig),checkoutStore=store();
+      return executeTestCheckout(input,{...checkoutStore,providerMode:stripeConfig.mode,now:()=>new Date(),selectAuthorizedContext:async(raw,nextSignal)=>{if(raw.resourceId&&!await owns(principal,raw,nextSignal))throw new PlatformApiError('RESOURCE_UNAVAILABLE');return await selection(principal,raw,nextSignal);},createTestSession:(quote,key,nextSignal)=>stripe.createCheckout({attemptId:key.slice('platform-checkout-'.length),productKey:quote.scope.productKey,planKey:quote.scope.planKey,idempotencyKey:key},nextSignal),retrieveTestSession:(sessionId,_quote,nextSignal)=>stripe.retrieveCheckout(sessionId,nextSignal)},signal);
     },
     async startCommunityTrial(principal,input,signal){
       if(input.product!=='community_platform'||input.resourceId!==null)throw new PlatformApiError('INVALID_REQUEST');

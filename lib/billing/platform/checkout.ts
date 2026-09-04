@@ -15,6 +15,7 @@ export type ReservedAttempt = CheckoutAttempt & { created: boolean };
 export type TestCheckoutSession = { id: string; url: string; expiresAt: string };
 export type CheckoutResult = { state: 'redirect'; redirectUrl: string } | { state: 'pending' };
 export type CheckoutExecutionDependencies = {
+  providerMode: 'test' | 'live';
   // Must freshly authorize owner/resource and existing paid contracts, using server policy registry.
   selectAuthorizedContext(input: CheckoutRequestV0, signal: AbortSignal): Promise<BillingSelection>;
   loadQuote(ownerUserId: string, quoteId: string, signal: AbortSignal): Promise<unknown>;
@@ -35,9 +36,9 @@ export class CheckoutExecutionError extends Error {
 function error(code: CheckoutExecutionError['code']): never { throw new CheckoutExecutionError(code); }
 const pending = (): CheckoutResult => ({ state: 'pending' });
 
-function checkedSession(raw: unknown, now: Date): TestCheckoutSession | null {
+function checkedSession(raw: unknown, now: Date, providerMode: 'test' | 'live'): TestCheckoutSession | null {
   if (!isRecord(raw) || !hasExactKeys(raw, ['id', 'url', 'expiresAt'])
-    || typeof raw.id !== 'string' || !/^cs_(?:test|live)_[A-Za-z0-9]+$/.test(raw.id)
+    || typeof raw.id !== 'string' || !new RegExp(`^cs_${providerMode}_[A-Za-z0-9]+$`).test(raw.id)
     || !isPlatformRedirect(raw.url, 'checkout') || !isCanonicalTime(raw.expiresAt)
     || !Number.isFinite(now.getTime()) || Date.parse(raw.expiresAt) <= now.getTime()) return null;
   return { id: raw.id, url: raw.url, expiresAt: raw.expiresAt };
@@ -45,13 +46,13 @@ function checkedSession(raw: unknown, now: Date): TestCheckoutSession | null {
 export function checkoutSessionHash(session: TestCheckoutSession): string {
   return createHash('sha256').update(JSON.stringify([session.id, session.url, session.expiresAt])).digest('hex');
 }
-function matchesAttempt(value: unknown, quote: PlatformBillingQuote): value is CheckoutAttempt {
+function matchesAttempt(value: unknown, quote: PlatformBillingQuote, providerMode: 'test' | 'live'): value is CheckoutAttempt {
   if (!isRecord(value) || !isResourceId(value.attempt_id) || value.quote_id !== quote.quoteId
     || value.quote_revision !== quote.revision || typeof value.provider_idempotency_key !== 'string'
     || value.provider_idempotency_key !== `platform-checkout-${value.attempt_id}`
     || !['prepared', 'provider_ready', 'uncertain'].includes(value.status as string)) return false;
   return value.status === 'provider_ready'
-    ? typeof value.provider_session_id === 'string' && /^cs_(?:test|live)_[A-Za-z0-9]+$/.test(value.provider_session_id)
+    ? typeof value.provider_session_id === 'string' && new RegExp(`^cs_${providerMode}_[A-Za-z0-9]+$`).test(value.provider_session_id)
       && typeof value.provider_result_hash === 'string' && /^[a-f0-9]{64}$/.test(value.provider_result_hash)
     : value.provider_session_id === null && value.provider_result_hash === null;
 }
@@ -76,13 +77,13 @@ export async function executeTestCheckout(
     termsVersion: validated.quote.policies.terms.version, accepted: true as const });
   signal.throwIfAborted();
   const attempt = await dependencies.reserve(context.ownerUserId, validated.quote.quoteId, consent, signal);
-  if (!matchesAttempt(attempt, validated.quote) || typeof attempt.created !== 'boolean') error('BILLING_NOT_CONFIGURED');
+  if (!matchesAttempt(attempt, validated.quote, dependencies.providerMode) || typeof attempt.created !== 'boolean') error('BILLING_NOT_CONFIGURED');
   if (!attempt.created) {
     // Prepared may already have sent the provider request. Never start again on timeout/crash.
     // Recovery is explicit reconciliation, with the persisted key and provider retention window.
     if (attempt.status !== 'provider_ready') return pending();
     try {
-      const session = checkedSession(await dependencies.retrieveTestSession(attempt.provider_session_id!, validated.quote, signal), dependencies.now());
+      const session = checkedSession(await dependencies.retrieveTestSession(attempt.provider_session_id!, validated.quote, signal), dependencies.now(), dependencies.providerMode);
       if (!session || session.id !== attempt.provider_session_id || checkoutSessionHash(session) !== attempt.provider_result_hash) return pending();
       return { state: 'redirect', redirectUrl: session.url };
     } catch { return pending(); }
@@ -94,12 +95,12 @@ export async function executeTestCheckout(
     const current = await dependencies.selectAuthorizedContext(input, signal);
     const revalidated = validatePlatformBillingConsent(validated.quote, current, consent, dependencies.now());
     if (!revalidated.ok) throw new Error('context changed');
-    const session = checkedSession(await dependencies.createTestSession(validated.quote, attempt.provider_idempotency_key, signal), dependencies.now());
+    const session = checkedSession(await dependencies.createTestSession(validated.quote, attempt.provider_idempotency_key, signal), dependencies.now(), dependencies.providerMode);
     if (!session) throw new Error('invalid provider response');
     const hash = checkoutSessionHash(session);
     // Persist even if the browser disconnects; failure remains prepared/uncertain, never auto-retry.
     const saved = await dependencies.markReady(context.ownerUserId, attempt.attempt_id, session.id, hash, AbortSignal.timeout(10000));
-    if (!matchesAttempt(saved, validated.quote) || saved.attempt_id !== attempt.attempt_id
+    if (!matchesAttempt(saved, validated.quote, dependencies.providerMode) || saved.attempt_id !== attempt.attempt_id
       || saved.status !== 'provider_ready' || saved.provider_session_id !== session.id || saved.provider_result_hash !== hash) return pending();
     return { state: 'redirect', redirectUrl: session.url };
   } catch {
