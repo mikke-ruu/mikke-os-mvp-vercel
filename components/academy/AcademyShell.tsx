@@ -535,6 +535,23 @@ function ShellInner({
           </Link>
         </div>
       ) : null}
+      {headquartersAccess?.access_kind === "paid" && !accessNotice ? (
+        <div className="mb-4 rounded-xl border border-[var(--mikke-green)] bg-[var(--mikke-green)]/15 px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
+          <p className="font-bold">
+            {headquartersAccess.status === "internal_grant"
+              ? "Academyを利用できます"
+              : "Academy有料プランを利用中です"}
+          </p>
+          <p className="mt-1 text-xs font-medium">
+            {headquartersAccess.status === "internal_grant"
+              ? "この本部は現在利用できます。料金のお申し込み状況は、本部設定の「Academy利用料金」で確認できます。"
+              : "現在の利用状況と次回の請求内容は、本部設定の「Academy利用料金」で確認できます。"}
+          </p>
+          <Link href={contextHref("/academy/settings")} className="mt-2 inline-flex rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text)]">
+            Academy利用料金を確認する
+          </Link>
+        </div>
+      ) : null}
       {previewMode === "readonly" ? (
         <div className="mb-4 rounded-xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] px-4 py-3 text-xs font-bold text-[var(--mikke-accent-strong)]">
           ローカル読み取り確認中です。画面移動はできますが、フォームの保存は停止しています。
