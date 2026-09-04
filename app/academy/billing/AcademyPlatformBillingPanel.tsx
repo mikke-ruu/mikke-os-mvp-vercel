@@ -112,7 +112,7 @@ export function AcademyPlatformBillingPanel({
             {portalBusy ? "請求管理を開いています…" : "請求・支払方法・解約を管理する"}
           </button>
         </div>
-        <p id="academy-checkout-guidance" className="mt-3 text-sm leading-6 text-[var(--mikke-muted)]">決済前に、共通の契約情報から今回と次回の金額・日付、販売者、適用規約を表示します。</p>
+        <p id="academy-checkout-guidance" className="mt-3 text-sm leading-6 text-[var(--mikke-muted)]">「料金・条件を確認して申し込む」では課金されません。共通の契約情報から今回と次回の金額・日付、販売者、適用規約を表示し、本人が確認・同意して「決済画面へ進む」を押したときだけ課金手続きが始まります。</p>
         {quote ? (
           <div className="mt-5 min-w-0 rounded-2xl border border-[var(--mikke-primary)]/35 bg-[var(--mikke-surface-soft)] p-4 sm:p-5" aria-labelledby="academy-quote-title">
             <h3 id="academy-quote-title" className="text-base font-bold">Academy利用料のお申し込み内容</h3>

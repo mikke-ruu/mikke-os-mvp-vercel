@@ -16,6 +16,7 @@ const settings = read("app/academy/settings/page.tsx");
 const courseList = read("app/academy/courses/page.tsx");
 const newCourse = read("app/academy/courses/new/page.tsx");
 const courseCreationAccess = read("lib/academy/course-creation-access.ts");
+const billingPanel = read("app/academy/billing/AcademyPlatformBillingPanel.tsx");
 
 for (const marker of [
   "講座を保存できませんでした",
@@ -64,6 +65,15 @@ if (!newCourse.includes("if (!createAccess?.allowed)")) {
 }
 if (!courseCreationAccess.includes('"academy:courses:manage"') || !courseCreationAccess.includes("can_manage_drafts")) {
   throw new Error("course creation must require both role capability and authoritative draft access");
+}
+for (const marker of ["開始日時:", "終了日時:", "料金と規約を確認し、同意して決済画面へ進んだ場合だけ"]) {
+  if (!shell.includes(marker)) throw new Error(`trial timing marker missing: ${marker}`);
+}
+if (!dashboard.includes("開始ボタンを押した日時から7日間")) {
+  throw new Error("trial start screen must explain when the seven-day period begins");
+}
+if (!billingPanel.includes("本人が確認・同意して") || !billingPanel.includes("課金手続きが始まります")) {
+  throw new Error("billing screen must identify the explicit payment-start action");
 }
 for (const marker of ["本部責任者", "本部運営担当", "講座編集担当"]) {
   if (!settings.includes(marker)) throw new Error(`Japanese role label missing: ${marker}`);
