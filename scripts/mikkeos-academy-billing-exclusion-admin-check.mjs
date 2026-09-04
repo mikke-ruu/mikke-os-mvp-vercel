@@ -13,6 +13,8 @@ const checks = [
   [migration.includes("canonical_handle = 'ayumi'"), "canonical @ayumi admin pin"],
   [migration.includes("lower(profile.handle) = 'ayumi'"), "current canonical handle revalidation"],
   [migration.includes("p_actor_user_id <> (select auth.uid())"), "database binds signed-in @ayumi"],
+  [!migration.match(/returns void[\s\S]*?v_operation[\s\S]*?end;\n\$\$;/), "void authorization function contains no trigger-only variables"],
+  [migration.match(/returns trigger[\s\S]*?v_operation[\s\S]*?current_user in \('postgres', 'supabase_admin'\)/), "fixture bypass is limited to the trigger function"],
   [migration.includes("from public, anon, authenticated, service_role"), "direct ledger writes revoked"],
   [migration.includes("academy_billing_exclusion_events"), "immutable audit events"],
   [server.includes("auth.getUser(accessToken)"), "server revalidates user token"],
