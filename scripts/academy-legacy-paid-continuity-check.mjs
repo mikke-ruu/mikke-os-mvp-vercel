@@ -19,7 +19,7 @@ for (const marker of [
 if (/headquarters\.name\s*=|headquarters\.handle\s*=|\('mikkeOS official Academy'/iu.test(migration)) {
   throw new Error("legacy continuity must be selected by prior access state, not a headquarters name");
 }
-if (!migration.includes("null\n  from public.academy_headquarters")) {
+if (!/null\r?\n  from public\.academy_headquarters/u.test(migration)) {
   throw new Error("legacy continuity must not be converted to an expiring test grant");
 }
 if (/insert\s+into\s+public\.academy_headquarters/iu.test(migration)) {
