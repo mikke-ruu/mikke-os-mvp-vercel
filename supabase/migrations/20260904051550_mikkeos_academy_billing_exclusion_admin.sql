@@ -70,13 +70,6 @@ set search_path = ''
 stable
 as $$
 begin
-  -- Database owners remain able to build rollback-only fixtures. Application
-  -- roles, including service_role, must use the audited RPCs below.
-  if current_user in ('postgres', 'supabase_admin')
-    and v_operation = '' then
-    return case when tg_op = 'DELETE' then old else new end;
-  end if;
-
   if (select auth.role()) <> 'authenticated'
     or p_actor_user_id is null
     or p_actor_user_id <> (select auth.uid())
@@ -107,6 +100,13 @@ as $$
 declare
   v_operation text := coalesce(current_setting('mikkeos.billing_exclusion_operation', true), '');
 begin
+  -- Database owners remain able to build rollback-only fixtures. Application
+  -- roles, including service_role, must use the audited RPCs below.
+  if current_user in ('postgres', 'supabase_admin')
+    and v_operation = '' then
+    return case when tg_op = 'DELETE' then old else new end;
+  end if;
+
   if tg_op = 'TRUNCATE' or tg_op = 'DELETE' then
     raise exception using errcode = '42501', message = 'ACADEMY_BILLING_EXCLUSION_IMMUTABLE';
   end if;
