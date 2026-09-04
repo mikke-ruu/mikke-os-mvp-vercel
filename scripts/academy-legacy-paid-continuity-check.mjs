@@ -1,6 +1,6 @@
 import fs from "node:fs";
 
-const migration = fs.readFileSync("supabase/migrations/20260904143000_academy_legacy_paid_access_continuity.sql", "utf8");
+const migration = fs.readFileSync("supabase/migrations/20260904083849_academy_legacy_paid_access_continuity.sql", "utf8");
 const sqlTest = fs.readFileSync("supabase/tests/academy_legacy_paid_access_continuity.sql", "utf8");
 const shell = fs.readFileSync("components/academy/AcademyShell.tsx", "utf8");
 const settings = fs.readFileSync("app/academy/settings/page.tsx", "utf8");
