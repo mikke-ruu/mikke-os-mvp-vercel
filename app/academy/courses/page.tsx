@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BookOpen, Eye, EyeOff, GraduationCap, LayoutTemplate, PenSquare, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { getMyAcademyCourseCreationAccess } from "@/lib/academy/course-creation-access";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import { listCourses } from "@/lib/academy/courses";
@@ -14,13 +15,24 @@ function CoursesContent() {
   const { profile } = useAuth();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
+  const [createAccess, setCreateAccess] = useState<{ allowed: boolean; reason: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     const foundHq = await getOwnedHeadquarters(profile.user_id);
     setHq(foundHq);
-    if (foundHq) setCourses(await listCourses(foundHq.id));
+    if (foundHq) {
+      const [foundCourses, foundCreateAccess] = await Promise.all([
+        listCourses(foundHq.id),
+        getMyAcademyCourseCreationAccess(foundHq.id)
+      ]);
+      setCourses(foundCourses);
+      setCreateAccess(foundCreateAccess);
+    } else {
+      setCourses([]);
+      setCreateAccess(null);
+    }
     setLoading(false);
   }, [profile.user_id]);
 
@@ -46,18 +58,32 @@ function CoursesContent() {
           <p className="text-xs text-[var(--mikke-muted)]">{hq.name}</p>
           <h2 className="text-base font-bold text-[var(--mikke-text)]">講座管理</h2>
         </div>
-        <Link href="/academy/courses/new" className="flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
-          <Plus size={16} /> 新規
-        </Link>
+        {createAccess?.allowed ? (
+          <Link href="/academy/courses/new" className="flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
+            <Plus size={16} /> 新規
+          </Link>
+        ) : (
+          <span aria-disabled="true" className="flex items-center gap-1 rounded-full bg-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">
+            <Plus size={16} /> 新規
+          </span>
+        )}
       </div>
+
+      {!createAccess?.allowed && createAccess?.reason ? (
+        <p role="status" className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-text-soft)]">
+          {createAccess.reason}
+        </p>
+      ) : null}
 
       {courses.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-8 text-center">
           <BookOpen size={28} className="mx-auto text-[var(--mikke-accent)]" />
           <p className="mt-2 text-sm text-[var(--mikke-text-soft)]">まだ講座がありません。</p>
-          <Link href="/academy/courses/new" className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
-            最初の講座を作る
-          </Link>
+          {createAccess?.allowed ? (
+            <Link href="/academy/courses/new" className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
+              最初の講座を作る
+            </Link>
+          ) : null}
         </div>
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">

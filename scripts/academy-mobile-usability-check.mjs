@@ -13,6 +13,9 @@ const instructors = read("app/academy/instructors/page.tsx");
 const classes = read("app/academy/classes/page.tsx");
 const applications = read("app/academy/applications/page.tsx");
 const settings = read("app/academy/settings/page.tsx");
+const courseList = read("app/academy/courses/page.tsx");
+const newCourse = read("app/academy/courses/new/page.tsx");
+const courseCreationAccess = read("lib/academy/course-creation-access.ts");
 
 for (const marker of [
   "講座を保存できませんでした",
@@ -52,6 +55,15 @@ if (!applications.includes("本部が直接受け付けた申込") || !applicati
 }
 if (!applications.includes("koushiPendingCount") || !applications.includes("countUnattendedInstructorOrders")) {
   throw new Error("instructor intake tab must expose its unattended count before opening");
+}
+if (!courseList.includes("getMyAcademyCourseCreationAccess") || !courseList.includes('aria-disabled="true"')) {
+  throw new Error("course list must disable creation before navigation when write access is unavailable");
+}
+if (!newCourse.includes("if (!createAccess?.allowed)")) {
+  throw new Error("direct course creation route must stop before rendering the form");
+}
+if (!courseCreationAccess.includes('"academy:courses:manage"') || !courseCreationAccess.includes("can_manage_drafts")) {
+  throw new Error("course creation must require both role capability and authoritative draft access");
 }
 for (const marker of ["本部責任者", "本部運営担当", "講座編集担当"]) {
   if (!settings.includes(marker)) throw new Error(`Japanese role label missing: ${marker}`);
