@@ -22,6 +22,7 @@ for (const pattern of [
   /revoke all on function public\.platform_billing_community_trial_start\(uuid, uuid\)[\s\S]*from public, anon, authenticated/,
   /grant execute on function public\.platform_billing_community_trial_start\(uuid, uuid\)[\s\S]*to service_role/,
   /'automaticBilling', false/,
+  /'automaticBilling', not v_subscription\.cancel_at_period_end/,
   /'allowedActions',[\s\S]*'\["checkout","start_trial"\]'/
 ]) assert.match(migration, pattern);
 

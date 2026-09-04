@@ -92,6 +92,17 @@ equal(canceled, true);
 await checkError('checkout', request('checkout', confirmation), 'BILLING_NOT_CONFIGURED', 503);
 const ready = { ...unavailableStatus(scope), availability: 'ready', noticeCode: null,
   subscription: { state: 'active', planKey: 'starter', currentPeriodStartsAt: '2026-09-01T00:00:00.000Z', currentPeriodEndsAt: '2026-10-01T00:00:00.000Z', automaticBilling: true, cancelAtPeriodEnd: false }, allowedActions: ['checkout', 'portal'] };
+const legacyReady = structuredClone(ready);
+delete legacyReady.subscription.currentPeriodStartsAt;
+delete legacyReady.subscription.automaticBilling;
+equal(decodePlatformStatus(legacyReady, scope), {
+  ...ready,
+  subscription: { ...ready.subscription, currentPeriodStartsAt: null }
+});
+const cancelScheduled = structuredClone(ready);
+cancelScheduled.subscription.cancelAtPeriodEnd = true;
+cancelScheduled.subscription.automaticBilling = false;
+equal(decodePlatformStatus(cancelScheduled, scope), cancelScheduled);
 const policyPending = { ...unavailableStatus(scope), availability: 'policy_pending', noticeCode: 'POLICY_PENDING' };
 const blocked = await checkError('checkout', request('checkout', confirmation), 'POLICY_PENDING', 503, { readStatus: async () => policyPending });
 for (const field of ['availability', 'creation', 'subscription']) {

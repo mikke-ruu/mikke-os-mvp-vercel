@@ -179,7 +179,7 @@ begin
         'planKey', v_subscription.plan_key,
         'currentPeriodStartsAt', to_char(v_subscription.current_period_start at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
         'currentPeriodEndsAt', to_char(v_subscription.current_period_end at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-        'automaticBilling', true,
+        'automaticBilling', not v_subscription.cancel_at_period_end,
         'cancelAtPeriodEnd', v_subscription.cancel_at_period_end
       ),
       'creation', jsonb_build_object('state', v_creation->>'state'),

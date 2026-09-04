@@ -102,17 +102,31 @@ export function decodePlatformStatus(value: unknown, scope: PlatformScope): Plat
   if (value.noticeCode !== null && !platformErrorCodes.includes(value.noticeCode as PlatformErrorCode)) return null;
   if (value.availability !== 'ready' && value.allowedActions.length !== 0) return null;
   if (value.noticeCode !== null && value.allowedActions.length !== 0) return null;
+  let normalizedSubscription: PlatformStatusV0['subscription'] = null;
   if (value.subscription !== null) {
     const sub = value.subscription;
-    if (!isRecord(sub) || !hasExactKeys(sub, ['state', 'planKey', 'currentPeriodStartsAt', 'currentPeriodEndsAt', 'automaticBilling', 'cancelAtPeriodEnd'])
+    if (!isRecord(sub)) return null;
+    const legacyShape = hasExactKeys(sub, ['state', 'planKey', 'currentPeriodEndsAt', 'cancelAtPeriodEnd']);
+    const currentShape = hasExactKeys(sub, ['state', 'planKey', 'currentPeriodStartsAt', 'currentPeriodEndsAt', 'automaticBilling', 'cancelAtPeriodEnd']);
+    if ((!legacyShape && !currentShape)
       || typeof sub.state !== 'string' || !['pending', 'trialing', 'active', 'past_due', 'ended'].includes(sub.state)
       || typeof sub.planKey !== 'string' || !/^[a-z][a-z0-9_]{0,39}$/.test(sub.planKey)
-      || typeof sub.automaticBilling !== 'boolean'
       || typeof sub.cancelAtPeriodEnd !== 'boolean'
-      || (sub.currentPeriodStartsAt !== null && !isCanonicalTime(sub.currentPeriodStartsAt))
+      || (currentShape && typeof sub.automaticBilling !== 'boolean')
+      || (currentShape && sub.currentPeriodStartsAt !== null && !isCanonicalTime(sub.currentPeriodStartsAt))
       || (sub.currentPeriodEndsAt !== null && !isCanonicalTime(sub.currentPeriodEndsAt))) return null;
+    normalizedSubscription = {
+      state: sub.state as NonNullable<PlatformStatusV0['subscription']>['state'],
+      planKey: sub.planKey,
+      currentPeriodStartsAt: currentShape ? sub.currentPeriodStartsAt as string | null : null,
+      currentPeriodEndsAt: sub.currentPeriodEndsAt as string | null,
+      automaticBilling: currentShape
+        ? sub.automaticBilling as boolean
+        : sub.state === 'active' && sub.cancelAtPeriodEnd === false,
+      cancelAtPeriodEnd: sub.cancelAtPeriodEnd
+    };
   }
-  return value as PlatformStatusV0;
+  return { ...value, subscription: normalizedSubscription } as PlatformStatusV0;
 }
 
 // A URL is never proof of payment. Restrict provider navigation separately.
