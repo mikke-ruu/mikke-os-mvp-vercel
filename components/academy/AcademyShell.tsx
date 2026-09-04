@@ -31,6 +31,7 @@ import {
 import { withAcademyContextQuery } from "@/lib/academy/context-query.mjs";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getAcademyOnboardingEligibility, getMyAcademyHeadquartersAccess } from "@/lib/academy/trial";
+import { getAcademyAccessNotice } from "@/lib/academy/access-notice";
 import { getMyInstructorRecords } from "@/lib/academy/instructor-portal";
 import { listPublicHeadquartersByIds } from "@/lib/academy/lp";
 import { supabase } from "@/lib/supabase/client";
@@ -321,10 +322,12 @@ function ShellInner({
     return contextualHref;
   }
 
-  const trialLocked = headquartersAccess?.access_kind === "trial" && !headquartersAccess.can_manage_drafts;
+  const accessNotice = getAcademyAccessNotice(headquartersAccess);
+  const accessLocked = accessNotice !== null;
+  const trialLocked = headquartersAccess?.access_kind === "trial" && accessLocked;
 
   function captureAcademyLink(event: React.MouseEvent<HTMLDivElement>) {
-    if (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough" || previewMode === "trial" || trialLocked) {
+    if (previewMode === "readonly" || previewMode === "dashboard" || previewMode === "walkthrough" || previewMode === "trial" || accessLocked) {
       const target = event.target as Element;
       const toggle = target.closest('input[type="checkbox"], input[type="radio"]');
       const button = target.closest("button");
@@ -336,8 +339,8 @@ function ShellInner({
         event.preventDefault();
         event.stopPropagation();
         window.alert(
-          trialLocked
-            ? "7日間お試しは終了しています。有料利用を開始するまで変更できません。自動課金はされていません。"
+          accessLocked
+            ? accessNotice.mutationMessage
             : "ローカル確認中は変更できません。本番データは変更されていません。"
         );
         return;
@@ -354,12 +357,12 @@ function ShellInner({
   }
 
   function blockReadonlySubmit(event: React.FormEvent<HTMLDivElement>) {
-    if (previewMode !== "readonly" && previewMode !== "dashboard" && previewMode !== "walkthrough" && previewMode !== "trial" && !trialLocked) return;
+    if (previewMode !== "readonly" && previewMode !== "dashboard" && previewMode !== "walkthrough" && previewMode !== "trial" && !accessLocked) return;
     event.preventDefault();
     event.stopPropagation();
     window.alert(
-      trialLocked
-        ? "7日間お試しは終了しています。有料利用を開始するまで保存できません。自動課金はされていません。"
+      accessLocked
+        ? accessNotice.mutationMessage
         : "ローカル確認中は保存できません。本番データは変更されていません。"
     );
   }
@@ -521,6 +524,15 @@ function ShellInner({
             <p className="mt-2 text-xs font-bold">開始日時・終了日時を確認しています。</p>
           )}
           <p className="mt-2 text-xs font-medium">有料利用は、本部設定で料金と規約を確認し、同意して決済画面へ進んだ場合だけ申し込みが始まります。</p>
+        </div>
+      ) : null}
+      {headquartersAccess?.access_kind === "paid" && accessNotice ? (
+        <div className="mb-4 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)]/20 px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
+          <p className="font-bold">{accessNotice.title}</p>
+          <p className="mt-1 text-xs font-medium">{accessNotice.description}</p>
+          <Link href={contextHref("/academy/settings")} className="mt-2 inline-flex rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text)]">
+            Academy利用料金を確認する
+          </Link>
         </div>
       ) : null}
       {previewMode === "readonly" ? (

@@ -8,6 +8,8 @@ import { AcademyPlatformBillingLoader } from "@/app/academy/billing/AcademyPlatf
 import { academyCheckoutPlanForCatalogPrice } from "@/lib/academy/platform-billing-view";
 import { supabase } from "@/lib/supabase/client";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
+import { getMyAcademyHeadquartersAccess } from "@/lib/academy/trial";
+import { getAcademyAccessNotice } from "@/lib/academy/access-notice";
 import {
   getMyAcademyBillingSnapshot,
   getMyAcademyCurrentBillingEstimate,
@@ -33,6 +35,7 @@ import {
   type AcademyCommunityLinkOption
 } from "@/lib/academy/community-links";
 import type {
+  AcademyHeadquartersAccess,
   AcademyHeadquarters,
   AcademyHeadquartersInvitation,
   AcademyHeadquartersMember,
@@ -59,6 +62,7 @@ function SettingsContent() {
   const { user, profile, isGuest } = useAuth();
   const [headquarters, setHeadquarters] = useState<AcademyHeadquarters | null>(null);
   const [role, setRole] = useState<AcademyHeadquartersRole | null>(null);
+  const [headquartersAccess, setHeadquartersAccess] = useState<AcademyHeadquartersAccess | null>(null);
   const [members, setMembers] = useState<AcademyHeadquartersMember[]>([]);
   const [invitations, setInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [myInvitations, setMyInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
@@ -81,7 +85,9 @@ function SettingsContent() {
   const [message, setMessage] = useState("");
   const [communityForm, setCommunityForm] = useState({ communityId: "", mappingId: "", entitlementKey: "", sourceProductKey: "academy-membership", status: "draft" as "draft" | "active" | "archived" });
 
-  const canManage = role === "owner" || role === "administrator";
+  const canManageRole = role === "owner" || role === "administrator";
+  const canManage = canManageRole && headquartersAccess?.can_manage_drafts === true;
+  const accessNotice = getAcademyAccessNotice(headquartersAccess);
   const selectedCommunity = useMemo(
     () => communityLinks.find((item) => item.communityId === communityForm.communityId) ?? null,
     [communityForm.communityId, communityLinks]
@@ -107,6 +113,7 @@ function SettingsContent() {
       setHeadquarters(hq);
       if (!hq) {
         setRole(null);
+        setHeadquartersAccess(null);
         setMembers([]);
         setInvitations([]);
         setBillingSnapshot(null);
@@ -114,8 +121,12 @@ function SettingsContent() {
         return;
       }
 
-      const nextRole = await getMyHeadquartersRole(hq.id);
+      const [nextRole, nextAccess] = await Promise.all([
+        getMyHeadquartersRole(hq.id),
+        getMyAcademyHeadquartersAccess(hq.id),
+      ]);
       setRole(nextRole);
+      setHeadquartersAccess(nextAccess);
       setForm({
         name: hq.name,
         logo_url: hq.logo_url ?? "",
@@ -396,6 +407,8 @@ function SettingsContent() {
               <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-muted)]">
                 {role === "course_editor"
                   ? "講座編集担当は本部情報を変更できません。本部責任者または本部運営担当へ依頼してください。"
+                  : accessNotice
+                    ? accessNotice.description
                   : "この本部の利用状態または編集権限を確認できませんでした。画面を再読み込みし、直らない場合は運営へお知らせください。"}
               </p>
             )}
