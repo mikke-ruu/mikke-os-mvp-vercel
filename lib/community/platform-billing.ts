@@ -1,8 +1,9 @@
 import { getCommunityPlatformPlan } from "./platform-plans";
 import {
-  UUID_PATTERN, decodePlatformStatus, hasExactKeys, isCanonicalTime, isPlatformRedirect, isRecord,
+  UUID_PATTERN, decodeCommunityTrialStartResult, decodePlatformStatus, hasExactKeys, isCanonicalTime, isPlatformRedirect, isRecord,
   type PlatformAction, type PlatformStatusV0
 } from "../billing/platform/contracts";
+import type { CommunityTrialStartResult } from "../billing/platform/contracts";
 
 // Community projection of the control room's platform billing UI contract v0.
 // No provider, DB, membership, Academy entitlement or authorization logic here.
@@ -15,7 +16,7 @@ export const COMMUNITY_PLATFORM_TRIAL_POLICY = Object.freeze({
   explicitPaidApplicationRequired: true,
   postTrialCapabilities: "policy_pending",
   notice: "30日間のお試しが終わっても、自動課金・有料プランへの自動移行はありません。本人が有料プランを申し込んだ時に課金が始まります。",
-  pendingNotice: "お試しの開始手続きや、終了後に使える機能などは準備中です。"
+  pendingNotice: "「30日無料を始める」を押した時に開始します。押す前に試用も請求も始まりません。"
 } as const);
 export type CommunityPlatformAction = PlatformAction;
 export type CommunityPlatformStatusV0 = Omit<PlatformStatusV0, "product"> & { product: typeof COMMUNITY_PLATFORM_PRODUCT };
@@ -70,6 +71,8 @@ export function communityPlatformActionBlock(state: CommunityPlatformReadState, 
   if (!data.allowedActions.includes(action)) return "現在この操作は利用できません。";
   if (action === "checkout") return null;
   if (action === "portal") return data.resourceId && data.subscription ? null : "請求・契約管理の対象を確認できません。";
+  if (action === "start_trial") return data.resourceId === null && data.subscription === null && data.creation.state === "none"
+    ? null : "30日無料を開始できません。契約状態を再確認してください。";
   // This is a display hint, not a grant. The actual create API must atomically
   // consume the entitlement. No inference from URL, plan or local storage.
   return data.resourceId === null && data.creation.state === "available"
@@ -207,6 +210,28 @@ export async function requestCommunityPlatformQuote(
     const quote = decodeCommunityPlatformQuote(raw, state.data.resourceId, planKey, requestId);
     return quote ? { ok: true, quote } : { ok: false, message: "契約条件を安全に確認できませんでした。状態を再確認してください。" };
   } catch { return { ok: false, message: "通信できませんでした。状態を再確認してください。" }; }
+}
+
+export async function startCommunityPlatformTrial(
+  state: CommunityPlatformReadState,
+  requestId: string,
+  transport: CommunityBillingTransport,
+  signal?: AbortSignal
+): Promise<{ ok: true; trial: CommunityTrialStartResult } | { ok: false; message: string; authRequired?: boolean }> {
+  const blocked = communityPlatformActionBlock(state, "start_trial");
+  if (blocked || state.kind !== "loaded" || state.data.resourceId !== null || !UUID_PATTERN.test(requestId))
+    return { ok: false, message: blocked ?? "30日無料を開始できません。状態を再確認してください。" };
+  try {
+    const { response, raw, authRequired } = await postCommunityBilling("/api/billing/platform/trial/start", {
+      product: COMMUNITY_PLATFORM_PRODUCT, resourceId: null, requestId
+    }, transport, signal);
+    if (authRequired) return { ok: false, message: COMMUNITY_PLATFORM_MESSAGES.auth_required, authRequired: true };
+    if (!response?.ok) return { ok: false, message: "30日無料を開始できませんでした。状態を再確認してください。" };
+    const trial = decodeCommunityTrialStartResult(raw);
+    return trial ? { ok: true, trial } : { ok: false, message: "無料期間を安全に確認できませんでした。状態を再確認してください。" };
+  } catch {
+    return { ok: false, message: "通信できませんでした。状態を再確認してください。" };
+  }
 }
 
 export async function startCommunityPlatformCheckout(

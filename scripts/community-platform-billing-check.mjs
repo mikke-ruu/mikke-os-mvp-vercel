@@ -46,7 +46,7 @@ let checks = 0;
 function check(name, fn) { fn(); checks++; }
 async function checkAsync(name, fn) { await fn(); checks++; }
 const dto = (patch = {}) => ({ version: 0, product: "community_platform", resourceId: resource, availability: "ready",
-  subscription: { state: "active", planKey: "starter", currentPeriodEndsAt: "2026-10-01T00:00:00.000Z", cancelAtPeriodEnd: false },
+  subscription: { state: "active", planKey: "starter", currentPeriodStartsAt: "2026-09-01T00:00:00.000Z", currentPeriodEndsAt: "2026-10-01T00:00:00.000Z", automaticBilling: true, cancelAtPeriodEnd: false },
   creation: { state: "consumed" }, allowedActions: ["portal"], noticeCode: null, ...patch });
 const state = (patch = {}) => ({ kind: "loaded", data: dto(patch) });
 const response = (raw, status = 200) => new Response(JSON.stringify(raw), { status, headers: { "Content-Type": "application/json" } });
@@ -152,7 +152,7 @@ check("approved trial policy is narrow and immutable", () => {
 });
 const trialBoundary = Date.parse("2026-09-01T00:00:00.000Z");
 for (const offset of [-1, 0, 1]) check("deadline never synthesizes active or rights", () => {
-  const raw = dto({ subscription: { state: "trialing", planKey: "trial", currentPeriodEndsAt: new Date(trialBoundary + offset).toISOString(), cancelAtPeriodEnd: false }, allowedActions: [], creation: { state: "none" } });
+  const raw = dto({ subscription: { state: "trialing", planKey: "trial", currentPeriodStartsAt: "2026-08-02T00:00:00.000Z", currentPeriodEndsAt: new Date(trialBoundary + offset).toISOString(), automaticBilling: false, cancelAtPeriodEnd: false }, allowedActions: [], creation: { state: "none" } });
   const before = JSON.stringify(raw);
   const decoded = model.decodeCommunityPlatformStatus(raw, resource);
   assert.equal(decoded.subscription.state, "trialing");
@@ -206,7 +206,7 @@ for (const patch of [
   { subscription: { ...dto().subscription, cancelAtPeriodEnd: "false" } }
 ]) check("unknown/mismatched DTO fails closed", () => assert.equal(model.decodeCommunityPlatformStatus(dto(patch), resource), null));
 for (const kind of ["unavailable", "policy_pending", "auth_required", "resource_unavailable", "error", "loading"]) {
-  for (const action of ["checkout", "portal", "create_resource"]) check("unloaded actions blocked", () => assert.ok(model.communityPlatformActionBlock({ kind }, action)));
+  for (const action of ["checkout", "portal", "create_resource", "start_trial"]) check("unloaded actions blocked", () => assert.ok(model.communityPlatformActionBlock({ kind }, action)));
 }
 for (const availability of ["not_configured", "policy_pending"]) {
   check("not ready blocks portal", () => assert.ok(model.communityPlatformActionBlock(state({ availability }), "portal")));
@@ -323,6 +323,27 @@ await checkAsync("checkout rejects unsafe redirect", async () => {
   assert.equal(result.ok, false);
 });
 
+await checkAsync("trial start uses narrow authenticated request and server dates", async () => {
+  let body;
+  const trialState = state({ resourceId: null, subscription: null, creation: { state: "none" }, allowedActions: ["checkout", "start_trial"] });
+  const result = await model.startCommunityPlatformTrial(trialState, requestId, transport(async (url, init) => {
+    assert.equal(url, "/api/billing/platform/trial/start");
+    assert.equal(init.method, "POST"); assert.equal(init.credentials, "omit"); assert.equal(init.redirect, "error");
+    body = JSON.parse(init.body);
+    return response({ state: "trialing", startsAt: "2026-09-04T00:00:00.000Z", endsAt: "2026-10-04T00:00:00.000Z", automaticBilling: false, creation: { state: "available" } });
+  }));
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(body, { product: "community_platform", resourceId: null, requestId });
+  assert.equal(result.trial.automaticBilling, false);
+  assert.ok(!JSON.stringify(body).includes(owner));
+});
+await checkAsync("trial start rejects missing capability, bad result and missing token", async () => {
+  assert.equal((await model.startCommunityPlatformTrial(state({ resourceId: null, subscription: null, allowedActions: [] }), requestId, transport(() => assert.fail()))).ok, false);
+  const ready = state({ resourceId: null, subscription: null, creation: { state: "none" }, allowedActions: ["start_trial"] });
+  assert.equal((await model.startCommunityPlatformTrial(ready, requestId, transport(async () => response({ state: "trialing", startsAt: "today" })))).ok, false);
+  assert.equal((await model.startCommunityPlatformTrial(ready, requestId, transport(() => assert.fail(), null))).authRequired, true);
+});
+
 for (const kind of ["unavailable", "auth_required", "error", "policy_pending"]) check("UI empty state honest", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: { kind } }));
   assert.ok(html.includes("請求額と請求日は未取得")); assert.ok(html.includes("disabled"));
@@ -333,6 +354,21 @@ check("UI links to guarded create only after authoritative readiness", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({ resourceId: null, subscription: null, creation: { state: "available" }, allowedActions: ["create_resource"] }) }));
   assert.ok(html.includes("1回だけ安全に消費")); assert.ok(html.includes('href="/community/create"'));
   assert.ok(html.includes("利用開始確認が完了"));
+});
+check("trial UI explains the click boundary and server dates", () => {
+  const initial = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, {
+    state: state({ resourceId: null, subscription: null, creation: { state: "none" }, allowedActions: ["checkout", "start_trial"] }),
+    selectedKey: "trial", onStartTrial() {}
+  }));
+  assert.ok(initial.includes("30日無料を始める"));
+  assert.ok(initial.includes("押した時に開始"));
+  assert.ok(initial.includes("自動課金・有料プランへの自動移行はありません"));
+  const active = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: state({
+    resourceId: null,
+    subscription: { state: "trialing", planKey: "trial", currentPeriodStartsAt: "2026-09-04T00:00:00.000Z", currentPeriodEndsAt: "2026-10-04T00:00:00.000Z", automaticBilling: false, cancelAtPeriodEnd: false },
+    creation: { state: "available" }, allowedActions: ["create_resource"]
+  }) }));
+  assert.ok(active.includes("2026/09/04")); assert.ok(active.includes("2026/10/04")); assert.ok(active.includes("自動課金")); assert.ok(active.includes("なし"));
 });
 check("SSR quote is responsive and still requires explicit consent", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, {
@@ -362,6 +398,7 @@ check("source boundaries", () => {
   assert.doesNotMatch(adapter + view + browserTransport, /localStorage|service_role|STRIPE_SECRET|\.rpc\(|\.from\(/);
   assert.match(adapter, /\/api\/billing\/platform\/quote/);
   assert.match(adapter, /\/api\/billing\/platform\/checkout/);
+  assert.match(adapter, /\/api\/billing\/platform\/trial\/start/);
   assert.match(view, /pending\.current/); assert.match(view, /quoteRequest\.current\.id/);
   assert.match(browserTransport, /getSession\(\)/); assert.doesNotMatch(view + browserTransport, /console\./);
   assert.match(view, /onAuthStateChange/); assert.match(view, /subscription\.unsubscribe\(\)/);

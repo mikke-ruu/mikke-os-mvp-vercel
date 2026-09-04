@@ -1,7 +1,8 @@
 import {
-  decodePlatformStatus, hasExactKeys, isPlatformRedirect, isRecord, isResourceId, parseCheckout, parsePortal, parseScope
+  decodeCommunityTrialStartResult, decodePlatformStatus, hasExactKeys, isPlatformRedirect, isRecord, isResourceId,
+  parseCheckout, parseCommunityTrialStart, parsePortal, parseScope
 } from './contracts';
-import type { PlatformErrorCode, PlatformScope, PortalRequestV0 } from './contracts';
+import type { CommunityTrialStartRequest, PlatformErrorCode, PlatformScope, PortalRequestV0 } from './contracts';
 
 export class PlatformApiError extends Error {
   readonly code: PlatformErrorCode;
@@ -17,6 +18,7 @@ export type PlatformHttpDependencies = {
   openPortal(principal: PlatformPrincipal, input: PortalRequestV0, signal: AbortSignal): Promise<string>;
   issueQuote(principal: PlatformPrincipal, input: NonNullable<ReturnType<typeof parseCheckout>>, signal: AbortSignal): Promise<unknown>;
   startCheckout(principal: PlatformPrincipal, input: unknown, signal: AbortSignal): Promise<unknown>;
+  startCommunityTrial(principal: PlatformPrincipal, input: CommunityTrialStartRequest, signal: AbortSignal): Promise<unknown>;
   trustedOrigins: readonly string[];
 };
 const statusByCode: Record<PlatformErrorCode, number> = {
@@ -78,7 +80,7 @@ function getScope(request: Request): PlatformScope {
 }
 
 export async function handlePlatformRequest(
-  action: 'status' | 'quote' | 'checkout' | 'portal', request: Request, dependencies: PlatformHttpDependencies
+  action: 'status' | 'quote' | 'checkout' | 'portal' | 'trial_start', request: Request, dependencies: PlatformHttpDependencies
 ): Promise<Response> {
   try {
     if (request.method !== (action === 'status' ? 'GET' : 'POST')) fail('INVALID_REQUEST');
@@ -93,6 +95,7 @@ export async function handlePlatformRequest(
       : action === 'checkout' && isRecord(rawBody)
         && hasExactKeys(rawBody, ['version', 'product', 'resourceId', 'planKey', 'requestId', 'consent'])
         ? parseCheckout({product:rawBody.product,resourceId:rawBody.resourceId,planKey:rawBody.planKey,requestId:rawBody.requestId})
+        : action === 'trial_start' ? parseCommunityTrialStart(rawBody)
         : parsePortal(rawBody);
     if (!input) fail('INVALID_REQUEST');
     const scope: PlatformScope = { product: input.product, resourceId: input.resourceId };
@@ -102,6 +105,14 @@ export async function handlePlatformRequest(
     if (action === 'status') return json(status);
     if (status.availability === 'not_configured') fail('BILLING_NOT_CONFIGURED');
     if (status.availability === 'policy_pending') fail('POLICY_PENDING');
+    if (action === 'trial_start') {
+      if (!status.allowedActions.includes('start_trial')) fail('STATE_CONFLICT');
+      const trial = decodeCommunityTrialStartResult(
+        await dependencies.startCommunityTrial(principal, input as CommunityTrialStartRequest, signal)
+      );
+      if (!trial) fail('BILLING_NOT_CONFIGURED');
+      return json(trial);
+    }
     if (action === 'quote') {
       if (!status.allowedActions.includes('checkout')) fail('STATE_CONFLICT');
       return json(await dependencies.issueQuote(principal, input as NonNullable<ReturnType<typeof parseCheckout>>, signal));
