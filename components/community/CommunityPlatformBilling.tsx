@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, CreditCard, RefreshCw, ShieldCheck } from "lucid
 import {
   COMMUNITY_PLATFORM_MESSAGES, COMMUNITY_PLATFORM_TRIAL_POLICY, communityPlatformActionBlock, communityPlatformLoginHref,
   communityPlatformStatusLabel, communityPlatformTrialPeriodNotice, openCommunityPlatformPortal, requestCommunityPlatformQuote,
-  startCommunityPlatformCheckout, type CommunityPlatformQuote, type CommunityPlatformReadState
+  startCommunityPlatformCheckout, startCommunityPlatformTrial, type CommunityPlatformQuote, type CommunityPlatformReadState
 } from "@/lib/community/platform-billing";
 import { COMMUNITY_PLATFORM_PLANS, communityPlatformPriceLabel, getCommunityPlatformPlan, type CommunityPlatformPlanKey } from "@/lib/community/platform-plans";
 import { createCommunityPlatformStatusLoader } from "@/lib/community/platform-billing-loader";
@@ -23,7 +23,7 @@ function dateLabel(value: string | null) {
 // Pure view exported for fixture-only tests. No fixture state is served by routes.
 export function CommunityPlatformBillingView({
   state, resourceId = null, busy = false, message = "", quote = null, selectedKey: selectedKeyProp,
-  onRefresh, onPortal, onSelectPlan, onQuote, onCheckout
+  onRefresh, onPortal, onSelectPlan, onQuote, onCheckout, onStartTrial
 }: {
   state: CommunityPlatformReadState;
   resourceId?: string | null;
@@ -36,6 +36,7 @@ export function CommunityPlatformBillingView({
   onSelectPlan?: (plan: CommunityPlatformPlanKey) => void;
   onQuote?: (plan: CommunityPlatformPlanKey) => void;
   onCheckout?: (accepted: boolean) => void;
+  onStartTrial?: () => void;
 }) {
   const [localSelectedKey, setLocalSelectedKey] = useState<CommunityPlatformPlanKey>("starter");
   const [accepted, setAccepted] = useState(false);
@@ -48,6 +49,7 @@ export function CommunityPlatformBillingView({
   const trialPeriodNotice = communityPlatformTrialPeriodNotice(subscription);
   const portalBlock = communityPlatformActionBlock(state, "portal");
   const checkoutBlock = communityPlatformActionBlock(state, "checkout");
+  const trialBlock = communityPlatformActionBlock(state, "start_trial");
   const createBlock = communityPlatformActionBlock(state, "create_resource");
   const notice = state.kind !== "loaded" ? COMMUNITY_PLATFORM_MESSAGES[state.kind]
     : data?.availability === "policy_pending" ? COMMUNITY_PLATFORM_MESSAGES.policy_pending
@@ -78,7 +80,9 @@ export function CommunityPlatformBillingView({
             <p className="mt-4 font-bold text-[var(--mikke-primary)]">{currentPlan?.name} · {trialPeriodNotice ? "お試しの契約状態を再確認してください" : communityPlatformStatusLabel(subscription.state)}</p>
             {trialPeriodNotice ? <p className="mt-2 text-sm leading-6">{trialPeriodNotice}</p> : null}
             <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+              <div><dt className="text-[var(--mikke-muted)]">現在の利用期間の開始日時</dt><dd className="mt-1">{dateLabel(subscription.currentPeriodStartsAt)}</dd></div>
               <div><dt className="text-[var(--mikke-muted)]">現在の利用期間の終了日時</dt><dd className="mt-1">{dateLabel(subscription.currentPeriodEndsAt)}</dd></div>
+              <div><dt className="text-[var(--mikke-muted)]">自動課金</dt><dd className="mt-1">{subscription.automaticBilling ? "契約条件に従って更新" : "なし"}</dd></div>
               <div><dt className="text-[var(--mikke-muted)]">解約予約</dt><dd className="mt-1">{subscription.cancelAtPeriodEnd ? "期間終了時の解約を予約済み" : "なし"}</dd></div>
             </dl>
           </> : <p className="mt-4 text-sm text-[var(--mikke-muted)]">{data?.creation.state === "available" ? "Communityの利用開始確認が完了しています。下のボタンから作成できます。" : data ? "表示できる契約はありません。既存契約がある場合は運営者のアカウントで再確認してください。" : "契約情報はまだ取得できていません。"}</p>}
@@ -112,8 +116,9 @@ export function CommunityPlatformBillingView({
         <section className={panel} aria-labelledby="community-confirm-title">
           <h2 id="community-confirm-title" className="text-lg font-bold">選択中：{selected.name}</h2>
           <p className="mt-2 text-sm font-bold">{communityPlatformPriceLabel(selected)} · {selected.memberLimit === null ? "1,001名以上" : `${selected.memberLimit}名まで`}</p>
-          <p className="mt-3 text-sm leading-7">{selectedKey === "enterprise" ? "個別見積のプランです。この画面では決済しません。" : selectedKey === "trial" ? `${COMMUNITY_PLATFORM_TRIAL_POLICY.pendingNotice}ここでは試用も請求も開始しません。` : checkoutBlock ?? "契約条件を取得して確認しても、確定ボタンを押すまでは請求されません。"}</p>
-          {!quote ? <button type="button" disabled={busy || Boolean(checkoutBlock) || selectedKey === "trial" || selectedKey === "enterprise" || !onQuote} onClick={() => onQuote?.(selectedKey)} className={`${button} mt-4`} aria-describedby="community-checkout-note">{selectedKey === "enterprise" ? "個別見積の受付準備中" : selectedKey === "trial" ? "お試しの受付準備中" : "契約条件を確認"}</button> : <>
+          <p className="mt-3 text-sm leading-7">{selectedKey === "enterprise" ? "個別見積のプランです。この画面では決済しません。" : selectedKey === "trial" ? `${COMMUNITY_PLATFORM_TRIAL_POLICY.pendingNotice}無料期間を始めても請求は発生しません。` : checkoutBlock ?? "契約条件を取得して確認しても、確定ボタンを押すまでは請求されません。"}</p>
+          {selectedKey === "trial" ? <button type="button" disabled={busy || Boolean(trialBlock) || !onStartTrial} onClick={onStartTrial} className={`${button} mt-4 border-transparent bg-[var(--mikke-accent)] text-white`} aria-describedby="community-checkout-note">30日無料を始める</button>
+            : !quote ? <button type="button" disabled={busy || Boolean(checkoutBlock) || selectedKey === "enterprise" || !onQuote} onClick={() => onQuote?.(selectedKey)} className={`${button} mt-4`} aria-describedby="community-checkout-note">{selectedKey === "enterprise" ? "個別見積の受付準備中" : "契約条件を確認"}</button> : <>
             <div className="mt-5 grid gap-3 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-bg)] p-4 text-sm sm:grid-cols-2" data-testid="community-server-quote">
               <div><p className="text-xs text-[var(--mikke-muted)]">今回のお支払い（税込）</p><p className="mt-1 text-xl font-bold">{quote.dueNow.totalYen.toLocaleString("ja-JP")}円</p><p className="mt-1">{quote.dueNow.dueOn}</p></div>
               <div><p className="text-xs text-[var(--mikke-muted)]">次回のお支払い予定（税込）</p><p className="mt-1 text-xl font-bold">{quote.nextPayment.totalYen.toLocaleString("ja-JP")}円</p><p className="mt-1">{quote.nextPayment.dueOn}</p></div>
@@ -150,6 +155,7 @@ function CommunityPlatformBillingSession({ resourceId }: { resourceId: string | 
   const [selectedKey, setSelectedKey] = useState<CommunityPlatformPlanKey>("starter");
   const pending = useRef(false);
   const portalRequest = useRef<{ resourceId: string | null; id: string } | null>(null);
+  const trialRequest = useRef<{ resourceId: string | null; id: string } | null>(null);
   const quoteRequest = useRef<{ resourceId: string | null; planKey: string; id: string } | null>(null);
   const operation = useRef<AbortController | null>(null);
   const principal = useRef<string | null>(null);
@@ -173,7 +179,7 @@ function CommunityPlatformBillingSession({ resourceId }: { resourceId: string | 
         identityEpoch.current++;
         // Token refresh/refocus is not a new operation by the same person.
         const nextPrincipal = session?.user.id ?? null;
-        if (principal.current !== nextPrincipal) { portalRequest.current = null; quoteRequest.current = null; setQuote(null); operation.current?.abort(); }
+        if (principal.current !== nextPrincipal) { portalRequest.current = null; trialRequest.current = null; quoteRequest.current = null; setQuote(null); operation.current?.abort(); }
         principal.current = nextPrincipal;
         pending.current = false;
         setBusy(false);
@@ -247,7 +253,29 @@ function CommunityPlatformBillingSession({ resourceId }: { resourceId: string | 
     } finally { if (identityEpoch.current === epoch) { pending.current = false; setBusy(false); } }
   }
 
+  async function startTrial() {
+    if (pending.current || resourceId !== null) return;
+    const epoch = identityEpoch.current;
+    const controller = new AbortController(); operation.current?.abort(); operation.current = controller;
+    pending.current = true; setBusy(true); setMessage("");
+    try {
+      if (!trialRequest.current || trialRequest.current.resourceId !== resourceId)
+        trialRequest.current = { resourceId, id: crypto.randomUUID() };
+      const result = await startCommunityPlatformTrial(state, trialRequest.current.id, transport, controller.signal);
+      if (identityEpoch.current !== epoch || controller.signal.aborted) return;
+      if (result.ok) {
+        setSelectedKey("trial");
+        setMessage(`30日無料を開始しました。終了日時は${dateLabel(result.trial.endsAt)}です。自動課金はありません。`);
+        await refresh();
+      } else {
+        setMessage(result.message);
+        if (result.authRequired) loader.current?.clear({ kind: "auth_required" });
+        else await refresh();
+      }
+    } finally { if (identityEpoch.current === epoch) { pending.current = false; setBusy(false); } }
+  }
+
   return <CommunityPlatformBillingView state={state} resourceId={resourceId} busy={busy || state.kind === "loading"} message={message}
     quote={quote} selectedKey={selectedKey} onSelectPlan={selectPlan} onRefresh={() => void refresh()} onPortal={() => void portal()}
-    onQuote={(plan) => void loadQuote(plan)} onCheckout={(accepted) => void checkout(accepted)} />;
+    onQuote={(plan) => void loadQuote(plan)} onCheckout={(accepted) => void checkout(accepted)} onStartTrial={() => void startTrial()} />;
 }
