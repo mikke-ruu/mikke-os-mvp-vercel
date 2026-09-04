@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ArrowRight, CreditCard, RefreshCw, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CreditCard, RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
 import {
   COMMUNITY_PLATFORM_MESSAGES, COMMUNITY_PLATFORM_TRIAL_POLICY, communityPlatformActionBlock, communityPlatformLoginHref,
   communityPlatformStatusLabel, communityPlatformTrialPeriodNotice, openCommunityPlatformPortal, requestCommunityPlatformQuote,
@@ -142,12 +142,69 @@ export function CommunityPlatformBillingView({
   );
 }
 
-export function CommunityPlatformBilling({ resourceId = null }: { resourceId?: string | null }) {
-  // Remount before render so even the first frame cannot show another resource.
-  return <CommunityPlatformBillingSession key={resourceId ?? "new"} resourceId={resourceId} />;
+export function CommunityQuickStartView({
+  state, busy = false, message = "", onRefresh, onStartTrial
+}: {
+  state: CommunityPlatformReadState;
+  busy?: boolean;
+  message?: string;
+  onRefresh?: () => void;
+  onStartTrial?: () => void;
+}) {
+  const data = state.kind === "loaded" ? state.data : null;
+  const trialBlock = communityPlatformActionBlock(state, "start_trial");
+  const createBlock = communityPlatformActionBlock(state, "create_resource");
+  const canCreate = data !== null && !createBlock;
+  const canStartTrial = data !== null && !trialBlock;
+
+  return (
+    <main className="min-h-screen bg-[var(--mikke-bg)] px-5 py-8 text-[var(--mikke-text)] sm:px-6">
+      <div className="mx-auto max-w-xl">
+        <Link href="/community" className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} aria-hidden="true" />Communityへ戻る</Link>
+        <header className="mt-5">
+          <p className="text-xs font-bold tracking-widest text-[var(--mikke-primary)]">COMMUNITY</p>
+          <h1 className="mt-2 text-3xl font-bold text-[var(--mikke-primary)]">新しいCommunityを作る</h1>
+          <p className="mt-3 text-base leading-7 text-[var(--mikke-muted)]">まずは30日間、無料で試せます。</p>
+        </header>
+
+        <section className="mt-7 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm sm:p-7">
+          <div className="grid h-11 w-11 place-items-center rounded-full bg-[var(--mikke-yellow-soft)] text-[var(--mikke-primary)]"><Sparkles size={21} aria-hidden="true" /></div>
+          {canCreate ? <>
+            <h2 className="mt-4 text-xl font-bold">準備ができました</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">名前を決めて、あなたのCommunityを作りましょう。</p>
+            <Link href="/community/create" className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--mikke-accent)] px-5 py-3 font-bold text-white">Communityを作る<ArrowRight size={17} aria-hidden="true" /></Link>
+          </> : canStartTrial ? <>
+            <h2 className="mt-4 text-xl font-bold">気軽にはじめてみましょう</h2>
+            <button type="button" disabled={busy || !onStartTrial} onClick={onStartTrial} className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--mikke-accent)] px-5 py-3 font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{busy ? "準備しています…" : "30日間試してみる"}<ArrowRight size={17} aria-hidden="true" /></button>
+            <p className="mt-3 text-center text-xs font-bold text-[var(--mikke-muted)]">0円・自動課金なし</p>
+          </> : state.kind === "loading" ? <>
+            <h2 className="mt-4 text-xl font-bold">準備しています…</h2>
+            <p className="mt-2 text-sm text-[var(--mikke-muted)]">利用できる状態を確認しています。</p>
+          </> : state.kind === "auth_required" ? <>
+            <h2 className="mt-4 text-xl font-bold">ログインしてはじめる</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">ログイン後、この画面に戻って続けられます。</p>
+            <Link href={communityPlatformLoginHref(null)} className="mt-5 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[var(--mikke-accent)] px-5 py-3 font-bold text-white">ログイン・新規登録<ArrowRight size={17} aria-hidden="true" /></Link>
+          </> : <>
+            <h2 className="mt-4 text-xl font-bold">状態を確認してください</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{state.kind === "error" ? "利用状態を取得できませんでした。" : data?.noticeCode ? "利用状態の確認が必要です。" : COMMUNITY_PLATFORM_MESSAGES[state.kind === "loaded" ? "unavailable" : state.kind]}</p>
+            <button type="button" disabled={busy || !onRefresh} onClick={onRefresh} className={`${button} mt-5 w-full`}><RefreshCw size={16} aria-hidden="true" />もう一度確認</button>
+          </>}
+          {message ? <p role="status" aria-live="polite" className="mt-4 rounded-lg bg-[var(--mikke-accent-soft)] p-3 text-sm font-bold text-[var(--mikke-accent-strong)]">{message}</p> : null}
+        </section>
+
+        <p className="mt-5 text-center text-sm"><Link href="/community/platform-billing" className="font-bold text-[var(--mikke-primary)] underline underline-offset-4">料金・利用条件を見る</Link></p>
+        <p className="mt-8 text-center text-xs leading-6 text-[var(--mikke-muted-light)]">すでに参加・運営しているCommunityには影響しません。</p>
+      </div>
+    </main>
+  );
 }
 
-function CommunityPlatformBillingSession({ resourceId }: { resourceId: string | null }) {
+export function CommunityPlatformBilling({ resourceId = null, startOnly = false }: { resourceId?: string | null; startOnly?: boolean }) {
+  // Remount before render so even the first frame cannot show another resource.
+  return <CommunityPlatformBillingSession key={`${resourceId ?? "new"}:${startOnly ? "start" : "billing"}`} resourceId={resourceId} startOnly={startOnly} />;
+}
+
+function CommunityPlatformBillingSession({ resourceId, startOnly }: { resourceId: string | null; startOnly: boolean }) {
   const [state, setState] = useState<CommunityPlatformReadState>({ kind: "loading" });
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -265,8 +322,11 @@ function CommunityPlatformBillingSession({ resourceId }: { resourceId: string | 
       if (identityEpoch.current !== epoch || controller.signal.aborted) return;
       if (result.ok) {
         setSelectedKey("trial");
-        setMessage(`30日無料を開始しました。終了日時は${dateLabel(result.trial.endsAt)}です。自動課金はありません。`);
-        await refresh();
+        if (startOnly) window.location.assign("/community/create");
+        else {
+          setMessage(`30日無料を開始しました。終了日時は${dateLabel(result.trial.endsAt)}です。自動課金はありません。`);
+          await refresh();
+        }
       } else {
         setMessage(result.message);
         if (result.authRequired) loader.current?.clear({ kind: "auth_required" });
@@ -275,6 +335,8 @@ function CommunityPlatformBillingSession({ resourceId }: { resourceId: string | 
     } finally { if (identityEpoch.current === epoch) { pending.current = false; setBusy(false); } }
   }
 
+  if (startOnly) return <CommunityQuickStartView state={state} busy={busy || state.kind === "loading"} message={message}
+    onRefresh={() => void refresh()} onStartTrial={() => void startTrial()} />;
   return <CommunityPlatformBillingView state={state} resourceId={resourceId} busy={busy || state.kind === "loading"} message={message}
     quote={quote} selectedKey={selectedKey} onSelectPlan={selectPlan} onRefresh={() => void refresh()} onPortal={() => void portal()}
     onQuote={(plan) => void loadQuote(plan)} onCheckout={(accepted) => void checkout(accepted)} onStartTrial={() => void startTrial()} />;

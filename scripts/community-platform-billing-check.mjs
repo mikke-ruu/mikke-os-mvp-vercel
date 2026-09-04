@@ -37,7 +37,7 @@ const model = load("lib/community/platform-billing.ts");
 const creation = load("lib/billing/platform/creation.ts");
 const { createCommunityPlatformStatusLoader } = load("lib/community/platform-billing-loader.ts");
 const plans = load("lib/community/platform-plans.ts");
-const { CommunityPlatformBillingView } = load("components/community/CommunityPlatformBilling.tsx");
+const { CommunityPlatformBillingView, CommunityQuickStartView } = load("components/community/CommunityPlatformBilling.tsx");
 const resource = "ad000001-0000-4000-8000-000000000001";
 const other = "ad000002-0000-4000-8000-000000000002";
 const requestId = "ad000003-0000-4000-8000-000000000003";
@@ -370,6 +370,28 @@ check("trial UI explains the click boundary and server dates", () => {
   }) }));
   assert.ok(active.includes("2026/09/04")); assert.ok(active.includes("2026/10/04")); assert.ok(active.includes("自動課金")); assert.ok(active.includes("なし"));
 });
+check("new Community route uses the lightweight start experience", () => {
+  const route = readFileSync("app/community/start/page.tsx", "utf8");
+  assert.match(route, /<CommunityPlatformBilling startOnly/);
+  const initial = renderToStaticMarkup(React.createElement(CommunityQuickStartView, {
+    state: state({ resourceId: null, subscription: null, creation: { state: "none" }, allowedActions: ["start_trial"] }),
+    onStartTrial() {}
+  }));
+  assert.ok(initial.includes("新しいCommunityを作る"));
+  assert.ok(initial.includes("30日間試してみる"));
+  assert.ok(initial.includes("0円・自動課金なし"));
+  assert.ok(initial.includes("料金・利用条件を見る"));
+  assert.ok(initial.includes("すでに参加・運営しているCommunityには影響しません"));
+  assert.doesNotMatch(initial, /現在の契約|運営プランを比較|決済・利用開始の確認/);
+});
+check("authoritative creation readiness goes straight to the create form", () => {
+  const ready = renderToStaticMarkup(React.createElement(CommunityQuickStartView, {
+    state: state({ resourceId: null, subscription: null, creation: { state: "available" }, allowedActions: ["create_resource"] })
+  }));
+  assert.ok(ready.includes("準備ができました"));
+  assert.ok(ready.includes('href="/community/create"'));
+  assert.doesNotMatch(ready, /30日間試してみる|現在の契約/);
+});
 check("SSR quote is responsive and still requires explicit consent", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, {
     state: state({ allowedActions: ["checkout"] }), selectedKey: "starter", quote: quoteDto()
@@ -402,7 +424,7 @@ check("source boundaries", () => {
   assert.match(view, /pending\.current/); assert.match(view, /quoteRequest\.current\.id/);
   assert.match(browserTransport, /getSession\(\)/); assert.doesNotMatch(view + browserTransport, /console\./);
   assert.match(view, /onAuthStateChange/); assert.match(view, /subscription\.unsubscribe\(\)/);
-  assert.match(view, /key=\{resourceId \?\? "new"\}/);
+  assert.match(view, /key=\{`\$\{resourceId \?\? "new"\}:\$\{startOnly \? "start" : "billing"\}`\}/);
   assert.match(view, /identityEpoch\.current !== epoch/);
   assert.match(view, /principal\.current !== nextPrincipal/); assert.match(view, /setQuote\(null\)/);
   const hub = readFileSync("components/community/CommunityHub.tsx", "utf8");
