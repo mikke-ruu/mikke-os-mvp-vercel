@@ -126,7 +126,7 @@ export type AcademyOnboardingEligibility = {
 export type AcademyHeadquartersAccess = {
   headquarters_id: string;
   access_kind: "trial" | "paid";
-  status: "trialing" | "active" | "past_due" | "expired" | "cancelled";
+  status: "trialing" | "active" | "internal_grant" | "past_due" | "ended" | "expired" | "cancelled" | "unavailable";
   starts_at: string;
   ends_at: string | null;
   days_remaining: number;

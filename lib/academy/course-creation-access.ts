@@ -1,6 +1,7 @@
 import { listMyAcademyContexts } from "@/lib/academy/access-context";
 import { isAcademyLocalReview } from "@/lib/academy/preview";
 import { getMyAcademyHeadquartersAccess } from "@/lib/academy/trial";
+import { getAcademyAccessNotice } from "@/lib/academy/access-notice";
 
 export type AcademyCourseCreationAccess =
   | { allowed: true; reason: null }
@@ -26,7 +27,8 @@ export async function getMyAcademyCourseCreationAccess(
     if (!access?.can_manage_drafts) {
       return {
         allowed: false,
-        reason: "現在は閲覧専用です。Academyの利用状態を確認してください。"
+        reason: getAcademyAccessNotice(access)?.description
+          ?? "Academyの利用状態を確認できませんでした。本部設定の「Academy利用料金」を確認してください。"
       };
     }
     return { allowed: true, reason: null };
