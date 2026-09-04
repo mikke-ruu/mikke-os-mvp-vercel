@@ -102,6 +102,20 @@ function manageHrefForCapabilityCheck(pathname: string) {
   return canonical ? `/academy${canonical[1] ?? ""}` : pathname;
 }
 
+function formatTrialDateTime(value: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
 function ShellInner({
   variant,
   title,
@@ -498,6 +512,15 @@ function ShellInner({
               ? "作成した下書きは残っています。有料利用を開始すると編集を再開できます。自動課金はされていません。"
               : "本部設定や講座の下書きを作れます。公開、実際の申込受付、講師登録、Community連携は有料利用の開始後に使えます。外部動画URLは利用できますが、Academy内の動画配信は準備中です。自動課金はされません。"}
           </p>
+          {formatTrialDateTime(headquartersAccess.starts_at) && formatTrialDateTime(headquartersAccess.ends_at) ? (
+            <dl className="mt-2 grid gap-x-5 gap-y-1 text-xs sm:grid-cols-2">
+              <div className="flex flex-wrap gap-1"><dt className="font-bold">開始日時:</dt><dd>{formatTrialDateTime(headquartersAccess.starts_at)}</dd></div>
+              <div className="flex flex-wrap gap-1"><dt className="font-bold">終了日時:</dt><dd>{formatTrialDateTime(headquartersAccess.ends_at)}</dd></div>
+            </dl>
+          ) : (
+            <p className="mt-2 text-xs font-bold">開始日時・終了日時を確認しています。</p>
+          )}
+          <p className="mt-2 text-xs font-medium">有料利用は、本部設定で料金と規約を確認し、同意して決済画面へ進んだ場合だけ申し込みが始まります。</p>
         </div>
       ) : null}
       {previewMode === "readonly" ? (
