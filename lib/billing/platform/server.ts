@@ -22,13 +22,16 @@ type Catalog = Readonly<{
 }>;
 const TOKEN=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 function environment(){
-  if(process.env.PLATFORM_BILLING_API_ENABLED!=='1')throw new PlatformApiError('BILLING_NOT_CONFIGURED');
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL,publicKey=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const secretKey=process.env.SUPABASE_SECRET_KEY??process.env.SUPABASE_SERVICE_ROLE_KEY;
   try{if(!url||!publicKey||!secretKey||new URL(url).protocol!=='https:')throw new Error();}catch{throw new PlatformApiError('BILLING_NOT_CONFIGURED');}
   return{url,publicKey,secretKey};
 }
+function requirePaidBillingEnabled(){
+  if(process.env.PLATFORM_BILLING_API_ENABLED!=='1')throw new PlatformApiError('BILLING_NOT_CONFIGURED');
+}
 function catalog():Catalog{
+  requirePaidBillingEnabled();
   let raw:unknown;try{raw=JSON.parse(process.env.PLATFORM_BILLING_CATALOG_JSON??'');}catch{throw new PlatformApiError('BILLING_NOT_CONFIGURED');}
   if(!isRecord(raw)||!TOKEN.test(String(raw.approvalId))||!Number.isSafeInteger(raw.revision)||!isRecord(raw.merchant)||!isRecord(raw.policies)||!isRecord(raw.plans))throw new PlatformApiError('BILLING_NOT_CONFIGURED');
   return raw as unknown as Catalog;
@@ -89,6 +92,7 @@ function requestDependencies():PlatformHttpDependencies{
       if(!validatePlatformBillingQuote(quote,expected,now).ok)throw new PlatformApiError('POLICY_PENDING');await store().saveQuote(quote,expected,now,signal);return quote;
     },
     async startCheckout(principal,input,signal){
+      requirePaidBillingEnabled();
       const stripe=createStripeProvider(readStripeRuntimeConfig()),checkoutStore=store();
       return executeTestCheckout(input,{...checkoutStore,now:()=>new Date(),selectAuthorizedContext:async(raw,nextSignal)=>{if(raw.resourceId&&!await owns(principal,raw,nextSignal))throw new PlatformApiError('RESOURCE_UNAVAILABLE');return await selection(principal,raw,nextSignal);},createTestSession:(quote,key,nextSignal)=>stripe.createCheckout({attemptId:key.slice('platform-checkout-'.length),productKey:quote.scope.productKey,planKey:quote.scope.planKey,idempotencyKey:key},nextSignal),retrieveTestSession:(sessionId,_quote,nextSignal)=>stripe.retrieveCheckout(sessionId,nextSignal)},signal);
     },
@@ -102,7 +106,7 @@ function requestDependencies():PlatformHttpDependencies{
       }
       return result.data;
     },
-    async openPortal(principal,input,signal){const result=await rpc('platform_billing_portal_context',{p_actor_user_id:principal.userId,p_product_key:input.product,p_resource_id:input.resourceId},signal);const context:unknown=result.data;if(result.error||!isRecord(context)||typeof context.providerCustomerId!=='string')throw new PlatformApiError('STATE_CONFLICT');return createStripeProvider(readStripeRuntimeConfig()).createPortal(context.providerCustomerId,signal);},
+    async openPortal(principal,input,signal){requirePaidBillingEnabled();const result=await rpc('platform_billing_portal_context',{p_actor_user_id:principal.userId,p_product_key:input.product,p_resource_id:input.resourceId},signal);const context:unknown=result.data;if(result.error||!isRecord(context)||typeof context.providerCustomerId!=='string')throw new PlatformApiError('STATE_CONFLICT');return createStripeProvider(readStripeRuntimeConfig()).createPortal(context.providerCustomerId,signal);},
   };
 }
 export function servePlatformRequest(action:'status'|'quote'|'checkout'|'portal'|'trial_start',request:Request){return handlePlatformRequest(action,request,requestDependencies());}
