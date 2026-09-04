@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, BellRing, BrainCircuit, ClipboardList, History, Mail, Newspaper, Rocket } from "lucide-react";
+import { BadgeMinus, BarChart3, BellRing, BrainCircuit, ClipboardList, History, Mail, Newspaper, Rocket } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
@@ -29,7 +29,7 @@ function canSeeAudit(role: HqRole) {
   return ["owner", "admin"].includes(role);
 }
 
-function buildNav(role: HqRole): MikkeShellNavItem[] {
+function buildNav(role: HqRole, isAyumi: boolean): MikkeShellNavItem[] {
   const items: MikkeShellNavItem[] = [
     { label: "ホーム", href: "/hq", icon: BarChart3, section: "本部運営" },
     { label: "AI TECH LAB", href: "/hq/ai-tech", icon: BrainCircuit }
@@ -42,6 +42,7 @@ function buildNav(role: HqRole): MikkeShellNavItem[] {
     items.push({ label: "アップデート", href: "/hq/updates", icon: Rocket });
   }
   if (canSeeAudit(role)) items.push({ label: "操作履歴", href: "/hq/audit", icon: History, section: "安全管理" });
+  if (isAyumi) items.push({ label: "課金対象外", href: "/hq/billing-exclusions", icon: BadgeMinus });
   return items;
 }
 
@@ -68,7 +69,7 @@ function HqAccessGate({ children }: { children: React.ReactNode }) {
     };
   }, [user.id]);
 
-  const navItems = useMemo(() => (membership ? buildNav(membership.role) : []), [membership]);
+  const navItems = useMemo(() => (membership ? buildNav(membership.role, profile.handle.toLowerCase() === "ayumi") : []), [membership, profile.handle]);
   const bottomNavItems = useMemo<MikkeShellBottomNavItem[]>(
     () => navItems.slice(0, 5).map(({ label, href, icon }) => ({ label, href, icon })),
     [navItems]
