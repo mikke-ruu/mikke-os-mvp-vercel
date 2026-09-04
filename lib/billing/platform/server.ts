@@ -47,7 +47,7 @@ function requestDependencies():PlatformHttpDependencies{
   const trustedOrigins=['https://app.mikke-os.com'];
   if(process.env.NODE_ENV==='development'){const configured=process.env.PLATFORM_BILLING_LOCAL_ORIGIN;if(configured)try{const url=new URL(configured);if(url.protocol==='http:'&&['localhost','127.0.0.1'].includes(url.hostname)&&url.origin===configured)trustedOrigins.push(configured);}catch{/* fail closed */}}
   const adminClient=()=>admin??=createClient(environment().url,environment().secretKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
-  const rpc=async(name:string,args:Record<string,unknown>,signal:AbortSignal)=>{signal.throwIfAborted();const{data,error}=await adminClient().rpc(name as never,args as never);signal.throwIfAborted();return{data:data as unknown,error:error?{code:error.code}:null};};
+  const rpc=async(name:string,args:Record<string,unknown>,signal:AbortSignal)=>{signal.throwIfAborted();const{data,error}=await adminClient().rpc(name as never,args as never);signal.throwIfAborted();return{data:data as unknown,error:error?{code:error.code,message:error.message}:null};};
   const store=()=>createCheckoutStore(rpc);
   async function owns(principal:PlatformPrincipal,scope:{product:string;resourceId:string|null},signal:AbortSignal){
     if(!scope.resourceId)return true;if(!userClient||principal.userId!==verifiedUserId)return false;
@@ -92,7 +92,17 @@ function requestDependencies():PlatformHttpDependencies{
       const stripe=createStripeProvider(readStripeRuntimeConfig()),checkoutStore=store();
       return executeTestCheckout(input,{...checkoutStore,now:()=>new Date(),selectAuthorizedContext:async(raw,nextSignal)=>{if(raw.resourceId&&!await owns(principal,raw,nextSignal))throw new PlatformApiError('RESOURCE_UNAVAILABLE');return await selection(principal,raw,nextSignal);},createTestSession:(quote,key,nextSignal)=>stripe.createCheckout({attemptId:key.slice('platform-checkout-'.length),productKey:quote.scope.productKey,planKey:quote.scope.planKey,idempotencyKey:key},nextSignal),retrieveTestSession:(sessionId,_quote,nextSignal)=>stripe.retrieveCheckout(sessionId,nextSignal)},signal);
     },
+    async startCommunityTrial(principal,input,signal){
+      if(input.product!=='community_platform'||input.resourceId!==null)throw new PlatformApiError('INVALID_REQUEST');
+      const result=await rpc('platform_billing_community_trial_start',{p_actor_user_id:principal.userId,p_request_id:input.requestId},signal);
+      if(result.error){
+        if(result.error.code==='23505')throw new PlatformApiError('STATE_CONFLICT');
+        if(result.error.code==='42501')throw new PlatformApiError('AUTH_REQUIRED');
+        throw new PlatformApiError('BILLING_NOT_CONFIGURED');
+      }
+      return result.data;
+    },
     async openPortal(principal,input,signal){const result=await rpc('platform_billing_portal_context',{p_actor_user_id:principal.userId,p_product_key:input.product,p_resource_id:input.resourceId},signal);const context:unknown=result.data;if(result.error||!isRecord(context)||typeof context.providerCustomerId!=='string')throw new PlatformApiError('STATE_CONFLICT');return createStripeProvider(readStripeRuntimeConfig()).createPortal(context.providerCustomerId,signal);},
   };
 }
-export function servePlatformRequest(action:'status'|'quote'|'checkout'|'portal',request:Request){return handlePlatformRequest(action,request,requestDependencies());}
+export function servePlatformRequest(action:'status'|'quote'|'checkout'|'portal'|'trial_start',request:Request){return handlePlatformRequest(action,request,requestDependencies());}

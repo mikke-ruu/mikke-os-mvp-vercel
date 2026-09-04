@@ -6,7 +6,7 @@ registerHooks({ resolve(specifier, context, nextResolve) {
   return nextResolve(specifier, context);
 } });
 const { handlePlatformRequest, PlatformApiError } = await import('../lib/billing/platform/http.ts');
-const { unavailableStatus, decodePlatformStatus, parseCheckout, isPlatformRedirect } = await import('../lib/billing/platform/contracts.ts');
+const { unavailableStatus, decodeCommunityTrialStartResult, decodePlatformStatus, parseCheckout, parseCommunityTrialStart, isPlatformRedirect } = await import('../lib/billing/platform/contracts.ts');
 const owner = 'a0000000-0000-4000-8000-000000000001';
 const resourceId = 'a0000000-0000-4000-8000-000000000002';
 const requestId = 'a0000000-0000-4000-8000-000000000003';
@@ -23,7 +23,7 @@ function request(action, body, headers = {}, query = `?product=${product}&resour
   });
 }
 function deps(options = {}) {
-  const calls = { auth: 0, owns: 0, read: 0, portal: 0, quote: 0, checkout: 0 };
+  const calls = { auth: 0, owns: 0, read: 0, portal: 0, quote: 0, checkout: 0, trial: 0 };
   const dependencies = {
     trustedOrigins: [origin],
     authenticate: async () => { calls.auth++; return { userId: owner, anonymous: false }; },
@@ -32,6 +32,10 @@ function deps(options = {}) {
     openPortal: async () => { calls.portal++; return 'https://billing.stripe.com/p/session'; },
     issueQuote: async () => { calls.quote++; return { quoteId: 'server-owned' }; },
     startCheckout: async () => { calls.checkout++; return { state: 'pending' }; },
+    startCommunityTrial: async () => { calls.trial++; return {
+      state: 'trialing', startsAt: '2026-09-04T00:00:00.000Z', endsAt: '2026-10-04T00:00:00.000Z',
+      automaticBilling: false, creation: { state: 'available' }
+    }; },
     ...options
   };
   return { calls, dependencies };
@@ -87,7 +91,7 @@ await stalledResult;
 equal(canceled, true);
 await checkError('checkout', request('checkout', confirmation), 'BILLING_NOT_CONFIGURED', 503);
 const ready = { ...unavailableStatus(scope), availability: 'ready', noticeCode: null,
-  subscription: { state: 'active', planKey: 'starter', currentPeriodEndsAt: '2026-10-01T00:00:00.000Z', cancelAtPeriodEnd: false }, allowedActions: ['checkout', 'portal'] };
+  subscription: { state: 'active', planKey: 'starter', currentPeriodStartsAt: '2026-09-01T00:00:00.000Z', currentPeriodEndsAt: '2026-10-01T00:00:00.000Z', automaticBilling: true, cancelAtPeriodEnd: false }, allowedActions: ['checkout', 'portal'] };
 const policyPending = { ...unavailableStatus(scope), availability: 'policy_pending', noticeCode: 'POLICY_PENDING' };
 const blocked = await checkError('checkout', request('checkout', confirmation), 'POLICY_PENDING', 503, { readStatus: async () => policyPending });
 for (const field of ['availability', 'creation', 'subscription']) {
@@ -109,6 +113,20 @@ const d = deps({ readStatus: async () => ready });
 const opened = await handlePlatformRequest('portal', request('portal', portal), d.dependencies);
 equal(opened.status, 200); equal(await opened.json(), { version: 0, redirectUrl: 'https://billing.stripe.com/p/session' });
 equal(d.calls.portal, 1);
+const trialInput = { product: 'community_platform', resourceId: null, requestId };
+const trialScope = { product: 'community_platform', resourceId: null };
+const trialReady = { ...unavailableStatus(trialScope), availability: 'ready', noticeCode: null, allowedActions: ['checkout', 'start_trial'] };
+const trialDeps = deps({ readStatus: async () => trialReady });
+const trialResponse = await handlePlatformRequest('trial_start', request('trial/start', trialInput), trialDeps.dependencies);
+equal(trialResponse.status, 200);
+const trialResult = await trialResponse.json();
+equal(decodeCommunityTrialStartResult(trialResult), trialResult);
+equal(trialDeps.calls.trial, 1);
+for (const malformedTrial of [
+  { ...trialInput, product: 'academy_platform' }, { ...trialInput, resourceId },
+  { ...trialInput, requestId: 'bad' }, { ...trialInput, actorUserId: owner }, { ...trialInput, days: 30 }
+]) await checkError('trial_start', request('trial/start', malformedTrial), 'INVALID_REQUEST', 422);
+await checkError('trial_start', request('trial/start', trialInput), 'STATE_CONFLICT', 409, { readStatus: async () => ({ ...trialReady, allowedActions: ['checkout'] }) });
 for (const url of ['http://billing.stripe.com/p', 'https://billing.stripe.com.evil.test/p', 'https://u:p@billing.stripe.com/p', 'https://checkout.stripe.com/p']) {
   await checkError('portal', request('portal', portal), 'BILLING_NOT_CONFIGURED', 503,
     { readStatus: async () => ready, openPortal: async () => url });
@@ -123,12 +141,15 @@ const absent = await handlePlatformRequest('status', request('status', null, {},
 equal(before.calls.owns, 0); equal((await absent.json()).allowedActions, []);
 equal(parseCheckout(checkout), checkout);
 equal(parseCheckout({ ...checkout, resourceId: resourceId.toUpperCase(), requestId: requestId.toUpperCase() }), checkout);
+equal(parseCommunityTrialStart(trialInput), trialInput);
 equal(decodePlatformStatus(unavailableStatus(scope), scope), unavailableStatus(scope));
 equal(isPlatformRedirect('https://checkout.stripe.com/c/a', 'checkout'), true);
 for (const route of ['status', 'quote', 'checkout', 'portal']) {
   const source = readFileSync(new URL(`../app/api/billing/platform/${route}/route.ts`, import.meta.url), 'utf8');
   assert.match(source, /force-dynamic/); checks++;
 }
+const trialRoute = readFileSync(new URL('../app/api/billing/platform/trial/start/route.ts', import.meta.url), 'utf8');
+assert.match(trialRoute, /force-dynamic/); checks++;
 const runtime = readFileSync(new URL('../lib/billing/platform/server.ts', import.meta.url), 'utf8');
 assert.match(runtime, /auth\.getUser\(token\)/); checks++;
 assert.match(runtime, /PLATFORM_BILLING_API_ENABLED/); checks++;
