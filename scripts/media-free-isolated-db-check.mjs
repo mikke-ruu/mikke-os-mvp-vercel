@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
+import assert from "node:assert/strict";
+import { createMediaPublicReader } from "../lib/media-app/public-contract.ts";
+import { createMediaPublicRpcTransport } from "../lib/media-app/public-rpc.ts";
 
 const docker = "C:/Users/user/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe";
 const container = "mikke-media-free-replay-20260902";
@@ -127,6 +130,15 @@ try {
   if (!output.split(/\r?\n/).includes("media_free_foundation_rls_test_ok")) {
     throw new Error("Media SQL test sentinel missing");
   }
+  const dtoLine = output.split(/\r?\n/).find((line) => line.startsWith("MEDIA_PUBLIC_DTO:"));
+  assert.ok(dtoLine, "SQL public DTO regression output required");
+  const publicRow = JSON.parse(dtoLine.slice("MEDIA_PUBLIC_DTO:".length));
+  const reader = createMediaPublicReader(createMediaPublicRpcTransport(async () => ({ data: [publicRow], error: null })));
+  const publicArticle = await reader.article("projection-test", publicRow.slug, "ja-JP");
+  assert.ok(publicArticle, "Real SQL public response must pass the transport and DTO renderer contract");
+  assert.equal(publicArticle.blocks.length, 7);
+  assert.equal(publicArticle.blocks[6].type, "image");
+  assert.equal(JSON.stringify(publicArticle).includes("imageAssetId"), false);
   const after = snapshot();
   const residualChanges = Object.fromEntries(Object.keys(before).map((key) => [key, before[key] === after[key] ? 0 : 1]));
   if (Object.values(residualChanges).some(Boolean)) {

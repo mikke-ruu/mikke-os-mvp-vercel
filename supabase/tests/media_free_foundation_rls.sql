@@ -3,6 +3,8 @@
 -- Every fixture is rolled back.
 begin;
 
+create temporary table media_public_projection_results(payload jsonb) on commit drop;
+
 do $$
 declare
   v_owner uuid := gen_random_uuid();
@@ -173,6 +175,91 @@ begin
 end;
 $$;
 
+-- Public RPC regression: image bindings and draft timestamps must never leak.
+do $$
+declare
+  v_owner uuid := gen_random_uuid();
+  v_asset uuid := gen_random_uuid();
+  v_site uuid := gen_random_uuid();
+  v_article uuid := gen_random_uuid();
+  v_version uuid;
+  v_suffix text := substr(replace(gen_random_uuid()::text,'-',''),1,12);
+  v_blocks jsonb;
+  v_bad jsonb;
+  v_public jsonb;
+  v_single jsonb;
+  v_published_at timestamptz;
+begin
+  insert into auth.users(id,email,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
+    values(v_owner,'media-projection-'||v_suffix||'@example.invalid','{}','{}',now(),now());
+  insert into public.mikke_media_assets(id,owner_id,storage_path,original_name,mime_type,byte_size,source_app,status,content_sha256)
+    values(v_asset,v_owner,v_owner::text||'/images/2026-09/'||v_suffix||'.webp','owner.webp','image/webp',10,'media','active',repeat('a',64));
+  perform set_config('app.settings.media_public_storage_origin','https://media-test.example.invalid',true);
+  v_blocks := jsonb_build_array(
+    jsonb_build_object('id','p','type','paragraph','text','Public text'),
+    jsonb_build_object('id','h','type','heading','text','Heading','level',2),
+    jsonb_build_object('id','q','type','quote','text','Quote','attribution','Source'),
+    jsonb_build_object('id','l','type','list','items',jsonb_build_array('One','Two')),
+    jsonb_build_object('id','d','type','divider'),
+    jsonb_build_object('id','u','type','link','url','https://example.invalid/article','title','Source'),
+    jsonb_build_object('id','i','type','image','imageAssetId',v_asset,'imageUrl',
+      'https://media-test.example.invalid/storage/v1/object/public/mikke-media/'||v_owner::text||'/images/2026-09/'||v_suffix||'.webp','alt','Image','caption','Caption')
+  );
+  if private.media_blocks_are_safe(v_blocks,v_owner) is distinct from true then
+    raise exception 'MEDIA_VALID_TYPED_BLOCKS_REJECTED';
+  end if;
+  for v_bad in select value from jsonb_array_elements('[
+    null, {}, 123,
+    [{"id":"p","type":"paragraph"}],
+    [{"id":"p","type":"paragraph","text":{}}],
+    [{"id":"p","type":"paragraph","text":null}],
+    [{"id":12,"type":"paragraph","text":"text"}],
+    [{"id":"h","type":"heading","text":"text","level":"2"}],
+    [{"id":"h","type":"heading","text":"text","level":4}],
+    [{"id":"q","type":"quote","text":"text","attribution":{}}],
+    [{"id":"l","type":"list","items":["text",12]}],
+    [{"id":"d","type":"divider","url":"https://example.invalid"}],
+    [{"id":"u","type":"link","url":"//tracking.example.invalid"}],
+    [{"id":"u","type":"link","url":"javascript:alert(1)"}]
+  ]'::jsonb) loop
+    if private.media_blocks_are_safe(v_bad,v_owner) is distinct from false then
+      raise exception 'MEDIA_INVALID_BLOCK_ACCEPTED: %',v_bad;
+    end if;
+  end loop;
+  if private.media_blocks_are_safe(jsonb_build_array(jsonb_build_object('id','q','type','quote','text','quote','attribution',repeat('x',501))),v_owner)
+    then raise exception 'MEDIA_LONG_ATTRIBUTION_ACCEPTED'; end if;
+  v_bad := jsonb_set(v_blocks,'{6,imageUrl}','"https://tracking.example.invalid/a.webp"'::jsonb);
+  if private.media_blocks_are_safe(v_bad,v_owner) then raise exception 'MEDIA_UNBOUND_IMAGE_URL_ACCEPTED'; end if;
+
+  insert into public.media_sites(id,owner_id,name,slug,author_name)
+    values(v_site,v_owner,'Projection','projection-'||v_suffix,'Owner');
+  insert into public.media_articles(id,site_id,title,slug,draft_blocks)
+    values(v_article,v_site,'Published','article-'||v_suffix,v_blocks);
+  perform set_config('request.jwt.claims',json_build_object('sub',v_owner,'role','authenticated','is_anonymous',false)::text,true);
+  perform set_config('request.jwt.claim.sub',v_owner::text,true);
+  execute 'set local role authenticated';
+  v_version := public.media_publish_article(v_article,'test-terms-v1',true,true,true);
+  select published_at into v_published_at from public.media_article_versions where id=v_version;
+  update public.media_articles set title='PRIVATE DRAFT',updated_at='2099-01-01T00:00:00Z',
+    draft_blocks='[{"id":"p","type":"paragraph","text":"PRIVATE DRAFT"}]'::jsonb where id=v_article;
+  execute 'reset role';
+  execute 'set local role anon';
+  select to_jsonb(p) into v_public from public.media_public_article('projection-'||v_suffix,'ja-JP','article-'||v_suffix) p;
+  if v_public is null or v_public::text like '%imageAssetId%' or v_public::text like '%'||v_asset::text||'%'
+    or v_public::text like '%PRIVATE DRAFT%' then raise exception 'MEDIA_PUBLIC_BINDING_OR_DRAFT_LEAK'; end if;
+  if (v_public->>'updated_at')::timestamptz <> v_published_at then raise exception 'MEDIA_DRAFT_TIMESTAMP_LEAK'; end if;
+  v_single := v_public;
+  select to_jsonb(p) into v_public from public.media_public_articles('projection-'||v_suffix,'ja-JP',50) p;
+  if v_public is null or v_public::text like '%imageAssetId%' or (v_public->>'updated_at')::timestamptz <> v_published_at
+    then raise exception 'MEDIA_PUBLIC_LIST_BINDING_OR_TIMESTAMP_LEAK'; end if;
+  execute 'reset role';
+  insert into media_public_projection_results(payload) values(v_single);
+  if not exists(select 1 from public.media_article_versions where id=v_version and blocks->6->>'imageAssetId'=v_asset::text)
+    then raise exception 'MEDIA_INTERNAL_ASSET_BINDING_LOST'; end if;
+end;
+$$;
+
+select 'MEDIA_PUBLIC_DTO:' || payload::text from media_public_projection_results;
 select 'media_free_foundation_rls_test_ok';
 
 rollback;

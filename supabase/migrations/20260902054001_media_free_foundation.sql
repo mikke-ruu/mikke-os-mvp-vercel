@@ -135,39 +135,92 @@ $$;
 
 create or replace function private.media_safe_url(p_url text)
 returns boolean language sql immutable security invoker set search_path = '' as $$
-  select p_url = '' or p_url ~ '^/[A-Za-z0-9_./~%?#=&+-]*$' or p_url ~ '^https://[^[:space:]]+$';
+  select coalesce(char_length(p_url) <= 2048 and (p_url = '' or p_url = '/'
+    or p_url ~ '^/[^/\\[:space:]][^\\[:space:]]*$'
+    or p_url ~ '^https?://[A-Za-z0-9.-]+(:[0-9]+)?([/?#][^\\[:space:]]*)?$'),false);
+$$;
+
+-- Deployment-owned origin; missing configuration disables image publication.
+-- This function does not change bucket visibility or accept an author-supplied origin.
+create or replace function private.media_asset_url_matches(p_url text,p_asset_id uuid,p_owner_id uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.mikke_media_assets a
+    where a.id=p_asset_id and a.owner_id=p_owner_id and a.status='active'
+      and a.content_sha256 is not null and a.mime_type='image/webp'
+      and current_setting('app.settings.media_public_storage_origin',true) ~ '^https://[A-Za-z0-9.-]+(:[0-9]+)?$'
+      and a.storage_path ~ ('^' || p_owner_id::text || '/images/[0-9]{4}-[0-9]{2}/[a-zA-Z0-9-]+[.]webp$')
+      and p_url=current_setting('app.settings.media_public_storage_origin',true)
+        || '/storage/v1/object/public/mikke-media/' || a.storage_path);
 $$;
 
 create or replace function private.media_blocks_are_safe(p_blocks jsonb, p_owner_id uuid)
 returns boolean language plpgsql stable security definer set search_path = '' as $$
 declare
-  v_block jsonb; v_asset_id uuid;
-  v_allowed text[] := array['id','type','text','level','imageUrl','imageAssetId','alt','caption','attribution','items','title','url'];
+  v_block jsonb; v_asset_id uuid; v_type text; v_key text; v_allowed text[]; v_required text[];
 begin
-  if jsonb_typeof(p_blocks) <> 'array' or jsonb_array_length(p_blocks) > 200 then return false; end if;
+  if jsonb_typeof(p_blocks) is distinct from 'array' then return false; end if;
+  if jsonb_array_length(p_blocks) > 200 then return false; end if;
   for v_block in select value from jsonb_array_elements(p_blocks) loop
-    if jsonb_typeof(v_block) <> 'object' or not (v_block ? 'id') or not (v_block ? 'type')
-      or char_length(v_block ->> 'id') not between 1 and 80
-      or (v_block ->> 'type') not in ('paragraph','heading','image','quote','list','divider','link')
-      or exists (select 1 from jsonb_object_keys(v_block) k where not (k = any(v_allowed)))
-      or char_length(coalesce(v_block ->> 'text','')) > 20000
+    if jsonb_typeof(v_block) is distinct from 'object' then return false; end if;
+    if jsonb_typeof(v_block->'id') is distinct from 'string'
+      or char_length(v_block->>'id') not between 1 and 80
+      or jsonb_typeof(v_block->'type') is distinct from 'string' then return false; end if;
+    v_type := v_block->>'type';
+    case v_type
+      when 'paragraph' then v_allowed:=array['id','type','text']; v_required:=v_allowed;
+      when 'heading' then v_allowed:=array['id','type','text','level']; v_required:=v_allowed;
+      when 'image' then v_allowed:=array['id','type','imageUrl','imageAssetId','alt','caption']; v_required:=array['id','type','imageUrl','imageAssetId','alt'];
+      when 'quote' then v_allowed:=array['id','type','text','attribution']; v_required:=array['id','type','text'];
+      when 'list' then v_allowed:=array['id','type','items']; v_required:=v_allowed;
+      when 'divider' then v_allowed:=array['id','type']; v_required:=v_allowed;
+      when 'link' then v_allowed:=array['id','type','url','title']; v_required:=array['id','type','url'];
+      else return false;
+    end case;
+    if not (v_block ?& v_required) or exists (select 1 from jsonb_object_keys(v_block) k where not (k=any(v_allowed))) then return false; end if;
+    foreach v_key in array array['text','alt','caption','attribution','url','imageUrl','imageAssetId','title'] loop
+      if v_block ? v_key and jsonb_typeof(v_block->v_key) is distinct from 'string' then return false; end if;
+    end loop;
+    if char_length(coalesce(v_block ->> 'text','')) > (case when v_type='heading' then 500 else 20000 end)
       or char_length(coalesce(v_block ->> 'title','')) > 500
       or char_length(coalesce(v_block ->> 'alt','')) > 500
       or char_length(coalesce(v_block ->> 'caption','')) > 1000
-      or char_length(coalesce(v_block ->> 'attribution','')) > 1000
+      or char_length(coalesce(v_block ->> 'attribution','')) > 500
       or not private.media_safe_url(coalesce(v_block ->> 'url',''))
       or not private.media_safe_url(coalesce(v_block ->> 'imageUrl','')) then return false;
     end if;
-    if v_block ? 'items' and (jsonb_typeof(v_block -> 'items') <> 'array' or jsonb_array_length(v_block -> 'items') > 100) then return false; end if;
+    if v_type='heading' and (jsonb_typeof(v_block->'level') is distinct from 'number'
+      or v_block->'level' not in ('2'::jsonb,'3'::jsonb)) then return false; end if;
+    if v_type='list' then
+      if jsonb_typeof(v_block->'items') is distinct from 'array' then return false; end if;
+      if jsonb_array_length(v_block->'items') > 100 or exists (
+        select 1 from jsonb_array_elements(v_block->'items') e
+        where jsonb_typeof(e) is distinct from 'string' or char_length(e #>> '{}') > 2000
+      ) then return false; end if;
+    end if;
     if v_block ->> 'type' = 'image' then
       begin v_asset_id := (v_block ->> 'imageAssetId')::uuid; exception when others then return false; end;
-      if not exists (select 1 from public.mikke_media_assets a
-        where a.id = v_asset_id and a.owner_id = p_owner_id and a.status = 'active' and a.content_sha256 is not null)
+      if not private.media_asset_url_matches(v_block->>'imageUrl',v_asset_id,p_owner_id)
       then return false; end if;
     end if;
   end loop;
   return true;
 end;
+$$;
+
+-- Only presentation fields leave the immutable internal snapshot.
+create or replace function private.media_public_blocks(p_blocks jsonb)
+returns jsonb language sql immutable security invoker set search_path = '' as $$
+  select coalesce(jsonb_agg((select coalesce(jsonb_object_agg(k.key,k.value),'{}'::jsonb)
+    from jsonb_each(b.value) k where k.key=any(case b.value->>'type'
+      when 'paragraph' then array['id','type','text']
+      when 'heading' then array['id','type','text','level']
+      when 'image' then array['id','type','imageUrl','alt','caption']
+      when 'quote' then array['id','type','text','attribution']
+      when 'list' then array['id','type','items']
+      when 'divider' then array['id','type']
+      when 'link' then array['id','type','url','title']
+      else array[]::text[] end)) order by b.ordinality),'[]'::jsonb)
+  from jsonb_array_elements(p_blocks) with ordinality b(value,ordinality);
 $$;
 
 create or replace function private.media_reject_version_mutation()
@@ -193,7 +246,8 @@ create trigger media_sites_published_slug_immutable before update of slug on pub
 for each row execute function private.media_reject_published_site_slug_change();
 
 revoke execute on function private.media_is_human_user(), private.media_safe_url(text),
-  private.media_blocks_are_safe(jsonb,uuid), private.media_reject_version_mutation(),
+  private.media_blocks_are_safe(jsonb,uuid), private.media_asset_url_matches(text,uuid,uuid),
+  private.media_public_blocks(jsonb), private.media_reject_version_mutation(),
   private.media_reject_published_site_slug_change()
   from public,anon,authenticated;
 grant execute on function private.media_is_human_user() to authenticated;
@@ -293,7 +347,8 @@ begin
   if v_article.cover_image_url <> '' and v_article.cover_image_asset_id is null then raise exception 'MEDIA_COVER_ASSET_REQUIRED'; end if;
   if v_article.cover_image_asset_id is not null and not exists (
     select 1 from public.mikke_media_assets a where a.id = v_article.cover_image_asset_id
-      and a.owner_id = v_owner and a.status = 'active' and a.content_sha256 is not null)
+      and a.owner_id = v_owner and a.status = 'active' and a.content_sha256 is not null
+      and private.media_asset_url_matches(v_article.cover_image_url,a.id,v_owner))
   then raise exception 'MEDIA_COVER_ASSET_NOT_AVAILABLE'; end if;
   insert into public.media_published_slugs(site_id,locale,slug,article_id)
     values (v_article.site_id,v_article.locale,v_article.slug,v_article.id)
@@ -361,8 +416,8 @@ create or replace function public.media_public_articles(p_site_slug text,p_local
 returns table (title text,slug text,excerpt text,category_name text,cover_image_url text,blocks jsonb,
   locale text,version_number integer,revision_hash text,published_at timestamptz,updated_at timestamptz)
 language sql stable security definer set search_path = '' as $$
-  select v.title,v.slug,v.excerpt,v.category_name,v.cover_image_url,v.blocks,v.locale,v.version_number,
-    v.revision_hash,v.published_at,a.updated_at
+  select v.title,v.slug,v.excerpt,v.category_name,v.cover_image_url,private.media_public_blocks(v.blocks),v.locale,v.version_number,
+    v.revision_hash,v.published_at,v.published_at
   from public.media_sites s join public.media_articles a on a.site_id=s.id
     join public.media_article_versions v on v.id=a.current_published_version_id and v.article_id=a.id
   where s.slug=p_site_slug and s.is_published=true and a.status='published' and v.locale=coalesce(p_locale,s.default_locale)
@@ -372,8 +427,8 @@ create or replace function public.media_public_article(p_site_slug text,p_locale
 returns table (title text,slug text,excerpt text,category_name text,cover_image_url text,blocks jsonb,
   locale text,version_number integer,revision_hash text,published_at timestamptz,updated_at timestamptz)
 language sql stable security definer set search_path = '' as $$
-  select v.title,v.slug,v.excerpt,v.category_name,v.cover_image_url,v.blocks,v.locale,v.version_number,
-    v.revision_hash,v.published_at,a.updated_at
+  select v.title,v.slug,v.excerpt,v.category_name,v.cover_image_url,private.media_public_blocks(v.blocks),v.locale,v.version_number,
+    v.revision_hash,v.published_at,v.published_at
   from public.media_sites s join public.media_articles a on a.site_id=s.id
     join public.media_article_versions v on v.id=a.current_published_version_id and v.article_id=a.id
   where s.slug=p_site_slug and v.slug=p_article_slug and s.is_published=true and a.status='published'
