@@ -1,90 +1,21 @@
 import { supabase } from "@/lib/supabase/client";
-import type {
-  MediaCreateInput,
-  MediaDirectOwnerSite,
-  MediaManagementTransport,
-  MediaSession
-} from "@/lib/media-app/integration";
+import { createMediaDatabaseOperations } from "./database-operations";
 
-export type MediaSiteDatabaseRow = MediaDirectOwnerSite;
+export type {
+  MediaSiteDatabaseRow,
+  CreateMediaSiteInput,
+  MediaPublicationAttestation,
+  MediaArticleDraftInput,
+  MediaArticleDraftDatabaseRow
+} from "./database-operations";
 
-export type CreateMediaSiteInput = {
-  name: string;
-  slug: string;
-  description: string;
-  authorName: string;
-  defaultLocale?: string;
-};
-
-export type MediaPublicationAttestation = {
-  termsVersion: string;
-  rightsConfirmed: true;
-  privacyConfirmed: true;
-  affiliateFreeConfirmed: true;
-};
-
-// The local prototype is deliberately not read here. A cloud Media becomes
-// owned only when media_create_site commits both the site and entitlement.
-export async function createMediaSiteInDatabase(input: CreateMediaSiteInput) {
-  const { data, error } = await supabase.rpc("media_create_site", {
-    p_name: input.name,
-    p_slug: input.slug,
-    p_description: input.description,
-    p_author_name: input.authorName,
-    p_default_locale: input.defaultLocale ?? "ja-JP"
-  });
-  if (error) throw error;
-  if (typeof data !== "string") throw new Error("MEDIA_CREATE_RESULT_INVALID");
-  return data;
-}
-
-export async function listMyMediaSitesFromDatabase() {
-  const { data, error } = await supabase
-    .from("media_sites")
-    .select("id,name,slug,description,author_name,default_locale,publishing_policy,is_published,created_at,updated_at")
-    .eq("publishing_policy", "direct_owner")
-    .order("created_at", { ascending: true })
-    .returns<MediaSiteDatabaseRow[]>();
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function publishMediaArticleInDatabase(
-  articleId: string,
-  attestation: MediaPublicationAttestation
-) {
-  const { data, error } = await supabase.rpc("media_publish_article", {
-    p_article_id: articleId,
-    p_terms_version: attestation.termsVersion,
-    p_rights_confirmed: attestation.rightsConfirmed,
-    p_privacy_confirmed: attestation.privacyConfirmed,
-    p_affiliate_free_confirmed: attestation.affiliateFreeConfirmed
-  });
-  if (error) throw error;
-  if (typeof data !== "string") throw new Error("MEDIA_PUBLISH_RESULT_INVALID");
-  return data;
-}
-
-export async function unpublishMediaArticleInDatabase(articleId: string) {
-  const { error } = await supabase.rpc("media_unpublish_article", { p_article_id: articleId });
-  if (error) throw error;
-}
-
-async function readDatabaseSession(): Promise<MediaSession | null> {
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
-  return {
-    subject: data.user.id,
-    isAnonymous: Boolean(data.user.is_anonymous)
-  };
-}
-
-export const mediaDatabaseTransport: MediaManagementTransport = {
-  readSession: readDatabaseSession,
-  subscribeSessionChange(listener) {
-    const { data } = supabase.auth.onAuthStateChange(() => listener());
-    return () => data.subscription.unsubscribe();
-  },
-  listDirectOwnerSites: listMyMediaSitesFromDatabase,
-  createDirectOwnerSite: (input: MediaCreateInput) => createMediaSiteInDatabase(input)
-};
+export const {
+  createMediaSiteInDatabase,
+  listMyMediaSitesFromDatabase,
+  publishMediaArticleInDatabase,
+  unpublishMediaArticleInDatabase,
+  createMediaArticleDraftInDatabase,
+  readMediaArticleDraftFromDatabase,
+  updateMediaArticleDraftInDatabase,
+  mediaDatabaseTransport
+} = createMediaDatabaseOperations(supabase);
