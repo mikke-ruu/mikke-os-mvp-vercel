@@ -36,7 +36,7 @@ legal, deployment, and publication gates are approved.
 
 ## Current storage boundary
 
-This slice uses `localStorage` key `mikke.media.free.v1`. It is a local usability prototype. A public route can only read the browser's own stored snapshot and is not an internet publication contract. The browser store is never authoritative ownership data and must not be imported or promoted automatically after sign-in.
+The management prototype uses `localStorage` key `mikke.media.free.v1`. Public routes now use the separate development-only server fixture described below, not this browser store. Neither is an internet publication contract. The browser store is never authoritative ownership data and must not be imported or promoted automatically after sign-in.
 
 The store keeps editable article data separate from `publishedSnapshot`. Editing a published article does not alter the visible snapshot until the owner publishes again. Unpublish removes the snapshot while retaining the editable draft.
 
@@ -99,3 +99,12 @@ contract is approved. Paid articles and automated affiliate behavior are later g
 - Development previews for the management empty/create state and public site/article were checked at 320x568, 390x844, and 1440x900 with no horizontal overflow.
 
 No migration, production database change, deploy, catalog/menu entitlement, billing, external publication, AI, affiliate automation, or paid article behavior is included in this slice.
+
+## September 7 integration and RPC readiness
+
+- Integrated the five Media commits through `4224d1b` into a dedicated worktree based on current `origin/master` (`c8b4812`). No conflicts occurred.
+- Added `createMediaPublicRpcTransport`, an injectable caller for the three public RPCs. It converts snake-case rows and categories into the DTO shape, requires singleton results for site/article, bounds lists to 50, and validates requested slug/locale identity. The existing public reader still performs final DTO validation.
+- No Supabase client, credentials, database selection, or loader activation is included. Missing approved non-production Auth/PostgREST infrastructure remains the real-account E2E gate.
+- The control room confirmed that `mikke-os-dev` is the existing production project despite its name; it is not a Media test target. No approved reusable non-production branch is currently available.
+- Current SQL must be corrected and replayed before connection: `v.blocks` exposes image asset bindings through direct anonymous RPC calls; `a.updated_at` exposes draft edit timing; SQL block validation does not yet match the strict DTO contract; image URL origins must be bound to approved assets. The new adapter rejects internal asset IDs instead of concealing that SQL defect.
+- Earlier isolated SQL passes cover the cases tested on September 3. They do not close these newly identified gaps or establish real Auth/PostgREST E2E readiness.
