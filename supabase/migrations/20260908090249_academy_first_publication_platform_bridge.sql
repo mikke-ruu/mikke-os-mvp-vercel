@@ -239,7 +239,7 @@ begin
  if not found then return a||jsonb_build_object('active',false,'inviteAllowed',false,'phase','attention'); end if;
  return a||jsonb_build_object('active',w.write_allowed,'inviteAllowed',w.write_allowed and a->>'cancellationAcceptedAt' is null
   and exists(select 1 from academy_publication_private.policies where version=a->>'policyVersion' and enabled),
-  'phase',case when w.write_allowed then 'paid' when w.status='ended' then 'ended' else 'attention' end,'endsAt',w.current_period_end);
+  'phase',case when w.write_allowed then 'paid' when w.status='ended' then 'expired' else 'attention' end,'endsAt',w.current_period_end);
 end $$;
 revoke all on function private.academy_first_publication_access(uuid),private.academy_first_publication_access_before_platform_bridge(uuid) from public,anon,authenticated,service_role;
 

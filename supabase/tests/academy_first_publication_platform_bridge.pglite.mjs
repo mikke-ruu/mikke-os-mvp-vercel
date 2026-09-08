@@ -1,5 +1,6 @@
 import {readFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
+import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
 const {PGlite}=await import(pathToFileURL(process.env.ACADEMY_PGLITE_PATH??'G:/Musubiプロジェクト/.local-tools/academy-db-validation/node_modules/@electric-sql/pglite/dist/index.js').href);
 const db=new PGlite(); let passed=0;
@@ -11,6 +12,12 @@ const svc=async sql=>{await db.exec('set role service_role');try{return await qu
 const ok=(value,expected)=>{assert.deepEqual(value,expected);passed++;};
 const deny=async(code,fn)=>{await assert.rejects(fn,new RegExp(code));passed++;};
 try {
+ const require=createRequire(import.meta.url);
+ const ts=require(process.env.ACADEMY_TYPESCRIPT_PATH??'typescript');
+ const clientModule={exports:{}};
+ const clientPath=process.env.ACADEMY_ACCESS_CLIENT_PATH??new URL('../../lib/academy/first-publication/access-client.ts',import.meta.url);
+ new Function('module','exports',ts.transpileModule(await readFile(clientPath,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)(clientModule,clientModule.exports);
+ const {parseFirstPublicationAccess,createFirstPublicationAccessRpc}=clientModule.exports;
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema private;
  create table auth.users(id uuid primary key,is_anonymous boolean default false);
  create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
@@ -117,6 +124,18 @@ try {
  ok((await query(`select private.academy_owner_read_allowed('${h}','${price.period_end}'::timestamptz+interval '89 days') as r`)).r,true);
  ok((await query(`select private.academy_owner_read_allowed('${h}','${price.period_end}'::timestamptz+interval '90 days') as r`)).r,false);
  ok((await query(`select private.academy_first_publication_access('${h}') as r`)).r.active,false);
+ await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${a}',false)`);
+ let endedAccess;
+ try {endedAccess=(await query(`select public.academy_first_publication_access('${h}') as r`)).r;} finally {await db.exec('reset role');}
+ ok(endedAccess.phase,'expired');
+ const readAccess=createFirstPublicationAccessRpc({rpc:async(name,args)=>{
+  assert.equal(name,'academy_first_publication_access');assert.equal(args.p_headquarters_id,h);
+  return {data:endedAccess,error:null};
+ }});
+ ok((await readAccess(h)).phase,'expired');
+ ok(parseFirstPublicationAccess(endedAccess).active,false);
+ assert.throws(()=>parseFirstPublicationAccess({...endedAccess,phase:'ended'}),/invalid_first_publication_access/);passed++;
+ assert.throws(()=>parseFirstPublicationAccess({...endedAccess,phase:'future_unknown_phase'}),/invalid_first_publication_access/);passed++;
  const cutoff=await query(`select (date_trunc('month',now() at time zone 'Asia/Tokyo') at time zone 'Asia/Tokyo') as at`);
  await db.exec(`update academy_publication_private.enrollments set first_published_at='${new Date(cutoff.at).toISOString()}'::timestamptz-interval '1 day',trial_ends_at='${new Date(cutoff.at).toISOString()}'::timestamptz+interval '6 days'`);
  const capture=(await svc('select public.academy_first_publication_capture_due_snapshots(50) as r')).r;
