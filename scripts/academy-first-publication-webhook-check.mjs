@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
+import { registerHooks } from 'node:module';
+registerHooks({resolve(s,c,next){if(s==='server-only')return{url:'data:text/javascript,export{}',shortCircuit:true};if(s.startsWith('.')&&!/\.[a-z]+$/i.test(s))return next(`${s}.ts`,c);return next(s,c);}});
+const {handleFirstPublicationWebhook}=await import('../lib/academy/first-publication-billing/webhook.ts');
+const start=Date.parse('2026-10-15T00:00:01Z'),end=Date.parse('2026-11-15T00:00:01Z');
+const context={scheme:'academy_first_publication_168h_v1',headquarters_id:'hq_A',owner_user_id:'owner_A',provider_customer_id:'cus_A',provider_subscription_id:'sub_A',first_invoice_id:'in_First',price_id:'price_A',amount_yen:3300,original_paid_at:'2026-09-15T00:00:01Z',current_period_start:'2026-09-15T00:00:01Z',current_period_end:'2026-10-15T00:00:01Z'};
+function fixture(){
+ let binding=context,failApply=false,effective=0;const events=new Set(),applied=[];
+ const invoice={id:'in_Next',customer:'cus_A',subscription:'sub_A',livemode:false,currency:'jpy',status:'paid',total:3300,amount_due:3300,amount_paid:3300,billing_reason:'subscription_cycle',lines:{has_more:false,data:[{price:{id:'price_A'},amount:3300,period:{start:start/1000,end:end/1000}}]}};
+ const deps={secret:'whsec_fixture',mode:'test',now:()=>start+1000,async read(){return invoice;},async context(){return binding;},async renewalQuote(){return{priceId:'price_A',amountYen:3300,periodEnd:new Date(end).toISOString()};},async apply(event){if(failApply)throw new Error('DB unavailable');applied.push(event);if(!events.has(event.eventId)){events.add(event.eventId);effective++;}}};
+ const event={id:'evt_A',created:start/1000,livemode:false,type:'invoice.paid',data:{object:{id:'in_Next'}}};
+ const request=(override={},signatureTime=start/1000)=>{const raw=JSON.stringify({...event,...override}),hash=createHmac('sha256',deps.secret).update(`${signatureTime}.${raw}`).digest('hex');return new Request('https://app.mikke-os.com/academy/api/first-publication/webhook/stripe',{method:'POST',headers:{'stripe-signature':`t=${signatureTime},v1=${hash}`},body:raw});};
+ return{deps,invoice,event,request,applied,effective:()=>effective,binding:v=>binding=v,fail:()=>failApply=true};
+}
+let count=0;async function test(name,fn){await fn();console.log(`PASS ${name}`);count++;}
+await test('verified renewal uses canonical line period and ledger contract',async()=>{const f=fixture();const r=await handleFirstPublicationWebhook(f.request(),f.deps);assert.equal(r.status,200);assert.equal(f.applied[0].periodStart,new Date(start).toISOString());assert.equal(f.applied[0].periodEnd,new Date(end).toISOString());});
+await test('invalid signature never reads provider',async()=>{const f=fixture();let reads=0;f.deps.read=async()=>{reads++;return f.invoice;};const r=await handleFirstPublicationWebhook(new Request('https://app.mikke-os.com/webhook',{method:'POST',headers:{'stripe-signature':`t=${start/1000},v1=${'0'.repeat(64)}`},body:JSON.stringify(f.event)}),f.deps);assert.equal(r.status,400);assert.equal(reads,0);});
+await test('signature outside tolerance rejected',async()=>{const f=fixture();assert.equal((await handleFirstPublicationWebhook(f.request({},start/1000-301),f.deps)).status,400);});
+await test('actual raw body cap rejects oversize',async()=>{const f=fixture();const req=new Request('https://app.mikke-os.com/webhook',{method:'POST',body:'x'.repeat(262145),headers:{'stripe-signature':'invalid'}});assert.equal((await handleFirstPublicationWebhook(req,f.deps)).status,400);});
+await test('unknown binding is retryable, not swallowed',async()=>{const f=fixture();f.binding(null);assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,503);assert.equal(f.applied.length,0);});
+await test('legacy binding is ignored without granting rights',async()=>{const f=fixture();f.binding({scheme:'other'});assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,200);assert.equal(f.applied.length,0);});
+await test('customer mismatch never applies',async()=>{const f=fixture();f.invoice.customer='cus_other';assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,503);assert.equal(f.applied.length,0);});
+await test('mode mismatch never applies',async()=>{const f=fixture();f.invoice.livemode=true;assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,503);});
+await test('amount or price mismatch stays retryable',async()=>{const f=fixture();f.invoice.amount_due=3301;assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,503);f.invoice.amount_due=3300;f.invoice.lines.data[0].price.id='price_wrong';assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,503);});
+await test('first standalone invoice never renews period',async()=>{const f=fixture();f.invoice.id='in_First';f.invoice.subscription=null;f.event.data.object.id='in_First';assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,200);assert.equal(f.applied.length,0);});
+await test('zero subscription-create invoice never renews period',async()=>{const f=fixture();f.invoice.billing_reason='subscription_create';f.invoice.total=0;f.invoice.amount_paid=0;assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,200);assert.equal(f.applied.length,0);});
+await test('late failure after canonical payment cannot regress state',async()=>{const f=fixture();assert.equal((await handleFirstPublicationWebhook(f.request({type:'invoice.payment_failed'}),f.deps)).status,200);assert.equal(f.applied.length,0);});
+await test('duplicate forwards stable event ID/hash to durable dedupe',async()=>{const f=fixture();await handleFirstPublicationWebhook(f.request(),f.deps);await handleFirstPublicationWebhook(f.request(),f.deps);assert.equal(f.applied.length,2);assert.equal(f.effective(),1);assert.equal(f.applied[0].eventHash,f.applied[1].eventHash);});
+await test('ledger failure returns 503',async()=>{const f=fixture();f.fail();assert.equal((await handleFirstPublicationWebhook(f.request(),f.deps)).status,503);});
+console.log(`${count} webhook checks passed; signatures and provider/RPC fixtures only, no external calls.`);

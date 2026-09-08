@@ -1,4 +1,8 @@
-# 初公開制度の決済接続境界
+# 初公開制度の決済接続
+
+2026-09-08に実HTTP transport、Setup API、outbox worker、専用webhook、更新workerを追加した。現在のAPI、必要設定、DB依存、未完了ゲートは [RUNTIME.md](./RUNTIME.md) を参照する。以下は初期の依存注入adapterと隔離テストの記録であり、新runtimeの未実装一覧ではない。
+
+## 初期adapterの記録
 
 `adapter.ts` はサーバー専用の依存注入adapter。既存の契約処理やUIからは未接続。本番の新制度や実課金が完成した状態ではない。
 
