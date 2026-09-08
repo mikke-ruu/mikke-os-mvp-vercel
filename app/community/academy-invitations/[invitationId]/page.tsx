@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, DoorOpen, GraduationCap, ShieldCheck } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import {
@@ -13,6 +13,22 @@ import { supabase } from "@/lib/supabase/client";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
+
+export function createInvitationSessionState(displayName: string) {
+  return {
+    accepted: false,
+    form: { displayName, legalName: "", phone: "", joinReason: "" },
+    consent: { terms: false, rules: false, privacy: false }
+  };
+}
+
+export function isCurrentInvitationRequest(
+  expectedKey: string,
+  expectedGeneration: number,
+  current: { key: string; generation: number }
+) {
+  return current.key === expectedKey && current.generation === expectedGeneration;
+}
 
 const previewInvitation: CommunityAcademyAccessInvitation = {
   id: "preview",
@@ -51,34 +67,43 @@ const previewInvitation: CommunityAcademyAccessInvitation = {
   hasNormalCommunityAccess: false
 };
 
-function InvitationContent({ invitationId, preview }: { invitationId: string; preview: boolean }) {
+function InvitationContent({ invitationId, preview, userId }: { invitationId: string; preview: boolean; userId: string }) {
   const { profile } = useAuth();
+  const initialSession = createInvitationSessionState(profile.display_name ?? "");
+  const requestState = useRef({ key: `${userId}:${invitationId}`, generation: 0 });
   const [invitation, setInvitation] = useState<CommunityAcademyAccessInvitation | null>(preview ? previewInvitation : null);
   const [loading, setLoading] = useState(!preview);
   const [message, setMessage] = useState("");
-  const [accepted, setAccepted] = useState(false);
+  const [accepted, setAccepted] = useState(initialSession.accepted);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ displayName: profile.display_name ?? "", legalName: "", phone: "", joinReason: "" });
-  const [consent, setConsent] = useState({ terms: false, rules: false, privacy: false });
+  const [form, setForm] = useState(initialSession.form);
+  const [consent, setConsent] = useState(initialSession.consent);
 
   useEffect(() => {
     if (preview) return;
     let active = true;
+    const key = `${userId}:${invitationId}`;
+    const generation = requestState.current.generation + 1;
+    requestState.current = { key, generation };
     setLoading(true);
+    setInvitation(null);
+    setMessage("");
     getMyCommunityAcademyAccessInvitation(supabase, invitationId)
       .then((data) => {
-        if (!active) return;
+        if (!active || !isCurrentInvitationRequest(key, generation, requestState.current)) return;
         setInvitation(data);
         if (!data) setMessage("この招待は見つからないか、現在のアカウント宛てではありません。");
       })
       .catch(() => {
-        if (active) setMessage("招待内容を読み込めませんでした。時間をおいてもう一度お試しください。");
+        if (active && isCurrentInvitationRequest(key, generation, requestState.current)) {
+          setMessage("招待内容を読み込めませんでした。時間をおいてもう一度お試しください。");
+        }
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active && isCurrentInvitationRequest(key, generation, requestState.current)) setLoading(false);
       });
     return () => { active = false; };
-  }, [invitationId, preview]);
+  }, [invitationId, preview, userId]);
 
   const canAccept = useMemo(() => {
     if (!invitation || invitation.status !== "pending" || !form.displayName.trim()) return false;
@@ -176,13 +201,19 @@ function InvitationContent({ invitationId, preview }: { invitationId: string; pr
   );
 }
 
+function KeyedInvitationContent({ invitationId, preview }: { invitationId: string; preview: boolean }) {
+  const { user } = useAuth();
+  const sessionKey = `${user.id}:${invitationId}`;
+  return <InvitationContent key={sessionKey} invitationId={invitationId} preview={preview} userId={user.id} />;
+}
+
 export default function CommunityAcademyInvitationPage({ params, searchParams }: { params: Promise<{ invitationId: string }>; searchParams: Promise<{ preview?: string }> }) {
   const { invitationId } = use(params);
   const query = use(searchParams);
   const preview = process.env.NODE_ENV !== "production" && query.preview === "walkthrough";
   return (
     <main className="min-h-screen bg-[var(--mikke-surface-soft)] px-5 py-10">
-      <AuthGate allowGuest={preview}><InvitationContent invitationId={invitationId} preview={preview} /></AuthGate>
+      <AuthGate allowGuest={preview}><KeyedInvitationContent invitationId={invitationId} preview={preview} /></AuthGate>
     </main>
   );
 }
