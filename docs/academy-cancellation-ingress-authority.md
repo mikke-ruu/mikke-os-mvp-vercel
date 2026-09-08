@@ -1,0 +1,31 @@
+# Academy取消の永続受付候補
+
+Supabase未適用。PGliteの最小fixtureでSQLを適用して検査する。多接続PostgreSQL、実Auth/RLS、運用時計の検査が完了するまでは初回課金をコードで拒否する。policy flagだけでは解除できない。
+
+## 接続契約
+
+JWT付きauthenticated RPCを一呼出しずつ別transactionで実行する。service keyはbrowserへ渡さない。
+
+1. `academy_first_publication_cancel_append(p_headquarters_id uuid,p_idempotency_key uuid)`。UUID keyを再送でも保持する。返却は `{status:'awaiting_durable_acknowledgment'}` のみ。まだ成功表示しない。
+2. `academy_first_publication_cancel_acknowledge(同じ引数)`。commit済みappendを別transactionから読み、観測時刻を永続化する。commit成功応答の `{status:'accepted',receipt_id,headquarters_id,request_received_at,durable_acknowledged_at,sequence,trial_ends_at}` を成功表示に使う。観測時刻を実commit時刻と呼ばず、期限判定にも使わない。
+3. 別transactionで既存 `command(HQ,'cancel_conversion',...)` を呼ぶ。最古の本人ack済receiptを使う。失敗しても受付効力は残るので「取消受付済み・画面反映待ち」とする。
+
+reload/応答不明時はread-only `academy_first_publication_cancel_status(p_headquarters_id uuid)` を使う。未受付=null、未ackはstatusとidempotency_key、ack済は上のDTOにidempotency_keyとappliedを追加する。例外を未受付へ変換しない。未ackなら同じkeyでackを再試行する。旧record_cancelとreceiptなしcommandは拒否する。未初公開はtrial_not_started、期限後の新規appendはpaid_cancellation_required。同じ期限内receiptの再送は期限後でも復旧できる。
+
+## 正本と順序
+
+認証済み非匿名actorを確認した後、未割当transactionへXIDを採番し、その直後の独立したPL/pgSQL文でDB clockを固定する。同じtransactionで現在ownerを検査し、専用HQ scope行の順序lockを取得してgap-free番号とinboxを同時保存する。失敗は全rollback。新制度HQのowner変更をguardし、古いowner snapshotによる受付を防ぐ。
+
+共通lock順は inbox scope → owner → HQ → Community/claim。受付appendはscopeのみを取得し、業務lockは永続受付の後段へ分離する。Communityは既存 `private.academy_first_publication_lock(HQ)` を最初に呼び、読取helperをlock後に再検査する。helperはcommit済inboxを参照するので業務投影の遅延中も新招待を許可しない。
+
+## Watermark候補
+
+service-only `academy_first_publication_receipt_barrier(HQ)` は期限後に未割当の新しいXID Bを取りmarkerを保存する。応答barrier_idをcommit後、別transactionの `academy_first_publication_receipt_prove(p_barrier_id uuid)` へ渡す。
+
+proofはREAD COMMITTEDでcommit済markerを観測し、snapshot xmaxがBより後で、snapshot内にBより古い実行中XIDが一件もないことを確認する。残っていればpendingを返す。単にsnapshotのXIPを一度採取して待つだけではxmax以降の取引を見逃すため、commit済markerを必須とする。期限内受付はstamp前にXID取得済みなので、期限後markerより前の取引がすべてcommit/rollbackした後で初めて不在証明できる。
+
+専用scopeをlockしてinbox件数とrollbackで欠番の出ない連続番号を照合し、marker/snapshot/期限/件数のproofを保存する。呼出側はwatermarkや受付時刻を自己申告できない。無関係の長いtransactionも安全側に課金を保留する。固定timeoutやgraceを証明の代わりに使わない。
+
+現在はこのproofを旧手動watermarkとして偽装せず、dispatchを `ingress_concurrency_verification_pending` で固定拒否する。解除には本物の多接続検査、PostgREST pre-requestが先行XIDを割り当てないこと、READ COMMITTED、時計後退とfailover時の停止条件を検証した後のreview済migrationが必要。時計が後退して新しいXIDに古い時刻が付く状況を安全と仮定して本番解放しない。
+
+法務根拠: 2026-09-08_academy_cancellation_receipt_linearization.md とpolicy JSON SHA d809420ee678b32901c6b7089c7e7a8e12b6e8d285686a5a5878d06161622fc7。外部課金、本番データ、新サービスの操作なし。

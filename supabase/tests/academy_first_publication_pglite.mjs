@@ -162,6 +162,43 @@ if(process.env.ACADEMY_RUNTIME_TEST==='1') {
  assert.equal((await actor(na,()=>query(`select * from public.academy_get_my_headquarters_access('${nh}')`))).access_kind,'paid');passed++;
  await db.exec(`update academy_publication_private.policies set dispatch_enabled=false`);
  console.log(JSON.stringify({runtimePassed:passed-16,totalPassed:passed,dispatchActivated:false}));
+ await db.exec(await readFile(new URL('../migrations/20260908103347_academy_first_publication_setup_quote_projection.sql',import.meta.url),'utf8'));
+ assert.equal((await svc(`select public.academy_first_publication_setup_reserve('${na}','${nh}','${nq.id}') as result`)).result.quote.plan_name,nq.plan_name);passed++;
+ await db.exec(await readFile(new URL('../migrations/20260908102540_academy_first_publication_ingress_authority.sql',import.meta.url),'utf8'));
+ // Single-backend fixture proves SQL/ACL/separate-transaction behavior, not
+ // concurrent backend waiting, failover or PostgREST transaction configuration.
+ const receiptKey='90000000-0000-0000-0000-000000000001';
+ await db.exec(`update academy_publication_private.enrollments set first_published_at=null,trial_ends_at=null where headquarters_id='${nh}'`);
+ await rejects('trial_not_started',()=>actor(na,()=>query(`select public.academy_first_publication_cancel_append('${nh}','${receiptKey}')`)));
+ await rejects('first_publication_owner_immutable',()=>db.exec(`update public.academy_headquarters set owner_user_id='${b}' where id='${nh}'`));
+ await db.exec(`update academy_publication_private.enrollments set first_published_at=now(),trial_ends_at=now()+interval '168 hours',cancellation_accepted_at=null,phase='trialing' where headquarters_id='${nh}'`);
+ await rejects('dedicated_cancel_ingress_required',()=>actor(na,()=>query(`select public.academy_first_publication_record_cancel('${nh}')`)));
+ await rejects('durable_acknowledged_receipt_required',()=>actor(na,()=>query(`select public.academy_first_publication_command('${nh}','cancel_conversion')`)));
+ await rejects('forbidden',()=>actor(b,()=>query(`select public.academy_first_publication_cancel_append('${nh}','${receiptKey}')`)));
+ await rejects('permission denied',()=>svc(`select public.academy_first_publication_cancel_append('${nh}','${receiptKey}')`));
+ const append=(await actor(na,()=>query(`select public.academy_first_publication_cancel_append('${nh}','${receiptKey}') as result`))).result;
+ assert.equal(append.status,'awaiting_durable_acknowledgment');assert.equal(append.receipt_id,undefined);passed++;
+ assert.equal((await actor(na,()=>query(`select public.academy_first_publication_cancel_status('${nh}') as result`))).result.status,'awaiting_durable_acknowledgment');passed++;
+ await rejects('durable_acknowledged_receipt_required',()=>actor(na,()=>query(`select public.academy_first_publication_command('${nh}','cancel_conversion')`)));
+ const ack=(await actor(na,()=>query(`select public.academy_first_publication_cancel_acknowledge('${nh}','${receiptKey}') as result`))).result;
+ assert.equal(ack.status,'accepted');assert.equal(ack.sequence,1);passed++;
+ assert.deepEqual((await actor(na,()=>query(`select public.academy_first_publication_cancel_acknowledge('${nh}','${receiptKey}') as result`))).result,ack);passed++;
+ await actor(na,()=>query(`select public.academy_first_publication_cancel_append('${nh}','${receiptKey}')`));
+ assert.equal((await query(`select count(*)::int as n from academy_publication_private.receipt_inbox`)).n,1);passed++;
+ await rejects('immutable',()=>db.exec(`update academy_publication_private.receipt_inbox set request_received_at=now()`));
+ await actor(na,()=>query(`select public.academy_first_publication_command('${nh}','cancel_conversion')`));
+ assert.equal((await actor(na,()=>query(`select public.academy_first_publication_cancel_status('${nh}') as result`))).result.applied,true);passed++;
+ await db.exec(`update academy_publication_private.enrollments set first_published_at=now()-interval '169 hours',trial_ends_at=now()-interval '1 hour' where headquarters_id='${nh}'`);
+ await rejects('paid_cancellation_required',()=>actor(na,()=>query(`select public.academy_first_publication_cancel_append('${nh}',gen_random_uuid())`)));
+ await actor(na,()=>query(`select public.academy_first_publication_cancel_append('${nh}','${receiptKey}')`));passed++;
+ await rejects('permission denied',()=>actor(na,()=>query(`select public.academy_first_publication_receipt_barrier('${nh}')`)));
+ const barrier=(await svc(`select public.academy_first_publication_receipt_barrier('${nh}') as result`)).result;
+ const proof=(await svc(`select public.academy_first_publication_receipt_prove('${barrier.barrier_id}') as result`)).result;
+ assert.equal(proof.verified,true);assert.equal(proof.receipt_count,1);passed++;
+ await rejects('permission denied',()=>svc(`delete from academy_publication_private.receipt_proofs`));
+ await db.exec(`update academy_publication_private.outbox set delivered_at=null,lease_until=now()+interval '1 hour',blocked=false where event_key='${paidJob.event_key}'`);
+ assert.equal((await svc(`select public.academy_first_publication_outbox_dispatch_check('${paidJob.event_key}','${paidJob.lease_token}') as result`)).result.reason,'ingress_concurrency_verification_pending');passed++;
+ console.log(JSON.stringify({totalPassed:passed,ingressSingleBackendOnly:true,multiConnectionVerified:false,dispatchActivated:false}));
 }
 } catch(error) {
   console.error(JSON.stringify({error:error.message,code:error.code,where:error.where,position:error.position}));
