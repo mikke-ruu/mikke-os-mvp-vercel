@@ -82,11 +82,17 @@ type MikkeAppShellProps = {
 /** pathnameに対して最も長く前方一致するhrefを「現在地」とみなす（ホームが常時アクティブ化しないように）。 */
 function findActiveHref(pathname: string, hrefs: string[]): string | null {
   let best: string | null = null;
+  let bestPathLength = -1;
   for (const href of hrefs) {
-    const normalized = href.endsWith("/") ? href : `${href}/`;
-    const matches = pathname === href || pathname.startsWith(normalized);
+    const hrefPath = href.split(/[?#]/, 1)[0];
+    if (!hrefPath) continue;
+    const normalized = hrefPath.endsWith("/") ? hrefPath : `${hrefPath}/`;
+    const matches = pathname === hrefPath || pathname.startsWith(normalized);
     if (!matches) continue;
-    if (!best || href.length > best.length) best = href;
+    if (hrefPath.length > bestPathLength) {
+      best = href;
+      bestPathLength = hrefPath.length;
+    }
   }
   return best;
 }
