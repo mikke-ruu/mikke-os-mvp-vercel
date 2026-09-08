@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useMediaRouter as useRouter } from "./MediaNavigation";
 import { useAuth } from "@/components/AuthGate";
 import { createMediaSite, normalizeMediaSlug } from "@/lib/media-app/store";
 

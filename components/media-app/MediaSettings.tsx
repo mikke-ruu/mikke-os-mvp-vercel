@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { MediaLink as Link } from "./MediaNavigation";
 import { useAuth } from "@/components/AuthGate";
 import { getOwnedMedia, normalizeMediaSlug, updateMediaSite } from "@/lib/media-app/store";
 import type { MediaSite } from "@/lib/media-app/types";

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { MediaLink as Link } from "./MediaNavigation";
 import { useEffect, useState } from "react";
 import { ArrowRight, FileText, PenLine } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";

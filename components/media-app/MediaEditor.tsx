@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { MediaLink as Link } from "./MediaNavigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useMediaRouter as useRouter } from "./MediaNavigation";
 import { ArrowDown, ArrowUp, Copy, Eye, Heading2, ImageIcon, Link2, List, Minus, Plus, Quote, Send, Trash2, Type } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { MikkeMediaPicker } from "@/components/media/MikkeMediaPicker";
