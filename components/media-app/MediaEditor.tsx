@@ -120,8 +120,8 @@ export function MediaEditor() {
   const buttonClass = "inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-[var(--mikke-line)] bg-white px-4 py-2 text-sm font-semibold";
   return <div className="mx-auto max-w-5xl pb-16">
     <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--mikke-line)] bg-white/95 py-3">
-      <div><p className="text-sm font-semibold">{preview ? "読者の目で、読み返す" : "あなたの言葉で、書いてみよう。"}</p><p role="status" className="mt-1 text-xs text-[var(--mikke-muted)]">{message}</p></div>
-      <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} onClick={() => setPreview(!preview)}>{preview ? <Pencil size={15} /> : <Eye size={15} />}{preview ? "執筆に戻る" : "プレビュー"}</button><button type="button" className={buttonClass} onClick={saveNow}>保存</button><button type="button" onClick={publish} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[var(--mikke-orange)] px-4 py-2 text-sm font-bold text-white"><Send size={15} />公開版を保存</button></div>
+      <div><p className="text-sm font-semibold">{preview ? "読者の目で読み返す" : "あなたの言葉で書いてみよう"}</p><p role="status" className="mt-1 text-xs text-[var(--mikke-muted)]">{message}</p></div>
+      <div className="flex flex-wrap gap-2"><button type="button" className={buttonClass} onClick={() => { const saved = saveNow(); if (saved) router.push(`/apps/media/reader?article=${saved.id}`); }}>読者画面を見る</button><button type="button" className={buttonClass} onClick={() => setPreview(!preview)}>{preview ? <Pencil size={15} /> : <Eye size={15} />}{preview ? "執筆に戻る" : "プレビュー"}</button><button type="button" className={buttonClass} onClick={saveNow}>保存</button><button type="button" onClick={publish} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-[var(--mikke-orange)] px-4 py-2 text-sm font-bold text-white"><Send size={15} />公開版を保存</button></div>
     </header>
     {error ? <p role="alert" className="mt-4 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-primary-soft)] p-4 text-sm">{error}</p> : null}
     {preview ? <section className="py-6">
