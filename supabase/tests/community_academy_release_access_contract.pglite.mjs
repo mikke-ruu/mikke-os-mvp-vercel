@@ -5,18 +5,22 @@ import { PGlite } from "../../../.local-tools/academy-db-validation/node_modules
 
 const migrationUrl = new URL("../migrations/20260908070053_community_academy_release_access_contract.sql", import.meta.url);
 const migration = await readFile(fileURLToPath(migrationUrl), "utf8");
+const firstPublicationMigrationUrl = new URL("../migrations/20260908085138_community_academy_first_publication_access.sql", import.meta.url);
+const firstPublicationMigration = await readFile(fileURLToPath(firstPublicationMigrationUrl), "utf8");
 const db = new PGlite();
 await db.waitReady;
 
 const OWNER = "10000000-0000-4000-8000-000000000001";
 const INSTRUCTOR = "10000000-0000-4000-8000-000000000002";
 const OUTSIDER = "10000000-0000-4000-8000-000000000003";
+const SECOND_INSTRUCTOR = "10000000-0000-4000-8000-000000000004";
 const HQ = "20000000-0000-4000-8000-000000000001";
 const OTHER_HQ = "20000000-0000-4000-8000-000000000002";
 const COMMUNITY = "30000000-0000-4000-8000-000000000001";
 const OTHER_COMMUNITY = "30000000-0000-4000-8000-000000000002";
 const MAPPING = "40000000-0000-4000-8000-000000000001";
 const INSTRUCTOR_ROW = "50000000-0000-4000-8000-000000000001";
+const SECOND_INSTRUCTOR_ROW = "50000000-0000-4000-8000-000000000002";
 const ROOM = "60000000-0000-4000-8000-000000000001";
 const ADDED_ROOM = "60000000-0000-4000-8000-000000000002";
 
@@ -57,12 +61,19 @@ await db.exec(`
     headquarters_id uuid not null references public.academy_headquarters(id),
     user_id uuid references auth.users(id),
     is_active boolean not null,
-    registration_status text not null
+    registration_status text not null,
+    profile_id uuid
+  );
+  create table public.profiles (
+    id uuid primary key,
+    display_name text not null
   );
   create table public.community_communities (
     id uuid primary key,
     slug text not null,
     name text not null,
+    description text,
+    logo_url text,
     status text not null,
     owner_user_id uuid references auth.users(id)
   );
@@ -79,6 +90,7 @@ await db.exec(`
     community_id uuid not null references public.community_communities(id),
     key text not null,
     name text not null,
+    description text,
     status text not null,
     primary key (community_id, key)
   );
@@ -96,8 +108,30 @@ await db.exec(`
     id uuid primary key,
     community_id uuid not null references public.community_communities(id),
     title text not null,
+    description text,
     access_type text not null,
-    is_archived boolean not null default false
+    is_archived boolean not null default false,
+    sort_order integer not null default 0,
+    created_at timestamptz not null default pg_catalog.now()
+  );
+  create table public.community_safety_settings (
+    community_id uuid primary key references public.community_communities(id),
+    require_legal_name boolean not null default true,
+    require_phone boolean not null default true,
+    require_join_reason boolean not null default false,
+    terms_version integer not null,
+    terms_text text not null,
+    rules_version integer not null,
+    rules_text text not null,
+    privacy_version integer not null,
+    privacy_text text not null
+  );
+  create table public.community_consent_records (
+    community_id uuid not null,
+    user_id uuid not null,
+    terms_version integer not null,
+    rules_version integer not null,
+    privacy_version integer not null
   );
   create table public.community_room_entitlement_rules (
     community_id uuid not null,
@@ -159,6 +193,15 @@ await db.exec(`
     write_allowed boolean not null,
     read_allowed boolean not null
   );
+  create table private.test_first_publication_access (
+    headquarters_id uuid primary key,
+    policy_version text not null,
+    active boolean not null,
+    invite_allowed boolean not null,
+    ends_at timestamptz,
+    phase text not null,
+    cancellation_accepted_at timestamptz
+  );
 
   create function community_private.community_owner_write_allowed(uuid,timestamptz)
   returns boolean language sql stable security definer set search_path=''
@@ -182,6 +225,23 @@ await db.exec(`
   create function private.academy_headquarters_access_mode(uuid) returns text
   language sql stable security definer set search_path=''
   as $$ select h.access_mode from public.academy_headquarters h where h.id=$1 $$;
+  create function private.academy_first_publication_access(uuid) returns jsonb
+  language sql stable security definer set search_path=''
+  as $$
+    select jsonb_build_object(
+      'scheme','first_publication_168h_v1',
+      'policyVersion',a.policy_version,
+      'active',a.active,
+      'inviteAllowed',a.invite_allowed,
+      'endsAt',a.ends_at,
+      'phase',a.phase,
+      'cancellationAcceptedAt',a.cancellation_accepted_at
+    )
+    from private.test_first_publication_access a where a.headquarters_id=$1
+  $$;
+  create function private.academy_first_publication_lock(uuid) returns void
+  language plpgsql volatile security definer set search_path=''
+  as $$ begin perform 1 from public.academy_headquarters h where h.id=$1 for update; end $$;
   create function community_private.community_assert_new_membership_capacity(uuid,uuid,timestamptz)
   returns void language plpgsql security definer set search_path=''
   as $$ begin return; end $$;
@@ -213,6 +273,11 @@ await db.exec(`
     ) values(v.id,v.mapping_id,v.community_id,v.user_id,v.entitlement_key,v.source_reference,v.academy_role,'active',v.starts_at,v.ends_at);
     update public.community_academy_access_invitations
     set status='accepted',accepted_at=pg_catalog.now() where id=v.id;
+    insert into public.community_consent_records(
+      community_id,user_id,terms_version,rules_version,privacy_version
+    )
+    select v.community_id,v.user_id,s.terms_version,s.rules_version,s.privacy_version
+    from public.community_safety_settings s where s.community_id=v.community_id;
     return v.id;
   end $$;
   create function community_private.can_access_room(uuid) returns boolean language sql as $$ select false $$;
@@ -221,6 +286,15 @@ await db.exec(`
 `);
 
 await db.exec(migration);
+try {
+  await db.exec(firstPublicationMigration);
+} catch (error) {
+  console.error("first_publication_migration_failed", {
+    message: error instanceof Error ? error.message : String(error),
+    position: error?.position,
+  });
+  process.exit(1);
+}
 
 async function setActor(userId, role = "authenticated") {
   await db.exec("reset role");
@@ -238,17 +312,25 @@ async function value(sql, params = []) {
 assert.equal(await value("select count(*)::int value from community_private.academy_community_invitation_policies"), 0, "production policy must not be seeded");
 
 await db.exec(`
-  insert into auth.users(id) values ('${OWNER}'),('${INSTRUCTOR}'),('${OUTSIDER}');
+  insert into auth.users(id) values ('${OWNER}'),('${INSTRUCTOR}'),('${OUTSIDER}'),('${SECOND_INSTRUCTOR}');
   insert into public.academy_headquarters(id,owner_user_id,access_mode) values
     ('${HQ}','${OWNER}','paid'),('${OTHER_HQ}','${OUTSIDER}','paid');
   insert into public.academy_instructors(id,headquarters_id,user_id,is_active,registration_status)
-    values('${INSTRUCTOR_ROW}','${HQ}','${INSTRUCTOR}',true,'registered');
+    values('${INSTRUCTOR_ROW}','${HQ}','${INSTRUCTOR}',true,'registered'),
+          ('${SECOND_INSTRUCTOR_ROW}','${HQ}','${SECOND_INSTRUCTOR}',true,'registered');
+  insert into public.profiles(id,display_name) values
+    ('${INSTRUCTOR_ROW}','Registered instructor'),
+    ('${SECOND_INSTRUCTOR_ROW}','Second instructor');
+  update public.academy_instructors set profile_id=id;
   insert into public.community_communities(id,slug,name,status,owner_user_id) values
     ('${COMMUNITY}','release-community','Release Community','active','${OWNER}'),
     ('${OTHER_COMMUNITY}','other-community','Other Community','active','${OUTSIDER}');
   insert into community_private.test_contracts(community_id,actor_user_id,status,current_period_start,current_period_end,write_allowed,read_allowed)
     values('${COMMUNITY}','${OWNER}','active',now()-interval '1 day',now()+interval '29 days',true,true),
           ('${OTHER_COMMUNITY}','${OUTSIDER}','active',now()-interval '1 day',now()+interval '29 days',true,true);
+  insert into public.community_safety_settings(
+    community_id,terms_version,terms_text,rules_version,rules_text,privacy_version,privacy_text
+  ) values('${COMMUNITY}',3,'Terms v3',4,'Rules v4',5,'Privacy v5');
   insert into public.community_memberships(community_id,user_id,role,status,access_scope) values
     ('${COMMUNITY}','${OWNER}','owner','active','community'),
     ('${COMMUNITY}','${INSTRUCTOR}','member','active','community');
@@ -279,7 +361,7 @@ assert.equal(overview.invitationCount, 0);
 
 await assert.rejects(
   db.query("select public.academy_get_community_release_overview($1,$2)", [OTHER_HQ, COMMUNITY]),
-  /Academy headquarters management is required/
+  /Academy headquarters owner authority is required/
 );
 await assert.rejects(
   db.query("select public.academy_get_community_release_overview($1,$2)", [HQ, OTHER_COMMUNITY]),
@@ -291,7 +373,7 @@ await db.exec(`update public.academy_headquarters set access_mode='trial_active'
 await setActor(OWNER);
 await assert.rejects(
   db.query("select public.academy_issue_community_instructor_invitation($1,$2,$3,$4,$5,$6)", [HQ, COMMUNITY, MAPPING, INSTRUCTOR_ROW, [ROOM], "test_legacy_trial_flag"]),
-  /Current paid Academy access is required/
+  /Current eligible Academy access is required for Community invitations/
 );
 await db.exec("reset role");
 await db.exec(`update public.academy_headquarters set access_mode='paid' where id='${HQ}'`);
@@ -317,7 +399,7 @@ assert.equal(duplicate.id, first.id);
 await setActor(OUTSIDER);
 await assert.rejects(
   db.query("select public.academy_issue_community_instructor_invitation($1,$2,$3,$4,$5,$6)", [HQ, COMMUNITY, MAPPING, INSTRUCTOR_ROW, [ROOM], "test_owner_paid"]),
-  /Academy headquarters management is required/
+  /Academy headquarters owner authority is required/
 );
 
 await db.exec("reset role");
@@ -374,6 +456,132 @@ await setActor(OWNER, "service_role");
 assert.equal(await value("select public.community_expire_academy_access_invitations(now()) value"), 1);
 await db.exec("reset role");
 assert.equal(await value("select status value from public.community_academy_access_invitations where id=$1", [third.id]), "expired");
+
+await db.exec("reset role");
+await db.exec(`
+  insert into private.test_first_publication_access(
+    headquarters_id,policy_version,active,invite_allowed,ends_at,phase
+  ) values(
+    '${HQ}','academy-first-publication-trial-2026-09-08-v1',true,true,
+    now()+interval '7 days','trialing'
+  );
+  insert into community_private.academy_community_invitation_policies(
+    key,status,inviter_authority,invitation_ttl,allow_during_academy_trial,
+    academy_access_scheme,academy_policy_version,community_consent_revision,
+    community_consent_mode,source_cancellation_mode
+  ) values(
+    'academy_first_publication_community_invitation_v1','active','community_owner',
+    interval '2 days',true,'first_publication_168h_v1',
+    'academy-first-publication-trial-2026-09-08-v1',
+    'academy-first-publication-community-invitation-consent-2026-09-08-v1',
+    'snapshot_current_versions_at_issue','preserve_accepted_until_source_end'
+  );
+`);
+
+await setActor(OWNER);
+const firstPublicationOverview = await value(
+  "select public.academy_get_community_release_overview($1,$2) value",
+  [HQ, COMMUNITY]
+);
+assert.equal(firstPublicationOverview.invitationOptions.state, "available");
+assert.equal(firstPublicationOverview.invitationOptions.reason, null);
+assert.equal(firstPublicationOverview.invitationOptions.items.length, 1);
+assert.equal(firstPublicationOverview.invitationOptions.items[0].policyKey, "academy_first_publication_community_invitation_v1");
+assert.deepEqual(firstPublicationOverview.invitationOptions.items[0].rooms, [
+  { id: ROOM, name: "Invited room" },
+  { id: ADDED_ROOM, name: "Later room" },
+]);
+assert.equal(firstPublicationOverview.instructorCandidates.state, "available");
+assert.equal(firstPublicationOverview.instructorCandidates.items.length, 2);
+
+const firstPublication = await value(
+  "select public.academy_issue_community_instructor_invitation($1,$2,$3,$4,$5,$6) value",
+  [HQ, COMMUNITY, MAPPING, INSTRUCTOR_ROW, [ROOM], "academy_first_publication_community_invitation_v1"]
+);
+const pendingAfterCancel = await value(
+  "select public.academy_issue_community_instructor_invitation($1,$2,$3,$4,$5,$6) value",
+  [HQ, COMMUNITY, MAPPING, SECOND_INSTRUCTOR_ROW, [ROOM], "academy_first_publication_community_invitation_v1"]
+);
+await db.exec("reset role");
+const sourceSnapshot = await db.query(`
+  select academy_access_scheme,academy_policy_version,community_consent_revision,
+         community_terms_version,community_rules_version,community_privacy_version,
+         ends_at <= expires_at as source_end_not_after_invite_expiry
+  from public.community_academy_access_invitations where id=$1
+`, [firstPublication.id]);
+assert.equal(sourceSnapshot.rows[0].academy_access_scheme, "first_publication_168h_v1");
+assert.equal(sourceSnapshot.rows[0].academy_policy_version, "academy-first-publication-trial-2026-09-08-v1");
+assert.equal(sourceSnapshot.rows[0].community_consent_revision, "academy-first-publication-community-invitation-consent-2026-09-08-v1");
+assert.deepEqual(
+  [sourceSnapshot.rows[0].community_terms_version, sourceSnapshot.rows[0].community_rules_version, sourceSnapshot.rows[0].community_privacy_version],
+  [3, 4, 5]
+);
+assert.equal(sourceSnapshot.rows[0].source_end_not_after_invite_expiry, false, "shorter invitation TTL is retained");
+
+await setActor(INSTRUCTOR);
+const firstPublicationPreview = await value(
+  "select public.community_get_my_academy_access_invitation($1) value",
+  [firstPublication.id]
+);
+assert.equal(firstPublicationPreview.consentMode, "versioned");
+assert.equal(firstPublicationPreview.communityConsentRevision, "academy-first-publication-community-invitation-consent-2026-09-08-v1");
+assert.equal(firstPublicationPreview.canAccept, true);
+await assert.rejects(
+  db.query("select public.community_accept_academy_access_invitation($1,'Instructor','Instructor','09000000000','',true,true,true)", [firstPublication.id]),
+  /Versioned Community consent is required/
+);
+await assert.rejects(
+  db.query("select public.community_accept_academy_access_invitation_versioned($1,$2,'Instructor','Instructor','09000000000','',true,3,true,4,true,5)", [firstPublication.id, "wrong-revision"]),
+  /Community invitation consent revision changed/
+);
+await assert.rejects(
+  db.query("select public.community_accept_academy_access_invitation_versioned($1,$2,'Instructor','Instructor','09000000000','',true,2,true,4,true,5)", [firstPublication.id, "academy-first-publication-community-invitation-consent-2026-09-08-v1"]),
+  /Displayed Community document versions changed/
+);
+await value(
+  "select public.community_accept_academy_access_invitation_versioned($1,$2,'Instructor','Instructor','09000000000','',true,3,true,4,true,5) value",
+  [firstPublication.id, "academy-first-publication-community-invitation-consent-2026-09-08-v1"]
+);
+await db.exec("reset role");
+assert.equal(await value("select count(*)::int value from public.community_consent_records where community_id=$1 and user_id=$2 and terms_version=3 and rules_version=4 and privacy_version=5", [COMMUNITY, INSTRUCTOR]), 2, "versioned acceptance records the displayed Community document versions");
+
+await db.exec(`
+  update private.test_first_publication_access
+  set invite_allowed=false,phase='cancelled',cancellation_accepted_at=now()
+  where headquarters_id='${HQ}'
+`);
+await setActor(OWNER);
+const stoppedOverview = await value("select public.academy_get_community_release_overview($1,$2) value", [HQ, COMMUNITY]);
+assert.deepEqual(stoppedOverview.invitationOptions, { state: "unavailable", reason: "academy_invitation_stopped", items: [] });
+await assert.rejects(
+  db.query("select public.academy_issue_community_instructor_invitation($1,$2,$3,$4,$5,$6)", [HQ, COMMUNITY, MAPPING, SECOND_INSTRUCTOR_ROW, [ROOM], "academy_first_publication_community_invitation_v1"]),
+  /Academy first-publication invitations are currently stopped/
+);
+await setActor(SECOND_INSTRUCTOR);
+await assert.rejects(
+  db.query("select public.community_accept_academy_access_invitation_versioned($1,$2,'Second','Second','09000000001','',true,3,true,4,true,5)", [pendingAfterCancel.id, "academy-first-publication-community-invitation-consent-2026-09-08-v1"]),
+  /Academy first-publication invitation is no longer acceptable/
+);
+await setActor(OWNER, "service_role");
+const stoppedCounts = await value("select public.community_reconcile_academy_first_publication_access($1) value", [HQ]);
+assert.equal(stoppedCounts.pendingExpired, 1);
+await setActor(INSTRUCTOR);
+assert.equal(await value("select community_private.can_access_room($1) value", [ROOM]), true, "accepted source right survives cancellation until the source end");
+
+await db.exec("reset role");
+await db.exec(`
+  update private.test_first_publication_access
+  set active=false,ends_at=now()-interval '1 second',phase='expired'
+  where headquarters_id='${HQ}'
+`);
+await setActor(INSTRUCTOR);
+assert.equal(await value("select community_private.can_access_room($1) value", [ROOM]), false, "source end is enforced even before reconciliation");
+await setActor(OWNER, "service_role");
+const expiredCounts = await value("select public.community_reconcile_academy_first_publication_access($1) value", [HQ]);
+assert.equal(expiredCounts.claimsExpired, 1);
+await db.exec("reset role");
+assert.equal(await value("select count(*)::int value from public.community_member_entitlements where community_id=$1 and user_id=$2 and source='manual' and status='active'", [COMMUNITY, INSTRUCTOR]), 1, "ordinary manual right remains active");
+assert.equal(await value("select status value from public.community_memberships where community_id=$1 and user_id=$2", [COMMUNITY, INSTRUCTOR]), "active", "ordinary membership remains active");
 
 await db.close();
 console.log("community_academy_release_access_contract_pglite_ok");

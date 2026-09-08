@@ -20,6 +20,26 @@ export type CommunityAcademyReleaseOverview = {
         writeAllowed: boolean;
       };
   activeMemberCount: number;
+  invitationOptions: {
+    state: "available" | "unavailable";
+    reason:
+      | "academy_access_unavailable"
+      | "academy_invitation_stopped"
+      | "community_access_unavailable"
+      | "policy_unavailable"
+      | "no_mapping"
+      | null;
+    items: Array<{
+      mappingId: string;
+      policyKey: string;
+      rooms: Array<{ id: string; name: string }>;
+    }>;
+  };
+  instructorCandidates: {
+    state: "available" | "unavailable";
+    reason: CommunityAcademyReleaseOverview["invitationOptions"]["reason"];
+    items: Array<{ instructorId: string; displayName: string }>;
+  };
   invitationCount: number;
   invitationsTruncated: boolean;
   invitations: Array<{

@@ -101,11 +101,15 @@ export type CommunityInvitation = {
 
 export type CommunityAcademyAccessInvitation = {
   id: string;
-  status: "pending" | "accepted" | "revoked" | "expired";
+  status: "pending" | "accepted" | "declined" | "cancelled" | "revoked" | "expired";
   academyRole: CommunityAcademyRole;
   startsAt: string;
   endsAt: string | null;
   expiresAt: string | null;
+  consentMode: "legacy" | "versioned";
+  communityConsentRevision: string | null;
+  canAccept: boolean;
+  acceptanceReason: "not_pending" | "expired" | "source_unavailable" | "source_expired" | "source_stopped" | "policy_changed" | "documents_changed" | null;
   community: {
     id: string;
     slug: string;

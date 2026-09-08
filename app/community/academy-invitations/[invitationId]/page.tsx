@@ -9,8 +9,8 @@ import {
   getMyCommunityAcademyAccessInvitation
 } from "@/lib/community/client";
 import type { CommunityAcademyAccessInvitation } from "@/lib/community/types";
-import { supabase } from "@/lib/supabase/client";
 import { createInvitationSessionState, isCurrentInvitationRequest } from "@/lib/community/academy-invitation-session";
+import { supabase } from "@/lib/supabase/client";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
@@ -22,6 +22,10 @@ const previewInvitation: CommunityAcademyAccessInvitation = {
   startsAt: "2026-08-26T00:00:00+09:00",
   endsAt: "2027-08-25T23:59:59+09:00",
   expiresAt: null,
+  consentMode: "versioned",
+  communityConsentRevision: "academy-first-publication-community-invitation-consent-2026-09-08-v1",
+  canAccept: true,
+  acceptanceReason: null,
   community: {
     id: "preview-community",
     slug: "sample-academy-community",
@@ -78,6 +82,7 @@ function InvitationContent({ invitationId, preview, userId }: { invitationId: st
         if (!active || !isCurrentInvitationRequest(key, generation, requestState.current)) return;
         setInvitation(data);
         if (!data) setMessage("この招待は見つからないか、現在のアカウント宛てではありません。");
+        else if (!data.canAccept) setMessage("この招待は現在受諾できません。AcademyまたはCommunityの利用状態をご確認ください。");
       })
       .catch(() => {
         if (active && isCurrentInvitationRequest(key, generation, requestState.current)) {
@@ -91,7 +96,7 @@ function InvitationContent({ invitationId, preview, userId }: { invitationId: st
   }, [invitationId, preview, userId]);
 
   const canAccept = useMemo(() => {
-    if (!invitation || invitation.status !== "pending" || !form.displayName.trim()) return false;
+    if (!invitation || !invitation.canAccept || invitation.status !== "pending" || !form.displayName.trim()) return false;
     if (invitation.consent.requireLegalName && !form.legalName.trim()) return false;
     if (invitation.consent.requirePhone && !form.phone.trim()) return false;
     if (invitation.consent.requireJoinReason && !form.joinReason.trim()) return false;
@@ -108,7 +113,12 @@ function InvitationContent({ invitationId, preview, userId }: { invitationId: st
         displayName: form.displayName,
         legalName: form.legalName,
         phone: form.phone,
-        joinReason: form.joinReason
+        joinReason: form.joinReason,
+        consentMode: invitation.consentMode,
+        communityConsentRevision: invitation.communityConsentRevision,
+        termsVersion: invitation.consent.termsVersion,
+        rulesVersion: invitation.consent.rulesVersion,
+        privacyVersion: invitation.consent.privacyVersion
       });
       setAccepted(true);
     } catch {
