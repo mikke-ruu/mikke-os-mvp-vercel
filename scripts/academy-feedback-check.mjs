@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 const require = createRequire(import.meta.url);
 function load(path) {
   const module = { exports: {} };
-  new Function('module','exports','require',ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText)(module,module.exports,name => name === 'next/link' ? {default:({children,...props})=>React.createElement('a',props,children)} : name === '@/lib/academy/access-context' ? {toCurrentAcademyContextHref: value=>value} : require(name));
+  new Function('module','exports','require',ts.transpileModule(readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText)(module,module.exports,name => name === './AcademyCommunityInvitations' ? {AcademyCommunityInvitations:()=>null} : name === 'next/link' ? {default:({children,...props})=>React.createElement('a',props,children)} : name === '@/lib/academy/access-context' ? {toCurrentAcademyContextHref: value=>value} : require(name));
   return module.exports;
 }
 const { applicationIntakeCounts, matchesIntake } = load('lib/academy/intake-summary.ts');

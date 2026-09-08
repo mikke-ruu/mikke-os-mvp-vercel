@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
@@ -16,9 +16,9 @@ import {
   getOwnedHeadquarters,
   hasAvailablePlatformHeadquartersCreation
 } from "@/lib/academy/headquarters";
-import { getAcademyOnboardingEligibility, startAcademySevenDayTrial } from "@/lib/academy/trial";
+import { getAcademyOnboardingEligibility } from "@/lib/academy/trial";
 
-const ACADEMY_TRIAL_TERMS_VERSION = "academy-pilot-2026-08-30";
+const ACADEMY_PREPARATION_POLICY = "academy-first-publication-trial-2026-09-08-v1";
 import { listCourses } from "@/lib/academy/courses";
 import { listInstructors } from "@/lib/academy/instructors";
 import {
@@ -53,7 +53,7 @@ function DashboardContent() {
   const [classes, setClasses] = useState<AcademyClass[]>([]);
   const [canCreate, setCanCreate] = useState(false);
   const [canStartTrial, setCanStartTrial] = useState(false);
-  const [trialTermsAccepted, setTrialTermsAccepted] = useState(false);
+  const preparationInFlight = useRef(false);
   const [creationError, setCreationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -117,24 +117,24 @@ function DashboardContent() {
   }
 
   async function startTrial() {
-    if (!trialTermsAccepted) {
-      setCreationError("7日間お試しの条件を確認し、同意してください。");
-      return;
-    }
+    if (preparationInFlight.current) return;
+    preparationInFlight.current = true;
     setLoading(true);
     setCreationError(null);
     try {
-      const created = await startAcademySevenDayTrial(
-        `${profile.display_name}アカデミー`,
-        ACADEMY_TRIAL_TERMS_VERSION
-      );
-      setHq(created);
+      const { data: created, error } = await supabase.rpc("academy_first_publication_create_preparation", {
+        p_name: `${profile.display_name}アカデミー`.slice(0, 100),
+        p_policy_version: ACADEMY_PREPARATION_POLICY
+      });
+      if (error) throw error;
+      if (!created || created.scheme !== "first_publication_168h_v1" || typeof created.headquarters_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(created.headquarters_id)) throw new Error("invalid_preparation");
       setCanStartTrial(false);
-      router.replace(toAcademyContextHref("/academy", created.id, "manage"));
+      router.replace(toAcademyContextHref("/academy", created.headquarters_id, "manage"));
     } catch {
-      setCreationError("7日間お試しを開始できませんでした。画面を読み込み直して、もう一度お試しください。");
+      setCreationError("本部の準備状態を確認できませんでした。画面を再読み込みしてご確認ください。この操作では無料期間や課金は始まりません。");
     } finally {
       setLoading(false);
+      preparationInFlight.current = false;
     }
   }
 
@@ -145,34 +145,23 @@ function DashboardContent() {
     return (
       <div className="mx-auto max-w-md space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
         <p className="text-sm font-bold text-[var(--mikke-text)]">
-          {canStartTrial ? "7日間、無料でお試しできます" : canCreate ? "本部を作成できます" : "Academyの利用確認が必要です"}
+          {canStartTrial ? "まずは本部と講座の下書きを準備しましょう" : canCreate ? "本部を作成できます" : "Academyの利用確認が必要です"}
         </p>
         <p className="text-xs leading-5 text-[var(--mikke-muted)]">
           {canStartTrial
-            ? "質問に答えながら本部設定と講座の下書きを作れます。開始ボタンを押した日時から7日間です。開始後は画面に開始日時と終了日時を表示します。公開や実際の申込受付は行われず、自動課金もありません。"
+            ? "準備中は無料期間を消費しません。料金と支払方法を確認し、最初の講座を公開した日時から7日間無料です。その後は有料契約へ移行します。公開前に条件をご確認いただけます。"
             : canCreate
             ? "契約確認済みの作成権を使って、認定講座を管理する本部を作成します。"
             : "利用状況を確認できませんでした。すでに本部をお持ちの場合は、所属Academyの選択画面をご確認ください。"}
         </p>
         {canStartTrial ? (
           <div className="space-y-3 text-left">
-            <label className="flex items-start gap-2 rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs leading-5 text-[var(--mikke-text-soft)]">
-              <input
-                type="checkbox"
-                checked={trialTermsAccepted}
-                onChange={(event) => setTrialTermsAccepted(event.target.checked)}
-                className="mt-1"
-              />
-              <span>
-                開始ボタンを押した日時から7日間は、下書き作成のお試し期間です。自動課金はなく、期限後は閲覧のみになることに同意します。
-              </span>
-            </label>
+            <p className="rounded-xl bg-[var(--mikke-surface-soft)] p-3 text-xs leading-5">このボタンでは講座は公開されず、課金も始まりません。</p>
             <button
               onClick={startTrial}
-              disabled={!trialTermsAccepted}
               className="w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-45"
             >
-              7日間お試しを始める
+              本部を作って準備を始める
             </button>
           </div>
         ) : null}
@@ -181,7 +170,7 @@ function DashboardContent() {
             契約確認済みの本部を作成する
           </button>
         ) : null}
-        {!canCreate ? (
+        {!canCreate && !canStartTrial ? (
           <div className="mt-4 border-t border-[var(--mikke-line)] pt-4 text-left">
             <p className="mb-3 text-xs font-bold text-[var(--mikke-text)]">有料で新しい本部を始める場合</p>
             <AcademyPlatformBillingLoader
@@ -205,7 +194,12 @@ function DashboardContent() {
 export default function AcademyDashboardPage() {
   return (
     <HonbuShell title="ホーム">
-      <DashboardContent />
+      <DashboardIdentity />
     </HonbuShell>
   );
+}
+
+function DashboardIdentity() {
+  const { user } = useAuth();
+  return <DashboardContent key={user.id} />;
 }

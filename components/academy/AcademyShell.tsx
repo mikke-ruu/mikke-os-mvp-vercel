@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { AcademyPageHelp } from "./AcademyPageHelp";
 import { AcademyUsageStatus } from "./AcademyUsageStatus";
+import { AcademySchemeUsageStatus } from "./AcademySchemeUsageStatus";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -495,7 +496,9 @@ function ShellInner({
           操作確認用のサンプルです。実データは変更しません。
         </div>
       ) : null}
-      {variant === "honbu" && selectedContext ? <AcademyUsageStatus access={headquartersAccess} sample={previewMode === "walkthrough" || previewMode === "dashboard" || previewMode === "trial"} href={contextHref("/academy/settings")} /> : null}
+      {variant === "honbu" && selectedContext ? (previewMode === "walkthrough" || previewMode === "dashboard" || previewMode === "trial"
+        ? <AcademyUsageStatus access={headquartersAccess} sample href={contextHref("/academy/settings")} />
+        : <AcademySchemeUsageStatus headquartersId={selectedContext.academy_id} userId={user.id} href={contextHref("/academy/settings")} legacy={<AcademyUsageStatus access={headquartersAccess} sample={false} href={contextHref("/academy/settings")} />} />) : null}
       {variant !== "honbu" && headquartersAccess?.access_kind === "trial" && !accessBannerDismissed ? (
         <div className="relative mb-4 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)]/20 text-[var(--mikke-text)]">
           <button

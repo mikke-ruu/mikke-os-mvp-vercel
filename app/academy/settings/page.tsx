@@ -1,15 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Building2, Check, Link2, ReceiptJapaneseYen, ShieldCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyPlatformBillingLoader } from "@/app/academy/billing/AcademyPlatformBillingLoader";
 import { AcademyCommunityOverview } from "@/components/academy/AcademyCommunityOverview";
+import { AcademySettingsBilling } from "@/components/academy/AcademySettingsBilling";
 import { isAcademyLocalReview } from "@/lib/academy/preview";
 import { academyCheckoutPlanForCatalogPrice } from "@/lib/academy/platform-billing-view";
 import { supabase } from "@/lib/supabase/client";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
+import { listInstructors } from "@/lib/academy/instructors";
 import { getMyAcademyHeadquartersAccess } from "@/lib/academy/trial";
 import { getAcademyAccessNotice } from "@/lib/academy/access-notice";
 import {
@@ -70,8 +73,10 @@ function SettingsContent() {
   const [myInvitations, setMyInvitations] = useState<AcademyHeadquartersInvitation[]>([]);
   const [billingSnapshot, setBillingSnapshot] = useState<AcademyBillingSnapshot | null>(null);
   const [currentBillingEstimate, setCurrentBillingEstimate] = useState<AcademyCurrentBillingEstimate | null>(null);
+  const [legacyBillingState, setLegacyBillingState] = useState<"loading" | "ready" | "error">("loading");
   const [communityLinks, setCommunityLinks] = useState<AcademyCommunityLinkOption[]>([]);
   const [communityUnavailable, setCommunityUnavailable] = useState(false);
+  const [communityInstructors, setCommunityInstructors] = useState<Array<{id: string; name: string; canInvite: boolean}> | undefined>();
   const [form, setForm] = useState({
     name: "",
     logo_url: "",
@@ -108,6 +113,8 @@ function SettingsContent() {
   const load = useCallback(async () => {
     setLoading(true);
     setMessage("");
+    setCommunityInstructors(undefined);
+    setCommunityLinks([]);
     try {
       const pending = await listMyHeadquartersInvitations(profile.id);
       setMyInvitations(pending);
@@ -150,6 +157,12 @@ function SettingsContent() {
           setCommunityUnavailable(false);
           const nextCommunityLinks = await listMyAcademyCommunityLinkOptions(hq.id);
           setCommunityLinks(nextCommunityLinks);
+          try {
+            const teachers = await listInstructors(hq.id);
+            setCommunityInstructors(teachers.map(teacher => ({ id: teacher.id, name: teacher.business_name || "講師", canInvite: Boolean(teacher.user_id) && teacher.is_active && teacher.registration_status === "registered" && teacher.status === "active" })));
+          } catch {
+            setCommunityInstructors(undefined);
+          }
           const firstCommunity = nextCommunityLinks[0];
           const firstCurrentMapping = firstCommunity?.mappings.find((mapping) => mapping.isCurrent);
           const firstDefinition = firstCommunity?.definitions[0];
@@ -167,17 +180,6 @@ function SettingsContent() {
           setCommunityLinks([]);
         }
       }
-      if (nextRole === "owner") {
-        const [snapshot, estimate] = await Promise.all([
-          getMyAcademyBillingSnapshot(hq.id),
-          getMyAcademyCurrentBillingEstimate(hq.id),
-        ]);
-        setBillingSnapshot(snapshot);
-        setCurrentBillingEstimate(estimate);
-      } else {
-        setBillingSnapshot(null);
-        setCurrentBillingEstimate(null);
-      }
     } catch {
       setMessage("本部設定を読み込めませんでした。DB設定と権限を確認してください。");
     } finally {
@@ -188,6 +190,23 @@ function SettingsContent() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Legacy billing errors must not block the new contract workflow or the rest of settings.
+  useEffect(() => {
+    let active = true;
+    setBillingSnapshot(null);
+    setCurrentBillingEstimate(null);
+    setLegacyBillingState("loading");
+    if (!headquarters || role !== "owner") return () => { active = false; };
+    Promise.all([getMyAcademyBillingSnapshot(headquarters.id), getMyAcademyCurrentBillingEstimate(headquarters.id)])
+      .then(([snapshot, estimate]) => {
+        if (!active) return;
+        setBillingSnapshot(snapshot);
+        setCurrentBillingEstimate(estimate);
+        setLegacyBillingState("ready");
+      }).catch(() => { if (active) setLegacyBillingState("error"); });
+    return () => { active = false; };
+  }, [headquarters?.id, role]);
 
   const activeMembers = useMemo(
     () => members.filter((member) => member.status === "active"),
@@ -421,6 +440,7 @@ function SettingsContent() {
           </section>
 
           {role === "owner" ? (
+            <AcademySettingsBilling key={`${user.id}:${headquarters.id}`} userId={user.id} headquartersId={headquarters.id} sample={isAcademyLocalReview()} legacy={
             <section className={cardClass}>
               <h2 className="flex items-center gap-2 text-base font-bold">
                 <ReceiptJapaneseYen size={18} /> Academy利用料金
@@ -428,6 +448,8 @@ function SettingsContent() {
               <p className="mt-1 text-sm text-[var(--mikke-muted)]">
                 請求先の本部責任者だけに表示しています。すべて税込です。
               </p>
+
+              {legacyBillingState !== "ready" ? <p role={legacyBillingState === "error" ? "alert" : "status"} className="mt-3 text-sm leading-7">{legacyBillingState === "error" ? "料金の集計情報を取得できませんでした。未請求や0円という意味ではありません。ページを再読み込みしてください。" : "料金の集計情報を読み込んでいます…"}</p> : <>
 
               <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                 <div><dt className="text-xs text-[var(--mikke-muted)]">{billingSnapshot ? `${Number(billingSnapshot.charge_month.slice(5,7))}月分の料金` : "次回料金"}</dt><dd className="mt-1 font-bold">{billingSnapshot ? `${billingSnapshot.charge_price_yen.toLocaleString()}円` : "月末集計後に表示"}</dd></div>
@@ -505,10 +527,12 @@ function SettingsContent() {
                 />
               </div>}
               </details>
+              </>}
             </section>
+            } />
           ) : null}
 
-          {canManageRole ? <AcademyCommunityOverview key={headquarters.id} sample={isAcademyLocalReview()} links={communityLinks} unavailable={communityUnavailable} /> : null}
+          {canManageRole ? <AcademyCommunityOverview key={`${user.id}:${headquarters.id}`} headquartersId={headquarters.id} userId={user.id} instructors={communityInstructors} sample={isAcademyLocalReview()} links={communityLinks} unavailable={communityUnavailable} /> : null}
 
           {canManage ? (
             <section className={cardClass}>
@@ -669,7 +693,13 @@ function SettingsContent() {
 export default function AcademySettingsPage() {
   return (
     <HonbuShell title="本部設定">
-      <SettingsContent />
+      <SettingsIdentityBoundary />
     </HonbuShell>
   );
+}
+
+function SettingsIdentityBoundary() {
+  const { user } = useAuth();
+  const pathname = usePathname();
+  return <SettingsContent key={`${user.id}:${pathname}`} />;
 }

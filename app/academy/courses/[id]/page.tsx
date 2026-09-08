@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
-import { AcademyPublicationPanel } from "@/components/academy/AcademyPublicationPanel";
+import { AcademyCoursePublication } from "@/components/academy/AcademyCoursePublication";
 import { isAcademyLocalReview } from "@/lib/academy/preview";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse, setCoursePublished, updateCourse, type CourseInput } from "@/lib/academy/courses";
@@ -79,7 +79,7 @@ function EditCourseContent({ courseId }: { courseId: string }) {
           setCourse(updated);
         }}
       />
-      <AcademyPublicationPanel key={`${hq.id}:${course.id}`} course={course} sample={isAcademyLocalReview()} onChange={async (published) => {
+      <AcademyCoursePublication key={`${profile.user_id}:${hq.id}:${course.id}`} headquartersId={hq.id} userId={profile.user_id} ownerUserId={hq.owner_user_id} course={course} sample={isAcademyLocalReview()} onReloadCourse={async()=>{ const refreshed=await getCourse(hq.id,course.id); if(!refreshed)throw new Error("course_unavailable"); setCourse(refreshed); }} onLegacyChange={async (published) => {
         if (isAcademyLocalReview()) {
           setCourse({ ...course, is_published: published });
           return;
@@ -94,7 +94,12 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
   const { id } = use(params);
   return (
     <HonbuShell title="講座を編集">
-      <EditCourseContent courseId={id} />
+      <EditCourseIdentity courseId={id} />
     </HonbuShell>
   );
+}
+
+function EditCourseIdentity({ courseId }: { courseId: string }) {
+  const { user } = useAuth();
+  return <EditCourseContent key={`${user.id}:${courseId}`} courseId={courseId} />;
 }
