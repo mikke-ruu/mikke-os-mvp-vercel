@@ -175,9 +175,22 @@ await test('quote uses server price and scope without submitting a client amount
   const quote=rpcModule.exports.createFirstPublicationQuoteRpc({rpc:async(name,args)=>{
     assert.equal(name,'academy_first_publication_quote');assert.deepEqual(args,{p_headquarters_id:hqId,p_policy_version:'test-v1'});
     return {data:{id:quoteId,headquarters_id:hqId,policy_version:'test-v1',terms_revision:'terms',amount_yen:3300,
+      plan_key:'small',plan_name:'登録講師20名まで',discount_description:'割引なし',consent_revision:'academy-first-publication-trial-consent-2026-09-08-v1',
       instructor_count:2,issued_at:new Date(start).toISOString(),expires_at:new Date(start+1800000).toISOString(),owner_user_id:'private'},error:null};
   }});
   const q=await quote(hqId,'test-v1');assert.equal(q.amountYen,3300);assert.equal(q.owner_user_id,undefined);
+  assert.equal(q.planName,'登録講師20名まで');assert.equal(q.discountDescription,'割引なし');
+});
+await test('quote requires server catalog and exact consent revision',async()=>{
+  const base={id:quoteId,headquarters_id:hqId,policy_version:'test-v1',terms_revision:'terms',amount_yen:3300,instructor_count:2,
+    issued_at:new Date(start).toISOString(),expires_at:new Date(start+1800000).toISOString(),plan_key:'small',plan_name:'登録講師20名まで',discount_description:'割引なし',consent_revision:'academy-first-publication-trial-consent-2026-09-08-v1'};
+  for(const key of ['plan_key','plan_name','discount_description','consent_revision']) {
+    const missing={...base};delete missing[key];
+    const read=rpcModule.exports.createFirstPublicationQuoteRpc({rpc:async()=>({data:missing,error:null})});
+    await assert.rejects(read(hqId,'test-v1'),/invalid_quote_catalog/);
+  }
+  const read=rpcModule.exports.createFirstPublicationQuoteRpc({rpc:async()=>({data:{...base,consent_revision:'unapproved-version'},error:null})});
+  await assert.rejects(read(hqId,'test-v1'),/invalid_quote_catalog/);
 });
 await test('quote errors are not a free quote',async()=>{
   const quote=rpcModule.exports.createFirstPublicationQuoteRpc({rpc:async()=>({data:null,error:{message:'denied'}})});

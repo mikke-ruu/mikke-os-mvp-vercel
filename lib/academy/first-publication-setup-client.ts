@@ -6,7 +6,11 @@ export function parseConfirmedSetupQuote(value: unknown, headquartersId: string,
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("確認済みの見積もりを取得できませんでした。");
   const row=value as Record<string,unknown>;
   if (row.id!==quoteId || row.headquartersId!==headquartersId || typeof row.policyVersion!=="string" || !row.policyVersion.trim() || row.policyVersion.length>200 || typeof row.termsRevision!=="string" || !row.termsRevision.trim() || row.termsRevision.length>200 || typeof row.amountYen!=="number" || !Number.isSafeInteger(row.amountYen) || row.amountYen<=0 || typeof row.instructorCount!=="number" || !Number.isSafeInteger(row.instructorCount) || row.instructorCount<0 || typeof row.issuedAt!=="string" || typeof row.expiresAt!=="string" || !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(row.issuedAt) || !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(row.expiresAt) || !Number.isFinite(Date.parse(row.issuedAt)) || !Number.isFinite(Date.parse(row.expiresAt)) || Date.parse(row.expiresAt)<=Date.parse(row.issuedAt)) throw new Error("見積もりの対象・料金・期限を確認できませんでした。");
-  return {id:quoteId,headquartersId,policyVersion:row.policyVersion,termsRevision:row.termsRevision,amountYen:row.amountYen,instructorCount:row.instructorCount,issuedAt:row.issuedAt,expiresAt:row.expiresAt};
+  if (typeof row.planKey !== "string" || !row.planKey.trim() || row.planKey.length > 200 || typeof row.planName !== "string" || !row.planName.trim() || row.planName.length > 200
+    || typeof row.discountDescription !== "string" || !row.discountDescription.trim() || row.discountDescription.length > 2000
+    || row.consentRevision !== "academy-first-publication-trial-consent-2026-09-08-v1") throw new Error("プラン・割引条件・同意する文書の版を確認できませんでした。");
+  return {id:quoteId,headquartersId,policyVersion:row.policyVersion,termsRevision:row.termsRevision,amountYen:row.amountYen,instructorCount:row.instructorCount,issuedAt:row.issuedAt,expiresAt:row.expiresAt,
+    planKey:row.planKey,planName:row.planName,discountDescription:row.discountDescription,consentRevision:row.consentRevision};
 }
 
 export function approvedAcademySetupUrl(value: unknown): string {

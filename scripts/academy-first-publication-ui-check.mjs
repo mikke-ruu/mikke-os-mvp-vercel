@@ -45,11 +45,18 @@ assert.deepEqual(JSON.parse(requests[0].init.body),{headquartersId:hq,quoteId:qu
 await assert.rejects(()=>client.confirm(hq,quote,quote));
 const bad=createAcademySetupClient(async()=>'token',async()=>new Response('{}',{status:503}));
 await assert.rejects(()=>bad.start(hq,quote));
-const originalQuote={id:quote,headquartersId:hq,policyVersion:'v1',termsRevision:'v1',amountYen:5000,instructorCount:1,issuedAt:'2026-09-08T01:00:00Z',expiresAt:'2026-09-08T01:30:00Z'};
+const originalQuote={id:quote,headquartersId:hq,policyVersion:'v1',termsRevision:'v1',amountYen:5000,instructorCount:1,issuedAt:'2026-09-08T01:00:00Z',expiresAt:'2026-09-08T01:30:00Z',planKey:'small',planName:'登録講師20名まで',discountDescription:'割引なし',consentRevision:'academy-first-publication-trial-consent-2026-09-08-v1'};
 const confirmed=createAcademySetupClient(async()=>'token',async()=>new Response(JSON.stringify({paymentPreparationId:quote,verified:true,quote:originalQuote})));
 assert.deepEqual((await confirmed.confirm(hq,quote,quote)).quote,originalQuote);
 for(const altered of [{...originalQuote,headquartersId:quote},{...originalQuote,amountYen:-1},{...originalQuote,expiresAt:'2026-09-08T00:30:00Z'}]){
  const mismatch=createAcademySetupClient(async()=>'token',async()=>new Response(JSON.stringify({paymentPreparationId:quote,verified:true,quote:altered})));
  await assert.rejects(()=>mismatch.confirm(hq,quote,quote));
 }
+for(const key of ['planKey','planName','discountDescription','consentRevision']){
+ const altered={...originalQuote};delete altered[key];
+ const mismatch=createAcademySetupClient(async()=>'token',async()=>new Response(JSON.stringify({paymentPreparationId:quote,verified:true,quote:altered})));
+ await assert.rejects(()=>mismatch.confirm(hq,quote,quote));
+}
+const wrongConsent=createAcademySetupClient(async()=>'token',async()=>new Response(JSON.stringify({paymentPreparationId:quote,verified:true,quote:{...originalQuote,consentRevision:'old'}})));
+await assert.rejects(()=>wrongConsent.confirm(hq,quote,quote));
 console.log('academy_first_publication_ui_ok: expiry, cancellation, no render mutations, confirmation, hosted URL, unverified setup refusal');

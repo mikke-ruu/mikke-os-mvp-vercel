@@ -10,25 +10,10 @@ import {
 } from "@/lib/community/client";
 import type { CommunityAcademyAccessInvitation } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
+import { createInvitationSessionState, isCurrentInvitationRequest } from "@/lib/community/academy-invitation-session";
 
 const inputClass =
   "mt-1 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--mikke-accent)]";
-
-export function createInvitationSessionState(displayName: string) {
-  return {
-    accepted: false,
-    form: { displayName, legalName: "", phone: "", joinReason: "" },
-    consent: { terms: false, rules: false, privacy: false }
-  };
-}
-
-export function isCurrentInvitationRequest(
-  expectedKey: string,
-  expectedGeneration: number,
-  current: { key: string; generation: number }
-) {
-  return current.key === expectedKey && current.generation === expectedGeneration;
-}
 
 const previewInvitation: CommunityAcademyAccessInvitation = {
   id: "preview",

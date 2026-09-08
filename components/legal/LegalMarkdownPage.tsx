@@ -3,6 +3,8 @@ import { join } from "node:path";
 import type { ReactNode } from "react";
 
 const LEGAL_DOCUMENTS = new Set([
+  "academy-first-publication-trial-terms-2026-09-08-v1.md",
+  "academy-first-publication-trial-consent-2026-09-08-v1.md",
   "academy-billing-2026-09-04-v1.md",
   "academy-terms-2026-09-04-v1.md",
   "commercial-disclosure-2026-09-04-v1.md",

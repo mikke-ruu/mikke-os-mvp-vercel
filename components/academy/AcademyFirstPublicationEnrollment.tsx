@@ -42,6 +42,9 @@ export function shouldResumeAcademyRepreparation(href: string, headquartersId: s
 export function usableAcademyEnrollmentQuote(quote: FirstPublicationQuote, scope: Pick<Props, "headquartersId" | "policyVersion" | "termsRevision">, now: number) {
   return UUID.test(quote.id) && quote.headquartersId === scope.headquartersId && quote.policyVersion === scope.policyVersion
     && quote.termsRevision === scope.termsRevision && Number.isSafeInteger(quote.amountYen) && quote.amountYen > 0
+    && typeof quote.planKey === "string" && quote.planKey.trim().length > 0 && typeof quote.planName === "string" && quote.planName.trim().length > 0
+    && typeof quote.discountDescription === "string" && quote.discountDescription.trim().length > 0
+    && quote.consentRevision === "academy-first-publication-trial-consent-2026-09-08-v1"
     && Number.isFinite(Date.parse(quote.issuedAt)) && Date.parse(quote.issuedAt) <= now
     && Number.isFinite(Date.parse(quote.expiresAt)) && Date.parse(quote.expiresAt) > now;
 }
@@ -68,8 +71,7 @@ function Enrollment(props: Props) {
   const [returnAttempt, setReturnAttempt] = useState<ReturnAttempt | null>(null);
   const [verified, setVerified] = useState(false);
   const [consent, setConsent] = useState(false);
-  const [readTerms, setReadTerms] = useState(false);
-  const [readBilling, setReadBilling] = useState(false);
+  const [readDocuments, setReadDocuments] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [requiresCheck, setRequiresCheck] = useState(false);
   const [prepared, setPrepared] = useState(false);
@@ -90,14 +92,22 @@ function Enrollment(props: Props) {
   }, [props.headquartersId]);
   const alive = () => lifetime.current !== null && !lifetime.current.signal.aborted;
   const validQuote = quote !== null && usableAcademyEnrollmentQuote(quote, props, now);
-  const ready = validQuote && consent && readTerms && readBilling;
+  const documents = [
+    { href: props.termsHref, label: "初公開から7日間無料の特約" },
+    { href: props.billingHref, label: "料金・取消条件" },
+    { href: "/legal/academy/first-publication-trial/consent/2026-09-08-v1", label: "申し込み時の同意事項" },
+    { href: "/legal/academy/terms/2026-09-04-v1", label: "Academy基本利用規約" },
+    { href: "/legal/privacy/2026-09-04-v1", label: "プライバシーポリシー" },
+  ];
+  const allDocumentsOpened = documents.every(document => readDocuments.includes(document.href));
+  const ready = validQuote && consent && allDocumentsOpened;
   async function currentToken() {
     const { data, error: authError } = await supabase.auth.getSession();
     if (!alive() || authError || data.session?.user.id !== props.userId) throw new Error("契約するアカウントが変わりました。ページを再読み込みしてください。");
     return data.session.access_token;
   }
   const setup = createAcademySetupClient(currentToken);
-  function clearConsent() { setConsent(false); setReadTerms(false); setReadBilling(false); }
+  function clearConsent() { setConsent(false); setReadDocuments([]); }
   async function run(operation: () => Promise<void>, ambiguous = false) {
     if (inFlight.current || !alive()) return;
     inFlight.current = true; setBusy(true); setError("");
@@ -132,6 +142,7 @@ function Enrollment(props: Props) {
   function getQuote() {
     if (requiresCheck || prepared) return;
     void run(async () => {
+      setQuote(null); setVerified(false); clearConsent();
       await currentToken();
       const next = await createFirstPublicationQuoteRpc(supabase)(props.headquartersId, props.policyVersion);
       await currentToken();
@@ -179,8 +190,8 @@ function Enrollment(props: Props) {
     {error && <p role="alert" className="text-sm leading-7">{error}</p>}
     {!prepared && <>
       {returnAttempt && !verified && <button type="button" className={buttonClass} disabled={busy || requiresCheck} onClick={confirmSetup}>支払方法の登録結果を確認</button>}
-      {quote && <div className="space-y-2 rounded-lg border border-[var(--mikke-line)] p-3 text-sm"><p>初回月額（税込）：<strong className="text-lg">{quote.amountYen.toLocaleString("ja-JP")}円</strong></p><p>登録講師：{quote.instructorCount}名</p><p>見積もりの有効期限：{firstPublicationDate(quote.expiresAt)}（日本時間）</p>{!validQuote && <p role="status">見積もりの期限が終了したか条件が変更されています。新しい料金を確認してください。</p>}</div>}
-      {validQuote && <div className="space-y-2 text-sm"><p>初回料金は公開時に固定し、後の人数変化は次回更新から反映します。無料終了日時までに取消を受け付ければ初回請求はありません。</p><div className="flex flex-wrap gap-3"><a className="inline-flex min-h-11 items-center text-[var(--mikke-primary)] underline" href={props.termsHref} target="_blank" rel="noopener noreferrer" onClick={() => setReadTerms(true)}>利用規約を開く</a><a className="inline-flex min-h-11 items-center text-[var(--mikke-primary)] underline" href={props.billingHref} target="_blank" rel="noopener noreferrer" onClick={() => setReadBilling(true)}>料金・取消条件を開く</a></div><label className="flex min-h-11 items-start gap-2 leading-7"><input className="mt-2" type="checkbox" disabled={busy || requiresCheck || !readTerms || !readBilling} checked={consent} onChange={event => setConsent(event.target.checked)} />上の2つの文書と表示された料金を確認し、条件に同意します</label></div>}
+      {quote && <div className="space-y-2 rounded-lg border border-[var(--mikke-line)] p-3 text-sm"><p>プラン：<strong>{quote.planName}</strong></p><p>初回月額（税込）：<strong className="text-lg">{quote.amountYen.toLocaleString("ja-JP")}円</strong></p><p>割引条件：{quote.discountDescription}</p><p>登録講師：{quote.instructorCount}名</p><p>見積もりの有効期限：{firstPublicationDate(quote.expiresAt)}（日本時間）</p><p className="break-words text-xs">同意事項の版：{quote.consentRevision}</p>{!validQuote && <p role="status">見積もりの期限が終了したか条件が変更されています。新しい料金を確認してください。</p>}</div>}
+      {validQuote && <div className="space-y-2 text-sm"><p>初回料金は公開時に固定し、後の人数変化は次回更新から反映します。無料終了日時までに取消を受け付ければ初回請求はありません。</p><p>適用される次の文書をそれぞれ開いて内容を確認してください。</p><ul className="grid gap-2 sm:grid-cols-2">{documents.map(document => <li key={document.href}><a className="inline-flex min-h-11 items-center text-[var(--mikke-primary)] underline" href={document.href} target="_blank" rel="noopener noreferrer" onClick={() => setReadDocuments(previous => previous.includes(document.href) ? previous : [...previous, document.href])}>{document.label}を開く</a></li>)}</ul><label className="flex min-h-11 items-start gap-2 leading-7"><input className="mt-2" type="checkbox" disabled={busy || requiresCheck || !allDocumentsOpened} checked={consent} onChange={event => setConsent(event.target.checked)} />上のすべての適用文書と、表示されたプラン・料金・割引条件を確認し、内容に同意します</label></div>}
       <div className="flex flex-wrap gap-2">
         <button type="button" className={buttonClass} disabled={busy || requiresCheck} onClick={getQuote}>{returnAttempt ? "新しい見積もりでやり直す" : quote ? "最新の料金で見積もり直す" : "料金を確認する"}</button>
         {quote && !verified && <button type="button" className={buttonClass} disabled={busy || requiresCheck || !ready} onClick={startSetup}>支払方法の登録へ進む</button>}

@@ -15,6 +15,7 @@ export type FirstPublicationStatus = {
 export type FirstPublicationQuote = {
   id: string; headquartersId: string; policyVersion: string; termsRevision: string;
   amountYen: number; instructorCount: number; issuedAt: string; expiresAt: string;
+  planKey: string; planName: string; discountDescription: string; consentRevision: string;
 };
 type Command =
   | { action: "status" }
@@ -88,7 +89,11 @@ export function createFirstPublicationQuoteRpc(client: {
       typeof row.instructor_count === "number" && Number.isSafeInteger(row.instructor_count) && row.instructor_count>=0, "invalid_quote_amount");
     required(date(row.issued_at) && row.issued_at!==null && date(row.expires_at) && row.expires_at!==null &&
       Date.parse(row.expires_at)>Date.parse(row.issued_at), "invalid_quote_time");
+    required(text(row.plan_key) && row.plan_key.trim().length > 0 && text(row.plan_name) && row.plan_name.trim().length > 0
+      && typeof row.discount_description === "string" && row.discount_description.trim().length > 0 && row.discount_description.length <= 2000
+      && row.consent_revision === "academy-first-publication-trial-consent-2026-09-08-v1", "invalid_quote_catalog");
     return {id:row.id,headquartersId:row.headquarters_id,policyVersion,termsRevision:row.terms_revision,
-      amountYen:row.amount_yen,instructorCount:row.instructor_count,issuedAt:row.issued_at,expiresAt:row.expires_at};
+      amountYen:row.amount_yen,instructorCount:row.instructor_count,issuedAt:row.issued_at,expiresAt:row.expires_at,
+      planKey:row.plan_key,planName:row.plan_name,discountDescription:row.discount_description,consentRevision:row.consent_revision};
   };
 }
