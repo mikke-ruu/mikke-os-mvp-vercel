@@ -1,0 +1,21 @@
+# 初回公開後の権限委任と受付証明ゲート
+
+後続migrationはCLI生成 `20260908091030_academy_first_publication_course_delegation.sql`。runtime `0293841` が前提。Supabase未適用。
+
+`academy_first_publication_set_course_published(p_headquarters_id uuid,p_course_id uuid,p_published boolean)` は `{headquarters_id,course_id,is_published}` を返す。初回owner公開済みかつ有効な168時間/paid期間内で、既存 `private.academy_can_edit_courses` のowner/administrator/course_editorだけを許可する。初回同意、料金、quote、期限は変更しない。
+
+`private.academy_first_publication_lock(p_headquarters_id uuid)` はowner auth.users行→HQ行の順でtransaction lockを取得する。認可やscheme判定は呼出側に残す。Communityはhelperを最初に取得し、Community/claim lockの後でaccessを再検査する。取消RPCもlock前のstatement受理時刻を維持し同helperで直列化する。helperの直接EXECUTE権限は付与しない。
+
+provider checkpointに `subscription_hold` を追加。Stripeのpause_collection設定は課金担当がこのstepで追跡する。SQLテストはStripe安全性の検証ではない。
+
+## Watermarkは未接続
+
+`verified_receipt_watermarks` はRLS有効、service_roleも含め直接書込み権限なし。writer RPC、seed、定期生成処理はない。dispatch_enabledがtrueでも期限以上のthrough_atを持つwatermarkが無ければ `receipt_watermark_unavailable` で拒否する。
+
+将来の受付adapterは、認証済要求を業務lockとは別の永続ingressへ信頼server時刻と単調sequenceで保存する必要がある。authorityは期限までの受付範囲をsealし、未確定sequenceやgapが無いこと、受付イベントが取消inboxへ反映済みであることを確認してwatermarkを発行する。first/last sequenceとreceipt_countの数式一致だけでは証明と扱わない。authority_revisionは監査識別子であり自己申告で実行を許可するものではない。
+
+authorityは未実装なので実請求activationは不可。任意の待機時間を受付完了の証明にしない。PGliteの後段検証にだけ明示したsynthetic watermarkを使う。
+
+## 検証
+
+`ACADEMY_RUNTIME_TEST=1` のPGlite runnerはexit 0、43チェック成功（先行16＋runtime/委任27）。初回前の委任拒否、編集担当の初回後/paid公開、他HQ actor拒否、契約snapshot不変、watermarkなし拒否、service_roleのwatermark書込み拒否を含む。全実schema・RLS・多接続競合は未検証。

@@ -88,11 +88,16 @@ if(process.env.ACADEMY_RUNTIME_TEST==='1') {
  create function public.academy_get_my_headquarters_access(uuid) returns table(headquarters_id uuid,access_kind text,status text,starts_at timestamptz,ends_at timestamptz,days_remaining integer,can_manage_drafts boolean,can_use_live_features boolean) language sql as $$ select $1,'trial'::text,'expired'::text,null::timestamptz,null::timestamptz,0,false,false $$;
  `);
  await db.exec(await readFile(new URL('../migrations/20260908084409_academy_first_publication_runtime.sql',import.meta.url),'utf8'));
+ await db.exec(`create table public.academy_headquarters_members(headquarters_id uuid,member_profile_id uuid,role text,status text);
+ create function private.academy_can_edit_courses(uuid) returns boolean language sql as $$ select exists(select 1 from public.academy_headquarters where id=$1 and owner_user_id=auth.uid()) or exists(select 1 from public.academy_headquarters_members m join public.profiles p on p.id=m.member_profile_id where m.headquarters_id=$1 and p.user_id=auth.uid() and m.status='active' and m.role in ('administrator','course_editor')) $$;`);
+ await db.exec(await readFile(new URL('../migrations/20260908091030_academy_first_publication_course_delegation.sql',import.meta.url),'utf8'));
  const na='10000000-0000-4000-8000-000000000003', np='40000000-0000-4000-8000-000000000003',nc='30000000-0000-4000-8000-000000000003';
  await db.exec(`insert into auth.users values('${na}',false);insert into public.profiles values('${np}','${na}','fixture');update academy_publication_private.policies set pricing_revision='catalog-v1';`);
  const nh=(await actor(na,()=>query(`select public.academy_first_publication_create_preparation('Fixture academy','fixture-v1') as result`))).result.headquarters_id;
  assert.equal((await query(`select count(*)::integer as n from public.academy_trial_usage_ledger where owner_user_id='${na}'`)).n,0);passed++;
  await db.exec(`insert into public.academy_courses(id,headquarters_id,user_id) values('${nc}','${nh}','${na}')`);
+ await db.exec(`insert into public.profiles values('40000000-0000-4000-8000-000000000002','${b}','editor');insert into public.academy_headquarters_members values('${nh}','40000000-0000-4000-8000-000000000002','course_editor','active')`);
+ await rejects('owner_first_publication_required',()=>actor(b,()=>query(`select public.academy_first_publication_set_course_published('${nh}','${nc}',true)`)));
  const nq=(await actor(na,()=>query(`select public.academy_first_publication_quote('${nh}','fixture-v1') as result`))).result;
  async function svc(s){await db.exec('set role service_role');try{return await query(s);}finally{await db.exec('reset role');}}
  const attempt=(await svc(`select public.academy_first_publication_setup_reserve('${na}','${nh}','${nq.id}') as result`)).result;
@@ -104,6 +109,11 @@ if(process.env.ACADEMY_RUNTIME_TEST==='1') {
  await actor(na,()=>query(`select public.academy_first_publication_command('${nh}','prepare',p_quote_id=>'${nq.id}',p_confirmed=>true,p_terms_revision=>'fixture-terms',p_amount_yen=>5000)`));
  await db.exec(`insert into public.academy_instructors values(gen_random_uuid(),'${nh}',now(),null)`);
  await actor(na,()=>query(`select public.academy_first_publication_command('${nh}','publish',p_course_id=>'${nc}',p_quote_id=>'${nq.id}',p_confirmed=>true)`));passed++;
+ const beforeDelegation=(await query(`select to_jsonb(e) as result from academy_publication_private.enrollments e where headquarters_id='${nh}'`)).result;
+ await actor(b,()=>query(`select public.academy_first_publication_set_course_published('${nh}','${nc}',false)`));
+ await actor(b,()=>query(`select public.academy_first_publication_set_course_published('${nh}','${nc}',true)`));
+ assert.deepEqual((await query(`select to_jsonb(e) as result from academy_publication_private.enrollments e where headquarters_id='${nh}'`)).result,beforeDelegation);passed++;
+ await rejects('forbidden',()=>actor(a,()=>query(`select public.academy_first_publication_set_course_published('${nh}','${nc}',true)`)));
  // Existing synthetic outbox has no real setup proof; leave it outside claim fixture.
  await db.exec(`update academy_publication_private.outbox set blocked=true where headquarters_id<>'${nh}'`);
  const job=(await svc(`select public.academy_first_publication_outbox_claim('fixture-worker',60) as result`)).result;
@@ -128,6 +138,10 @@ if(process.env.ACADEMY_RUNTIME_TEST==='1') {
  const paidJob=(await svc(`select public.academy_first_publication_outbox_claim('fixture-worker',60) as result`)).result;
  assert.equal((await svc(`select public.academy_first_publication_outbox_dispatch_check('${paidJob.event_key}','${paidJob.lease_token}') as result`)).result.reason,'conversion_cancelled');passed++;
  await db.exec(`delete from academy_publication_private.cancel_intents where headquarters_id='${nh}';update academy_publication_private.enrollments set phase='trialing',cancellation_accepted_at=null where headquarters_id='${nh}'`);
+ assert.equal((await svc(`select public.academy_first_publication_outbox_dispatch_check('${paidJob.event_key}','${paidJob.lease_token}') as result`)).result.reason,'receipt_watermark_unavailable');passed++;
+ await rejects('permission denied',()=>svc(`insert into academy_publication_private.verified_receipt_watermarks values('${nh}',now(),'fake-service-claim',1,1,1,now())`));
+ // Synthetic authority proof solely to exercise downstream SQL. No production writer exists.
+ await db.exec(`insert into academy_publication_private.verified_receipt_watermarks values('${nh}',now(),'fixture-authority-only',1,1,1,now())`);
  const checkpoint=(await svc(`select public.academy_first_publication_outbox_checkpoint('${paidJob.event_key}','${paidJob.lease_token}','invoice_create') as result`)).result;
  assert.equal(checkpoint.provider_id,null);passed++;
  await svc(`select public.academy_first_publication_outbox_checkpoint('${paidJob.event_key}','${paidJob.lease_token}','invoice_create','in_fixture')`);
@@ -137,6 +151,8 @@ if(process.env.ACADEMY_RUNTIME_TEST==='1') {
  assert.equal(ac.active,true);assert.equal(ac.phase,'paid');passed++;
  await actor(na,()=>query(`select public.academy_first_publication_command('${nh}','unpublish',p_course_id=>'${nc}')`));
  await actor(na,()=>query(`select public.academy_first_publication_command('${nh}','publish',p_course_id=>'${nc}',p_confirmed=>true)`));passed++;
+ await actor(b,()=>query(`select public.academy_first_publication_set_course_published('${nh}','${nc}',false)`));
+ await actor(b,()=>query(`select public.academy_first_publication_set_course_published('${nh}','${nc}',true)`));passed++;
  assert.equal((await actor(na,()=>query(`select * from public.academy_get_my_headquarters_access('${nh}')`))).access_kind,'paid');passed++;
  await db.exec(`update academy_publication_private.policies set dispatch_enabled=false`);
  console.log(JSON.stringify({runtimePassed:passed-16,totalPassed:passed,dispatchActivated:false}));
