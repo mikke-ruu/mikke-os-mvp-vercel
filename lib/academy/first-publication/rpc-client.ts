@@ -12,6 +12,10 @@ export type FirstPublicationStatus = {
   firstPublishedAt: string | null; trialEndsAt: string | null; cancellationAcceptedAt: string | null;
   phase: "prepared" | "sync_pending" | "trialing" | "cancelled" | "attention";
 };
+export type FirstPublicationQuote = {
+  id: string; headquartersId: string; policyVersion: string; termsRevision: string;
+  amountYen: number; instructorCount: number; issuedAt: string; expiresAt: string;
+};
 type Command =
   | { action: "status" }
   | { action: "prepare"; quoteId: string; termsRevision: string; amountYen: number; consent: boolean }
@@ -67,5 +71,24 @@ export function createFirstPublicationRpc(client: FirstPublicationRpcClient) {
     if (error) throw new Error("first_publication_request_failed");
     if (data === null && input.action === "status") return null;
     return parseFirstPublicationStatus(data, headquartersId);
+  };
+}
+export function createFirstPublicationQuoteRpc(client: {
+  rpc(name: "academy_first_publication_quote", args: { p_headquarters_id: string; p_policy_version: string }): PromiseLike<{data: unknown; error: unknown}>;
+}) {
+  return async (headquartersId: string, policyVersion: string): Promise<FirstPublicationQuote> => {
+    required(uuid(headquartersId) && text(policyVersion), "invalid_quote_request");
+    const {data,error}=await client.rpc("academy_first_publication_quote",{p_headquarters_id:headquartersId,p_policy_version:policyVersion});
+    if(error) throw new Error("first_publication_quote_failed");
+    required(data && typeof data === "object" && !Array.isArray(data), "invalid_quote_response");
+    const row=data as Record<string,unknown>;
+    required(uuid(row.id) && uuid(row.headquarters_id) && row.headquarters_id.toLowerCase()===headquartersId.toLowerCase() &&
+      row.policy_version===policyVersion && text(row.terms_revision), "invalid_quote_scope");
+    required(typeof row.amount_yen === "number" && Number.isSafeInteger(row.amount_yen) && row.amount_yen>0 &&
+      typeof row.instructor_count === "number" && Number.isSafeInteger(row.instructor_count) && row.instructor_count>=0, "invalid_quote_amount");
+    required(date(row.issued_at) && row.issued_at!==null && date(row.expires_at) && row.expires_at!==null &&
+      Date.parse(row.expires_at)>Date.parse(row.issued_at), "invalid_quote_time");
+    return {id:row.id,headquartersId:row.headquarters_id,policyVersion,termsRevision:row.terms_revision,
+      amountYen:row.amount_yen,instructorCount:row.instructor_count,issuedAt:row.issued_at,expiresAt:row.expires_at};
   };
 }

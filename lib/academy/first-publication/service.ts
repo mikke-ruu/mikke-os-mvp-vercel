@@ -39,6 +39,8 @@ export type Outbox = {
 export interface Transaction {
   /** DB/server time after acquiring the owner + HQ locks. */
   now(): number;
+  /** Trusted request/statement receipt time, captured before waiting for owner/HQ locks. */
+  receivedAt(): number;
   context(): Promise<Context>;
   state(): Promise<RecordState | null>;
   quote(id: string): Promise<Quote | null>;
@@ -174,8 +176,10 @@ export function createFirstPublicationService(repo: Repository, policy: Policy |
         const state = await tx.state();
         check(state && state.headquartersId === hq && state.ownerUserId === actor, "enrollment_not_found");
         if (state.cancellationAcceptedAt !== null) return state;
-        check(state.trialEndsAt === null || tx.now() <= state.trialEndsAt, "paid_cancellation_required");
-        const next: RecordState = { ...state, phase: "cancelled", cancellationAcceptedAt: tx.now() };
+        const received = tx.receivedAt();
+        check(Number.isSafeInteger(received) && received > 0 && received <= tx.now(), "invalid_server_receipt_time");
+        check(state.trialEndsAt === null || received <= state.trialEndsAt, "paid_cancellation_required");
+        const next: RecordState = { ...state, phase: "cancelled", cancellationAcceptedAt: received };
         await tx.save(next);
         await tx.enqueue({ key: `academy-first-publication-cancel:${hq}`, headquartersId: hq,
           kind: "cancel_conversion", firstPublishedAt: next.firstPublishedAt, trialEndsAt: next.trialEndsAt });

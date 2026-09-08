@@ -24,12 +24,13 @@ function fixture() {
     proof:{ id:'proof',headquartersId:'hq',ownerUserId:'owner',quoteId:'quote',verified:true,revoked:false } };
   let queue = Promise.resolve();
   const repo = { transaction(hq, actor, fn) {
+    const receivedAt=f.at;
     // Isolated in-memory serializable transaction with rollback, not a DB claim.
     const run = queue.then(async () => {
       const pending = structuredClone(f.db);
       const now = f.at;
       const tx = {
-        now:()=>now, context:async()=>structuredClone(f.ctx), state:async()=>structuredClone(pending.state),
+        now:()=>now, receivedAt:()=>receivedAt, context:async()=>structuredClone(f.ctx), state:async()=>structuredClone(pending.state),
         quote:async id=>id===f.quote.id?structuredClone(f.quote):null,
         paymentPreparation:async id=>id===f.proof.id?structuredClone(f.proof):null,
         course:async id=>structuredClone(pending.courses[id] ?? null),
@@ -112,6 +113,11 @@ await test('cancel at exact deadline wins and remains callable with rollout disa
 await test('after deadline uses paid cancellation, not retroactive free cancellation',async()=>{
   const f=fixture();await prepare(f);const s=await publish(f);f.at=s.trialEndsAt+1;await assert.rejects(f.service.cancelConversion('hq','owner'),/paid_cancellation_required/);
 });
+await test('cancellation received at deadline keeps receipt time after lock delay',async()=>{
+  const f=fixture();await prepare(f);const s=await publish(f);f.at=s.trialEndsAt;
+  const request=f.service.cancelConversion('hq','owner');f.at+=5000;
+  const cancelled=await request;assert.equal(cancelled.cancellationAcceptedAt,s.trialEndsAt);
+});
 await test('pre-publication cancellation starts no clock',async()=>{
   const f=fixture();await prepare(f);await f.service.cancelConversion('hq','owner');assert.equal(f.db.state.firstPublishedAt,null);assert.equal(f.db.ownerClaim,null);await assert.rejects(publish(f),/publication_blocked/);
 });
@@ -152,5 +158,17 @@ await test('RPC rejects wrong HQ and inconsistent trial window',async()=>{
     {phase:'cancelled',cancellation_accepted_at:null}]) {
     const run=rpc({rpc:async()=>({data:{...rpcState,...patch},error:null})});await assert.rejects(run(hqId,{action:'status'}),/invalid_first_publication/);
   }
+});
+await test('quote uses server price and scope without submitting a client amount',async()=>{
+  const quote=rpcModule.exports.createFirstPublicationQuoteRpc({rpc:async(name,args)=>{
+    assert.equal(name,'academy_first_publication_quote');assert.deepEqual(args,{p_headquarters_id:hqId,p_policy_version:'test-v1'});
+    return {data:{id:quoteId,headquarters_id:hqId,policy_version:'test-v1',terms_revision:'terms',amount_yen:3300,
+      instructor_count:2,issued_at:new Date(start).toISOString(),expires_at:new Date(start+1800000).toISOString(),owner_user_id:'private'},error:null};
+  }});
+  const q=await quote(hqId,'test-v1');assert.equal(q.amountYen,3300);assert.equal(q.owner_user_id,undefined);
+});
+await test('quote errors are not a free quote',async()=>{
+  const quote=rpcModule.exports.createFirstPublicationQuoteRpc({rpc:async()=>({data:null,error:{message:'denied'}})});
+  await assert.rejects(quote(hqId,'test-v1'),/quote_failed/);
 });
 console.log(`academy_first_publication_core_ok: ${cases} isolated contract cases; no DB, provider, invoice, or invitation calls`);
