@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MediaLink } from "./MediaNavigation";
 import { updateMediaAuthorProfile } from "@/lib/media-app/store";
 import type { MediaSite } from "@/lib/media-app/types";
 
@@ -28,6 +29,6 @@ export function MediaAuthorSettings({ site }: { site: MediaSite }) {
       {message ? <p role="status" className="text-sm">{message}</p> : null}
       <button type="submit" className="rounded-xl bg-[var(--mikke-accent)] px-5 py-3 text-sm font-bold text-white" style={{ backgroundColor: "var(--mikke-orange, #f75a3b)" }}>プロフィールを保存</button>
     </form>
-    <div className="mt-8 border-t border-[var(--mikke-line)] pt-6"><h3 className="font-bold">他のアプリに記事を載せる</h3><p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">STORY・Page・Academyへ選んだ記事を掲載する機能は準備中です。この設定だけで記事が他のアプリに公開されることはありません。</p></div>
+    <div className="mt-8 border-t border-[var(--mikke-line)] pt-6"><h3 className="font-bold">他のアプリに記事を載せる</h3><p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">STORY・Page・Academyへ選んだ記事を掲載する機能は準備中です。この設定だけで記事が他のアプリに公開されることはありません。</p><MediaLink href="/apps/media/connections" className="mt-4 inline-block text-sm font-bold text-[var(--mikke-primary)] underline">記事連携の動作見本を見る</MediaLink></div>
   </section>;
 }
