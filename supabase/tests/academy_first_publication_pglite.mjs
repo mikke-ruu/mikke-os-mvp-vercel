@@ -91,14 +91,19 @@ if(process.env.ACADEMY_RUNTIME_TEST==='1') {
  await db.exec(`create table public.academy_headquarters_members(headquarters_id uuid,member_profile_id uuid,role text,status text);
  create function private.academy_can_edit_courses(uuid) returns boolean language sql as $$ select exists(select 1 from public.academy_headquarters where id=$1 and owner_user_id=auth.uid()) or exists(select 1 from public.academy_headquarters_members m join public.profiles p on p.id=m.member_profile_id where m.headquarters_id=$1 and p.user_id=auth.uid() and m.status='active' and m.role in ('administrator','course_editor')) $$;`);
  await db.exec(await readFile(new URL('../migrations/20260908091030_academy_first_publication_course_delegation.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../migrations/20260908101940_academy_first_publication_quote_display.sql',import.meta.url),'utf8'));
  const na='10000000-0000-4000-8000-000000000003', np='40000000-0000-4000-8000-000000000003',nc='30000000-0000-4000-8000-000000000003';
- await db.exec(`insert into auth.users values('${na}',false);insert into public.profiles values('${np}','${na}','fixture');update academy_publication_private.policies set pricing_revision='catalog-v1';`);
+ await db.exec(`insert into auth.users values('${na}',false);insert into public.profiles values('${np}','${na}','fixture');update academy_publication_private.policies set pricing_revision='catalog-v1',consent_revision='fixture-consent';`);
  const nh=(await actor(na,()=>query(`select public.academy_first_publication_create_preparation('Fixture academy','fixture-v1') as result`))).result.headquarters_id;
  assert.equal((await query(`select count(*)::integer as n from public.academy_trial_usage_ledger where owner_user_id='${na}'`)).n,0);passed++;
  await db.exec(`insert into public.academy_courses(id,headquarters_id,user_id) values('${nc}','${nh}','${na}')`);
  await db.exec(`insert into public.profiles values('40000000-0000-4000-8000-000000000002','${b}','editor');insert into public.academy_headquarters_members values('${nh}','40000000-0000-4000-8000-000000000002','course_editor','active')`);
  await rejects('owner_first_publication_required',()=>actor(b,()=>query(`select public.academy_first_publication_set_course_published('${nh}','${nc}',true)`)));
+ await rejects('quote_display_metadata_required',()=>actor(na,()=>query(`select public.academy_first_publication_quote('${nh}','fixture-v1') as result`)));
+ await db.exec(`insert into academy_publication_private.quote_display_catalog values('fixture-v1','catalog-v1','small','Fixture small plan','Fixture no discount','fixture-consent')`);
  const nq=(await actor(na,()=>query(`select public.academy_first_publication_quote('${nh}','fixture-v1') as result`))).result;
+ assert.equal(nq.plan_name,'Fixture small plan');assert.equal(nq.discount_description,'Fixture no discount');passed++;
+ await rejects('quote_display_immutable',()=>db.exec(`update academy_publication_private.quotes set plan_name='changed' where id='${nq.id}'`));
  async function svc(s){await db.exec('set role service_role');try{return await query(s);}finally{await db.exec('reset role');}}
  const attempt=(await svc(`select public.academy_first_publication_setup_reserve('${na}','${nh}','${nq.id}') as result`)).result;
  await rejects('permission denied',()=>actor(na,()=>query(`select public.academy_first_publication_setup_complete('${attempt.attempt_id}','cus_fixture','seti_fixture','pm_fixture')`)));
@@ -106,6 +111,7 @@ if(process.env.ACADEMY_RUNTIME_TEST==='1') {
  await svc(`select public.academy_first_publication_setup_attach('${attempt.attempt_id}','cus_fixture','cs_fixture','seti_fixture')`);
  const complete=(await svc(`select public.academy_first_publication_setup_complete('${attempt.attempt_id}','cus_fixture','seti_fixture','pm_fixture') as result`)).result;
  assert.equal(complete.quote.id,nq.id);passed++;
+ assert.equal(complete.quote.planName,nq.plan_name);assert.equal(complete.quote.discountDescription,nq.discount_description);assert.equal(complete.quote.consentRevision,nq.consent_revision);passed++;
  await actor(na,()=>query(`select public.academy_first_publication_command('${nh}','prepare',p_quote_id=>'${nq.id}',p_confirmed=>true,p_terms_revision=>'fixture-terms',p_amount_yen=>5000)`));
  await db.exec(`insert into public.academy_instructors values(gen_random_uuid(),'${nh}',now(),null)`);
  await actor(na,()=>query(`select public.academy_first_publication_command('${nh}','publish',p_course_id=>'${nc}',p_quote_id=>'${nq.id}',p_confirmed=>true)`));passed++;
