@@ -109,7 +109,7 @@ export async function createCourse(profile: Profile, headquartersId: string, inp
   assertAcademyWritable();
   const { data, error } = await supabase
     .from("academy_courses")
-    .insert({ ...toRow(headquartersId, input), user_id: profile.user_id })
+    .insert({ ...toRow(headquartersId, input), user_id: profile.user_id, is_published: false })
     .select("*")
     .single();
 

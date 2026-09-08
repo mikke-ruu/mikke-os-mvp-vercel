@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, ClipboardList, GraduationCap, Link2, Package } from "lucide-react";
+import { ArrowRight, CalendarCheck, ClipboardList, GraduationCap, Link2, Package } from "lucide-react";
+import { AcademyHelp } from "@/components/academy/AcademyHelp";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { INSTRUCTOR_STATUS_LABELS } from "@/lib/academy/instructors";
@@ -27,13 +28,13 @@ function QuickCard({
   desc: string;
 }) {
   return (
-    <Link href={href} className="flex items-center gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 transition hover:border-[var(--mikke-accent)]/40">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]">
+    <Link href={href} className="flex items-center gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 transition hover:border-[var(--mikke-accent)]/40">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#ffd370] text-[var(--mikke-text)]">
         <Icon size={18} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-bold text-[var(--mikke-text)]">{title}</span>
-        <span className="mt-0.5 block truncate text-xs text-[var(--mikke-muted)]">{desc}</span>
+        <span className="mt-1 block text-sm leading-6 text-[var(--mikke-muted)]">{desc}</span>
       </span>
       <ArrowRight size={15} className="shrink-0 text-[var(--mikke-accent)]" />
     </Link>
@@ -93,7 +94,7 @@ function PortalDashboard() {
 
   if (records.length === 0 && learnerApps.length === 0) {
     return (
-      <div className="mx-auto max-w-md rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
+      <div className="mx-auto max-w-md rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-center">
         <p className="text-sm font-bold text-[var(--mikke-text)]">表示できる講座がありません</p>
         <p className="mt-1 text-xs text-[var(--mikke-muted)]">受講が確定した講座や、認定講師として登録された講座がここに表示されます。</p>
       </div>
@@ -111,23 +112,25 @@ function PortalDashboard() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] p-4">
-        <p className="text-sm font-bold text-[var(--mikke-accent-strong)]">{profile.display_name}さんのマイポータル</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{currentView === "learner" ? "受講した講座と復習内容を確認できます。" : "認定講師として活動する講座を確認できます。"}</p>
+      <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
+        <p className="text-sm text-[var(--mikke-muted)]">{profile.display_name}さんのマイポータル</p>
+        <h2 className="mt-2 text-2xl font-bold">{currentView === "learner" ? "学びの続きを、ここから。" : "担当する講座と、今日の仕事。"}</h2>
+        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{currentView === "learner" ? "受講した講座を確認し、復習ページで学びを振り返れます。" : "自分に届いた申込を確認し、開催準備や教材の注文を進められます。"}</p>
+        <AcademyHelp title="本部とマイポータルの違い">本部は教室全体の講座・講師・申込を管理する場所です。マイポータルは自分の受講や講師活動のための場所です。両方の役割がある場合も、アカウントを作り直す必要はありません。</AcademyHelp>
       </section>
 
       {showViewSwitch ? (
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-[var(--mikke-line)] bg-white p-2" aria-label="マイポータルの表示切り替え">
+        <div className="grid grid-cols-2 gap-2 rounded-lg border border-[var(--mikke-line)] bg-white p-2" aria-label="マイポータルの表示切り替え">
           {([
-            ["learner", "受講者用"],
-            ["instructor", "認定講師用"]
+            ["learner", "学ぶ｜受講した講座"],
+            ["instructor", "教える｜講師の仕事"]
           ] as const).map(([value, label]) => (
             <button
               key={value}
               type="button"
               aria-pressed={sampleView === value}
               onClick={() => switchView(value)}
-              className={`rounded-xl px-3 py-2 text-sm font-bold ${sampleView === value ? "bg-[#3f4eb5] text-white" : "bg-white text-[var(--mikke-text-soft)]"}`}
+              className={`min-h-12 rounded-lg border px-3 py-2 text-sm font-bold ${sampleView === value ? "border-[#3f4eb5] text-[#3f4eb5]" : "border-transparent bg-white text-[var(--mikke-text-soft)]"}`}
             >
               {label}
             </button>
@@ -135,13 +138,17 @@ function PortalDashboard() {
         </div>
       ) : null}
 
-      <h2 className="text-sm font-bold text-[var(--mikke-text)]">{currentView === "learner" ? "受講中・修了した講座" : "取得した認定・営業できる講座"}</h2>
+      <div className="grid grid-cols-2 gap-3">
+        <section className="rounded-lg border border-[var(--mikke-line)] border-t-4 border-t-[#8bc7ad] bg-white p-4"><h3 className="text-sm font-bold">{currentView === "learner" ? "受講した講座" : "講師として登録された講座"}</h3><p className="mt-2 text-2xl font-bold">{currentView === "learner" ? learnerCourseIds.length : records.length}<span className="ml-1 text-sm font-normal">件</span></p></section>
+        <section className="rounded-lg border border-[var(--mikke-line)] border-t-4 border-t-[#ffd370] bg-white p-4"><h3 className="text-sm font-bold">{currentView === "learner" ? "次にできること" : "新しい担当申込"}</h3>{currentView === "learner" ? <Link href="/academy/portal/study?view=learner" className="mt-2 inline-flex min-h-11 items-center text-sm text-[var(--mikke-primary)]">復習ページを開く →</Link> : <p className="mt-2 text-2xl font-bold">{pendingApps.length}<span className="ml-1 text-sm font-normal">件</span></p>}</section>
+      </div>
+      <h2 className="text-base font-bold text-[var(--mikke-text)]">{currentView === "learner" ? "受講中・修了した講座" : "講師として登録された講座"}</h2>
       <div className="grid gap-3 md:grid-cols-2">
         {currentView === "learner" ? learnerCourseIds.map((courseId) => {
           const course = courseMap[courseId];
           const application = learnerApps.find((item) => item.course_id === courseId);
           return (
-            <div key={courseId} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+            <div key={courseId} className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
               <div className="flex items-center gap-2">
                 <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
                 <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{course?.name}</p>
@@ -155,7 +162,7 @@ function PortalDashboard() {
           const course = courseMap[rec.course_id];
           const activityLabel = rec.is_active ? INSTRUCTOR_STATUS_LABELS[rec.status] : "活動なし";
           return (
-            <div key={rec.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+            <div key={rec.id} className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
               <div className="flex items-center gap-2">
                 <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
                 <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{course?.name}</p>
@@ -174,15 +181,16 @@ function PortalDashboard() {
         <QuickCard href={currentView === "learner" ? "/academy/portal/study?view=learner" : "/academy/portal/study?view=instructor"} icon={GraduationCap} title={currentView === "learner" ? "復習ページ" : "講師用資料"} desc={currentView === "learner" ? "受講した講座の復習内容を確認" : "講座運営に必要なマニュアル、PDF、動画、リンクを確認"} />
         {currentView === "instructor" && canOperate ? (
           <>
-            <QuickCard href="/academy/portal/url" icon={Link2} title="営業用URL" desc="あなた専用の講師紹介ページをSNSで活用" />
+            <QuickCard href="/academy/portal/class-requests" icon={CalendarCheck} title="開催日・担当依頼" desc="自分が担当する日程と、本部からの依頼を確認" />
+            <QuickCard href="/academy/portal/url" icon={Link2} title="募集ページを案内する" desc="自分専用の紹介リンクをコピーして、受講希望者へ案内" />
             <QuickCard href="/academy/portal/applications" icon={ClipboardList} title="申込管理" desc={`担当申込 ${apps.length}件${pendingApps.length ? `（未対応 ${pendingApps.length}件）` : ""}`} />
-            <QuickCard href="/academy/portal/kits" icon={Package} title="講座仕入れ" desc={`注文履歴 ${kits.length}件`} />
+            <QuickCard href="/academy/portal/kits" icon={Package} title="教材を注文する" desc={`講座に使う教材の注文・履歴を確認（${kits.length}件）`} />
           </>
         ) : null}
       </div>
 
       {/* 最近の担当申込 */}
-      {currentView === "instructor" && canOperate ? <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
+      {currentView === "instructor" && canOperate ? <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-[var(--mikke-text)]">最近の担当申込</h2>
           <Link href="/academy/portal/applications" className="flex items-center gap-1 text-xs font-bold text-[var(--mikke-accent)]">
@@ -197,9 +205,9 @@ function PortalDashboard() {
               <li key={a.id} className="flex items-center justify-between gap-2 py-2.5">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{a.applicant_name}</p>
-                  <p className="text-[11px] text-[var(--mikke-muted)]">{courseMap[a.course_id]?.code ?? ""}</p>
+                  <p className="text-sm text-[var(--mikke-muted)]">{courseMap[a.course_id]?.name ?? "講座名を確認"}</p>
                 </div>
-                <span className="shrink-0 rounded-full bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">
+                <span className="shrink-0 rounded-lg bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">
                   {APPLICATION_STATUS_LABELS[a.status]}
                 </span>
               </li>

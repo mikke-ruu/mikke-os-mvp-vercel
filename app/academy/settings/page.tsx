@@ -5,6 +5,8 @@ import { Building2, Check, Link2, ReceiptJapaneseYen, ShieldCheck, UserPlus } fr
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyPlatformBillingLoader } from "@/app/academy/billing/AcademyPlatformBillingLoader";
+import { AcademyCommunityOverview } from "@/components/academy/AcademyCommunityOverview";
+import { isAcademyLocalReview } from "@/lib/academy/preview";
 import { academyCheckoutPlanForCatalogPrice } from "@/lib/academy/platform-billing-view";
 import { supabase } from "@/lib/supabase/client";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
@@ -69,6 +71,7 @@ function SettingsContent() {
   const [billingSnapshot, setBillingSnapshot] = useState<AcademyBillingSnapshot | null>(null);
   const [currentBillingEstimate, setCurrentBillingEstimate] = useState<AcademyCurrentBillingEstimate | null>(null);
   const [communityLinks, setCommunityLinks] = useState<AcademyCommunityLinkOption[]>([]);
+  const [communityUnavailable, setCommunityUnavailable] = useState(false);
   const [form, setForm] = useState({
     name: "",
     logo_url: "",
@@ -144,6 +147,7 @@ function SettingsContent() {
         setMembers(nextMembers);
         setInvitations(nextInvitations);
         try {
+          setCommunityUnavailable(false);
           const nextCommunityLinks = await listMyAcademyCommunityLinkOptions(hq.id);
           setCommunityLinks(nextCommunityLinks);
           const firstCommunity = nextCommunityLinks[0];
@@ -159,6 +163,7 @@ function SettingsContent() {
             });
           }
         } catch {
+          setCommunityUnavailable(true);
           setCommunityLinks([]);
         }
       }
@@ -405,7 +410,8 @@ function SettingsContent() {
               </div>
             ) : (
               <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm leading-6 text-[var(--mikke-muted)]">
-                {role === "course_editor"
+                {isAcademyLocalReview() ? "操作確認中のため、本部情報の変更は行いません。"
+                  : role === "course_editor"
                   ? "講座編集担当は本部情報を変更できません。本部責任者または本部運営担当へ依頼してください。"
                   : accessNotice
                     ? accessNotice.description
@@ -422,6 +428,13 @@ function SettingsContent() {
               <p className="mt-1 text-sm text-[var(--mikke-muted)]">
                 請求先の本部責任者だけに表示しています。すべて税込です。
               </p>
+
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div><dt className="text-xs text-[var(--mikke-muted)]">{billingSnapshot ? `${Number(billingSnapshot.charge_month.slice(5,7))}月分の料金` : "次回料金"}</dt><dd className="mt-1 font-bold">{billingSnapshot ? `${billingSnapshot.charge_price_yen.toLocaleString()}円` : "月末集計後に表示"}</dd></div>
+                <div><dt className="text-xs text-[var(--mikke-muted)]">現在の登録講師（参考）</dt><dd className="mt-1 font-bold">{currentBillingEstimate ? `${currentBillingEstimate.registered_instructor_count}名` : "確認できません"}</dd></div>
+              </dl>
+              {billingSnapshot?.price_notice_required ? <p className="mt-3 border-l-2 border-[#ffd370] pl-3 text-xs leading-6">次月の料金は据え置きです。人数が上限を超えたままの場合は、その次の更新月から通常料金になります。</p> : null}
+              <details className="mt-3 border-t border-[var(--mikke-line)] pt-2"><summary className="cursor-pointer py-2 text-sm text-[var(--mikke-primary)]">料金表と計算方法を見る</summary>
 
               {currentBillingEstimate ? (
                 <div className="mt-4 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
@@ -479,7 +492,9 @@ function SettingsContent() {
               <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">
                 登録中の講師を数えます。活動中・休眠・停止中も登録解除までは対象です。同じ人が同一本部で複数講座を担当しても1名です。本部責任者も講師登録している場合は1名に含まれます。登録解除は翌月分から反映します。
               </p>
-              <div className="mt-5 border-t border-[var(--mikke-line)] pt-5">
+              </details>
+              <details className="mt-2 border-t border-[var(--mikke-line)] pt-2"><summary className="cursor-pointer py-2 text-sm text-[var(--mikke-primary)]">契約・支払いの手続き</summary>
+              {isAcademyLocalReview() ? <p className="py-2 text-xs leading-6">操作確認中のため契約情報は取得しません。お申し込み・支払いは行いません。</p> : <div className="mt-3">
                 <AcademyPlatformBillingLoader
                   userId={user.id}
                   resourceId={headquarters.id}
@@ -488,13 +503,17 @@ function SettingsContent() {
                   fetch={globalThis.fetch}
                   checkoutPlanKey={academyCheckoutPlanForCatalogPrice(currentBillingEstimate?.catalog_price_yen)}
                 />
-              </div>
+              </div>}
+              </details>
             </section>
           ) : null}
+
+          {canManageRole ? <AcademyCommunityOverview key={headquarters.id} sample={isAcademyLocalReview()} links={communityLinks} unavailable={communityUnavailable} /> : null}
 
           {canManage ? (
             <section className={cardClass}>
               <h2 className="flex items-center gap-2 text-base font-bold"><Link2 size={18} /> Community連携</h2>
+              <details className="mt-2"><summary className="cursor-pointer py-2 text-sm text-[var(--mikke-primary)]">接続先と利用範囲を設定する</summary>
               <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
                 AcademyとCommunityは別商品のまま、受講者や認定講師に指定Roomだけを追加料金なしで案内します。通常のCommunity会費や契約は変更しません。
               </p>
@@ -578,8 +597,9 @@ function SettingsContent() {
                   ) : null}
                 </div>
               ) : (
-                <p className="mt-4 rounded-xl bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold">あなたが運営するCommunityと、Roomの利用範囲を先にCommunity側で作成してください。</p>
+                <p className="mt-4 px-4 py-3 text-sm">{communityUnavailable ? "接続情報を取得できませんでした。権限や通信状態をご確認ください。" : "接続できるCommunityが見つかりません。Community側の運営権限とRoomの利用範囲をご確認ください。"}</p>
               )}
+              </details>
             </section>
           ) : null}
 

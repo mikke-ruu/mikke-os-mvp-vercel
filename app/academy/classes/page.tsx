@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { CalendarCheck, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyListTools } from "@/components/academy/AcademyListTools";
 import {
   cancelClassInstructorRequest,
   CLASS_INSTRUCTOR_REQUEST_STATUS_LABELS,
@@ -23,17 +25,20 @@ import type {
 } from "@/types/database";
 
 const fieldClass =
-  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
+  "min-w-0 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 
 function formatDateTime(value: string | null) {
   if (!value) return "未設定";
   return new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "medium",
+    timeZone: "Asia/Tokyo",
     timeStyle: "short"
   }).format(new Date(value));
 }
 
 function ClassesContent() {
+  const query = useSearchParams();
+  const selectedClass = query.get("class");
   const { profile } = useAuth();
   const [headquarters, setHeadquarters] = useState<AcademyHeadquarters | null>(null);
   const [classes, setClasses] = useState<AcademyClass[]>([]);
@@ -45,6 +50,9 @@ function ClassesContent() {
   const [busyId, setBusyId] = useState("");
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const visibleClasses = classes.filter(c => (!selectedClass || c.id === selectedClass) && `${c.title} ${c.course?.name || ""}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()) && (filter === "all" || (filter === "undated" ? !c.starts_at : !c.instructor_id)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,7 +140,7 @@ function ClassesContent() {
 
   if (!headquarters) {
     return (
-      <p className="rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-sm text-[var(--mikke-muted)]">
+      <p className="rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-sm text-[var(--mikke-muted)]">
         先に本部を作成すると、講座の開催日程と講師依頼を管理できます。
       </p>
     );
@@ -140,20 +148,20 @@ function ClassesContent() {
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
+      <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:p-5">
         <div className="flex flex-wrap items-start gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--mikke-accent-soft)] text-[var(--mikke-accent)]">
             <CalendarCheck size={19} />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-base font-bold text-[var(--mikke-text)]">開催日程と担当講師</h2>
+            <h2 className="text-2xl font-bold text-[var(--mikke-text)]">開催日程と担当講師</h2>
             <p className="mt-1 text-sm text-[var(--mikke-muted)]">
               講座ごとの日時・形式・定員・担当講師を管理します。
             </p>
           </div>
           <Link
             href={toCurrentAcademyContextHref("/academy/classes/new")}
-            className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white sm:w-auto"
+            className="inline-flex w-full items-center justify-center gap-1 rounded-lg bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white sm:w-auto"
           >
             <Plus size={16} /> 開催日程を作成
           </Link>
@@ -161,12 +169,18 @@ function ClassesContent() {
         {message ? <p className="mt-4 text-sm font-bold text-[var(--mikke-accent-strong)]">{message}</p> : null}
       </section>
 
-      {classes.length ? (
-        classes.map((classItem) => {
+      {selectedClass ? <Link className="inline-flex min-h-11 items-center text-sm text-[var(--mikke-primary)]" href={toCurrentAcademyContextHref("/academy/classes")}>すべての開催日程を表示 →</Link> : null}
+      <AcademyListTools label="開催・講座" query={search} onQuery={setSearch} filter={filter} onFilter={setFilter} count={visibleClasses.length} options={[
+        {value:"all",label:"すべて",count:classes.filter(c=>!selectedClass || c.id===selectedClass).length},
+        {value:"undated",label:"日程未定",count:classes.filter(c=>(!selectedClass || c.id===selectedClass) && !c.starts_at).length},
+        {value:"unassigned",label:"担当未決定",count:classes.filter(c=>(!selectedClass || c.id===selectedClass) && !c.instructor_id).length}
+      ]} />
+      {visibleClasses.length ? (
+        visibleClasses.map((classItem) => {
           const classRequests = requestsByClass[classItem.id] ?? [];
           const courseInstructors = instructors.filter((item) => item.course_id === classItem.course_id);
           return (
-            <section key={classItem.id} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
+            <section key={classItem.id} className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-[var(--mikke-accent-strong)]">
@@ -184,7 +198,7 @@ function ClassesContent() {
                     {classItem.venue_name ? ` ・ ${classItem.venue_name}` : ""}
                   </p>
                 </div>
-                <span className="rounded-full bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold text-[var(--mikke-text-soft)]">
+                <span className="rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold text-[var(--mikke-text-soft)]">
                   担当: {classItem.instructor?.business_name ?? "未決定"}
                 </span>
               </div>
@@ -193,7 +207,7 @@ function ClassesContent() {
                 <div className="mt-4 space-y-2 border-t border-[var(--mikke-line)] pt-4">
                   <p className="text-xs font-bold text-[var(--mikke-text)]">依頼履歴</p>
                   {classRequests.map((request) => (
-                    <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2">
+                    <div key={request.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2">
                       <div>
                         <p className="text-sm font-bold text-[var(--mikke-text)]">
                           {request.instructor?.business_name ?? "講師"} ・ {CLASS_INSTRUCTOR_REQUEST_STATUS_LABELS[request.status]}
@@ -208,7 +222,7 @@ function ClassesContent() {
                           type="button"
                           disabled={busyId === request.id}
                           onClick={() => void cancelRequest(request.id)}
-                          className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)] disabled:opacity-50"
+                          className="rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)] disabled:opacity-50"
                         >
                           依頼を取り消す
                         </button>
@@ -219,6 +233,8 @@ function ClassesContent() {
               ) : null}
 
               <div className="mt-4 grid gap-2 border-t border-[var(--mikke-line)] pt-4 md:grid-cols-2">
+                <h4 className="text-sm font-bold md:col-span-2">担当講師への依頼</h4>
+                <p className="text-xs leading-6 text-[var(--mikke-muted)] md:col-span-2">講師と任意のメモ・回答期限を入力し、「担当を依頼する」で送信します。選択だけでは送信しません。</p>
                 <select
                   aria-label={`${classItem.title}の担当講師`}
                   value={instructorByClass[classItem.id] ?? ""}
@@ -236,6 +252,7 @@ function ClassesContent() {
                 </select>
                 <input
                   value={noteByClass[classItem.id] ?? ""}
+                  aria-label={`${classItem.title}の依頼メモ（任意）`}
                   onChange={(event) =>
                     setNoteByClass((current) => ({ ...current, [classItem.id]: event.target.value }))
                   }
@@ -255,7 +272,7 @@ function ClassesContent() {
                   type="button"
                   disabled={busyId === classItem.id || !instructorByClass[classItem.id]}
                   onClick={() => void requestInstructor(classItem)}
-                  className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                 >
                   担当を依頼する
                 </button>
@@ -267,8 +284,8 @@ function ClassesContent() {
           );
         })
       ) : (
-        <section className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-5 text-center">
-          <p className="text-sm font-bold text-[var(--mikke-text)]">開催日程はまだありません</p>
+        <section className="rounded-lg border border-dashed border-[var(--mikke-line)] bg-white p-5 text-center">
+          <p className="text-sm font-bold text-[var(--mikke-text)]">{classes.length || selectedClass ? "条件に合う開催はありません" : "開催日程はまだありません"}</p>
           <p className="mt-1 text-xs text-[var(--mikke-muted)]">上の「開催日程を作成」から、講座・日程・形式・定員を登録できます。</p>
         </section>
       )}

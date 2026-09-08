@@ -32,7 +32,7 @@ export function getAcademyLaunchProgress({ headquarters, courses, materialCourse
   const basicSaved = filled(headquarters.name) && filled(headquarters.contact_email);
   const steps: Step[] = [
     { step: 1, label: "本部を設定", description: basicSaved ? "団体名と連絡先が登録されています。" : "団体名と連絡先を登録してください。ロゴは任意です。", href: "/academy/settings", action: "本部設定を確認", state: basicSaved ? "complete" : "incomplete" },
-    { step: 2, label: "講座を作成", description: courses.length ? "講座が登録されています。" : "6つの質問に答えると、講座の下書きができます。", href: courses.length ? "/academy/courses" : "/academy/courses/new", action: courses.length ? "講座一覧を見る" : "講座の質問へ進む", state: courses.length ? "complete" : "incomplete" },
+    { step: 2, label: "講座を作成", description: courses.length ? "講座が登録されています。" : "講座名と受講料を決めて、下書きを保存します。", href: courses.length ? "/academy/courses" : "/academy/courses/new", action: courses.length ? "講座一覧を見る" : "講座をつくる", state: courses.length ? "complete" : "incomplete" },
     {
       step: 3, label: "講座の詳細を設定",
       description: missingMaterial ? `「${missingMaterial.name}」は講師用ファイルを使う設定ですが、まだファイルが登録されていません。`
