@@ -9,8 +9,8 @@ new Function('module', 'exports', ts.transpileModule(readFileSync('lib/academy/f
 }).outputText)(module, module.exports);
 const { createFirstPublicationService: create, TRIAL_MS } = module.exports;
 const start = Date.parse('2026-09-08T12:00:00Z');
-// Test-only business-policy assumptions. Not approval or production defaults.
-const policy = { version:'test-v1', approvalId:'isolated-test-only', termsRevision:'test-terms', quoteTtlMs:900000,
+// Isolated policy fixture. Never seed this identity into production.
+const policy = { version:'test-v1', approvalId:'isolated-test-only', termsRevision:'test-terms', quoteTtlMs:1800000,
   initialPrice:'fixed_at_publication', cancellation:'inclusive_deadline', eligibility:'no_previous_trial_or_contract' };
 const prepareInput = { quoteId:'quote', paymentPreparationId:'proof', acceptedTermsRevision:'test-terms', acceptedAmountYen:3300, consent:true };
 const publishInput = { courseId:'course', quoteId:'quote', confirmed:true };
@@ -18,9 +18,9 @@ function fixture() {
   const f = { at:start, fail:null, db:{ state:null, ownerClaim:null, outbox:[],
     courses:{ course:{headquartersId:'hq',published:false}, course2:{headquartersId:'hq',published:false} } },
     ctx:{ headquartersId:'hq',ownerUserId:'owner',actorUserId:'owner',authenticated:true,anonymous:false,canContract:true,
-      legacyAccess:false,previousTrialUsed:false,priorPublications:false,currentAmountYen:3300,currentInstructorCount:2 },
+      legacyAccess:false,previousTrialUsed:false,priorPublications:false,currentAmountYen:3300,currentInstructorCount:2,currentPricingRevision:'plan-base:band-1:discount-none' },
     quote:{ id:'quote',headquartersId:'hq',ownerUserId:'owner',amountYen:3300,instructorCount:2,termsRevision:'test-terms',
-      policyVersion:'test-v1',issuedAt:start,expiresAt:start+900000 },
+      policyVersion:'test-v1',pricingRevision:'plan-base:band-1:discount-none',issuedAt:start,expiresAt:start+1800000 },
     proof:{ id:'proof',headquartersId:'hq',ownerUserId:'owner',quoteId:'quote',verified:true,revoked:false } };
   let queue = Promise.resolve();
   const repo = { transaction(hq, actor, fn) {
@@ -74,9 +74,14 @@ await test('proof must match HQ owner quote and verified status',async()=>{
     const f=fixture();Object.assign(f.proof,patch);await assert.rejects(prepare(f),/payment_preparation_unverified/);
   }
 });
-await test('expiry and count changes require new confirmation',async()=>{
+await test('expiry and changed price terms require new confirmation',async()=>{
   const f=fixture();await prepare(f);f.at=f.quote.expiresAt;await assert.rejects(publish(f),/quote_expired/);
-  const g=fixture();await prepare(g);g.ctx.currentInstructorCount=3;await assert.rejects(publish(g),/requote_required/);
+  const g=fixture();await prepare(g);g.ctx.currentAmountYen=5500;await assert.rejects(publish(g),/requote_required/);
+  const h=fixture();await prepare(h);h.ctx.currentPricingRevision='different-plan-same-amount';await assert.rejects(publish(h),/requote_required/);
+});
+await test('headcount changes inside the same price terms do not block publication',async()=>{
+  const f=fixture();await prepare(f);f.ctx.currentInstructorCount=3;const s=await publish(f);
+  assert.equal(s.amountYen,3300);assert.equal(s.instructorCount,2);
 });
 await test('first publication is atomic and starts exactly 168 hours',async()=>{
   const f=fixture();await prepare(f);f.at+=5000;const s=await publish(f);assert.equal(s.firstPublishedAt,start+5000);assert.equal(s.trialEndsAt,s.firstPublishedAt+TRIAL_MS);assert.equal(f.db.courses.course.published,true);assert.equal(f.db.outbox.length,1);
@@ -108,7 +113,14 @@ await test('cancel at exact deadline wins and remains callable with rollout disa
   const f=fixture();await prepare(f);const s=await publish(f);f.at=s.trialEndsAt;
   const stopped=create(f.repo,null);const cancelled=await stopped.cancelConversion('hq','owner');assert.equal(cancelled.cancellationAcceptedAt,s.trialEndsAt);
   assert.deepEqual(await stopped.cancelConversion('hq','owner'),cancelled);assert.equal(f.db.outbox.filter(x=>x.kind==='cancel_conversion').length,1);
-  await assert.rejects(publish(f),/publication_blocked/);await stopped.unpublish('hq','owner','course');assert.equal(f.db.courses.course.published,false);
+  await assert.rejects(publish(f),/trial_ended/);await stopped.unpublish('hq','owner','course');assert.equal(f.db.courses.course.published,false);
+});
+await test('conversion cancellation preserves publication until the original deadline',async()=>{
+  const f=fixture();await prepare(f);const original=await publish(f);f.at+=1000;
+  await f.service.cancelConversion('hq','owner');await f.service.unpublish('hq','owner','course');
+  const s=await publish(f);assert.equal(s.phase,'cancelled');assert.equal(s.trialEndsAt,original.trialEndsAt);
+  assert.equal(f.db.courses.course.published,true);assert.equal(f.db.outbox.filter(x=>x.kind==='synchronize_trial').length,1);
+  f.at=original.trialEndsAt;await assert.rejects(publish(f),/trial_ended/);
 });
 await test('after deadline uses paid cancellation, not retroactive free cancellation',async()=>{
   const f=fixture();await prepare(f);const s=await publish(f);f.at=s.trialEndsAt+1;await assert.rejects(f.service.cancelConversion('hq','owner'),/paid_cancellation_required/);
@@ -170,5 +182,36 @@ await test('quote uses server price and scope without submitting a client amount
 await test('quote errors are not a free quote',async()=>{
   const quote=rpcModule.exports.createFirstPublicationQuoteRpc({rpc:async()=>({data:null,error:{message:'denied'}})});
   await assert.rejects(quote(hqId,'test-v1'),/quote_failed/);
+});
+const accessModule={exports:{}};
+new Function('module','exports',ts.transpileModule(readFileSync('lib/academy/first-publication/access-client.ts','utf8'),{
+  compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}
+}).outputText)(accessModule,accessModule.exports);
+const {createFirstPublicationAccessRpc:accessRpc,parseFirstPublicationAccess:parseAccess}=accessModule.exports;
+const access={scheme:'first_publication_168h_v1',policyVersion:'test-v1',active:true,inviteAllowed:true,endsAt:new Date(start+TRIAL_MS).toISOString(),
+  phase:'trialing',cancellationAcceptedAt:null};
+await test('read access discriminator sends only the HQ and strips private fields',async()=>{
+  let calls=0;
+  const read=accessRpc({rpc:async(name,args)=>{calls++;assert.equal(name,'academy_first_publication_access');
+    assert.deepEqual(args,{p_headquarters_id:hqId});return {data:{...access,provider:'secret'},error:null};}});
+  assert.deepEqual(await read(hqId),access);assert.equal(calls,1);
+});
+await test('only successful null access means legacy or unregistered',async()=>{
+  assert.equal(await accessRpc({rpc:async()=>({data:null,error:null})})(hqId),null);
+  await assert.rejects(accessRpc({rpc:async()=>({data:null,error:{code:'PGRST202'}})})(hqId),/access_failed/);
+  assert.throws(()=>parseAccess(undefined),/invalid_first_publication_access/);
+});
+await test('cancelled trial keeps access but blocks invitations',async()=>{
+  const cancelled={...access,phase:'cancelled',inviteAllowed:false,cancellationAcceptedAt:new Date(start+1).toISOString()};
+  assert.deepEqual(parseAccess(cancelled),cancelled);
+  assert.throws(()=>parseAccess({...cancelled,inviteAllowed:true}),/inconsistent/);
+});
+await test('access validation rejects malformed and impossible projections',async()=>{
+  for(const patch of [{scheme:'old_trial'},{policyVersion:null},{policyVersion:''},{active:'true'},{endsAt:'tomorrow'},{phase:'unknown'},
+    {phase:'expired'},{phase:'prepared'},{endsAt:null},{active:false,inviteAllowed:true}]) {
+    assert.throws(()=>parseAccess({...access,...patch}),/first_publication_access/);
+  }
+  assert.equal(parseAccess({...access,active:false,inviteAllowed:false,phase:'expired'}).active,false);
+  assert.equal(parseAccess({...access,phase:'paid'}).phase,'paid');
 });
 console.log(`academy_first_publication_core_ok: ${cases} isolated contract cases; no DB, provider, invoice, or invitation calls`);

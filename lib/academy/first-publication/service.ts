@@ -14,14 +14,14 @@ export type Policy = {
 };
 export type Quote = {
   id: string; headquartersId: string; ownerUserId: string;
-  amountYen: number; instructorCount: number; termsRevision: string;
+  amountYen: number; instructorCount: number; termsRevision: string; pricingRevision: string;
   policyVersion: string; issuedAt: number; expiresAt: number;
 };
 export type Context = {
   headquartersId: string; ownerUserId: string; actorUserId: string;
   authenticated: boolean; anonymous: boolean; canContract: boolean;
   legacyAccess: boolean; previousTrialUsed: boolean; priorPublications: boolean;
-  currentAmountYen: number; currentInstructorCount: number;
+  currentAmountYen: number; currentInstructorCount: number; currentPricingRevision: string;
 };
 export type RecordState = {
   headquartersId: string; ownerUserId: string; policyVersion: string; approvalId: string;
@@ -97,7 +97,10 @@ async function validQuote(tx: Transaction, id: string, ctx: Context, policy: Pol
     q.issuedAt <= now && now < q.expiresAt && q.expiresAt <= q.issuedAt + policy.quoteTtlMs, "quote_expired");
   check(Number.isSafeInteger(q.amountYen) && q.amountYen > 0 && Number.isSafeInteger(q.instructorCount) && q.instructorCount >= 0,
     "invalid_quote");
-  check(q.amountYen === ctx.currentAmountYen && q.instructorCount === ctx.currentInstructorCount, "requote_required");
+  // The revision represents trusted plan/discount/price-band identity, not raw headcount.
+  // Headcount may move within a band; an equal amount alone does not prove the same terms.
+  check(q.pricingRevision?.trim() && q.pricingRevision === ctx.currentPricingRevision &&
+    q.amountYen === ctx.currentAmountYen, "requote_required");
   return q;
 }
 export function createFirstPublicationService(repo: Repository, policy: Policy | null) {
@@ -134,13 +137,14 @@ export function createFirstPublicationService(repo: Repository, policy: Policy |
         check(input.confirmed === true, "publication_confirmation_required");
         const course = await tx.course(input.courseId);
         check(course?.headquartersId === hq, "course_not_found");
-        check(state.phase !== "cancelled" && state.phase !== "attention", "publication_blocked");
+        check(state.phase !== "attention", "publication_blocked");
         if (state.firstPublishedAt !== null) {
           check(state.trialEndsAt !== null && tx.now() < state.trialEndsAt, "trial_ended");
           await tx.publishCourse(input.courseId, true);
           return state;
         }
         eligible(ctx);
+        check(state.phase !== "cancelled", "publication_blocked");
         check(state.phase === "prepared" && !course.published && input.quoteId === state.quoteId, "confirmation_changed");
         await validQuote(tx, state.quoteId, ctx, policy);
         const proof = await tx.paymentPreparation(state.paymentPreparationId);
