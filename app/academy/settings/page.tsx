@@ -440,7 +440,7 @@ function SettingsContent() {
           </section>
 
           {role === "owner" ? (
-            <AcademySettingsBilling key={`${user.id}:${headquarters.id}`} userId={user.id} headquartersId={headquarters.id} sample={isAcademyLocalReview()} legacy={
+            <AcademySettingsBilling key={`${user.id}:${headquarters.id}`} userId={user.id} headquartersId={headquarters.id} isGuest={isGuest} sample={isAcademyLocalReview()} legacy={
             <section className={cardClass}>
               <h2 className="flex items-center gap-2 text-base font-bold">
                 <ReceiptJapaneseYen size={18} /> Academy利用料金

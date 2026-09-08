@@ -54,6 +54,11 @@ function DashboardContent() {
   const [canCreate, setCanCreate] = useState(false);
   const [canStartTrial, setCanStartTrial] = useState(false);
   const preparationInFlight = useRef(false);
+  const activeIdentity = useRef(true);
+  useEffect(() => {
+    activeIdentity.current = true;
+    return () => { activeIdentity.current = false; };
+  }, []);
   const [creationError, setCreationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -122,11 +127,15 @@ function DashboardContent() {
     setLoading(true);
     setCreationError(null);
     try {
+      const { data: session, error: sessionError } = await supabase.auth.getSession();
+      if (!activeIdentity.current || sessionError || session.session?.user.id !== user.id) throw new Error("preparation_identity_changed");
       const { data: created, error } = await supabase.rpc("academy_first_publication_create_preparation", {
         p_name: `${profile.display_name}アカデミー`.slice(0, 100),
         p_policy_version: ACADEMY_PREPARATION_POLICY
       });
       if (error) throw error;
+      const { data: currentSession, error: currentSessionError } = await supabase.auth.getSession();
+      if (!activeIdentity.current || currentSessionError || currentSession.session?.user.id !== user.id) throw new Error("preparation_identity_changed");
       if (!created || created.scheme !== "first_publication_168h_v1" || typeof created.headquarters_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(created.headquarters_id)) throw new Error("invalid_preparation");
       setCanStartTrial(false);
       router.replace(toAcademyContextHref("/academy", created.headquarters_id, "manage"));

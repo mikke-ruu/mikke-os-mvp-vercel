@@ -214,4 +214,23 @@ await test('access validation rejects malformed and impossible projections',asyn
   assert.equal(parseAccess({...access,active:false,inviteAllowed:false,phase:'expired'}).active,false);
   assert.equal(parseAccess({...access,phase:'paid'}).phase,'paid');
 });
+await test('delegated publication sends no quote consent or new trial fields',async()=>{
+  const run=accessModule.exports.createFirstPublicationCourseRpc({rpc:async(name,args)=>{
+    assert.equal(name,'academy_first_publication_set_course_published');
+    assert.deepEqual(args,{p_headquarters_id:hqId,p_course_id:courseId,p_published:true});
+    return {data:{headquarters_id:hqId,course_id:courseId,is_published:true,secret:'omit'},error:null};
+  }});
+  assert.deepEqual(await run(hqId,courseId,true),{headquartersId:hqId,courseId,published:true});
+});
+await test('delegated publication rejects invalid inputs failures and foreign results',async()=>{
+  let calls=0;
+  const run=accessModule.exports.createFirstPublicationCourseRpc({rpc:async()=>{calls++;return {data:null,error:{message:'private'}};}});
+  await assert.rejects(run('bad',courseId,true),/invalid_publication_request/);
+  await assert.rejects(run(hqId,courseId,'true'),/invalid_publication_request/);assert.equal(calls,0);
+  await assert.rejects(run(hqId,courseId,true),/first_publication_course_failed/);assert.equal(calls,1);
+  for(const data of [null,{headquarters_id:quoteId,course_id:courseId,is_published:true},
+    {headquarters_id:hqId,course_id:courseId,is_published:false}]) {
+    await assert.rejects(accessModule.exports.createFirstPublicationCourseRpc({rpc:async()=>({data,error:null})})(hqId,courseId,true),/invalid_publication_result/);
+  }
+});
 console.log(`academy_first_publication_core_ok: ${cases} isolated contract cases; no DB, provider, invoice, or invitation calls`);

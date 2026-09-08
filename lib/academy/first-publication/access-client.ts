@@ -48,3 +48,23 @@ export function createFirstPublicationAccessRpc(client: {
     return parseFirstPublicationAccess(data);
   };
 }
+
+/** Subsequent publication only. The DB refuses this path before owner activation. */
+export function createFirstPublicationCourseRpc(client: {
+  rpc(name: "academy_first_publication_set_course_published", args: {
+    p_headquarters_id: string; p_course_id: string; p_published: boolean;
+  }): PromiseLike<{ data: unknown; error: unknown }>;
+}) {
+  return async (headquartersId: string, courseId: string, published: boolean) => {
+    if (!UUID.test(headquartersId) || !UUID.test(courseId) || typeof published !== "boolean") throw new Error("invalid_publication_request");
+    const { data, error } = await client.rpc("academy_first_publication_set_course_published", {
+      p_headquarters_id: headquartersId, p_course_id: courseId, p_published: published,
+    });
+    if (error) throw new Error("first_publication_course_failed");
+    if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("invalid_publication_result");
+    const r = data as Record<string, unknown>;
+    if (typeof r.headquarters_id !== "string" || r.headquarters_id.toLowerCase() !== headquartersId.toLowerCase() ||
+      typeof r.course_id !== "string" || r.course_id.toLowerCase() !== courseId.toLowerCase() || r.is_published !== published) throw new Error("invalid_publication_result");
+    return { headquartersId, courseId, published };
+  };
+}

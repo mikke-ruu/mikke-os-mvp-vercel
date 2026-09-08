@@ -13,6 +13,8 @@ type Props = {
   termsRevision: string;
   termsHref: string;
   billingHref: string;
+  /** Re-preparation must not mistake the previous quote for the new consent. */
+  replacePreparedQuoteId?: string;
   onPrepared: (state: FirstPublicationStatus) => void | Promise<void>;
 };
 type ReturnAttempt = { quoteId: string; attemptId: string };
@@ -31,11 +33,24 @@ export function readAcademySetupReturn(href: string, headquartersId: string): Re
   return UUID.test(quoteId) && UUID.test(attemptId) ? { quoteId, attemptId } : null;
 }
 
+export function shouldResumeAcademyRepreparation(href: string, headquartersId: string, status: FirstPublicationStatus | null) {
+  const returned = readAcademySetupReturn(href, headquartersId);
+  return Boolean(status && status.headquartersId === headquartersId && status.phase === "prepared" && status.firstPublishedAt === null
+    && status.cancellationAcceptedAt === null && returned && returned !== "cancelled" && returned.quoteId !== status.quoteId);
+}
+
 export function usableAcademyEnrollmentQuote(quote: FirstPublicationQuote, scope: Pick<Props, "headquartersId" | "policyVersion" | "termsRevision">, now: number) {
   return UUID.test(quote.id) && quote.headquartersId === scope.headquartersId && quote.policyVersion === scope.policyVersion
     && quote.termsRevision === scope.termsRevision && Number.isSafeInteger(quote.amountYen) && quote.amountYen > 0
     && Number.isFinite(Date.parse(quote.issuedAt)) && Date.parse(quote.issuedAt) <= now
     && Number.isFinite(Date.parse(quote.expiresAt)) && Date.parse(quote.expiresAt) > now;
+}
+
+export function matchesAcademyEnrollmentResult(state: FirstPublicationStatus, scope: Pick<Props, "headquartersId" | "policyVersion" | "termsRevision" | "replacePreparedQuoteId">, expectedQuoteId: string | null) {
+  return state.headquartersId === scope.headquartersId && state.policyVersion === scope.policyVersion && state.termsRevision === scope.termsRevision
+    && state.phase === "prepared" && state.firstPublishedAt === null && state.cancellationAcceptedAt === null
+    && (!expectedQuoteId || state.quoteId === expectedQuoteId)
+    && (!scope.replacePreparedQuoteId || Boolean(expectedQuoteId) && state.quoteId !== scope.replacePreparedQuoteId);
 }
 
 export function AcademyFirstPublicationEnrollment(props: Props) {
@@ -45,7 +60,7 @@ export function AcademyFirstPublicationEnrollment(props: Props) {
     return () => data.subscription.unsubscribe();
   }, []);
   if (!session || session.userId !== props.userId) return <p role="status" className="text-sm">契約するアカウントを確認しています。ログインし直した場合はページを再読み込みしてください。</p>;
-  return <Enrollment key={`${props.userId}:${session.token}:${props.headquartersId}:${props.policyVersion}:${props.termsRevision}`} {...props} />;
+  return <Enrollment key={`${props.userId}:${session.token}:${props.headquartersId}:${props.policyVersion}:${props.termsRevision}:${props.replacePreparedQuoteId ?? "new"}`} {...props} />;
 }
 
 function Enrollment(props: Props) {
@@ -107,9 +122,11 @@ function Enrollment(props: Props) {
       await currentToken();
       const state = await createFirstPublicationRpc(supabase)(props.headquartersId, { action: "status" });
       await currentToken();
-      if (state) { await showPrepared(state); return; }
+      const expectedQuoteId = quote?.id ?? returnAttempt?.quoteId ?? null;
+      if (state && matchesAcademyEnrollmentResult(state, props, expectedQuoteId)) { await showPrepared(state); return; }
+      if (state && (state.firstPublishedAt !== null || state.phase !== "prepared")) throw new Error("別の操作で契約状態が変わりました。再申し込みせずページを再読み込みしてください。");
       setRequiresCheck(false); clearConsent();
-      setMessage("契約準備はまだ登録されていません。支払方法を登録済みの場合は登録結果を確認してください。未登録の場合は料金を確認して進めてください。");
+      setMessage(state ? "以前の見積もりによる準備を確認しましたが、今回の料金と支払方法の確認はまだ完了していません。新しい見積もりで手続きを続けてください。" : "契約準備はまだ登録されていません。支払方法を登録済みの場合は登録結果を確認してください。未登録の場合は料金を確認して進めてください。");
     });
   }
   function getQuote() {
@@ -118,7 +135,7 @@ function Enrollment(props: Props) {
       await currentToken();
       const next = await createFirstPublicationQuoteRpc(supabase)(props.headquartersId, props.policyVersion);
       await currentToken();
-      if (!usableAcademyEnrollmentQuote(next, props, Date.now())) throw new Error("料金の有効期限または契約条件が変わりました。最新の条件で見積もりを取得してください。");
+      if (!usableAcademyEnrollmentQuote(next, props, Date.now()) || next.id === props.replacePreparedQuoteId) throw new Error("料金の有効期限または契約条件が変わりました。最新の条件で見積もりを取得してください。");
       setQuote(next); setVerified(false); setReturnAttempt(null); clearConsent(); setMessage("");
     });
   }
@@ -151,7 +168,7 @@ function Enrollment(props: Props) {
       if (!usableAcademyEnrollmentQuote(quote, props, Date.now())) throw new Error("見積もりの有効期限が終了しました。料金を再確認してください。");
       const state = await createFirstPublicationRpc(supabase)(props.headquartersId, { action: "prepare", quoteId: quote.id, termsRevision: quote.termsRevision, amountYen: quote.amountYen, consent: true });
       await currentToken();
-      if (!state) throw new Error("契約準備の結果を確認できませんでした。再申し込みせず契約状態を確認してください。");
+      if (!state || !matchesAcademyEnrollmentResult(state, props, quote.id)) throw new Error("今回の見積もりによる契約準備を確認できませんでした。再申し込みせず契約状態を確認してください。");
       await showPrepared(state);
     }, true);
   }
@@ -165,7 +182,7 @@ function Enrollment(props: Props) {
       {quote && <div className="space-y-2 rounded-lg border border-[var(--mikke-line)] p-3 text-sm"><p>初回月額（税込）：<strong className="text-lg">{quote.amountYen.toLocaleString("ja-JP")}円</strong></p><p>登録講師：{quote.instructorCount}名</p><p>見積もりの有効期限：{firstPublicationDate(quote.expiresAt)}（日本時間）</p>{!validQuote && <p role="status">見積もりの期限が終了したか条件が変更されています。新しい料金を確認してください。</p>}</div>}
       {validQuote && <div className="space-y-2 text-sm"><p>初回料金は公開時に固定し、後の人数変化は次回更新から反映します。無料終了日時までに取消を受け付ければ初回請求はありません。</p><div className="flex flex-wrap gap-3"><a className="inline-flex min-h-11 items-center text-[var(--mikke-primary)] underline" href={props.termsHref} target="_blank" rel="noopener noreferrer" onClick={() => setReadTerms(true)}>利用規約を開く</a><a className="inline-flex min-h-11 items-center text-[var(--mikke-primary)] underline" href={props.billingHref} target="_blank" rel="noopener noreferrer" onClick={() => setReadBilling(true)}>料金・取消条件を開く</a></div><label className="flex min-h-11 items-start gap-2 leading-7"><input className="mt-2" type="checkbox" disabled={busy || requiresCheck || !readTerms || !readBilling} checked={consent} onChange={event => setConsent(event.target.checked)} />上の2つの文書と表示された料金を確認し、条件に同意します</label></div>}
       <div className="flex flex-wrap gap-2">
-        {(!returnAttempt || quote && !validQuote) && <button type="button" className={buttonClass} disabled={busy || requiresCheck} onClick={getQuote}>{quote ? "最新の料金で見積もり直す" : "料金を確認する"}</button>}
+        <button type="button" className={buttonClass} disabled={busy || requiresCheck} onClick={getQuote}>{returnAttempt ? "新しい見積もりでやり直す" : quote ? "最新の料金で見積もり直す" : "料金を確認する"}</button>
         {quote && !verified && <button type="button" className={buttonClass} disabled={busy || requiresCheck || !ready} onClick={startSetup}>支払方法の登録へ進む</button>}
         {verified && <button type="button" className={`${buttonClass} font-bold`} disabled={busy || requiresCheck || !ready} onClick={prepare}>同意して契約準備を完了</button>}
       </div>
