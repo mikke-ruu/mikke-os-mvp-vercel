@@ -29,3 +29,6 @@ localStorage試作は認可の正典ではない。今回の設定は他アプ�
 
 ## 統制追加レビュー
 STORY公開面はapp/story/[handle]/page.tsx → components/mikkeos/StoryNameCard.tsx。Pageはlib/page/types.ts、cms-selectors.ts、components/page/PageRenderer.tsx。Page既存の空選択=全候補表示はMediaへ流用せず、空選択=非表示を強制する。STORYのmockProfileを本人確認に使わない。公開画像URL内に内部所有者パスがないことも別途検証する。
+
+## STORY最終レビュー追記
+StoryNameCardの作品写真後に専用mediaSectionを置く案。STORY/Mediaの公開と掲載許可・承認revision一致を条件とし、0件/失敗は記事sectionだけ非表示。取り下げ後は再公開しても自動復活させず再選択を必要とする。既存STORY実績migrationへ混ぜない。STORY室81faf3bは未公開かつmasterから遅れがあるため、そのまま取り込まない。
