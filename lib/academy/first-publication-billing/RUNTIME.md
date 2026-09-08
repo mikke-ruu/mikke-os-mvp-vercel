@@ -6,6 +6,8 @@
 
 全てPOST。利用者APIは同一origin、非匿名getUser、HQ owner、実本文4096 byte以内、JSONの厳密キーを検証する。応答はprivate/no-store。
 
+見積metadataは `setup_reserve.quote` の元quote snake投影から読む。`plan_key/plan_name/discount_description/consent_revision` を必須とし、confirmの `planKey/planName/discountDescription/consentRevision` を含む全12項目が元証跡と一致しなければ成功を返さない。値の推測や定数補完はしない。DB metadata差分 dcdf8e3 と後続 reserve.quote 返却が必要。
+
 - `/academy/api/first-publication/setup`: `{headquartersId,quoteId}` → `{attemptId,setupUrl}`。全IDはUUID。サーバーが固定attempt、専用Stripe customer、hosted Checkout mode=setupを作る。課金subscriptionは作らない。
 - `/academy/api/first-publication/setup/confirm`: `{headquartersId,quoteId,attemptId}` → `{paymentPreparationId,verified:true,quote}`。DB保存sessionを再取得し、SetupIntent succeeded、customer、HQ、owner、quote、modeを検証してproofを保存する。quoteは元の見積DTOで、再発行しない。
 - 戻り先は `/academy/h/{DB由来HQ}/manage/settings?billing=setup_return&quoteId={DB由来quote}&attemptId={DB由来attempt}`。取消戻りは `setup_cancel`。呼出者からreturn URLを受け取らない。返り先への到着だけで成功と判定しない。
@@ -48,6 +50,7 @@ DB担当の0293841、2a31d75とplatform bridge c4b7a55が必要。初回paidの�
 - `node scripts/academy-first-publication-runtime-check.mjs`: hosted setup/HTTP/初回課金の17件。
 - `node scripts/academy-first-publication-webhook-check.mjs`: 署名と再照合の14件。
 - `node scripts/academy-first-publication-renewal-check.mjs`: 更新priceとdraft invoice再確認の9件。
+- `node scripts/academy-first-publication-quote-check.mjs`: 元quote metadataの不変受け渡しと欠落拒否の12件。
 
 上記はfake HTTP/RPCのみ。所有TSのstrict型検査も行う。実Auth、実Stripe、多接続のDB競合、本番公開の証拠にはならない。
 

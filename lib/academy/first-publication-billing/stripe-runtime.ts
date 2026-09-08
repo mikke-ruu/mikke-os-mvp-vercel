@@ -10,6 +10,7 @@ export type SetupAttempt = {
   quote_id: string; amount_yen: number; policy_version: string;
   provider_customer_id: string | null; checkout_session_id: string | null;
   setup_intent_id: string | null; payment_method_id: string | null; status: string;
+  quote?: unknown;
 };
 export type JsonObject = Record<string, unknown>;
 export const object = (v: unknown): v is JsonObject => !!v && typeof v === 'object' && !Array.isArray(v);

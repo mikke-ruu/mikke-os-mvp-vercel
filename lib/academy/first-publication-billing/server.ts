@@ -10,6 +10,7 @@ import { handleFirstPublicationWebhook } from './webhook';
 import type { SubscriptionContext } from './webhook';
 import { processRenewalJob } from './renewal';
 import type { RenewalJob, RenewalQuote } from './renewal';
+import { quoteFromDatabase, verifyConfirmedQuote } from './quote';
 
 function runtime(signal: AbortSignal) {
   const env=process.env;
@@ -34,9 +35,9 @@ export async function serveSetup(action:'setup'|'confirm',request:Request){
       allowedOrigins:['https://app.mikke-os.com','https://mikke-os.com'],
       async authenticate(token){const {data,error}=await r.user(token).auth.getUser(token);return error||!data.user?null:{id:data.user.id,anonymous:data.user.is_anonymous!==false};},
       async owns(token,userId,hq){const {data,error}=await r.user(token).from('academy_headquarters').select('id,owner_user_id').eq('id',hq).eq('owner_user_id',userId).abortSignal(signal).maybeSingle();return !error&&data?.id===hq&&data?.owner_user_id===userId;},
-      async reserve(userId,hq,quote){const value=await r.rpc('academy_first_publication_setup_reserve',{p_owner_user_id:userId,p_headquarters_id:hq,p_quote_id:quote});demand(object(value),'INVALID_ATTEMPT');return value as SetupAttempt;},
+      async reserve(userId,hq,quote){const value=await r.rpc('academy_first_publication_setup_reserve',{p_owner_user_id:userId,p_headquarters_id:hq,p_quote_id:quote});demand(object(value),'INVALID_ATTEMPT');quoteFromDatabase(value.quote,value as SetupAttempt);return value as SetupAttempt;},
       async setup(a){return r.stripe.setup(a,async(customer,session,setup)=>{await r.rpc('academy_first_publication_setup_attach',{p_attempt_id:a.attempt_id,p_provider_customer_id:customer,p_checkout_session_id:session,p_setup_intent_id:setup??null});},signal);},
-      async confirm(a){const proof=await r.stripe.verifySetup(a,signal);const saved=await r.rpc('academy_first_publication_setup_complete',{p_attempt_id:a.attempt_id,p_provider_customer_id:proof.customerId,p_setup_intent_id:proof.setupIntentId,p_payment_method_id:proof.paymentMethodId});demand(object(saved)&&saved.attempt_id===a.attempt_id&&saved.status==='verified'&&object(saved.quote)&&saved.quote.id===a.quote_id&&saved.quote.headquartersId===a.headquarters_id,'PROOF_NOT_PERSISTED');return{paymentPreparationId:a.attempt_id,verified:true,quote:saved.quote};},
+      async confirm(a){const original=quoteFromDatabase(a.quote,a);const proof=await r.stripe.verifySetup(a,signal);const saved=await r.rpc('academy_first_publication_setup_complete',{p_attempt_id:a.attempt_id,p_provider_customer_id:proof.customerId,p_setup_intent_id:proof.setupIntentId,p_payment_method_id:proof.paymentMethodId});demand(object(saved)&&saved.attempt_id===a.attempt_id&&saved.status==='verified','PROOF_NOT_PERSISTED');return{paymentPreparationId:a.attempt_id,verified:true,quote:verifyConfirmedQuote(original,saved.quote,a)};},
     });
   }catch{return privateJson({error:'BILLING_NOT_CONFIGURED'},503);}
 }
