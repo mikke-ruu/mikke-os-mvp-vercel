@@ -33,6 +33,10 @@ assert.match(markup,/disabled=""/);
 assert.match(markup,/5,000/);
 assert.doesNotMatch(markup,/自動課金されません/);
 assert.equal(mutations,0);
+// An unpublished prepared contract has no conversion deadline to cancel.
+// Cancelling it would permanently block the first publication in the database.
+const publicationSource=readFileSync('components/academy/AcademyCoursePublication.tsx','utf8');
+assert.ok(publicationSource.includes('status.firstPublishedAt!==null && status.cancellationAcceptedAt===null && load.access.cancellationAcceptedAt===null'));
 const {approvedAcademySetupUrl,createAcademySetupClient}=load('lib/academy/first-publication-setup-client.ts');
 assert.equal(approvedAcademySetupUrl('https://checkout.stripe.com/c/pay/test'), 'https://checkout.stripe.com/c/pay/test');
 for(const bad of ['http://checkout.stripe.com/a','https://checkout.stripe.com.evil.test/a','https://evil.test','https://u@checkout.stripe.com/a','javascript:alert(1)'])assert.throws(()=>approvedAcademySetupUrl(bad));

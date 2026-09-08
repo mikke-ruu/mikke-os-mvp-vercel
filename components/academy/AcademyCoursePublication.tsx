@@ -68,7 +68,7 @@ function Connected(props: Props) {
   const status=load.status;
   const allowedActions:Array<"publish"|"unpublish"|"cancel_conversion">=[];
   if (load.access.active || status.phase==="prepared") allowedActions.push(course.is_published?"unpublish":"publish");
-  if (load.access.phase!=="paid" && status.cancellationAcceptedAt===null && status.phase!=="attention") allowedActions.push("cancel_conversion");
+  if (load.access.phase!=="paid" && status.firstPublishedAt!==null && status.cancellationAcceptedAt===null && load.access.cancellationAcceptedAt===null) allowedActions.push("cancel_conversion");
   return <div className="space-y-3">{status.firstPublishedAt === null ? <p className="text-sm leading-7">料金見積もりには30分の有効期限があります。準備から時間が経った場合や公開を完了できない場合は、<Link href={settingsHref} className="text-[var(--mikke-primary)] underline">本部設定で料金と支払方法を確認し直してください</Link>。講座の下書きは残ります。</p> : null}<AcademyFirstPublicationPanel identityKey={userId} state={status} access={load.access} course={course} allowedActions={allowedActions} onRefresh={async()=>{await onReloadCourse();await refresh();}} onAction={async action=>{
     if (action !== "cancel_conversion" && status.firstPublishedAt !== null) await createFirstPublicationCourseRpc(supabase)(headquartersId, course.id, action === "publish");
     else if(action==="publish")await createFirstPublicationRpc(supabase)(headquartersId,{action,courseId:course.id,quoteId:status.quoteId,confirmed:true});
