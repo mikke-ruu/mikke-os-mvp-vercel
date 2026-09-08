@@ -42,6 +42,8 @@ renew_price完了で期限時のrenew_payを作ります。実請求の権利更
 
 2026-09-08の最終ローカル実行は55 checks PASS、exit 0でした。既存subscription契約SQL一式はこのうち1つの回帰グループとして数えています。新scheme限定snapshot捕捉と再実行時0件も含みます。
 
+統合時の順序確認として対象13本をファイル名の時刻順にsortし、空のPGliteへ再適用して55 checks PASSを確認しました。順序はatomic 070613 → runtime 084409 → bridge 090249 → delegation 091030です。bridgeの作成時に必要なlock_outboxは084409で定義済みです。subscription_holdは文字列による照合であり、091030によるstep制約追加後に初回支払処理で使います。verified receipt watermarkも091030が既存dispatch_checkを置き換えて実行時に検査します。bridgeのファイル時刻変更は不要です。全本番migrationの再現ではなく、周辺Academy依存を最小fixtureにした対象13本のfresh replayという検証範囲は変わりません。
+
 未完了:
 
 - 実Supabase全schema/RLS/Auth、advisors、多接続での取消受付と請求の競合。

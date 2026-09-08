@@ -27,13 +27,15 @@ try {
  create function private.academy_headquarters_role(uuid,uuid) returns text language sql as $$select 'owner'::text from public.academy_headquarters where id=$1 and owner_user_id=$2$$;
  create function public.academy_get_my_headquarters_access(uuid) returns table(headquarters_id uuid,access_kind text,status text,starts_at timestamptz,ends_at timestamptz,days_remaining integer,can_manage_drafts boolean,can_use_live_features boolean) language sql as $$select $1,'trial'::text,'expired'::text,null::timestamptz,null::timestamptz,0,false,false$$;
  `);
- for(const name of ['20260825161200_academy_month_end_billing_snapshots.sql','20260831180143_platform_billing_checkout_ledger.sql','20260901124412_platform_billing_creation_entitlements.sql','20260902171944_platform_billing_verified_provider_events.sql','20260902223651_platform_billing_subscription_runtime.sql','20260903161500_platform_billing_resource_access_window.sql','20260903201500_platform_billing_subscription_recontract_selection.sql','20260903203000_platform_retention_recontract_workers.sql','20260903204500_platform_billing_customer_recontract_activation.sql','20260908070613_academy_first_publication_atomic.sql','20260908084409_academy_first_publication_runtime.sql','20260908090249_academy_first_publication_platform_bridge.sql']) {
+ // Fresh database replay follows migration timestamps, never cherry-pick order.
+ const migrations=['20260825161200_academy_month_end_billing_snapshots.sql','20260831180143_platform_billing_checkout_ledger.sql','20260901124412_platform_billing_creation_entitlements.sql','20260902171944_platform_billing_verified_provider_events.sql','20260902223651_platform_billing_subscription_runtime.sql','20260903161500_platform_billing_resource_access_window.sql','20260903201500_platform_billing_subscription_recontract_selection.sql','20260903203000_platform_retention_recontract_workers.sql','20260903204500_platform_billing_customer_recontract_activation.sql','20260908070613_academy_first_publication_atomic.sql','20260908084409_academy_first_publication_runtime.sql','20260908090249_academy_first_publication_platform_bridge.sql','20260908091030_academy_first_publication_course_delegation.sql'].sort();
+ assert(migrations.indexOf('20260908090249_academy_first_publication_platform_bridge.sql')<migrations.indexOf('20260908091030_academy_first_publication_course_delegation.sql'));
+ for(const name of migrations) {
   try {await db.exec(await readFile(new URL(name,root),'utf8'));} catch(error) {throw Object.assign(error,{message:`${name}: ${error.message}`});}
  }
  passed++;
  await db.exec('begin');
  try {await db.exec(await readFile(new URL('./platform_billing_subscription_runtime.sql',import.meta.url),'utf8'));passed++;} finally {await db.exec('rollback');}
- await db.exec(await readFile(new URL('20260908091030_academy_first_publication_course_delegation.sql',root),'utf8'));
  await db.exec(`insert into auth.users values('${a}',false);insert into public.academy_headquarters(id,owner_user_id) values('${h}','${a}');
  insert into academy_publication_private.policies(version,approval_id,terms_revision,quote_ttl_seconds,enabled,initial_price,cancellation,eligibility,pricing_revision) values('fixture','approval','terms',1800,true,'fixed_at_publication','inclusive_deadline','no_previous_trial_or_contract','v1');
  insert into academy_publication_private.quotes(id,headquarters_id,owner_user_id,policy_version,terms_revision,amount_yen,instructor_count,issued_at,expires_at,payment_preparation_id,payment_verified) values('${q}','${h}','${a}','fixture','terms',5000,0,now()-interval '9 days',now()-interval '8 days','fixture',true);
@@ -122,5 +124,5 @@ try {
  ok((await svc('select public.academy_first_publication_capture_due_snapshots(50) as r')).r.captured,0);
  ok((await query(`select charge_price_yen as n from public.academy_monthly_billing_snapshots where snapshot_month='${capture.snapshot_month}' and headquarters_id='${h}'`)).n,5000);
  await deny('invalid_limit',()=>svc('select public.academy_first_publication_capture_due_snapshots(101)'));
- console.log(JSON.stringify({passed,engine:'PGlite real billing migrations + synthetic Academy dependencies',activation:false,notValidated:['real Auth/provider','full production schema','multi-connection cancellation race','production retention mutations']}));
+ console.log(JSON.stringify({passed,migrationOrder:migrations,engine:'PGlite real billing migrations + synthetic Academy dependencies',activation:false,notValidated:['real Auth/provider','full production schema','multi-connection cancellation race','production retention mutations']}));
 } catch(error) {console.error(JSON.stringify({error:error.message,code:error.code,where:error.where,position:error.position}));process.exitCode=1;} finally {await db.close();}
