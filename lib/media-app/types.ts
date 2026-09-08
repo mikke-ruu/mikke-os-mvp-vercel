@@ -49,6 +49,9 @@ export type MediaSite = {
   slug: string;
   description: string;
   authorName: string;
+  authorBio?: string;
+  storyUrl?: string;
+  showStory?: boolean;
   categories: string[];
   createdAt: string;
   updatedAt: string;

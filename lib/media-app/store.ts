@@ -3,6 +3,7 @@
 import type { MediaArticle, MediaBlock, MediaBlockType, MediaSite, MediaStoreState } from "./types";
 export { isSafeMediaUrl, normalizeMediaSlug } from "./validation.js";
 import { isSafeMediaUrl, normalizeMediaSlug } from "./validation.js";
+import { normalizeMediaStoryUrl } from "./profile-links.js";
 
 export const MEDIA_APP_STORAGE_KEY = "mikke.media.free.v1";
 
@@ -83,6 +84,20 @@ export function updateMediaSite(id: string, input: Pick<MediaSite, "name" | "slu
   if (state.sites.some((item) => item.id !== id && item.slug === slug)) throw new Error("この公開URL名はすでに使われています。");
   const updated = { ...site, ...input, name: input.name.trim(), slug, description: input.description.trim(), authorName: input.authorName.trim() || input.name.trim(), categories: input.categories.map((item) => item.trim()).filter(Boolean), updatedAt: new Date().toISOString() };
   saveMediaStore({ ...state, sites: state.sites.map((item) => item.id === id ? updated : item) });
+  return updated;
+}
+
+// Local design fixture only; never used as server authorization or imported to DB.
+export function updateMediaAuthorProfile(siteId: string, input: { authorBio: string; storyUrl: string; showStory: boolean }) {
+  const state = loadMediaStore();
+  const site = state.sites.find((item) => item.id === siteId);
+  if (!site) throw new Error("Mediaが見つかりませんでした。");
+  const authorBio = input.authorBio.trim();
+  if (Array.from(authorBio).length > 500) throw new Error("自己紹介は500文字以内で入力してください。");
+  const storyUrl = normalizeMediaStoryUrl(input.storyUrl);
+  if ((input.storyUrl.trim() || input.showStory) && !storyUrl) throw new Error("公開STORYのURLを入力してください。編集画面のURLは使えません。");
+  const updated = { ...site, authorBio, storyUrl, showStory: input.showStory === true, updatedAt: new Date().toISOString() };
+  saveMediaStore({ ...state, sites: state.sites.map((item) => item.id === siteId ? updated : item) });
   return updated;
 }
 
