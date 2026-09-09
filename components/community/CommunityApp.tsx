@@ -143,6 +143,11 @@ function buildNavigation(base: string, showOwner: boolean) {
     { label: "HELP", href: `${base}/help`, icon: MessageCircle, section: "安心して使う" }
   ];
   if (showOwner) navItems.push({ label: "OWNER", href: `${base}/owner`, icon: ShieldCheck, section: "運営" });
+  navItems.push(
+    { label: "Communityを切り替える", href: "/community", icon: Users, section: "Community" },
+    { label: "運営中のCommunity", href: "/community/manage", icon: ShieldCheck, section: "Community" },
+    { label: "新しく作る", href: "/community/start", icon: Plus, section: "Community" }
+  );
   const bottomNavItems: MikkeShellBottomNavItem[] = [
     { label: "HOME", href: base, icon: Home },
     { label: "ROOMS", href: `${base}/rooms`, icon: MessagesSquare },
@@ -174,7 +179,14 @@ function isOwnerLike(data: CommunityDashboard | null, userId?: string) {
   return data?.community.ownerUserId === userId || data?.membership?.role === "owner" || data?.membership?.role === "moderator";
 }
 
-export function CommunityApp({ view, roomId, postId, communitySlug }: { view: CommunityView; roomId?: string; postId?: string; communitySlug: string }) {
+type CommunityAppProps = { view: CommunityView; roomId?: string; postId?: string; communitySlug: string };
+
+export function CommunityApp(props: CommunityAppProps) {
+  // A new tenant must never inherit the previous tenant's data, drafts or dialogs.
+  return <CommunityTenantApp key={props.communitySlug} {...props} />;
+}
+
+function CommunityTenantApp({ view, roomId, postId, communitySlug }: CommunityAppProps) {
   const router = useRouter();
   const base = `/community/c/${encodeURIComponent(communitySlug)}`;
   const [user, setUser] = useState<SessionUser | null>(null);
