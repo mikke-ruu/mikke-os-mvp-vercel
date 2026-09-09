@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from 'node:fs';
 const documents = [
   ['academy-first-publication-trial-terms-2026-09-08-v1.md', 'a337bd78bfbfb20991c015ab0b7c7db00eb26cf663608f629f1d7e6e92fd5cff', 'app/legal/academy/first-publication-trial/2026-09-08-v1/page.tsx'],
   ['academy-first-publication-trial-consent-2026-09-08-v1.md', 'ec63e2b2d035e92bb75b41f2cdcda5145466b5ccad7ab2ec28a388d8a8e0f5d2', 'app/legal/academy/first-publication-trial/consent/2026-09-08-v1/page.tsx'],
+  ['academy-first-publication-community-invitation-consent-2026-09-08-v1.md', 'bb8204d944d4b83841f92a6e12ce22401daf3552a36703be1ead8263e821a30f', 'app/legal/community/academy-invitation/consent/2026-09-08-v1/page.tsx'],
 ];
 const renderer = readFileSync('components/legal/LegalMarkdownPage.tsx', 'utf8');
 for (const [name, digest, route] of documents) {
