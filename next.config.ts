@@ -2,11 +2,6 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
-  experimental: {
-    cpus: 2,
-    webpackBuildWorker: false,
-    webpackMemoryOptimizations: true,
-  },
   async rewrites() {
     return [
       { source: "/academy/h/:academyId/manage", destination: "/academy" },

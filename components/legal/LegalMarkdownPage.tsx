@@ -48,6 +48,18 @@ function renderMarkdown(markdown: string) {
       continue;
     }
 
+    if (line.startsWith("### ")) {
+      nodes.push(<h3 key={index} className="pt-3 text-base font-bold text-slate-950 sm:text-lg">{line.slice(4)}</h3>);
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith("#")) {
+      nodes.push(<p key={index} className="text-sm font-bold leading-7 text-slate-900 sm:text-base">{line.replace(/^#+\s*/, "")}</p>);
+      index += 1;
+      continue;
+    }
+
     if (line.startsWith("- ")) {
       const items: string[] = [];
       while (index < lines.length && lines[index].trim().startsWith("- ")) {
