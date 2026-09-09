@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { normalizeMediaStoryUrl } from '../lib/media-app/profile-links.js';
+const values = new Map();
+globalThis.window = { localStorage: { getItem: k => values.get(k) ?? null, setItem: (k,v) => values.set(k,v) } };
+const store = await import('../lib/media-app/store.ts');
+assert.equal(normalizeMediaStoryUrl('https://app.mikke-os.com/story/ayumi/'), 'https://mikke-os.com/story/ayumi');
+for (const url of ['javascript:alert(1)', 'https://evil.example/story/ayumi', 'https://mikke-os.com/apps/story', 'https://mikke-os.com/story/ayumi?preview=true', 'https://name:pw@mikke-os.com/story/ayumi', '//mikke-os.com/story/ayumi']) assert.equal(normalizeMediaStoryUrl(url), '');
+const site = store.createMediaSite({ ownerProfileId: 'fixture', name: 'test', slug: 'test', description: '', authorName: 'test' });
+assert.equal(site.showStory, undefined);
+const next = store.updateMediaAuthorProfile(site.id, { authorBio: ' Hello ', storyUrl: 'https://mikke-os.com/story/sample', showStory: true });
+assert.equal(next.authorBio, 'Hello');
+assert.equal(next.ownerProfileId, site.ownerProfileId);
+assert.equal(next.showStory, true);
+const before = values.get(store.MEDIA_APP_STORAGE_KEY);
+assert.throws(() => store.updateMediaAuthorProfile(site.id, { authorBio: '', storyUrl: 'javascript:alert(1)', showStory: true }));
+assert.equal(values.get(store.MEDIA_APP_STORAGE_KEY), before);
+assert.equal(store.updateMediaAuthorProfile(site.id, { authorBio: '', storyUrl: next.storyUrl, showStory: false }).showStory, false);
+console.log('Media author profile checks passed');

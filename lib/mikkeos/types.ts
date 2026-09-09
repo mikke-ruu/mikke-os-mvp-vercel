@@ -9,6 +9,7 @@ export type AppKey =
   | "team_works"
   | "fund"
   | "page"
+  | "media"
   | "library";
 
 export type AmountType = "income" | "expense" | "none";

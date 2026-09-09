@@ -101,6 +101,8 @@ import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
 import { ensureProfile } from "@/lib/profile";
+import { CommunityAuthBoundary, communityScopedClient } from "./CommunityAuthBoundary";
+import type { CommunityAuthLease } from "@/lib/community/auth-scope";
 
 type CommunityView = "home" | "join" | "rooms" | "room" | "post" | "compose" | "events" | "library" | "profile" | "search" | "bookmarks" | "rules" | "help" | "owner" | "owner-settings" | "owner-rooms" | "owner-members" | "owner-content" | "owner-safety" | "owner-moderation";
 
@@ -143,6 +145,11 @@ function buildNavigation(base: string, showOwner: boolean) {
     { label: "HELP", href: `${base}/help`, icon: MessageCircle, section: "安心して使う" }
   ];
   if (showOwner) navItems.push({ label: "OWNER", href: `${base}/owner`, icon: ShieldCheck, section: "運営" });
+  navItems.push(
+    { label: "Communityを切り替える", href: "/community", icon: Users, section: "Community" },
+    { label: "運営中のCommunity", href: "/community/manage", icon: ShieldCheck, section: "Community" },
+    { label: "新しく作る", href: "/community/start", icon: Plus, section: "Community" }
+  );
   const bottomNavItems: MikkeShellBottomNavItem[] = [
     { label: "HOME", href: base, icon: Home },
     { label: "ROOMS", href: `${base}/rooms`, icon: MessagesSquare },
@@ -174,7 +181,14 @@ function isOwnerLike(data: CommunityDashboard | null, userId?: string) {
   return data?.community.ownerUserId === userId || data?.membership?.role === "owner" || data?.membership?.role === "moderator";
 }
 
-export function CommunityApp({ view, roomId, postId, communitySlug }: { view: CommunityView; roomId?: string; postId?: string; communitySlug: string }) {
+type CommunityAppProps = { view: CommunityView; roomId?: string; postId?: string; communitySlug: string };
+
+export function CommunityApp(props: CommunityAppProps) {
+  // A new tenant must never inherit the previous tenant's data, drafts or dialogs.
+  return <CommunityAuthBoundary>{(lease) => <CommunityTenantApp key={`${props.communitySlug}:${lease.epoch}`} {...props} lease={lease} />}</CommunityAuthBoundary>;
+}
+
+function CommunityTenantApp({ view, roomId, postId, communitySlug, lease }: CommunityAppProps & { lease: CommunityAuthLease }) {
   const router = useRouter();
   const base = `/community/c/${encodeURIComponent(communitySlug)}`;
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -184,51 +198,58 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const mounted = useRef(true);
+  const reloadGeneration = useRef(0);
+  const current = () => mounted.current && lease.isCurrent();
 
   const reload = async (targetUser = user) => {
-    if (!targetUser) return;
+    if (!targetUser || !current() || targetUser.id !== lease.user?.id) return;
+    const generation = ++reloadGeneration.current;
     setError("");
     try {
-      setData(await loadCommunityDashboard(supabase, targetUser.id, communitySlug));
+      const dashboard = await loadCommunityDashboard(communityScopedClient(lease), targetUser.id, communitySlug);
+      if (current() && generation === reloadGeneration.current) setData(dashboard);
     } catch (nextError) {
-      setError(communityErrorMessage(nextError, "COMMUNITYを読み込めませんでした。"));
+      if (current() && generation === reloadGeneration.current) setError(communityErrorMessage(nextError, "COMMUNITYを読み込めませんでした。"));
     }
   };
 
   useEffect(() => {
-    let mounted = true;
-    supabase.auth.getSession().then(async ({ data: sessionData }) => {
-      if (!mounted) return;
-      const sessionUser = sessionData.session?.user ?? null;
+    mounted.current = true;
+    void (async () => {
+      if (!current()) return;
+      const sessionUser = lease.user;
       const nextUser = sessionUser ? { id: sessionUser.id, email: sessionUser.email } : null;
       setUser(nextUser);
       if (!sessionUser || !nextUser) {
         try {
-          setPublicEntry(await loadCommunityPublicEntry(supabase, communitySlug));
+          const entry = await loadCommunityPublicEntry(supabase, communitySlug);
+          if (current()) setPublicEntry(entry);
         } catch (nextError) {
-          setError(communityErrorMessage(nextError, "このCommunityの参加案内を読み込めませんでした。"));
+          if (current()) setError(communityErrorMessage(nextError, "このCommunityの参加案内を読み込めませんでした。"));
         } finally {
-          if (mounted) setLoading(false);
+          if (current()) setLoading(false);
         }
         return;
       }
       void ensureProfile(sessionUser)
         .then((profile) => {
-          if (mounted) setMikkeId(profile.handle);
+          if (current()) setMikkeId(profile.handle);
         })
         .catch(() => {
-          if (mounted) setMikkeId(undefined);
+          if (current()) setMikkeId(undefined);
         });
       try {
         await reload(nextUser);
       } finally {
-        if (mounted) setLoading(false);
+        if (current()) setLoading(false);
       }
-    });
+    })();
     return () => {
-      mounted = false;
+      mounted.current = false;
+      reloadGeneration.current++;
     };
-  }, [communitySlug, router]);
+  }, [communitySlug, router, lease]);
 
   useEffect(() => {
     if (!user || !data?.community.id || data.membership?.status !== "active") return;
@@ -263,12 +284,13 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
   }
 
   async function handleJoin(input: { displayName: string; legalName: string; phone: string; joinReason: string; acceptTerms: boolean; acceptRules: boolean; acceptPrivacy: boolean }) {
-    if (!user || !data?.community) return;
+    if (!user || !data?.community || !current()) return;
     setMessage("");
     setError("");
     try {
-      const application = await submitCommunityJoinApplication(supabase, data.community.id, input);
+      const application = await submitCommunityJoinApplication(communityScopedClient(lease), data.community.id, input);
       await reload(user);
+      if (!current()) return;
       if (application.status === "approved") {
         setMessage("COMMUNITYに参加しました。");
         router.replace(base);
@@ -276,6 +298,7 @@ export function CommunityApp({ view, roomId, postId, communitySlug }: { view: Co
         setMessage("参加申請を受け付けました。運営者の承認をお待ちください。");
       }
     } catch (nextError) {
+      if (!current()) return;
       setError(communityErrorMessage(nextError, "参加処理に失敗しました。"));
     }
   }

@@ -71,7 +71,11 @@ export function communityPlatformActionBlock(state: CommunityPlatformReadState, 
   if (!data.allowedActions.includes(action)) return "現在この操作は利用できません。";
   if (action === "checkout") return null;
   if (action === "portal") return data.resourceId && data.subscription ? null : "請求・契約管理の対象を確認できません。";
-  if (action === "start_trial") return data.resourceId === null && data.subscription === null && data.creation.state === "none"
+  // The server may allow a fresh operation for an expired, never-created trial.
+  // A bound Community or a paid subscription is never restarted here.
+  if (action === "start_trial") return data.resourceId === null
+    && (data.subscription === null || (data.subscription.planKey === "trial" && data.subscription.state === "ended"))
+    && data.creation.state === "none"
     ? null : "30日無料を開始できません。契約状態を再確認してください。";
   // This is a display hint, not a grant. The actual create API must atomically
   // consume the entitlement. No inference from URL, plan or local storage.

@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const module = { exports: {} };
+vm.runInNewContext(ts.transpileModule(readFileSync('lib/billing/platform/server-environment.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText, { module, exports: module.exports, URL });
+const allowed = module.exports.isAllowedPlatformSupabaseUrl;
+const local = 'http://127.0.0.1:54541';
+assert.equal(allowed(local, 'development', local), true);
+for (const mode of ['production', 'test', undefined]) assert.equal(allowed(local, mode, local), false);
+for (const configured of [undefined, '', 'http://127.0.0.1:54542']) assert.equal(allowed(local, 'development', configured), false);
+for (const url of ['http://example.com:54541', 'http://127.0.0.1.evil.test:54541', 'http://localhost:54541', 'http://127.1:54541', 'http://2130706433:54541', 'http://[::1]:54541', 'http://127.0.0.1:0', 'http://127.0.0.1:65536', 'http://127.0.0.1:80', `${local}/`, `${local}/rest/v1`, `${local}?a=b`, `${local}#fragment`, 'http://name:password@127.0.0.1:54541', ` ${local}`, 'not-a-url']) assert.equal(allowed(url, 'development', url), false, url);
+for (const mode of ['production', 'development', undefined]) assert.equal(allowed('https://project.supabase.co', mode, undefined), true);
+assert.match(readFileSync('lib/billing/platform/server.ts', 'utf8'), /isAllowedPlatformSupabaseUrl\(url,process.env.NODE_ENV,process.env.PLATFORM_BILLING_LOCAL_SUPABASE_URL\)/);
+console.log('Platform Supabase URL: explicit development loopback allowed; production/test/aliases/credentials/path/port failures rejected. No network.');

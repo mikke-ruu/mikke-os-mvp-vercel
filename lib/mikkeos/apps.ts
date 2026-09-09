@@ -112,6 +112,17 @@ export const mikkeApps: MikkeAppDefinition[] = [
     accent: "slate"
   },
   {
+    key: "media",
+    name: "Media",
+    shortName: "Media",
+    role: "記事を書き、公開し、自分の発信を積み重ねる入口。",
+    status: "prototype",
+    activityExamples: ["Mediaを作成", "記事を下書き", "記事を公開"],
+    storyOutputs: [],
+    deskOutputs: [],
+    accent: "blue"
+  },
+  {
     key: "library",
     name: "Library",
     shortName: "Library",
@@ -127,7 +138,7 @@ export const mikkeApps: MikkeAppDefinition[] = [
 // Academy is available only through its direct, authenticated routes for now.
 // Keep it in the OS registry for Activity Log and app-internal lookups, but do
 // not advertise it in the public app catalog or shared app menus.
-const hiddenCatalogAppKeys = new Set<AppKey>(["academy"]);
+const hiddenCatalogAppKeys = new Set<AppKey>(["academy", "media"]);
 
 export const catalogMikkeApps = mikkeApps.filter((app) => !hiddenCatalogAppKeys.has(app.key));
 

@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import { resolveSelectedMediaCards as resolve } from '../lib/media-app/selected-cards.ts';
+const destination = { kind: 'page', key: 'shop-internal' };
+const selection = { destination, mediaSlug: 'cake-shop', articleSlug: 'recipe', locale: 'ja', approvedRevision: 'a'.repeat(64), approvedPublication: 'publication-1' };
+const row = { destinationKind: 'page', destinationKey: 'shop-internal', mediaSlug: 'cake-shop', articleSlug: 'recipe', locale: 'ja', revision: 'a'.repeat(64), publication: 'publication-1', active: true, sourcePublished: true, destinationPublished: true, access: 'free', title: 'お店のレシピ', excerpt: '無料の紹介文', publishedAt: '2026-09-09T00:00:00Z' };
+let calls = 0;
+assert.deepEqual(await resolve(destination, [], async () => { calls++; return row; }), []);
+assert.equal(calls, 0);
+const cards = await resolve(destination, [selection, selection], async () => row);
+assert.equal(cards.length, 1);
+assert.deepEqual(Object.keys(cards[0]).sort(), ['title','excerpt','canonicalUrl','publishedAt'].sort());
+for (const changes of [{active:false},{sourcePublished:false},{destinationPublished:false},{access:'paid'},{publication:'publication-2'},{revision:'b'.repeat(64)},{destinationKey:'other'},{articleSlug:'other'},{blocks:[{text:'secret'}]},{owner_id:'secret'},{coverUrl:'https://storage.example/owner/secret'},{title:''}]) assert.deepEqual(await resolve(destination,[selection],async()=>({...row,...changes})),[]);
+assert.deepEqual(await resolve({...destination,key:'other'},[selection],async()=>row),[]);
+assert.deepEqual(await resolve(destination,[selection],async()=>{throw Error('offline');}),[]);
+assert.deepEqual(await resolve(destination,[selection],()=>new Promise(()=>{}),{timeoutMs:5}),[]);
+const controller = new AbortController();
+const pending = resolve(destination,[selection],async()=>{controller.abort(); return row;},{signal:controller.signal});
+assert.deepEqual(await pending,[]);
+// A successful earlier read must never become a fallback after withdrawal.
+assert.equal((await resolve(destination,[selection],async()=>row)).length,1);
+assert.deepEqual(await resolve(destination,[selection],async()=>({...row,sourcePublished:false})),[]);
+assert.deepEqual(await resolve(destination,[selection],async()=>({...row,publication:'publication-2'})),[]);
+assert.equal((await resolve(destination,[{...selection,approvedPublication:'publication-2'}],async()=>({...row,publication:'publication-2'}))).length,1);
+console.log('Selected Media cards: explicit selection, destination, revision, withdraw/republish, DTO, paid rejection, timeout and cancellation PASS');

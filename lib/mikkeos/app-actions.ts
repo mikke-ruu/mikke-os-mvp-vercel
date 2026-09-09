@@ -225,6 +225,7 @@ export const appActionPresets: Record<AppKey, ActivityActionPreset[]> = {
   team_works: [],
   fund: [],
   page: [],
+  media: [],
   library: []
 };
 

@@ -344,6 +344,20 @@ await checkAsync("trial start rejects missing capability, bad result and missing
   assert.equal((await model.startCommunityPlatformTrial(ready, requestId, transport(() => assert.fail(), null))).authRequired, true);
 });
 
+check("only server-approved uncreated expired trial can start a fresh operation", () => {
+  const expired = { state: "ended", planKey: "trial", currentPeriodStartsAt: "2026-08-01T00:00:00.000Z", currentPeriodEndsAt: "2026-08-31T00:00:00.000Z", automaticBilling: false, cancelAtPeriodEnd: false };
+  const fresh = { resourceId: null, subscription: expired, creation: { state: "none" }, allowedActions: ["start_trial"] };
+  assert.equal(model.communityPlatformActionBlock(state(fresh), "start_trial"), null);
+  assert.notEqual(model.communityPlatformActionBlock(state({ ...fresh, allowedActions: [] }), "start_trial"), null);
+  assert.notEqual(model.communityPlatformActionBlock(state({ ...fresh, resourceId: resource }), "start_trial"), null);
+  assert.notEqual(model.communityPlatformActionBlock(state({ ...fresh, subscription: { ...expired, state: "trialing" } }), "start_trial"), null);
+  assert.notEqual(model.communityPlatformActionBlock(state({ ...fresh, subscription: { ...expired, planKey: "starter" } }), "start_trial"), null);
+  assert.notEqual(model.communityPlatformActionBlock(state({ ...fresh, creation: { state: "consumed" } }), "start_trial"), null);
+  const html = renderToStaticMarkup(React.createElement(CommunityQuickStartView, { state: state(fresh), onStartTrial() {} }));
+  assert.ok(html.includes("30日間試してみる"));
+  assert.ok(!html.includes('href="/community/create"'));
+});
+
 for (const kind of ["unavailable", "auth_required", "error", "policy_pending"]) check("UI empty state honest", () => {
   const html = renderToStaticMarkup(React.createElement(CommunityPlatformBillingView, { state: { kind } }));
   assert.ok(html.includes("請求額と請求日は未取得")); assert.ok(html.includes("disabled"));

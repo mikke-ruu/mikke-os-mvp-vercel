@@ -11,6 +11,7 @@ import { validatePlatformBillingQuote } from './quote';
 import type { BillingSelection, PlatformBillingQuote } from './quote';
 import { createStripeProvider, readStripeRuntimeConfig } from './stripe';
 import { resolveAcademyBillingPlan } from './academy-plan';
+import { isAllowedPlatformSupabaseUrl } from './server-environment';
 
 type PolicySet = PlatformBillingQuote['policies'];
 type Catalog = Readonly<{
@@ -24,7 +25,7 @@ const TOKEN=/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
 function environment(){
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL,publicKey=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const secretKey=process.env.SUPABASE_SECRET_KEY??process.env.SUPABASE_SERVICE_ROLE_KEY;
-  try{if(!url||!publicKey||!secretKey||new URL(url).protocol!=='https:')throw new Error();}catch{throw new PlatformApiError('BILLING_NOT_CONFIGURED');}
+  if(!url||!publicKey||!secretKey||!isAllowedPlatformSupabaseUrl(url,process.env.NODE_ENV,process.env.PLATFORM_BILLING_LOCAL_SUPABASE_URL))throw new PlatformApiError('BILLING_NOT_CONFIGURED');
   return{url,publicKey,secretKey};
 }
 function requirePaidBillingEnabled(){
