@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { LogOut } from "lucide-react";
 import { CommunityDirectory } from "./CommunityDirectory";
+import { CommunityAuthBoundary, communityScopedClient } from "./CommunityAuthBoundary";
+import type { CommunityAuthLease } from "@/lib/community/auth-scope";
 import { communityErrorMessage, createCommunity, listMyCommunities, listMyManagedCommunities } from "@/lib/community/client";
 import { communityPlatformActionBlock, loadCommunityPlatformStatus, type CommunityPlatformReadState } from "@/lib/community/platform-billing";
 import { communityPlatformBrowserTransport } from "@/lib/community/platform-billing-browser";
@@ -102,6 +104,10 @@ function slugify(value: string) {
 }
 
 export function CommunityCreatePage() {
+  return <CommunityAuthBoundary>{(lease) => <CommunityCreateForm key={lease.epoch} lease={lease} />}</CommunityAuthBoundary>;
+}
+
+function CommunityCreateForm({ lease }: { lease: CommunityAuthLease }) {
   const router = useRouter();
   const [user, setUser] = useState<HubUser | null>(null);
   const [name, setName] = useState("");
@@ -116,18 +122,22 @@ export function CommunityCreatePage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    supabase.auth.getSession().then(async ({ data }) => {
-      const sessionUser = data.session?.user ? { id: data.session.user.id, email: data.session.user.email } : null;
+    void (async () => {
+      const sessionUser = lease.user;
       if (!sessionUser) {
         router.replace("/community/for-organizers?mode=signup");
         return;
       }
       setUser(sessionUser);
       setDisplayName(sessionUser.email?.split("@")[0] ?? "");
-      setPlatformState(await loadCommunityPlatformStatus(null, communityPlatformBrowserTransport, controller.signal));
-    }).catch(() => setPlatformState({ kind: "error" }));
+      const state = await loadCommunityPlatformStatus(null, {
+        ...communityPlatformBrowserTransport,
+        getAccessToken: async () => lease.accessToken()
+      }, controller.signal);
+      if (lease.isCurrent() && !controller.signal.aborted) setPlatformState(state);
+    })().catch(() => { if (lease.isCurrent() && !controller.signal.aborted) setPlatformState({ kind: "error" }); });
     return () => controller.abort();
-  }, [router]);
+  }, [router, lease]);
 
   function updateName(value: string) {
     setName(value);
@@ -136,7 +146,7 @@ export function CommunityCreatePage() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user) return;
+    if (!user || !lease.isCurrent() || saving) return;
     if (createBlock) {
       setError(createBlock);
       return;
@@ -146,9 +156,11 @@ export function CommunityCreatePage() {
     try {
       const safeSlug = slugify(slug) || `community-${crypto.randomUUID().slice(0, 8)}`;
       assertMikkeNameIsNotReserved({ slug: safeSlug, displayName: name, label: "Community名またはURL用ID" });
-      const community = await createCommunity(supabase, user.id, { name, slug: safeSlug, description, displayName });
+      const community = await createCommunity(communityScopedClient(lease), user.id, { name, slug: safeSlug, description, displayName });
+      if (!lease.isCurrent()) return;
       router.replace(communityBasePath(community.slug));
     } catch (nextError) {
+      if (!lease.isCurrent()) return;
       setError(communityErrorMessage(nextError, "Communityを作成できませんでした。"));
       setSaving(false);
     }
