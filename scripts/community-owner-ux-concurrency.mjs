@@ -52,6 +52,32 @@ function asyncSql(sql) {
   });
 }
 
+function openHeldSql(initialSql, marker) {
+  const child = spawn(psql, [...dockerPrefix, ...args], { env: pgEnv, stdio: ["pipe", "pipe", "pipe"], shell: false });
+  let stdout = "";
+  let stderr = "";
+  let markerResolve;
+  let markerReject;
+  const markerSeen = new Promise((resolve, reject) => { markerResolve = resolve; markerReject = reject; });
+  const completion = new Promise((resolve) => {
+    child.stdout.setEncoding("utf8").on("data", (chunk) => {
+      stdout += chunk;
+      if (stdout.includes(marker)) markerResolve();
+    });
+    child.stderr.setEncoding("utf8").on("data", (chunk) => { stderr += chunk; });
+    child.on("error", markerReject);
+    child.on("close", (status) => resolve({ status, stdout, stderr }));
+  });
+  child.stdin.write(initialSql);
+  return {
+    async waitUntilHeld() {
+      await Promise.race([markerSeen, new Promise((_, reject) => setTimeout(() => reject(new Error(`${marker} was not observed`)), 10_000))]);
+    },
+    release(sql) { child.stdin.end(sql); },
+    completion
+  };
+}
+
 const owner = "df100000-0000-4000-8000-000000000001";
 const staff = "df100000-0000-4000-8000-000000000002";
 const member = "df100000-0000-4000-8000-000000000003";
@@ -112,21 +138,23 @@ const replayState = JSON.parse(sync(`select json_build_object(
 );`));
 assert.deepEqual(replayState, { claims: 1, entitlements: 1 });
 
-const revokeStaff = asyncSql(`begin; set local application_name='owner_ux_revoke_new'; select 1 from public.community_communities where id='${community}' for update; select pg_sleep(2); update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;`);
-await waitForActivity("owner_ux_revoke_new");
+const revokeStaff = openHeldSql(`begin; set local application_name='owner_ux_revoke_new'; select 1 from public.community_communities where id='${community}' for update; select '__OWNER_UX_NEW_LOCK_HELD__';\n`, "__OWNER_UX_NEW_LOCK_HELD__");
+await revokeStaff.waitUntilHeld();
 const blockedGrant = asyncSql(call(revokedRequest, "owner_ux_blocked_new"));
 await waitForActivity("owner_ux_blocked_new", true);
-const [revokeResult, blockedResult] = await Promise.all([revokeStaff, blockedGrant]);
+revokeStaff.release(`update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;\n`);
+const [revokeResult, blockedResult] = await Promise.all([revokeStaff.completion, blockedGrant]);
 assert.equal(revokeResult.status, 0, "staff revocation transaction must succeed");
 assert.notEqual(blockedResult.status, 0, "grant waiting behind revocation must fail");
 assert.match(blockedResult.stderr, /Community staff authority is required/);
 
 sync(`update public.community_memberships set status='active' where community_id='${community}' and user_id='${staff}';`);
-const revokeReplayStaff = asyncSql(`begin; set local application_name='owner_ux_revoke_replay'; select 1 from public.community_communities where id='${community}' for update; select pg_sleep(2); update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;`);
-await waitForActivity("owner_ux_revoke_replay");
+const revokeReplayStaff = openHeldSql(`begin; set local application_name='owner_ux_revoke_replay'; select 1 from public.community_communities where id='${community}' for update; select '__OWNER_UX_REPLAY_LOCK_HELD__';\n`, "__OWNER_UX_REPLAY_LOCK_HELD__");
+await revokeReplayStaff.waitUntilHeld();
 const blockedReplay = asyncSql(call(request, "owner_ux_blocked_replay"));
 await waitForActivity("owner_ux_blocked_replay", true);
-const [revokeReplayResult, blockedReplayResult] = await Promise.all([revokeReplayStaff, blockedReplay]);
+revokeReplayStaff.release(`update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;\n`);
+const [revokeReplayResult, blockedReplayResult] = await Promise.all([revokeReplayStaff.completion, blockedReplay]);
 assert.equal(revokeReplayResult.status, 0, "staff revocation before replay must succeed");
 assert.notEqual(blockedReplayResult.status, 0, "idempotent replay waiting behind revocation must fail");
 assert.match(blockedReplayResult.stderr, /Community staff authority is required/);

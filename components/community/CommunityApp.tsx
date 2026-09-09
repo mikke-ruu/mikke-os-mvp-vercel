@@ -155,13 +155,33 @@ function paymentMethodLabel(method: CommunityPaymentMethod) {
   return "外部決済";
 }
 
-function loadManualPaymentRequestId(storageKey: string) {
-  if (typeof window === "undefined") return crypto.randomUUID();
-  const stored = window.sessionStorage.getItem(storageKey);
-  if (stored && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored)) return stored;
-  const next = crypto.randomUUID();
-  window.sessionStorage.setItem(storageKey, next);
-  return next;
+type ManualPaymentDraft = {
+  requestId: string;
+  planId: string;
+  paymentMethod: Exclude<CommunityPaymentMethod, "external_link">;
+  externalReference: string;
+  note: string;
+  storageAvailable: boolean;
+};
+
+function loadManualPaymentDraft(storageKey: string, defaultPlanId: string): ManualPaymentDraft {
+  const fallback = { requestId: crypto.randomUUID(), planId: defaultPlanId, paymentMethod: "uword_points" as const, externalReference: "", note: "", storageAvailable: false };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(storageKey) ?? "null") as Partial<ManualPaymentDraft> | null;
+    const validRequestId = typeof stored?.requestId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored.requestId);
+    const validMethod = ["uword_points", "bank_transfer", "cash", "other"].includes(stored?.paymentMethod ?? "");
+    return validRequestId && validMethod ? {
+      requestId: stored.requestId!,
+      planId: typeof stored.planId === "string" ? stored.planId : defaultPlanId,
+      paymentMethod: stored.paymentMethod as ManualPaymentDraft["paymentMethod"],
+      externalReference: typeof stored.externalReference === "string" ? stored.externalReference : "",
+      note: typeof stored.note === "string" ? stored.note : "",
+      storageAvailable: true
+    } : { ...fallback, storageAvailable: true };
+  } catch {
+    return fallback;
+  }
 }
 
 function resourceKindLabel(kind: CommunityResourceKind) {
@@ -2400,16 +2420,27 @@ function MemberAccessEditor({ data, member, operatorUserId, actorClient, actorIs
   const [role, setRole] = useState(member.membership.role);
   const [savingMembership, setSavingMembership] = useState(false);
   const activePlans = data.membershipPlans.filter((plan) => plan.status === "active");
-  const [manualPlanId, setManualPlanId] = useState(activePlans[0]?.id ?? "");
-  const [manualPaymentMethod, setManualPaymentMethod] = useState<Exclude<CommunityPaymentMethod, "external_link">>("uword_points");
-  const [manualReference, setManualReference] = useState("");
-  const [manualNote, setManualNote] = useState("");
   const manualRequestStorageKey = `community:manual-payment:${operatorUserId}:${data.community.id}:${member.membership.userId}`;
-  const [manualRequestId, setManualRequestId] = useState(() => loadManualPaymentRequestId(manualRequestStorageKey));
+  const [restoredManualDraft] = useState(() => loadManualPaymentDraft(manualRequestStorageKey, activePlans[0]?.id ?? ""));
+  const [manualPlanId, setManualPlanId] = useState(activePlans.some((plan) => plan.id === restoredManualDraft.planId) ? restoredManualDraft.planId : (activePlans[0]?.id ?? ""));
+  const [manualPaymentMethod, setManualPaymentMethod] = useState<Exclude<CommunityPaymentMethod, "external_link">>(restoredManualDraft.paymentMethod);
+  const [manualReference, setManualReference] = useState(restoredManualDraft.externalReference);
+  const [manualNote, setManualNote] = useState(restoredManualDraft.note);
+  const [manualRequestId, setManualRequestId] = useState(restoredManualDraft.requestId);
+  const [manualDraftStorageAvailable, setManualDraftStorageAvailable] = useState(restoredManualDraft.storageAvailable);
   const active = member.entitlements.filter(isEffectiveEntitlement);
   const isSelf = member.membership.userId === operatorUserId;
   const isCanonicalOwner = member.membership.userId === data.community.ownerUserId;
   const operatorIsCanonicalOwner = operatorUserId === data.community.ownerUserId;
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.sessionStorage.setItem(manualRequestStorageKey, JSON.stringify({ requestId: manualRequestId, planId: manualPlanId, paymentMethod: manualPaymentMethod, externalReference: manualReference, note: manualNote }));
+      setManualDraftStorageAvailable(true);
+    } catch {
+      setManualDraftStorageAvailable(false);
+    }
+  }, [manualNote, manualPaymentMethod, manualPlanId, manualReference, manualRequestId, manualRequestStorageKey]);
   async function grant() {
     if (!keyName) return;
     try {
@@ -2461,7 +2492,6 @@ function MemberAccessEditor({ data, member, operatorUserId, actorClient, actorIs
       setManualReference("");
       setManualNote("");
       const nextRequestId = crypto.randomUUID();
-      if (typeof window !== "undefined") window.sessionStorage.setItem(manualRequestStorageKey, nextRequestId);
       setManualRequestId(nextRequestId);
       onMessage("支払い確認を記録し、メンバーシップ権限を付与しました。");
       await onReload();
@@ -2484,7 +2514,7 @@ function MemberAccessEditor({ data, member, operatorUserId, actorClient, actorIs
         <button type="button" disabled={savingMembership || isSelf || isCanonicalOwner} onClick={() => saveMembership(member.membership.status === "suspended" ? "active" : "suspended")} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-60">{isCanonicalOwner ? "オーナーは停止不可" : isSelf ? "自分は停止不可" : member.membership.status === "suspended" ? "復帰" : "停止"}</button>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]"><EntitlementSelect data={data} value={keyName} onChange={setKeyName} /><button type="button" disabled={!keyName} onClick={grant} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60">付与</button></div>
-      {activePlans.length > 0 ? <details className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><summary className="cursor-pointer text-sm font-bold text-[var(--mikke-primary)]">外部・振込の支払いを確認</summary><p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">ユーワードポイントや銀行振込など、運営者が入金を確認した時に使います。確認履歴を残し、選んだメンバーシップの権限を付与します。</p><div className="mt-3 grid gap-2 md:grid-cols-2"><select value={manualPlanId} onChange={(event) => setManualPlanId(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm">{activePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select><select value={manualPaymentMethod} onChange={(event) => setManualPaymentMethod(event.target.value as Exclude<CommunityPaymentMethod, "external_link">)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><option value="uword_points">ユーワードポイント</option><option value="bank_transfer">銀行振込</option><option value="cash">現金</option><option value="other">その他</option></select><input value={manualReference} onChange={(event) => setManualReference(event.target.value)} placeholder="決済番号・振込日など（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><input value={manualNote} onChange={(event) => setManualNote(event.target.value)} placeholder="運営メモ（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><button type="button" disabled={savingMembership || !manualPlanId} onClick={confirmManualPayment} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60 md:col-span-2">支払い確認を記録して権限を付与</button></div></details> : null}
+      {activePlans.length > 0 ? <details className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><summary className="cursor-pointer text-sm font-bold text-[var(--mikke-primary)]">外部・振込の支払いを確認</summary><p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">ユーワードポイントや銀行振込など、運営者が入金を確認した時に使います。確認履歴を残し、選んだメンバーシップの権限を付与します。</p>{!manualDraftStorageAvailable ? <p className="mt-2 rounded-md border border-[var(--mikke-warning)] bg-white px-3 py-2 text-xs leading-5 text-[var(--mikke-muted)]">この端末では再送情報を保存できません。完了表示を確認できないまま画面を閉じた場合は、支払い履歴を確認してからもう一度操作してください。</p> : null}<div className="mt-3 grid gap-2 md:grid-cols-2"><select value={manualPlanId} onChange={(event) => setManualPlanId(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm">{activePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select><select value={manualPaymentMethod} onChange={(event) => setManualPaymentMethod(event.target.value as Exclude<CommunityPaymentMethod, "external_link">)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><option value="uword_points">ユーワードポイント</option><option value="bank_transfer">銀行振込</option><option value="cash">現金</option><option value="other">その他</option></select><input value={manualReference} onChange={(event) => setManualReference(event.target.value)} placeholder="決済番号・振込日など（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><input value={manualNote} onChange={(event) => setManualNote(event.target.value)} placeholder="運営メモ（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><button type="button" disabled={savingMembership || !manualPlanId} onClick={confirmManualPayment} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60 md:col-span-2">支払い確認を記録して権限を付与</button></div></details> : null}
     </article>
   );
 }
