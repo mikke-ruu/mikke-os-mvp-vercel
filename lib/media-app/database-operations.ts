@@ -30,6 +30,9 @@ export type MediaArticleDraftInput = {
   excerpt?: string;
   locale?: string;
   blocks: MediaBlock[];
+  categoryId?: string | null;
+  coverImageUrl?: string;
+  coverImageAssetId?: string | null;
 };
 
 export type MediaArticleDraftDatabaseRow = {
@@ -40,11 +43,14 @@ export type MediaArticleDraftDatabaseRow = {
   excerpt: string;
   locale: string;
   draft_blocks: MediaBlock[];
+  category_id?: string | null;
+  cover_image_url?: string;
+  cover_image_asset_id?: string | null;
   created_at: string;
   updated_at: string;
 };
 
-const draftColumns = "id,site_id,title,slug,excerpt,locale,draft_blocks,created_at,updated_at";
+const draftColumns = "id,site_id,title,slug,excerpt,locale,draft_blocks,category_id,cover_image_url,cover_image_asset_id,created_at,updated_at";
 
 // Callers inject their authenticated client; RLS remains the ownership authority.
 export function createMediaDatabaseOperations(client: SupabaseClient) {
@@ -120,7 +126,10 @@ export function createMediaDatabaseOperations(client: SupabaseClient) {
       slug: input.slug,
       excerpt: input.excerpt ?? "",
       locale: input.locale ?? "ja-JP",
-      draft_blocks: input.blocks
+      draft_blocks: input.blocks,
+      ...(input.categoryId !== undefined ? { category_id: input.categoryId } : {}),
+      ...(input.coverImageUrl !== undefined ? { cover_image_url: input.coverImageUrl } : {}),
+      ...(input.coverImageAssetId !== undefined ? { cover_image_asset_id: input.coverImageAssetId } : {})
     };
   }
 

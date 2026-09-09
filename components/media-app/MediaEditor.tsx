@@ -143,7 +143,7 @@ export function MediaEditor() {
         <details className="mt-12 border-t border-[var(--mikke-line)] py-5"><summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold"><Settings2 size={16} />記事の設定（入力しなくても大丈夫）</summary><div className="mt-5 space-y-6">
           <label className="block text-sm font-semibold">記事URL名（任意）<input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="空欄なら自動で作成" className={inputClass} /><span className="mt-2 block break-all text-xs font-normal leading-6 text-[var(--mikke-muted)]">空欄のまま保存できます。一度作ったURLは空欄に戻しても変わりません。{article ? ` 現在：/media/${site.slug}/${article.slug}` : ""}</span></label>
           <label className="block text-sm font-semibold">記事一覧の紹介文（任意）<textarea value={excerpt} maxLength={300} onChange={(event) => setExcerpt(event.target.value)} rows={3} placeholder="書かなくても、本文のはじめから自動で作ります。" className={inputClass} /><span className="mt-2 block text-xs font-normal leading-6 text-[var(--mikke-muted)]">記事を開く前に内容を伝える短い文章です。自分で書きたいときだけ入力してください。AIは使いません。</span></label>
-          {article?.publishedSnapshot ? <button type="button" className={buttonClass} onClick={() => { setArticle(unpublishMediaArticle(article.id)); setMessage("公開版を取り下げました。下書きは残っています。"); }}>公開版を取り下げる</button> : null}
+          {article?.publishedSnapshot ? <button type="button" className={buttonClass} onClick={() => { setArticle(unpublishMediaArticle(article.id)); setMessage("公開をキャンセルしました。下書きは残っています。"); }}>公開をキャンセル</button> : null}
         </div></details>
       </div>
     </>}

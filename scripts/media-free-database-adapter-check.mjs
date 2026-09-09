@@ -46,3 +46,11 @@ assert.deepEqual(update, {
 assert.ok(calls.filter(([method]) => method === "select").every(([, columns]) =>
   !/owner_id|status|current_published_version_id|\*/.test(columns)));
 console.log("Media Free injected operations / publication-field exclusion: PASS");
+// The editor preserves optional category/cover edits without letting callers set publication state.
+await operations.updateMediaArticleDraftInDatabase('article', { ...input, categoryId: null, coverImageUrl: '', coverImageAssetId: null });
+const cleared = calls.filter(([method])=>method==='update').at(-1)[1];
+assert.equal(cleared.category_id, null);
+assert.equal(cleared.cover_image_url, '');
+assert.equal(cleared.cover_image_asset_id, null);
+assert.equal(cleared.status, undefined);
+assert.equal(cleared.owner_id, undefined);
