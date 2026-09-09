@@ -40,7 +40,12 @@ async function sign(jwt, path) {
   return fetch(signUrl(path), { method: "POST", headers: { ...authHeaders(jwt), "content-type": "application/json" }, body: JSON.stringify({ expiresIn: 900 }), redirect: "error" });
 }
 async function remove(jwt, path) {
-  return fetch(objectUrl(path), { method: "DELETE", headers: authHeaders(jwt), redirect: "error" });
+  return fetch(new URL("/storage/v1/object/community-resources", base), {
+    method: "DELETE",
+    headers: { ...authHeaders(jwt), "content-type": "application/json" },
+    body: JSON.stringify({ prefixes: [path] }),
+    redirect: "error",
+  });
 }
 async function expectDenied(response, reason) {
   assert.ok(!response.ok, `${reason} must fail`);
@@ -62,7 +67,7 @@ const cleanupTargets = new Map([
 try {
   for (const [jwt, path] of [[required.ownerJwt, pdfPath], [required.otherOwnerJwt, otherPath]]) {
     const uploaded = await upload(jwt, path, pdfBytes, "application/pdf");
-    assert.ok(uploaded.ok, `fixture upload failed with ${uploaded.status}`);
+    if (!uploaded.ok) throw new Error(`fixture upload failed with ${uploaded.status}: ${(await uploaded.text()).slice(0, 240)}`);
   }
 
   const signed = await sign(required.ownerJwt, pdfPath);
@@ -98,7 +103,8 @@ try {
     const deleted = await remove(jwt, path);
     assert.ok(deleted.ok || deleted.status === 404, `fixture cleanup failed with ${deleted.status}`);
     const residue = await fetch(authenticatedUrl(path), { headers: authHeaders(jwt), redirect: "error" });
-    assert.equal(residue.status, 404, `fixture must not remain readable: ${path}`);
+    assert.ok([400, 404].includes(residue.status), `fixture must not remain readable: ${path}`);
+    if (residue.status === 400) assert.match((await residue.text()).toLowerCase(), /not.?found|does not exist/);
   }
 }
 
