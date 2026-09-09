@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+const sql = readFileSync('supabase/migrations/20260909092809_community_creation_bind_before_children.sql','utf8');
+const locked = sql.indexOf('for update;');
+const parent = sql.indexOf('insert into public.community_communities');
+const bind = sql.indexOf('update platform_billing_private.creation_entitlements');
+const children = sql.indexOf('insert into public.community_memberships');
+assert(locked > 0 && locked < bind && bind < parent && parent < children);
+assert(sql.includes('v_resource_id uuid := pg_catalog.gen_random_uuid()'));
+assert(sql.includes('get diagnostics v_consumed = row_count;'));
+assert(sql.includes('if v_consumed <> 1 then'));
+assert.equal(sql.match(/update platform_billing_private.creation_entitlements/g)?.length,1);
+assert(!sql.includes('disable trigger') && !sql.includes('session_replication_role'));
+assert(sql.includes("set search_path = ''"));
+const test = readFileSync('supabase/tests/community_creation_bind_before_children.sql','utf8');
+for (const expected of ['community_memberships','community_rooms','LOCAL_CREATE_CHILD_FAILURE','failed creation mutated grant','community_owner_write_allowed','COMMUNITY_CREATE_ENTITLEMENT_CONFLICT','rollback;']) assert(test.includes(expected));
+console.log('Community creation bind ordering, affected-row guard and rollback regression contract passed');
