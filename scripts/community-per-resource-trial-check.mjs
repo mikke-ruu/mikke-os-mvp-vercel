@@ -24,7 +24,7 @@ const migrations = [
   '20260902171944_platform_billing_verified_provider_events.sql',
   '20260902223651_platform_billing_subscription_runtime.sql',
   '20260904004922_platform_billing_community_trial_start.sql',
-  '20260909074446_community_per_resource_trial.sql',
+  '20260909141538_community_per_resource_trial.sql',
 ];
 const setup = `
 create role anon; create role authenticated; create role service_role;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-const sql = readFileSync('supabase/migrations/20260909092809_community_creation_bind_before_children.sql','utf8');
+const sql = readFileSync('supabase/migrations/20260909141552_community_creation_bind_before_children.sql','utf8');
 const locked = sql.indexOf('for update;');
 const parent = sql.indexOf('insert into public.community_communities');
 const bind = sql.indexOf('update platform_billing_private.creation_entitlements');
