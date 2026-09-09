@@ -40,6 +40,7 @@ import type {
   CommunityAcademyAccessInvitation,
   CommunityStamp
 } from "./types";
+export { communityErrorMessage } from "./error-message";
 import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
 
 type DbClient = SupabaseClient<any, "public", any>;
@@ -345,15 +346,6 @@ function mapResource(row: any): CommunityResource {
     sortOrder: row.sort_order ?? 0,
     publishedAt: row.published_at ?? null
   };
-}
-
-export function communityErrorMessage(error: unknown, fallback: string) {
-  if (!error || typeof error !== "object") return fallback;
-  const message = "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
-  if (message.includes("relation") || message.includes("permission denied") || message.includes("column")) {
-    return "COMMUNITYのデータベース更新が必要です。最新migrationの適用後にもう一度お試しください。";
-  }
-  return message || fallback;
 }
 
 export async function loadCommunityPublicEntry(client: DbClient, communitySlug: string): Promise<CommunityPublicEntry> {
