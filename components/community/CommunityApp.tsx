@@ -51,6 +51,8 @@ import {
   createCommunityComment,
   createCommunityAttachmentDownloadUrl,
   createCommunityResource,
+  createCommunityResourceFile,
+  createCommunityResourceViewUrl,
   createCommunityDataRequest,
   createCommunityMembershipPlan,
   createCommunityPaymentClaim,
@@ -71,6 +73,7 @@ import {
   reorderCommunityRooms,
   restoreCommunityRoom,
   reviewCommunityPaymentClaim,
+  recordCommunityManualPayment,
   saveCommunitySettings,
   saveCommunityProfile,
   saveCommunityOperatorProfile,
@@ -84,6 +87,7 @@ import {
   updateCommunityEvent,
   updateCommunityEventStatus,
   updateCommunityMembership,
+  updateCommunityMembershipPlan,
   updateCommunityComment,
   updateCommunityChatMessage,
   updateCommunityPost,
@@ -97,7 +101,7 @@ import {
 } from "@/lib/community/client";
 import { submitCommunityJoinApplication } from "@/lib/community/client";
 import { CommunityHelpView, CommunityRulesView, OwnerCommunityModerationView, OwnerCommunitySafetyView } from "@/components/community/CommunitySafetyViews";
-import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEntitlementSource, CommunityEvent, CommunityHomeMetric, CommunityMemberEntitlement, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind, CommunitySearchResult } from "@/lib/community/types";
+import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEntitlementSource, CommunityEvent, CommunityHomeMetric, CommunityMemberEntitlement, CommunityMembershipPlan, CommunityPaymentMethod, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind, CommunitySearchResult } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
 import { ensureProfile } from "@/lib/profile";
@@ -116,6 +120,46 @@ function entitlementSourceLabel(source: CommunityEntitlementSource) {
   if (source === "subscription") return "Community有料会員";
   if (source === "manual") return "運営付与";
   return "招待・外部連携";
+}
+
+function membershipRoleLabel(role: string) {
+  if (role === "owner") return "オーナー";
+  if (role === "moderator") return "モデレーター";
+  return "参加者";
+}
+
+function membershipStatusLabel(status: string) {
+  if (status === "active") return "有効";
+  if (status === "suspended") return "停止中";
+  if (status === "left") return "退会済み";
+  return status;
+}
+
+function planStatusLabel(status: CommunityMembershipPlan["status"]) {
+  if (status === "active") return "公開中";
+  if (status === "draft") return "下書き";
+  return "公開終了";
+}
+
+function billingIntervalLabel(interval: CommunityMembershipPlan["billingInterval"]) {
+  if (interval === "month") return "月額";
+  if (interval === "year") return "年額";
+  return "1回";
+}
+
+function paymentMethodLabel(method: CommunityPaymentMethod) {
+  if (method === "uword_points") return "ユーワードポイント";
+  if (method === "bank_transfer") return "銀行振込";
+  if (method === "cash") return "現金";
+  if (method === "other") return "その他";
+  return "外部決済";
+}
+
+function resourceKindLabel(kind: CommunityResourceKind) {
+  if (kind === "web") return "Webページ";
+  if (kind === "pdf") return "PDF";
+  if (kind === "video") return "動画";
+  return "その他";
 }
 
 function isEffectiveEntitlement(item: CommunityMemberEntitlement) {
@@ -338,6 +382,7 @@ function CommunityTenantApp({ view, roomId, postId, communitySlug, lease }: Comm
 
   return (
     <CommunityShell base={base} userId={user.id} community={data} mikkeId={mikkeId} onSignOut={signOut} showOwner={ownerLike}>
+      {view.startsWith("owner-") ? <OwnerBackLink base={base} /> : null}
       {message ? <Notice>{message}</Notice> : null}
       {error ? <Notice>{error}</Notice> : null}
       {view === "home" ? <HomeView base={base} data={data} userId={user.id} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
@@ -360,6 +405,14 @@ function CommunityTenantApp({ view, roomId, postId, communitySlug, lease }: Comm
       {view === "owner-safety" ? <OwnerCommunitySafetyView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-moderation" ? <OwnerCommunityModerationView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
     </CommunityShell>
+  );
+}
+
+function OwnerBackLink({ base }: { base: string }) {
+  return (
+    <Link href={`${base}/owner`} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]">
+      <ArrowLeft size={16} />運営管理へ戻る
+    </Link>
   );
 }
 
@@ -608,7 +661,7 @@ function HomeView({ base, data, userId, onReload, onMessage, onError }: ViewMuta
           </section>
 
           <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--mikke-muted-light)]">NEW MEMBERS</p>
+            <p className="text-xs font-bold tracking-[0.16em] text-[var(--mikke-muted-light)]">新しいメンバー</p>
             <h2 className="mt-1 text-lg font-bold">新しいメンバー</h2>
             <div className="mt-4 space-y-3">
               {newMembers.map((profile) => <button type="button" onClick={() => setSelectedProfile(profile)} key={profile.userId} className="flex w-full items-center gap-3 rounded-xl p-1 text-left transition hover:bg-[var(--mikke-surface-soft)]"><MemberAvatar name={profile.displayName} avatarUrl={profile.avatarUrl} color={profile.avatarColor} size="sm" /><div className="min-w-0"><p className="truncate text-sm font-bold">{profile.displayName}</p><p className="truncate text-xs text-[var(--mikke-muted-light)]">{profile.bio || "プロフィールはまだ未設定です"}</p></div></button>)}
@@ -1283,20 +1336,50 @@ function LibraryView({ data }: { data: CommunityDashboard }) {
   const visibleResources = data.resources.filter((resource) => resource.isPublished);
   return (
     <section className="border-t border-[var(--mikke-line)] pt-5">
-      <h2 className="text-2xl font-bold tracking-normal">LIBRARY</h2>
+      <h2 className="text-2xl font-bold tracking-normal">資料</h2>
       <div className="mt-4 space-y-3">
-        {visibleResources.map((resource) => (
-          <a key={resource.id} href={resource.externalUrl} target="_blank" rel="noreferrer" className="flex items-start gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4">
-            <BookOpen className="mt-0.5 shrink-0 text-[var(--mikke-primary)]" size={18} />
-            <span className="min-w-0">
-              <span className="block text-sm font-bold text-[var(--mikke-text)]">{resource.title}</span>
-              {resource.description ? <span className="mt-1 block text-xs leading-5 text-[var(--mikke-muted)]">{resource.description}</span> : null}
-            </span>
-          </a>
-        ))}
+        {visibleResources.map((resource) => <LibraryResourceCard key={resource.id} resource={resource} />)}
         {visibleResources.length === 0 ? <MikkeEmptyState title="資料リンクはまだありません" helper="PDFや動画、説明ページのURLを運営画面から追加できます。" /> : null}
       </div>
     </section>
+  );
+}
+
+function LibraryResourceCard({ resource }: { resource: CommunityResource }) {
+  const [fileUrl, setFileUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [fileError, setFileError] = useState("");
+  async function openFile() {
+    if (!resource.storagePath || loading) return;
+    setLoading(true);
+    setFileError("");
+    try {
+      setFileUrl(await createCommunityResourceViewUrl(supabase, resource.storagePath));
+    } catch (error) {
+      setFileError(communityErrorMessage(error, "ファイルを開けませんでした。"));
+    } finally {
+      setLoading(false);
+    }
+  }
+  if (!resource.storagePath) {
+    return (
+      <a href={resource.externalUrl} target="_blank" rel="noreferrer" className="flex items-start gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4">
+        <BookOpen className="mt-0.5 shrink-0 text-[var(--mikke-primary)]" size={18} />
+        <span className="min-w-0"><span className="block text-sm font-bold text-[var(--mikke-text)]">{resource.title}</span>{resource.description ? <span className="mt-1 block text-xs leading-5 text-[var(--mikke-muted)]">{resource.description}</span> : null}</span>
+      </a>
+    );
+  }
+  return (
+    <article className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
+      <div className="flex items-start gap-3">
+        <FileDown className="mt-0.5 shrink-0 text-[var(--mikke-primary)]" size={18} />
+        <div className="min-w-0 flex-1"><p className="text-sm font-bold">{resource.title}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">{resourceKindLabel(resource.kind)}{resource.fileName ? ` ・ ${resource.fileName}` : ""}</p>{resource.description ? <p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">{resource.description}</p> : null}</div>
+      </div>
+      {!fileUrl ? <button type="button" onClick={openFile} disabled={loading} className="mt-3 rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60">{loading ? "準備中..." : resource.kind === "video" ? "この画面で見る" : "PDFを開く"}</button> : null}
+      {fileError ? <p className="mt-2 text-xs font-bold text-[var(--mikke-danger)]">{fileError}</p> : null}
+      {fileUrl && resource.kind === "video" ? <video controls preload="metadata" src={fileUrl} className="mt-3 max-h-[70vh] w-full rounded-lg bg-black" /> : null}
+      {fileUrl && resource.kind !== "video" ? <a href={fileUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white">PDFを開く</a> : null}
+    </article>
   );
 }
 
@@ -1395,20 +1478,20 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
       </section>
 
       {data.membershipPlans.filter((plan) => plan.status === "active").length > 0 ? <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
-        <h3 className="text-lg font-bold">有料会員プラン</h3>
-        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">決済はこのCommunityの運営者が契約する外部サービスで行います。mikkeは決済情報を保持しません。</p>
+        <h3 className="text-lg font-bold">メンバーシップ</h3>
+        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">プランを選び、運営者が案内する方法で支払います。支払い後に確認を申請すると、運営者の承認後に限定Roomを閲覧できます。</p>
         <div className="mt-4 grid gap-3">
           {data.membershipPlans.filter((plan) => plan.status === "active").map((plan) => {
             const matchingEntitlements = data.entitlements.filter((item) => isEffectiveEntitlement(item) && item.entitlementKey === plan.entitlementKey);
             const isAlreadyEntitled = matchingEntitlements.length > 0;
             return (
               <article key={plan.id} className="rounded-lg border border-[var(--mikke-line-soft)] p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold">{plan.name}</p><p className="mt-1 text-sm text-[var(--mikke-muted)]">{plan.description}</p></div><p className="font-bold text-[var(--mikke-primary)]">¥{plan.amountYen.toLocaleString()} / {plan.billingInterval === "month" ? "月" : plan.billingInterval === "year" ? "年" : "1回"}</p></div>
+                <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold">{plan.name}</p><p className="mt-1 text-sm text-[var(--mikke-muted)]">{plan.description}</p></div><p className="font-bold text-[var(--mikke-primary)]">{billingIntervalLabel(plan.billingInterval)} {plan.amountYen.toLocaleString()}円</p></div>
                 {isAlreadyEntitled ? (
                   <div className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]">この利用範囲は利用中です（{[...new Set(matchingEntitlements.map((item) => entitlementSourceLabel(item.source)))].join("・")}）</div>
                 ) : (
                   <>
-                    <a href={plan.externalPaymentUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white">{plan.paymentProviderLabel}で支払う</a>
+                    {plan.externalPaymentUrl ? <a href={plan.externalPaymentUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white">{plan.paymentProviderLabel}の案内を開く</a> : <p className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-muted)]">支払い方法は運営者へご確認ください。</p>}
                     <div className="mt-3 grid gap-2 sm:grid-cols-2"><input value={payerName} onChange={(event) => setPayerName(event.target.value)} placeholder="決済名義" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder="決済番号（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/></div>
                     <button type="button" disabled={requesting || data.paymentClaims.some((claim) => claim.planId === plan.id && claim.status === "pending")} onClick={() => submitPaymentClaim(plan.id)} className="mt-2 rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-50">{data.paymentClaims.some((claim) => claim.planId === plan.id && claim.status === "pending") ? "確認待ち" : "支払い確認を申請"}</button>
                   </>
@@ -1435,22 +1518,22 @@ function OwnerView({ base, data, ownerLike }: { base: string; data: CommunityDas
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <MikkeStatusBadge tone={ownerLike ? "success" : "muted"}>{ownerLike ? "運営権限" : "閲覧モード"}</MikkeStatusBadge>
-          <h2 className="mt-3 text-2xl font-bold tracking-normal">OWNER</h2>
+          <h2 className="mt-3 text-2xl font-bold tracking-normal">運営管理</h2>
         </div>
       </div>
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Metric label="参加者" value={String(data.ownerMembers.length || (data.membership ? 1 : 0))} />
+        <Metric label="承認待ち" value={String(data.joinApplications.filter((item) => item.status === "pending").length)} href={`${base}/owner/safety`} />
         <Metric label="Room" value={String(data.rooms.length)} />
         <Metric label="投稿" value={String(data.posts.length)} />
-        <Metric label="利用権限定義" value={String(data.entitlementDefinitions.length)} />
       </div>
       {ownerLike ? (
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid gap-2 md:grid-cols-2">
           <OwnerLink href={`${base}/owner/settings`} icon={Settings} title="基本設定" helper="名前・説明・参加方式" />
           <OwnerLink href={`${base}/owner/rooms`} icon={MessagesSquare} title="Room設定" helper="無料・限定・運営Room" />
-          <OwnerLink href={`${base}/owner/members`} icon={KeyRound} title="参加者と権限" helper="手動で利用権限を付与" />
           <OwnerLink href={`${base}/owner/content`} icon={BookOpen} title="コンテンツ管理" helper="告知・イベント・資料" />
           <OwnerLink href={`${base}/owner/safety`} icon={ShieldCheck} title="参加・安全設定" helper="参加承認・規約・禁止ワード" />
+          <OwnerLink href={`${base}/owner/members`} icon={KeyRound} title="参加者と権限" helper="メンバーシップ・支払い確認・利用権限" />
           <OwnerLink href={`${base}/owner/moderation`} icon={MessageCircle} title="通報・問い合わせ" helper="確認・対応・記録" />
         </div>
       ) : null}
@@ -1461,10 +1544,9 @@ function OwnerView({ base, data, ownerLike }: { base: string; data: CommunityDas
 
 function OwnerLink({ href, icon: Icon, title, helper }: { href: string; icon: typeof Settings; title: string; helper: string }) {
   return (
-    <Link href={href} className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
-      <Icon size={20} className="text-[var(--mikke-primary)]" />
-      <p className="mt-3 text-sm font-bold">{title}</p>
-      <p className="mt-1 text-xs text-[var(--mikke-muted)]">{helper}</p>
+    <Link href={href} className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
+      <span className="flex items-center gap-3"><Icon size={19} className="shrink-0 text-[var(--mikke-primary)]" /><span className="text-sm font-bold">{title}</span></span>
+      <p className="mt-1 pl-8 text-xs leading-5 text-[var(--mikke-muted)]">{helper}</p>
     </Link>
   );
 }
@@ -1474,7 +1556,7 @@ function OwnerContentView({ data, userId, ownerLike, onReload, onMessage, onErro
   return (
     <section className="space-y-6 border-t border-[var(--mikke-line)] pt-5">
       <div>
-        <p className="text-xs font-bold uppercase text-[var(--mikke-muted-light)]">CONTENT</p>
+        <p className="text-xs font-bold text-[var(--mikke-muted-light)]">運営メニュー</p>
         <h2 className="mt-1 text-2xl font-bold tracking-normal">コンテンツ管理</h2>
       </div>
       <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
@@ -1484,7 +1566,7 @@ function OwnerContentView({ data, userId, ownerLike, onReload, onMessage, onErro
           <OwnerStampManager data={data} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />
         </div>
         <div className="xl:col-span-2">
-          <OwnerResourceManager data={data} onReload={onReload} onMessage={onMessage} onError={onError} />
+          <OwnerResourceManager data={data} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />
         </div>
       </div>
     </section>
@@ -1708,22 +1790,29 @@ function OwnerEventRow({ event, onReload, onMessage, onError }: { event: Communi
   );
 }
 
-function OwnerResourceManager({ data, onReload, onMessage, onError }: { data: CommunityDashboard; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+function OwnerResourceManager({ data, userId, onReload, onMessage, onError }: { data: CommunityDashboard; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [kind, setKind] = useState<CommunityResourceKind>("web");
   const [externalUrl, setExternalUrl] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     try {
-      await createCommunityResource(supabase, data.community.id, { title, description, kind, externalUrl });
+      if ((kind === "pdf" || kind === "video") && file) {
+        await createCommunityResourceFile(supabase, { communityId: data.community.id, userId, title, description, kind, file });
+      } else {
+        if (!externalUrl.trim()) throw new Error("URLまたはファイルを選んでください。");
+        await createCommunityResource(supabase, data.community.id, { title, description, kind, externalUrl });
+      }
       setTitle("");
       setDescription("");
       setExternalUrl("");
-      onMessage("資料リンクを追加しました。");
+      setFile(null);
+      onMessage(file ? "資料ファイルを追加しました。" : "資料リンクを追加しました。");
       await onReload();
     } catch (error) {
       onError(communityErrorMessage(error, "資料リンクを追加できませんでした。"));
@@ -1734,17 +1823,18 @@ function OwnerResourceManager({ data, onReload, onMessage, onError }: { data: Co
 
   return (
     <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
-      <h3 className="text-base font-bold tracking-normal">資料リンクを追加</h3>
+      <h3 className="text-base font-bold tracking-normal">資料を追加</h3>
       <form onSubmit={submit} className="mt-4 grid gap-3 lg:grid-cols-[1fr_160px_1fr_auto]">
         <input required value={title} onChange={(event) => setTitle(event.target.value)} placeholder="タイトル" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" />
-        <select value={kind} onChange={(event) => setKind(event.target.value as CommunityResourceKind)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><option value="web">Web</option><option value="pdf">PDF</option><option value="video">Video</option><option value="other">Other</option></select>
-        <input required type="url" value={externalUrl} onChange={(event) => setExternalUrl(event.target.value)} placeholder="URL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" />
+        <select value={kind} onChange={(event) => { setKind(event.target.value as CommunityResourceKind); setFile(null); }} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><option value="web">Webページ</option><option value="pdf">PDF</option><option value="video">動画</option><option value="other">その他</option></select>
+        {kind === "pdf" || kind === "video" ? <label className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><span className="sr-only">ファイルを選択</span><input type="file" accept={kind === "pdf" ? "application/pdf,.pdf" : "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"} onChange={(event) => setFile(event.target.files?.[0] ?? null)} className="w-full text-xs" /><span className="mt-1 block text-[11px] text-[var(--mikke-muted)]">50MBまで。ファイルを選ばない場合はURLを入力できます。</span></label> : <input required type="url" value={externalUrl} onChange={(event) => setExternalUrl(event.target.value)} placeholder="URL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" />}
         <button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">追加</button>
+        {(kind === "pdf" || kind === "video") && !file ? <input required type="url" value={externalUrl} onChange={(event) => setExternalUrl(event.target.value)} placeholder="ファイルを使わない場合のURL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm lg:col-span-4" /> : null}
         <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="説明" rows={2} className="lg:col-span-4 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-6" />
       </form>
       <div className="mt-5 grid gap-2 md:grid-cols-2">
         {data.resources.map((resource) => <OwnerResourceRow key={resource.id} resource={resource} onReload={onReload} onMessage={onMessage} onError={onError} />)}
-        {data.resources.length === 0 ? <MikkeEmptyState title="資料リンクはまだありません" helper="説明ページ、PDF、動画などのURLを追加できます。" /> : null}
+        {data.resources.length === 0 ? <MikkeEmptyState title="資料はまだありません" helper="WebページのURL、PDFファイル、動画ファイルを追加できます。" /> : null}
       </div>
     </section>
   );
@@ -1785,7 +1875,7 @@ function OwnerResourceRow({ resource, onReload, onMessage, onError }: { resource
   return (
     <article className="rounded-lg border border-[var(--mikke-line-soft)] p-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><p className="text-sm font-bold">{resource.title}</p><p className="text-xs text-[var(--mikke-muted)]">{resource.kind} / {resource.isPublished ? "公開中" : "公開停止"}</p></div>
+        <div><p className="text-sm font-bold">{resource.title}</p><p className="text-xs text-[var(--mikke-muted)]">{resourceKindLabel(resource.kind)} ・ {resource.isPublished ? "公開中" : "公開停止"}{resource.fileName ? ` ・ ${resource.fileName}` : ""}</p></div>
         <div className="flex flex-wrap justify-end gap-2">
           <button type="button" onClick={() => setEditing((value) => !value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-primary)]">{editing ? "閉じる" : "編集"}</button>
           <button type="button" onClick={togglePublish} className="rounded-lg border border-[var(--mikke-line)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-danger)]">{resource.isPublished ? "公開停止" : "再公開"}</button>
@@ -1794,8 +1884,8 @@ function OwnerResourceRow({ resource, onReload, onMessage, onError }: { resource
       {editing ? (
         <form onSubmit={save} className="mt-3 grid gap-2 border-t border-[var(--mikke-line-soft)] pt-3 md:grid-cols-[1fr_140px]">
           <input required value={title} onChange={(event) => setTitle(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm" />
-          <select value={kind} onChange={(event) => setKind(event.target.value as CommunityResourceKind)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><option value="web">Web</option><option value="pdf">PDF</option><option value="video">Video</option><option value="other">Other</option></select>
-          <input required type="url" value={externalUrl} onChange={(event) => setExternalUrl(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm md:col-span-2" />
+          <select value={kind} disabled={Boolean(resource.storagePath)} onChange={(event) => setKind(event.target.value as CommunityResourceKind)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm disabled:bg-[var(--mikke-surface-soft)]"><option value="web">Webページ</option><option value="pdf">PDF</option><option value="video">動画</option><option value="other">その他</option></select>
+          {resource.storagePath ? <p className="rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs text-[var(--mikke-muted)] md:col-span-2">ファイルを差し替える場合は、新しい資料として追加してください。</p> : <input required type="url" value={externalUrl} onChange={(event) => setExternalUrl(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm md:col-span-2" />}
           <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={3} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-6 md:col-span-2" />
           <label className="flex items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]"><input type="checkbox" checked={isPublished} onChange={(event) => setIsPublished(event.target.checked)} />公開する</label>
           <button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60">{saving ? "保存中..." : "保存"}</button>
@@ -1892,7 +1982,7 @@ function OwnerSettingsView({ data, userId, ownerLike, onReload, onMessage, onErr
   return (
     <section className="max-w-3xl space-y-6 border-t border-[var(--mikke-line)] pt-5">
     <form onSubmit={submit} className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
-      <h2 className="text-2xl font-bold tracking-normal">COMMUNITY SETTINGS</h2>
+      <h2 className="text-2xl font-bold tracking-normal">基本設定</h2>
       <label className="mt-4 block"><span className="text-sm font-bold">Community名</span><input required value={name} onChange={(event) => setName(event.target.value)} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3" /></label>
       <label className="mt-4 block"><span className="text-sm font-bold">説明</span><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-4 py-3 leading-6" /></label>
       <div className="mt-4 grid gap-4 sm:grid-cols-2"><ImageFilePicker label="ブランドロゴ" file={logoFile} onChange={setLogoFile} /><ImageFilePicker label="ブランドバナー" file={bannerFile} onChange={setBannerFile} /></div>
@@ -1974,7 +2064,7 @@ function OwnerRoomsView({ data, ownerLike, onReload, onMessage, onError }: ViewM
   if (!ownerLike) return <MikkeEmptyState title="運営権限が必要です" helper="Room設定はownerまたはmoderatorが変更できます。" />;
   return (
     <section className="border-t border-[var(--mikke-line)] pt-5">
-      <h2 className="text-2xl font-bold tracking-normal">ROOM ACCESS</h2>
+      <h2 className="text-2xl font-bold tracking-normal">Room設定</h2>
       <div className="mt-5 space-y-3">
         {activeRooms.map((room, index) => <RoomAccessEditor key={room.id} room={room} data={data} onMoveUp={index > 0 ? () => moveRoom(index, -1) : undefined} onMoveDown={index < activeRooms.length - 1 ? () => moveRoom(index, 1) : undefined} onReload={onReload} onMessage={onMessage} onError={onError} />)}
       </div>
@@ -2121,7 +2211,7 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
   const [planEntitlement, setPlanEntitlement] = useState(data.entitlementDefinitions[0]?.key ?? "");
   const [planAmount, setPlanAmount] = useState("1000");
   const [planInterval, setPlanInterval] = useState<"month" | "year" | "one_time">("month");
-  const [paymentProvider, setPaymentProvider] = useState("Stripe");
+  const [paymentProvider, setPaymentProvider] = useState("運営者指定");
   const [paymentUrl, setPaymentUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const inviteUrl = `https://mikke-os.com/community/c/${data.community.slug}`;
@@ -2188,7 +2278,7 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
   if (!ownerLike) return <MikkeEmptyState title="運営権限が必要です" helper="参加者と利用権限はownerまたはmoderatorが管理できます。" />;
   return (
     <section className="border-t border-[var(--mikke-line)] pt-5">
-      <h2 className="text-2xl font-bold tracking-normal">MEMBERS & ACCESS</h2>
+      <h2 className="text-2xl font-bold tracking-normal">参加者と権限</h2>
       <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
         <p className="text-sm font-bold">参加者用の招待URL</p>
         <p className="mt-2 break-all rounded-lg bg-white px-3 py-2 text-sm text-[var(--mikke-primary)]">{inviteUrl}</p>
@@ -2200,7 +2290,7 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
         <input required value={inviteMikkeId} onChange={(event) => setInviteMikkeId(event.target.value)} placeholder="@mikke-id" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <select value={inviteEntitlement} onChange={(event) => setInviteEntitlement(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="">参加のみ（追加権限なし）</option>{data.entitlementDefinitions.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select>
         <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">招待する</button>
-        {data.invitations.length > 0 ? <div className="md:col-span-3 flex flex-wrap gap-2">{data.invitations.map((invitation) => <span key={invitation.id} className="rounded-full bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold">@{invitation.invitedMikkeId} / {invitation.status}</span>)}</div> : null}
+        {data.invitations.length > 0 ? <div className="md:col-span-3 flex flex-wrap gap-2">{data.invitations.map((invitation) => <span key={invitation.id} className="rounded-full bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold">@{invitation.invitedMikkeId} ・ {invitation.status === "pending" ? "手続き待ち" : invitation.status === "accepted" ? "参加済み" : invitation.status === "revoked" ? "取消済み" : invitation.status === "expired" ? "期限切れ" : "辞退"}</span>)}</div> : null}
       </form>
       <form onSubmit={createDefinition} className="mt-4 grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:grid-cols-[1fr_1fr_auto]">
         <div className="md:col-span-3"><p className="font-bold">利用権限ランク</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">Roomの公開範囲、有料プラン、Academy等の外部会員資格を同じ権限キーで結びます。</p></div>
@@ -2209,18 +2299,20 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
         <button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">権限を追加</button>
       </form>
       <form onSubmit={createPlan} className="mt-4 grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:grid-cols-2">
-        <div className="md:col-span-2"><p className="font-bold">参加者向け有料会員プラン</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">運営本部が契約するStripe・Square・STORES等の決済URLを使います。mikkeへのCommunityアプリ利用料とは別です。</p></div>
+        <div className="md:col-span-2"><p className="font-bold">参加者向けメンバーシップ</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">公開すると参加者のマイページに表示されます。外部決済後の申請を承認する方法と、ユーワードポイント・銀行振込などを運営者が確認して付与する方法を使えます。</p></div>
+        <p className="rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs leading-5 text-[var(--mikke-muted)] md:col-span-2">参加者の流れ：招待URLから参加 → 下部の「マイページ」→ メンバーシップを選ぶ → 支払い確認を申請 → 運営者が承認 → 限定Roomを閲覧</p>
         <input required value={planName} onChange={(event) => setPlanName(event.target.value)} placeholder="プラン名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <EntitlementSelect data={data} value={planEntitlement} onChange={setPlanEntitlement} />
         <textarea value={planDescription} onChange={(event) => setPlanDescription(event.target.value)} placeholder="内容・特典" rows={3} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 md:col-span-2" />
         <input required min="0" type="number" value={planAmount} onChange={(event) => setPlanAmount(event.target.value)} placeholder="金額（円）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <select value={planInterval} onChange={(event) => setPlanInterval(event.target.value as typeof planInterval)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="month">月額</option><option value="year">年額</option><option value="one_time">1回</option></select>
-        <input required value={paymentProvider} onChange={(event) => setPaymentProvider(event.target.value)} placeholder="決済サービス名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
-        <input required type="url" value={paymentUrl} onChange={(event) => setPaymentUrl(event.target.value)} placeholder="https:// 決済URL" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
-        <button disabled={saving || !planEntitlement} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">有料プランを公開</button>
-        {data.membershipPlans.length > 0 ? <div className="md:col-span-2 space-y-2">{data.membershipPlans.map((plan) => <p key={plan.id} className="text-sm"><b>{plan.name}</b> ¥{plan.amountYen.toLocaleString()} / {plan.billingInterval} → {plan.entitlementKey}（{plan.status}）</p>)}</div> : null}
+        <input required value={paymentProvider} onChange={(event) => setPaymentProvider(event.target.value)} placeholder="支払い方法・サービス名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <input type="url" value={paymentUrl} onChange={(event) => setPaymentUrl(event.target.value)} placeholder="決済・案内URL（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <button disabled={saving || !planEntitlement} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">メンバーシップを公開</button>
       </form>
+      {data.membershipPlans.length > 0 ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">公開済みメンバーシップ</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">特典や金額を編集できます。削除は履歴を残すため「公開終了」として処理します。</p><div className="mt-3 space-y-3">{data.membershipPlans.map((plan) => <MembershipPlanEditor key={plan.id} data={data} plan={plan} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div></section> : null}
       {data.paymentClaims.some((claim) => claim.status === "pending") ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">支払い確認待ち</h3><div className="mt-3 space-y-3">{data.paymentClaims.filter((claim) => claim.status === "pending").map((claim) => { const member = data.ownerMembers.find((item) => item.membership.userId === claim.userId); const plan = data.membershipPlans.find((item) => item.id === claim.planId); return <div key={claim.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><div><p className="text-sm font-bold">{member?.profile?.displayName ?? claim.payerName} / {plan?.name ?? "有料プラン"}</p><p className="text-xs text-[var(--mikke-muted)]">名義: {claim.payerName}{claim.externalReference ? ` / 番号: ${claim.externalReference}` : ""}</p></div><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => reviewClaim(claim.id, true)} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">承認</button><button type="button" disabled={saving} onClick={() => reviewClaim(claim.id, false)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)]">却下</button></div></div>; })}</div></section> : null}
+      {data.paymentClaims.some((claim) => claim.status !== "pending") ? <details className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><summary className="cursor-pointer font-bold">支払い確認の履歴</summary><div className="mt-3 space-y-2">{data.paymentClaims.filter((claim) => claim.status !== "pending").map((claim) => { const member = data.ownerMembers.find((item) => item.membership.userId === claim.userId); const plan = data.membershipPlans.find((item) => item.id === claim.planId); return <p key={claim.id} className="rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs text-[var(--mikke-muted)]"><b className="text-[var(--mikke-text)]">{member?.profile?.displayName ?? claim.payerName}</b> ・ {plan?.name ?? "メンバーシップ"} ・ {paymentMethodLabel(claim.paymentMethod)} ・ {claim.status === "approved" ? "承認済み" : claim.status === "rejected" ? "却下" : "取消済み"}{claim.externalReference ? ` ・ ${claim.externalReference}` : ""}</p>; })}</div></details> : null}
       <div className="mt-5 space-y-3">
         {data.ownerMembers.map((member) => <MemberAccessEditor key={member.membership.id} data={data} member={member} operatorUserId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />)}
         {data.ownerMembers.length === 0 ? <MikkeEmptyState title="参加者はまだいません" helper="無料登録した参加者がここに表示されます。" /> : null}
@@ -2229,10 +2321,70 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
   );
 }
 
+function MembershipPlanEditor({ data, plan, onReload, onMessage, onError }: {
+  data: CommunityDashboard;
+  plan: CommunityMembershipPlan;
+  onReload: () => Promise<void>;
+  onMessage: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(plan.name);
+  const [description, setDescription] = useState(plan.description ?? "");
+  const [entitlementKey] = useState(plan.entitlementKey);
+  const [amountYen, setAmountYen] = useState(String(plan.amountYen));
+  const [billingInterval, setBillingInterval] = useState(plan.billingInterval);
+  const [paymentProviderLabel, setPaymentProviderLabel] = useState(plan.paymentProviderLabel);
+  const [externalPaymentUrl, setExternalPaymentUrl] = useState(plan.externalPaymentUrl);
+  const [saving, setSaving] = useState(false);
+
+  async function save(status = plan.status) {
+    setSaving(true);
+    try {
+      await updateCommunityMembershipPlan(supabase, plan.id, {
+        entitlementKey, name, description, amountYen: Number(amountYen), billingInterval,
+        paymentProviderLabel, externalPaymentUrl, status
+      });
+      setEditing(false);
+      onMessage(status === "archived" ? "メンバーシップの公開を終了しました。" : "メンバーシップを保存しました。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "メンバーシップを更新できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <article className="rounded-lg border border-[var(--mikke-line-soft)] p-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><p className="font-bold">{plan.name}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">{plan.description || "特典説明なし"}</p><p className="mt-2 text-sm font-bold text-[var(--mikke-primary)]">{billingIntervalLabel(plan.billingInterval)} {plan.amountYen.toLocaleString()}円 ・ {planStatusLabel(plan.status)}</p></div>
+        <div className="flex gap-2"><button type="button" onClick={() => setEditing((value) => !value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">{editing ? "閉じる" : "詳細・編集"}</button>{plan.status !== "archived" ? <button type="button" disabled={saving} onClick={() => { if (window.confirm(`${plan.name}の公開を終了しますか？利用履歴は残ります。`)) void save("archived"); }} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)]">削除</button> : null}</div>
+      </div>
+      {editing ? <form onSubmit={(event) => { event.preventDefault(); void save(); }} className="mt-3 grid gap-2 border-t border-[var(--mikke-line-soft)] pt-3 md:grid-cols-2">
+        <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="プラン名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <label className="rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm"><span className="block text-[11px] font-bold text-[var(--mikke-muted)]">付与する権限</span>{data.entitlementDefinitions.find((item) => item.key === entitlementKey)?.name ?? entitlementKey}</label>
+        <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="内容・特典" rows={3} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 md:col-span-2" />
+        <input required min="0" type="number" value={amountYen} onChange={(event) => setAmountYen(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <select value={billingInterval} onChange={(event) => setBillingInterval(event.target.value as CommunityMembershipPlan["billingInterval"])} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="month">月額</option><option value="year">年額</option><option value="one_time">1回</option></select>
+        <input required value={paymentProviderLabel} onChange={(event) => setPaymentProviderLabel(event.target.value)} placeholder="支払い方法・サービス名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <input type="url" value={externalPaymentUrl} onChange={(event) => setExternalPaymentUrl(event.target.value)} placeholder="決済・案内URL（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">{saving ? "保存中..." : "変更を保存"}</button>
+      </form> : null}
+    </article>
+  );
+}
+
 function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage, onError }: { data: CommunityDashboard; member: CommunityDashboard["ownerMembers"][number]; operatorUserId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [keyName, setKeyName] = useState(data.entitlementDefinitions[0]?.key ?? "");
   const [role, setRole] = useState(member.membership.role);
   const [savingMembership, setSavingMembership] = useState(false);
+  const activePlans = data.membershipPlans.filter((plan) => plan.status === "active");
+  const [manualPlanId, setManualPlanId] = useState(activePlans[0]?.id ?? "");
+  const [manualPaymentMethod, setManualPaymentMethod] = useState<Exclude<CommunityPaymentMethod, "external_link">>("uword_points");
+  const [manualReference, setManualReference] = useState("");
+  const [manualNote, setManualNote] = useState("");
+  const [manualRequestId, setManualRequestId] = useState(() => crypto.randomUUID());
   const active = member.entitlements.filter(isEffectiveEntitlement);
   const isSelf = member.membership.userId === operatorUserId;
   const isCanonicalOwner = member.membership.userId === data.community.ownerUserId;
@@ -2268,9 +2420,33 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
       setSavingMembership(false);
     }
   }
+  async function confirmManualPayment() {
+    if (!manualPlanId) return;
+    setSavingMembership(true);
+    try {
+      await recordCommunityManualPayment(supabase, {
+        communityId: data.community.id,
+        planId: manualPlanId,
+        memberUserId: member.membership.userId,
+        paymentMethod: manualPaymentMethod,
+        externalReference: manualReference,
+        note: manualNote,
+        requestId: manualRequestId
+      });
+      setManualReference("");
+      setManualNote("");
+      setManualRequestId(crypto.randomUUID());
+      onMessage("支払い確認を記録し、メンバーシップ権限を付与しました。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "支払い確認を記録できませんでした。"));
+    } finally {
+      setSavingMembership(false);
+    }
+  }
   return (
     <article className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold">{member.profile?.displayName ?? "参加者"}</p><p className="text-xs text-[var(--mikke-muted)]">{member.membership.role} / {member.membership.status}</p></div><div className="flex flex-wrap gap-2">{active.map((item) => item.source !== "academy_subscription" ? <button key={item.id} type="button" onClick={() => revoke(item.id)} className="rounded-full border border-[var(--mikke-line)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)} ×</button> : <span key={item.id} className="rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)}</span>)}</div></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold">{member.profile?.displayName ?? "参加者"}</p><p className="text-xs text-[var(--mikke-muted)]">{membershipRoleLabel(member.membership.role)} ・ {membershipStatusLabel(member.membership.status)}</p></div><div className="flex flex-wrap gap-2">{active.map((item) => item.source !== "academy_subscription" ? <button key={item.id} type="button" onClick={() => revoke(item.id)} className="rounded-full border border-[var(--mikke-line)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)} ×</button> : <span key={item.id} className="rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)}</span>)}</div></div>
       <div className="mt-3 grid gap-2 md:grid-cols-[160px_auto_auto]">
         <select value={isCanonicalOwner ? "owner" : role} disabled={isCanonicalOwner || !operatorIsCanonicalOwner} onChange={(event) => setRole(event.target.value as typeof role)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm disabled:bg-[var(--mikke-surface-soft)] disabled:text-[var(--mikke-muted)]">
           <option value="member">参加者</option>
@@ -2281,6 +2457,7 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
         <button type="button" disabled={savingMembership || isSelf || isCanonicalOwner} onClick={() => saveMembership(member.membership.status === "suspended" ? "active" : "suspended")} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-60">{isCanonicalOwner ? "オーナーは停止不可" : isSelf ? "自分は停止不可" : member.membership.status === "suspended" ? "復帰" : "停止"}</button>
       </div>
       <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]"><EntitlementSelect data={data} value={keyName} onChange={setKeyName} /><button type="button" disabled={!keyName} onClick={grant} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60">付与</button></div>
+      {activePlans.length > 0 ? <details className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><summary className="cursor-pointer text-sm font-bold text-[var(--mikke-primary)]">外部・振込の支払いを確認</summary><p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">ユーワードポイントや銀行振込など、運営者が入金を確認した時に使います。確認履歴を残し、選んだメンバーシップの権限を付与します。</p><div className="mt-3 grid gap-2 md:grid-cols-2"><select value={manualPlanId} onChange={(event) => setManualPlanId(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm">{activePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select><select value={manualPaymentMethod} onChange={(event) => setManualPaymentMethod(event.target.value as Exclude<CommunityPaymentMethod, "external_link">)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><option value="uword_points">ユーワードポイント</option><option value="bank_transfer">銀行振込</option><option value="cash">現金</option><option value="other">その他</option></select><input value={manualReference} onChange={(event) => setManualReference(event.target.value)} placeholder="決済番号・振込日など（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><input value={manualNote} onChange={(event) => setManualNote(event.target.value)} placeholder="運営メモ（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><button type="button" disabled={savingMembership || !manualPlanId} onClick={confirmManualPayment} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60 md:col-span-2">支払い確認を記録して権限を付与</button></div></details> : null}
     </article>
   );
 }
@@ -2291,13 +2468,14 @@ function RoomAccessBadge({ room }: { room: CommunityRoom }) {
   return <MikkeStatusBadge tone="success">無料</MikkeStatusBadge>;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
+function Metric({ label, value, href }: { label: string; value: string; href?: string }) {
+  const body = (
+    <div className="rounded-lg border border-[var(--mikke-line)] bg-white p-3 sm:p-4">
       <p className="text-xs font-bold text-[var(--mikke-muted-light)]">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-[var(--mikke-primary)]">{value}</p>
+      <p className="mt-1 text-xl font-bold text-[var(--mikke-primary)] sm:text-2xl">{value}</p>
     </div>
   );
+  return href ? <Link href={href} aria-label={`${label} ${value}件を確認`}>{body}</Link> : body;
 }
 
 function SidePanel({ title, children }: { title: string; children: React.ReactNode }) {

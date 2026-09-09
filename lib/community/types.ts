@@ -14,6 +14,7 @@ export type CommunityAcademyRole = "learner" | "instructor" | "staff" | "contrac
 export type CommunityInvitationStatus = "pending" | "accepted" | "declined" | "revoked" | "expired";
 export type CommunityMembershipPlanStatus = "draft" | "active" | "archived";
 export type CommunityPaymentClaimStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type CommunityPaymentMethod = "external_link" | "uword_points" | "bank_transfer" | "cash" | "other";
 export type CommunityDataRequestStatus = "received" | "identity_check" | "processing" | "completed" | "rejected" | "cancelled";
 export type CommunityHomeMetric = "unread" | "today_activity" | "upcoming_events" | "rooms" | "posts" | "comments" | "chat_messages" | "resources";
 export type CommunityApprovalMode = "auto" | "manual";
@@ -161,6 +162,7 @@ export type CommunityPaymentClaim = {
   note: string | null;
   status: CommunityPaymentClaimStatus;
   reviewNote: string | null;
+  paymentMethod: CommunityPaymentMethod;
   createdAt: string;
 };
 
@@ -407,6 +409,10 @@ export type CommunityResource = {
   description: string | null;
   kind: CommunityResourceKind;
   externalUrl: string;
+  storagePath: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSizeBytes: number | null;
   isPublished: boolean;
   sortOrder: number;
   publishedAt: string | null;

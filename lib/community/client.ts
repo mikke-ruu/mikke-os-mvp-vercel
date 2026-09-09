@@ -22,6 +22,7 @@ import type {
   CommunityMembershipStatus,
   CommunityOperatorProfile,
   CommunityPaymentClaim,
+  CommunityPaymentMethod,
   CommunityPost,
   CommunityPostAttachment,
   CommunityPostKind,
@@ -179,7 +180,8 @@ function mapPaymentClaim(row: any): CommunityPaymentClaim {
   return {
     id: row.id, communityId: row.community_id, planId: row.plan_id, userId: row.user_id,
     payerName: row.payer_name, externalReference: row.external_reference ?? null, note: row.note ?? null,
-    status: row.status, reviewNote: row.review_note ?? null, createdAt: row.created_at
+    status: row.status, reviewNote: row.review_note ?? null,
+    paymentMethod: row.payment_method ?? "external_link", createdAt: row.created_at
   };
 }
 
@@ -342,6 +344,10 @@ function mapResource(row: any): CommunityResource {
     description: row.description ?? null,
     kind: row.kind,
     externalUrl: row.external_url,
+    storagePath: row.storage_path ?? null,
+    fileName: row.file_name ?? null,
+    mimeType: row.mime_type ?? null,
+    fileSizeBytes: row.file_size_bytes ?? null,
     isPublished: Boolean(row.is_published),
     sortOrder: row.sort_order ?? 0,
     publishedAt: row.published_at ?? null
@@ -909,6 +915,51 @@ export async function createCommunityMembershipPlan(client: DbClient, communityI
   if (error) throw error;
 }
 
+export async function updateCommunityMembershipPlan(client: DbClient, planId: string, input: {
+  entitlementKey: string;
+  name: string;
+  description: string;
+  amountYen: number;
+  billingInterval: CommunityMembershipPlan["billingInterval"];
+  paymentProviderLabel: string;
+  externalPaymentUrl: string;
+  status: CommunityMembershipPlan["status"];
+}) {
+  const { error } = await client.from("community_membership_plans").update({
+    entitlement_key: input.entitlementKey,
+    name: input.name.trim(),
+    description: input.description.trim() || null,
+    amount_yen: input.amountYen,
+    billing_interval: input.billingInterval,
+    payment_provider_label: input.paymentProviderLabel.trim() || "運営者指定",
+    external_payment_url: input.externalPaymentUrl.trim(),
+    status: input.status
+  }).eq("id", planId);
+  if (error) throw error;
+}
+
+export async function recordCommunityManualPayment(client: DbClient, input: {
+  communityId: string;
+  planId: string;
+  memberUserId: string;
+  paymentMethod: Exclude<CommunityPaymentMethod, "external_link">;
+  externalReference?: string;
+  note?: string;
+  requestId: string;
+}) {
+  const { data, error } = await client.rpc("community_record_manual_payment", {
+    p_community_id: input.communityId,
+    p_plan_id: input.planId,
+    p_member_user_id: input.memberUserId,
+    p_payment_method: input.paymentMethod,
+    p_external_reference: input.externalReference?.trim() || null,
+    p_note: input.note?.trim() || null,
+    p_request_id: input.requestId
+  });
+  if (error) throw error;
+  return mapPaymentClaim(Array.isArray(data) ? data[0] : data);
+}
+
 export async function createCommunityPaymentClaim(client: DbClient, communityId: string, planId: string, userId: string, payerName: string, externalReference: string, note: string) {
   if (!userId) throw new Error("ログインが必要です。");
   const { error } = await client.rpc("community_create_payment_claim", {
@@ -1386,6 +1437,69 @@ export async function createCommunityResource(client: DbClient, communityId: str
     published_at: new Date().toISOString()
   });
   if (error) throw error;
+}
+
+const COMMUNITY_RESOURCE_BUCKET = "community-resources";
+const COMMUNITY_RESOURCE_MAX_BYTES = 50 * 1024 * 1024;
+const communityResourceMimeTypes = new Set(["application/pdf", "video/mp4", "video/webm", "video/quicktime"]);
+
+export async function createCommunityResourceFile(client: DbClient, input: {
+  communityId: string;
+  userId: string;
+  title: string;
+  description: string;
+  kind: "pdf" | "video";
+  file: File;
+}) {
+  if (input.file.size <= 0 || input.file.size > COMMUNITY_RESOURCE_MAX_BYTES) {
+    throw new Error("PDF・動画ファイルは50MB以下にしてください。");
+  }
+  if (!communityResourceMimeTypes.has(input.file.type)) {
+    throw new Error("PDF、MP4、WebM、MOV形式のファイルを選んでください。");
+  }
+  if (input.kind === "pdf" && input.file.type !== "application/pdf") {
+    throw new Error("PDF資料にはPDFファイルを選んでください。");
+  }
+  if (input.kind === "video" && !input.file.type.startsWith("video/")) {
+    throw new Error("動画資料には動画ファイルを選んでください。");
+  }
+
+  const resourceId = crypto.randomUUID();
+  const rawExtension = input.file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+  const extension = rawExtension.slice(0, 10) || (input.kind === "pdf" ? "pdf" : "mp4");
+  const storagePath = `${input.communityId}/${resourceId}/${input.userId}/${crypto.randomUUID()}.${extension}`;
+  const { data, error } = await client.from("community_resources").insert({
+    id: resourceId,
+    community_id: input.communityId,
+    title: input.title.trim(),
+    description: input.description.trim() || null,
+    kind: input.kind,
+    external_url: "",
+    storage_path: storagePath,
+    file_name: input.file.name.slice(0, 255),
+    mime_type: input.file.type,
+    file_size_bytes: input.file.size,
+    is_published: true,
+    published_at: new Date().toISOString()
+  }).select("*").single();
+  if (error) throw error;
+
+  const { error: uploadError } = await client.storage.from(COMMUNITY_RESOURCE_BUCKET).upload(storagePath, input.file, {
+    cacheControl: "3600",
+    contentType: input.file.type,
+    upsert: false
+  });
+  if (uploadError) {
+    await client.from("community_resources").delete().eq("id", resourceId);
+    throw uploadError;
+  }
+  return mapResource(data);
+}
+
+export async function createCommunityResourceViewUrl(client: DbClient, storagePath: string) {
+  const { data, error } = await client.storage.from(COMMUNITY_RESOURCE_BUCKET).createSignedUrl(storagePath, 60 * 15);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 export async function updateCommunityResourceVisibility(client: DbClient, resourceId: string, isPublished: boolean) {
