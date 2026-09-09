@@ -68,6 +68,7 @@ alter table public.community_resources
       and split_part(storage_path, '/', 3) <> ''
       and split_part(storage_path, '/', 4) <> ''
       and split_part(storage_path, '/', 5) = ''
+      and pg_catalog.cardinality(pg_catalog.string_to_array(storage_path, '/')) = 4
       and (
         (kind = 'pdf' and mime_type = 'application/pdf')
         or (kind = 'video' and mime_type in ('video/mp4', 'video/webm', 'video/quicktime'))
@@ -201,27 +202,6 @@ begin
     pg_catalog.hashtextextended('community-manual-payment:' || p_request_id::text, 0)
   );
 
-  select claim.* into v_existing
-  from public.community_payment_claims claim
-  where claim.manual_request_id = p_request_id
-  for update;
-  if v_existing.id is not null then
-    if v_existing.community_id <> p_community_id
-      or v_existing.plan_id <> p_plan_id
-      or v_existing.user_id <> p_member_user_id
-      or v_existing.payment_method <> p_payment_method
-      or coalesce(v_existing.external_reference, '') <> pg_catalog.btrim(coalesce(p_external_reference, ''))
-      or coalesce(v_existing.note, '') <> pg_catalog.btrim(coalesce(p_note, ''))
-      or v_existing.status <> 'approved'
-    then
-      raise exception using errcode = '22023', message = 'Manual payment request payload does not match the recorded request';
-    end if;
-    return v_existing;
-  end if;
-  if not community_private.is_staff(p_community_id) then
-    raise exception using errcode = '42501', message = 'Community staff authority is required';
-  end if;
-
   -- Preserve the shared Community parent-first lock order.
   perform 1
   from public.community_communities community
@@ -237,6 +217,30 @@ begin
   for update;
   if not community_private.is_staff(p_community_id) then
     raise exception using errcode = '42501', message = 'Community staff authority is required';
+  end if;
+
+  -- An idempotent replay crosses the same post-wait authorization boundary as
+  -- a new grant. A staff member revoked while waiting must not receive the
+  -- recorded payment row.
+  select claim.* into v_existing
+  from public.community_payment_claims claim
+  where claim.manual_request_id = p_request_id
+  for update;
+  if v_existing.id is not null then
+    if v_existing.community_id <> p_community_id
+      or v_existing.plan_id <> p_plan_id
+      or v_existing.user_id <> p_member_user_id
+      or v_existing.payment_method <> p_payment_method
+      or coalesce(v_existing.external_reference, '') <> pg_catalog.btrim(coalesce(p_external_reference, ''))
+      or coalesce(v_existing.note, '') <> pg_catalog.btrim(coalesce(p_note, ''))
+      or v_existing.status <> 'approved'
+    then
+      raise exception using errcode = '22023', message = 'Manual payment request payload does not match the recorded request';
+    end if;
+    if not community_private.is_staff(p_community_id) then
+      raise exception using errcode = '42501', message = 'Community staff authority is required';
+    end if;
+    return v_existing;
   end if;
 
   select plan.* into v_plan

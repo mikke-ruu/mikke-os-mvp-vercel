@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -155,6 +155,15 @@ function paymentMethodLabel(method: CommunityPaymentMethod) {
   return "外部決済";
 }
 
+function loadManualPaymentRequestId(storageKey: string) {
+  if (typeof window === "undefined") return crypto.randomUUID();
+  const stored = window.sessionStorage.getItem(storageKey);
+  if (stored && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored)) return stored;
+  const next = crypto.randomUUID();
+  window.sessionStorage.setItem(storageKey, next);
+  return next;
+}
+
 function resourceKindLabel(kind: CommunityResourceKind) {
   if (kind === "web") return "Webページ";
   if (kind === "pdf") return "PDF";
@@ -234,6 +243,7 @@ export function CommunityApp(props: CommunityAppProps) {
 
 function CommunityTenantApp({ view, roomId, postId, communitySlug, lease }: CommunityAppProps & { lease: CommunityAuthLease }) {
   const router = useRouter();
+  const actorClient = useMemo(() => communityScopedClient(lease), [lease]);
   const base = `/community/c/${encodeURIComponent(communitySlug)}`;
   const [user, setUser] = useState<SessionUser | null>(null);
   const [data, setData] = useState<CommunityDashboard | null>(null);
@@ -400,8 +410,8 @@ function CommunityTenantApp({ view, roomId, postId, communitySlug, lease }: Comm
       {view === "owner" ? <OwnerView base={base} data={data} ownerLike={ownerLike} /> : null}
       {view === "owner-settings" ? <OwnerSettingsView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-rooms" ? <OwnerRoomsView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
-      {view === "owner-members" ? <OwnerMembersView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
-      {view === "owner-content" ? <OwnerContentView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
+      {view === "owner-members" ? <OwnerMembersView data={data} userId={user.id} ownerLike={ownerLike} actorClient={actorClient} actorIsCurrent={current} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
+      {view === "owner-content" ? <OwnerContentView data={data} userId={user.id} ownerLike={ownerLike} actorClient={actorClient} actorIsCurrent={current} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-safety" ? <OwnerCommunitySafetyView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
       {view === "owner-moderation" ? <OwnerCommunityModerationView data={data} userId={user.id} ownerLike={ownerLike} onReload={() => reload(user)} onMessage={setMessage} onError={setError} /> : null}
     </CommunityShell>
@@ -1551,7 +1561,7 @@ function OwnerLink({ href, icon: Icon, title, helper }: { href: string; icon: ty
   );
 }
 
-function OwnerContentView({ data, userId, ownerLike, onReload, onMessage, onError }: ViewMutationProps & { ownerLike: boolean }) {
+function OwnerContentView({ data, userId, ownerLike, actorClient, actorIsCurrent, onReload, onMessage, onError }: ViewMutationProps & { ownerLike: boolean; actorClient: ReturnType<typeof communityScopedClient>; actorIsCurrent: () => boolean }) {
   if (!ownerLike) return <MikkeEmptyState title="運営権限が必要です" helper="告知・イベント・資料の管理はownerまたはmoderatorが操作できます。" />;
   return (
     <section className="space-y-6 border-t border-[var(--mikke-line)] pt-5">
@@ -1566,7 +1576,7 @@ function OwnerContentView({ data, userId, ownerLike, onReload, onMessage, onErro
           <OwnerStampManager data={data} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />
         </div>
         <div className="xl:col-span-2">
-          <OwnerResourceManager data={data} userId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />
+          <OwnerResourceManager data={data} userId={userId} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />
         </div>
       </div>
     </section>
@@ -1790,7 +1800,7 @@ function OwnerEventRow({ event, onReload, onMessage, onError }: { event: Communi
   );
 }
 
-function OwnerResourceManager({ data, userId, onReload, onMessage, onError }: { data: CommunityDashboard; userId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+function OwnerResourceManager({ data, userId, actorClient, actorIsCurrent, onReload, onMessage, onError }: { data: CommunityDashboard; userId: string; actorClient: ReturnType<typeof communityScopedClient>; actorIsCurrent: () => boolean; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [kind, setKind] = useState<CommunityResourceKind>("web");
@@ -1803,11 +1813,12 @@ function OwnerResourceManager({ data, userId, onReload, onMessage, onError }: { 
     setSaving(true);
     try {
       if ((kind === "pdf" || kind === "video") && file) {
-        await createCommunityResourceFile(supabase, { communityId: data.community.id, userId, title, description, kind, file });
+        await createCommunityResourceFile(actorClient, { communityId: data.community.id, userId, title, description, kind, file });
       } else {
         if (!externalUrl.trim()) throw new Error("URLまたはファイルを選んでください。");
-        await createCommunityResource(supabase, data.community.id, { title, description, kind, externalUrl });
+        await createCommunityResource(actorClient, data.community.id, { title, description, kind, externalUrl });
       }
+      if (!actorIsCurrent()) return;
       setTitle("");
       setDescription("");
       setExternalUrl("");
@@ -1833,14 +1844,14 @@ function OwnerResourceManager({ data, userId, onReload, onMessage, onError }: { 
         <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="説明" rows={2} className="lg:col-span-4 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm leading-6" />
       </form>
       <div className="mt-5 grid gap-2 md:grid-cols-2">
-        {data.resources.map((resource) => <OwnerResourceRow key={resource.id} resource={resource} onReload={onReload} onMessage={onMessage} onError={onError} />)}
+        {data.resources.map((resource) => <OwnerResourceRow key={resource.id} resource={resource} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />)}
         {data.resources.length === 0 ? <MikkeEmptyState title="資料はまだありません" helper="WebページのURL、PDFファイル、動画ファイルを追加できます。" /> : null}
       </div>
     </section>
   );
 }
 
-function OwnerResourceRow({ resource, onReload, onMessage, onError }: { resource: CommunityResource; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+function OwnerResourceRow({ resource, actorClient, actorIsCurrent, onReload, onMessage, onError }: { resource: CommunityResource; actorClient: ReturnType<typeof communityScopedClient>; actorIsCurrent: () => boolean; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(resource.title);
   const [description, setDescription] = useState(resource.description ?? "");
@@ -1851,7 +1862,8 @@ function OwnerResourceRow({ resource, onReload, onMessage, onError }: { resource
 
   async function togglePublish() {
     try {
-      await updateCommunityResourceVisibility(supabase, resource.id, !resource.isPublished);
+      await updateCommunityResourceVisibility(actorClient, resource.id, !resource.isPublished);
+      if (!actorIsCurrent()) return;
       onMessage(resource.isPublished ? "資料リンクを公開停止しました。" : "資料リンクを再公開しました。");
       await onReload();
     } catch (error) {
@@ -1862,7 +1874,8 @@ function OwnerResourceRow({ resource, onReload, onMessage, onError }: { resource
     event.preventDefault();
     setSaving(true);
     try {
-      await updateCommunityResource(supabase, resource.id, { title, description, kind, externalUrl, isPublished });
+      await updateCommunityResource(actorClient, resource.id, { title, description, kind, externalUrl, isPublished });
+      if (!actorIsCurrent()) return;
       setEditing(false);
       onMessage("資料リンクを保存しました。");
       await onReload();
@@ -2201,7 +2214,7 @@ function EntitlementSelect({ data, value, onChange }: { data: CommunityDashboard
   return <select required value={value} onChange={(event) => onChange(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="">利用権限を選択</option>{data.entitlementDefinitions.map((item) => <option key={item.key} value={item.key}>{item.name} ({item.key})</option>)}</select>;
 }
 
-function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onError }: ViewMutationProps & { ownerLike: boolean }) {
+function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent, onReload, onMessage, onError }: ViewMutationProps & { ownerLike: boolean; actorClient: ReturnType<typeof communityScopedClient>; actorIsCurrent: () => boolean }) {
   const [keyName, setKeyName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [inviteMikkeId, setInviteMikkeId] = useState("");
@@ -2219,7 +2232,8 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
     event.preventDefault();
     setSaving(true);
     try {
-      await createEntitlementDefinition(supabase, data.community.id, { key: keyName, name: displayName });
+      await createEntitlementDefinition(actorClient, data.community.id, { key: keyName, name: displayName });
+      if (!actorIsCurrent()) return;
       setKeyName("");
       setDisplayName("");
       onMessage("利用権限を作成しました。");
@@ -2235,7 +2249,8 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
     event.preventDefault();
     setSaving(true);
     try {
-      await inviteCommunityMemberByMikkeId(supabase, data.community.id, inviteMikkeId, inviteEntitlement || undefined);
+      await inviteCommunityMemberByMikkeId(actorClient, data.community.id, inviteMikkeId, inviteEntitlement || undefined);
+      if (!actorIsCurrent()) return;
       setInviteMikkeId("");
       onMessage("mikke IDへ招待を登録しました。参加者は招待URLから規約同意と参加登録を行います。");
       await onReload();
@@ -2249,11 +2264,12 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
     event.preventDefault();
     setSaving(true);
     try {
-      await createCommunityMembershipPlan(supabase, data.community.id, userId, {
+      await createCommunityMembershipPlan(actorClient, data.community.id, userId, {
         entitlementKey: planEntitlement, name: planName, description: planDescription,
         amountYen: Number(planAmount), billingInterval: planInterval,
         paymentProviderLabel: paymentProvider, externalPaymentUrl: paymentUrl, status: "active"
       });
+      if (!actorIsCurrent()) return;
       setPlanName(""); setPlanDescription(""); setPaymentUrl("");
       onMessage("有料会員プランを公開しました。");
       await onReload();
@@ -2266,7 +2282,8 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
   async function reviewClaim(claimId: string, approved: boolean) {
     setSaving(true);
     try {
-      await reviewCommunityPaymentClaim(supabase, claimId, userId, approved);
+      await reviewCommunityPaymentClaim(actorClient, claimId, userId, approved);
+      if (!actorIsCurrent()) return;
       onMessage(approved ? "支払いを承認し、利用権限を付与しました。" : "支払い申請を却下しました。");
       await onReload();
     } catch (error) {
@@ -2310,20 +2327,22 @@ function OwnerMembersView({ data, userId, ownerLike, onReload, onMessage, onErro
         <input type="url" value={paymentUrl} onChange={(event) => setPaymentUrl(event.target.value)} placeholder="決済・案内URL（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <button disabled={saving || !planEntitlement} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">メンバーシップを公開</button>
       </form>
-      {data.membershipPlans.length > 0 ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">公開済みメンバーシップ</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">特典や金額を編集できます。削除は履歴を残すため「公開終了」として処理します。</p><div className="mt-3 space-y-3">{data.membershipPlans.map((plan) => <MembershipPlanEditor key={plan.id} data={data} plan={plan} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div></section> : null}
+      {data.membershipPlans.length > 0 ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">公開済みメンバーシップ</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">特典や金額を編集できます。削除は履歴を残すため「公開終了」として処理します。</p><div className="mt-3 space-y-3">{data.membershipPlans.map((plan) => <MembershipPlanEditor key={plan.id} data={data} plan={plan} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div></section> : null}
       {data.paymentClaims.some((claim) => claim.status === "pending") ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">支払い確認待ち</h3><div className="mt-3 space-y-3">{data.paymentClaims.filter((claim) => claim.status === "pending").map((claim) => { const member = data.ownerMembers.find((item) => item.membership.userId === claim.userId); const plan = data.membershipPlans.find((item) => item.id === claim.planId); return <div key={claim.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><div><p className="text-sm font-bold">{member?.profile?.displayName ?? claim.payerName} / {plan?.name ?? "有料プラン"}</p><p className="text-xs text-[var(--mikke-muted)]">名義: {claim.payerName}{claim.externalReference ? ` / 番号: ${claim.externalReference}` : ""}</p></div><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => reviewClaim(claim.id, true)} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">承認</button><button type="button" disabled={saving} onClick={() => reviewClaim(claim.id, false)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)]">却下</button></div></div>; })}</div></section> : null}
       {data.paymentClaims.some((claim) => claim.status !== "pending") ? <details className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><summary className="cursor-pointer font-bold">支払い確認の履歴</summary><div className="mt-3 space-y-2">{data.paymentClaims.filter((claim) => claim.status !== "pending").map((claim) => { const member = data.ownerMembers.find((item) => item.membership.userId === claim.userId); const plan = data.membershipPlans.find((item) => item.id === claim.planId); return <p key={claim.id} className="rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs text-[var(--mikke-muted)]"><b className="text-[var(--mikke-text)]">{member?.profile?.displayName ?? claim.payerName}</b> ・ {plan?.name ?? "メンバーシップ"} ・ {paymentMethodLabel(claim.paymentMethod)} ・ {claim.status === "approved" ? "承認済み" : claim.status === "rejected" ? "却下" : "取消済み"}{claim.externalReference ? ` ・ ${claim.externalReference}` : ""}</p>; })}</div></details> : null}
       <div className="mt-5 space-y-3">
-        {data.ownerMembers.map((member) => <MemberAccessEditor key={member.membership.id} data={data} member={member} operatorUserId={userId} onReload={onReload} onMessage={onMessage} onError={onError} />)}
+        {data.ownerMembers.map((member) => <MemberAccessEditor key={member.membership.id} data={data} member={member} operatorUserId={userId} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />)}
         {data.ownerMembers.length === 0 ? <MikkeEmptyState title="参加者はまだいません" helper="無料登録した参加者がここに表示されます。" /> : null}
       </div>
     </section>
   );
 }
 
-function MembershipPlanEditor({ data, plan, onReload, onMessage, onError }: {
+function MembershipPlanEditor({ data, plan, actorClient, actorIsCurrent, onReload, onMessage, onError }: {
   data: CommunityDashboard;
   plan: CommunityMembershipPlan;
+  actorClient: ReturnType<typeof communityScopedClient>;
+  actorIsCurrent: () => boolean;
   onReload: () => Promise<void>;
   onMessage: (message: string) => void;
   onError: (message: string) => void;
@@ -2341,10 +2360,11 @@ function MembershipPlanEditor({ data, plan, onReload, onMessage, onError }: {
   async function save(status = plan.status) {
     setSaving(true);
     try {
-      await updateCommunityMembershipPlan(supabase, plan.id, {
+      await updateCommunityMembershipPlan(actorClient, plan.id, {
         entitlementKey, name, description, amountYen: Number(amountYen), billingInterval,
         paymentProviderLabel, externalPaymentUrl, status
       });
+      if (!actorIsCurrent()) return;
       setEditing(false);
       onMessage(status === "archived" ? "メンバーシップの公開を終了しました。" : "メンバーシップを保存しました。");
       await onReload();
@@ -2375,7 +2395,7 @@ function MembershipPlanEditor({ data, plan, onReload, onMessage, onError }: {
   );
 }
 
-function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage, onError }: { data: CommunityDashboard; member: CommunityDashboard["ownerMembers"][number]; operatorUserId: string; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
+function MemberAccessEditor({ data, member, operatorUserId, actorClient, actorIsCurrent, onReload, onMessage, onError }: { data: CommunityDashboard; member: CommunityDashboard["ownerMembers"][number]; operatorUserId: string; actorClient: ReturnType<typeof communityScopedClient>; actorIsCurrent: () => boolean; onReload: () => Promise<void>; onMessage: (message: string) => void; onError: (message: string) => void }) {
   const [keyName, setKeyName] = useState(data.entitlementDefinitions[0]?.key ?? "");
   const [role, setRole] = useState(member.membership.role);
   const [savingMembership, setSavingMembership] = useState(false);
@@ -2384,7 +2404,8 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
   const [manualPaymentMethod, setManualPaymentMethod] = useState<Exclude<CommunityPaymentMethod, "external_link">>("uword_points");
   const [manualReference, setManualReference] = useState("");
   const [manualNote, setManualNote] = useState("");
-  const [manualRequestId, setManualRequestId] = useState(() => crypto.randomUUID());
+  const manualRequestStorageKey = `community:manual-payment:${operatorUserId}:${data.community.id}:${member.membership.userId}`;
+  const [manualRequestId, setManualRequestId] = useState(() => loadManualPaymentRequestId(manualRequestStorageKey));
   const active = member.entitlements.filter(isEffectiveEntitlement);
   const isSelf = member.membership.userId === operatorUserId;
   const isCanonicalOwner = member.membership.userId === data.community.ownerUserId;
@@ -2392,7 +2413,8 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
   async function grant() {
     if (!keyName) return;
     try {
-      await grantMemberEntitlement(supabase, data.community.id, member.membership.userId, keyName, operatorUserId);
+      await grantMemberEntitlement(actorClient, data.community.id, member.membership.userId, keyName, operatorUserId);
+      if (!actorIsCurrent()) return;
       onMessage("利用権限を付与しました。");
       await onReload();
     } catch (error) {
@@ -2401,7 +2423,8 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
   }
   async function revoke(id: string) {
     try {
-      await revokeMemberEntitlement(supabase, id);
+      await revokeMemberEntitlement(actorClient, id);
+      if (!actorIsCurrent()) return;
       onMessage("利用権限を停止しました。");
       await onReload();
     } catch (error) {
@@ -2411,7 +2434,8 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
   async function saveMembership(nextStatus = member.membership.status) {
     setSavingMembership(true);
     try {
-      await updateCommunityMembership(supabase, member.membership.id, { role, status: nextStatus });
+      await updateCommunityMembership(actorClient, member.membership.id, { role, status: nextStatus });
+      if (!actorIsCurrent()) return;
       onMessage("参加者設定を更新しました。");
       await onReload();
     } catch (error) {
@@ -2424,7 +2448,7 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
     if (!manualPlanId) return;
     setSavingMembership(true);
     try {
-      await recordCommunityManualPayment(supabase, {
+      await recordCommunityManualPayment(actorClient, {
         communityId: data.community.id,
         planId: manualPlanId,
         memberUserId: member.membership.userId,
@@ -2433,9 +2457,12 @@ function MemberAccessEditor({ data, member, operatorUserId, onReload, onMessage,
         note: manualNote,
         requestId: manualRequestId
       });
+      if (!actorIsCurrent()) return;
       setManualReference("");
       setManualNote("");
-      setManualRequestId(crypto.randomUUID());
+      const nextRequestId = crypto.randomUUID();
+      if (typeof window !== "undefined") window.sessionStorage.setItem(manualRequestStorageKey, nextRequestId);
+      setManualRequestId(nextRequestId);
       onMessage("支払い確認を記録し、メンバーシップ権限を付与しました。");
       await onReload();
     } catch (error) {

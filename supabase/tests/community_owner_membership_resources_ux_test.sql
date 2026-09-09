@@ -59,8 +59,24 @@ select pg_temp.community_owner_ux_assert(pg_temp.community_owner_ux_denied(
       id,community_id,title,kind,external_url,storage_path,file_name,mime_type,file_size_bytes
     ) values (
       'de160000-0000-4000-8000-000000000001','de110000-0000-4000-8000-000000000001',
-      'broken file','video','','other-community/wrong/path/file.mp4','file.mp4','video/mp4',null
-    )$q$, '23514'), 'partial and cross-namespace file metadata is rejected');
+      'missing size','video','','de110000-0000-4000-8000-000000000001/de160000-0000-4000-8000-000000000001/de100000-0000-4000-8000-000000000001/file.mp4','file.mp4','video/mp4',null
+    )$q$, '23514'), 'partial file metadata is rejected independently');
+
+select pg_temp.community_owner_ux_assert(pg_temp.community_owner_ux_denied(
+  $q$insert into public.community_resources(
+      id,community_id,title,kind,external_url,storage_path,file_name,mime_type,file_size_bytes
+    ) values (
+      'de160000-0000-4000-8000-000000000003','de110000-0000-4000-8000-000000000001',
+      'wrong namespace','video','','de990000-0000-4000-8000-000000000001/de160000-0000-4000-8000-000000000003/de100000-0000-4000-8000-000000000001/file.mp4','file.mp4','video/mp4',100
+    )$q$, '23514'), 'cross-namespace metadata is rejected independently');
+
+select pg_temp.community_owner_ux_assert(pg_temp.community_owner_ux_denied(
+  $q$insert into public.community_resources(
+      id,community_id,title,kind,external_url,storage_path,file_name,mime_type,file_size_bytes
+    ) values (
+      'de160000-0000-4000-8000-000000000004','de110000-0000-4000-8000-000000000001',
+      'extra segment','pdf','','de110000-0000-4000-8000-000000000001/de160000-0000-4000-8000-000000000004/de100000-0000-4000-8000-000000000001/file.pdf//hidden','file.pdf','application/pdf',100
+    )$q$, '23514'), 'resource path must contain exactly four non-empty segments');
 
 insert into public.community_memberships(community_id, user_id, role, status) values
   ('de110000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', 'owner', 'active'),

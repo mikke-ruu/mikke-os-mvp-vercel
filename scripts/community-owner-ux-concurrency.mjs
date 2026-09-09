@@ -86,11 +86,23 @@ insert into public.community_membership_plans(id,community_id,entitlement_key,na
 values('${plan}','${community}','paid:manual','Manual paid',1000,'month','Manual','','active','${owner}');
 `);
 
-const call = (requestId) => `begin; set local lock_timeout='5s'; set local statement_timeout='30s';
+const call = (requestId, applicationName = "owner_ux_manual_payment") => `begin; set local application_name='${applicationName}'; set local lock_timeout='5s'; set local statement_timeout='30s';
 select set_config('request.jwt.claims','{"sub":"${staff}","role":"authenticated","is_anonymous":false}',true);
 set local role authenticated;
 select (public.community_record_manual_payment('${community}','${plan}','${member}','bank_transfer','BANK-001','confirmed','${requestId}')).id;
 commit;`;
+
+async function waitForActivity(applicationName, requireLockWait = false) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const state = JSON.parse(sync(`select json_build_object(
+      'present',exists(select 1 from pg_catalog.pg_stat_activity where datname=current_database() and application_name='${applicationName}'),
+      'lockWaiting',exists(select 1 from pg_catalog.pg_stat_activity where datname=current_database() and application_name='${applicationName}' and wait_event_type='Lock')
+    );`));
+    if (state.present && (!requireLockWait || state.lockWaiting)) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`${applicationName} did not reach the required database wait state`);
+}
 
 const replay = await Promise.all([asyncSql(call(request)), asyncSql(call(request))]);
 assert.equal(replay.filter((item) => item.status === 0).length, 2, "both identical retries must succeed");
@@ -100,13 +112,24 @@ const replayState = JSON.parse(sync(`select json_build_object(
 );`));
 assert.deepEqual(replayState, { claims: 1, entitlements: 1 });
 
-const revokeStaff = asyncSql(`begin; select 1 from public.community_communities where id='${community}' for update; select pg_sleep(1); update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;`);
-await new Promise((resolve) => setTimeout(resolve, 150));
-const blockedGrant = asyncSql(call(revokedRequest));
+const revokeStaff = asyncSql(`begin; set local application_name='owner_ux_revoke_new'; select 1 from public.community_communities where id='${community}' for update; select pg_sleep(2); update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;`);
+await waitForActivity("owner_ux_revoke_new");
+const blockedGrant = asyncSql(call(revokedRequest, "owner_ux_blocked_new"));
+await waitForActivity("owner_ux_blocked_new", true);
 const [revokeResult, blockedResult] = await Promise.all([revokeStaff, blockedGrant]);
 assert.equal(revokeResult.status, 0, "staff revocation transaction must succeed");
 assert.notEqual(blockedResult.status, 0, "grant waiting behind revocation must fail");
 assert.match(blockedResult.stderr, /Community staff authority is required/);
+
+sync(`update public.community_memberships set status='active' where community_id='${community}' and user_id='${staff}';`);
+const revokeReplayStaff = asyncSql(`begin; set local application_name='owner_ux_revoke_replay'; select 1 from public.community_communities where id='${community}' for update; select pg_sleep(2); update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;`);
+await waitForActivity("owner_ux_revoke_replay");
+const blockedReplay = asyncSql(call(request, "owner_ux_blocked_replay"));
+await waitForActivity("owner_ux_blocked_replay", true);
+const [revokeReplayResult, blockedReplayResult] = await Promise.all([revokeReplayStaff, blockedReplay]);
+assert.equal(revokeReplayResult.status, 0, "staff revocation before replay must succeed");
+assert.notEqual(blockedReplayResult.status, 0, "idempotent replay waiting behind revocation must fail");
+assert.match(blockedReplayResult.stderr, /Community staff authority is required/);
 const finalState = JSON.parse(sync(`select json_build_object(
   'revokedRequestClaims',(select count(*) from public.community_payment_claims where manual_request_id='${revokedRequest}'),
   'allClaims',(select count(*) from public.community_payment_claims where community_id='${community}')

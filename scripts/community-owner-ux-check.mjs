@@ -6,6 +6,7 @@ const app = fs.readFileSync(path.join(root, "components/community/CommunityApp.t
 const client = fs.readFileSync(path.join(root, "lib/community/client.ts"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/20260909163047_community_owner_membership_resources_ux.sql"), "utf8");
 const concurrency = fs.readFileSync(path.join(root, "scripts/community-owner-ux-concurrency.mjs"), "utf8");
+const storageE2e = fs.readFileSync(path.join(root, "scripts/community-owner-ux-storage-e2e.mjs"), "utf8");
 const sqlTest = fs.readFileSync(path.join(root, "supabase/tests/community_owner_membership_resources_ux_test.sql"), "utf8");
 
 const assertions = [
@@ -22,11 +23,14 @@ const assertions = [
   [migration.includes("'community-resources'") && migration.includes("public, file_size_limit") && migration.includes("false,"), "resource bucket is private"],
   [migration.includes("community_resource_objects_select") && migration.includes("membership.access_scope = 'community'") && migration.includes("community_private.is_staff"), "resource reads are tenant and membership scoped"],
   [migration.includes("file_size_bytes is not null") && migration.includes("split_part(storage_path, '/', 1) = community_id::text") && migration.includes("resource.id::text = (storage.foldername(name))[2]"), "file metadata and object paths are fail closed"],
+  [migration.includes("cardinality(pg_catalog.string_to_array(storage_path, '/')) = 4") && sqlTest.includes("partial file metadata is rejected independently") && sqlTest.includes("cross-namespace metadata is rejected independently"), "resource paths and metadata failures are independently covered"],
   [migration.includes("'external', 'manual-payment-claim:'"), "manual payment grants only an external Community entitlement"],
   [migration.includes("manual_request_id") && migration.includes("pg_advisory_xact_lock") && migration.includes("payload does not match"), "manual payment retries are idempotent"],
-  [concurrency.includes("both identical retries must succeed") && concurrency.includes("staff revocation transaction must succeed") && concurrency.includes("revokedRequestClaims: 0"), "concurrency runner covers replay and authority revocation"],
+  [concurrency.includes("both identical retries must succeed") && concurrency.includes("wait_event_type='Lock'") && concurrency.includes("idempotent replay waiting behind revocation must fail") && concurrency.includes("revokedRequestClaims: 0"), "concurrency runner proves waits for new and replay authority revocation"],
+  [app.includes("actorClient={actorClient}") && app.includes("updateCommunityMembershipPlan(actorClient") && app.includes("recordCommunityManualPayment(actorClient") && app.includes("if (!actorIsCurrent()) return;") && app.includes("window.sessionStorage.setItem(manualRequestStorageKey"), "new owner mutations are actor scoped and retries survive a reload"],
   [migration.includes("mapping.provider_type = 'academy_subscription'") && migration.includes("already included with an active Academy benefit"), "manual payment rejects an active Academy duplicate"],
   [sqlTest.includes("active Academy access rejects duplicate manual payment") && sqlTest.includes("Academy duplicate rejection leaves no payment claim"), "SQL test covers Academy duplicate rollback"],
+  [storageE2e.includes('Only an isolated local Supabase Storage endpoint is allowed') && storageE2e.includes('signedSeconds: 900') && storageE2e.includes('an upload larger than 50MB must fail') && storageE2e.includes('disallowed MIME upload must fail'), "isolated Storage API runner covers bytes, MIME, size and signed URLs"],
 ];
 
 for (const [condition, message] of assertions) {
