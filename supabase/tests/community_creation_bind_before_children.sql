@@ -22,6 +22,11 @@ for each row execute function pg_temp.fail_community_create_child();
 create trigger community_test_safety_failure before insert on public.community_safety_settings
 for each row execute function pg_temp.fail_community_create_child();
 
+select set_config('request.jwt.claims','{"sub":"cb090909-0000-4000-8000-000000000001","role":"authenticated","is_anonymous":false}',true);
+set local role service_role;
+select public.platform_billing_community_trial_start('cb090909-0000-4000-8000-000000000001','cb090909-0000-4000-8000-000000000011');
+reset role;
+
 do $$
 declare
   v_actor uuid := 'cb090909-0000-4000-8000-000000000001';
@@ -31,9 +36,6 @@ declare
   v_phase text;
 begin
   perform set_config('request.jwt.claims',jsonb_build_object('sub',v_actor,'role','authenticated','is_anonymous',false)::text,true);
-  set local role service_role;
-  perform public.platform_billing_community_trial_start(v_actor,'cb090909-0000-4000-8000-000000000011');
-  reset role;
   set local role authenticated;
   v_created := public.community_create_with_platform_entitlement('Local bind success','local-bind-success',null,'Test owner');
   reset role;
@@ -46,9 +48,21 @@ begin
   if not community_private.community_owner_write_allowed(v_created.id,clock_timestamp()) then
     raise exception 'new trial owner must pass real retention guard';
   end if;
-  set local role service_role;
-  perform public.platform_billing_community_trial_start(v_actor,'cb090909-0000-4000-8000-000000000012');
-  reset role;
+end;
+$$;
+
+-- Separate RPC statements model real HTTP calls and avoid a fixture-created
+-- grant starting after the outer DO statement_timestamp used by guarded create.
+set local role service_role;
+select public.platform_billing_community_trial_start('cb090909-0000-4000-8000-000000000001','cb090909-0000-4000-8000-000000000012');
+reset role;
+do $$
+declare
+  v_actor uuid := 'cb090909-0000-4000-8000-000000000001';
+  v_pending jsonb;
+  v_after jsonb;
+  v_phase text;
+begin
   select to_jsonb(e) into strict v_pending from platform_billing_private.creation_entitlements e
     where actor_user_id=v_actor and status='available' and resource_id is null;
   foreach v_phase in array array['community_communities','community_safety_settings','community_memberships','community_rooms'] loop
