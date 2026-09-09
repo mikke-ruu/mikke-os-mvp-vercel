@@ -1,8 +1,6 @@
 import Link from "next/link";
 
 export function MediaPublicFooter({ name, articlePath }: { name: string; articlePath?: string }) {
-  const revision = process.env.NEXT_PUBLIC_MEDIA_LEGAL_REVISION ?? "";
-  const legalPath = /^[a-z0-9-]{1,80}$/.test(revision) ? `/legal/media/${revision}` : null;
   const email = "musubi.aroma@gmail.com";
   const contact = `mailto:${email}?` + new URLSearchParams({
     subject: "Media Free 通報",
@@ -12,7 +10,10 @@ export function MediaPublicFooter({ name, articlePath }: { name: string; article
   return <footer className="border-t border-[var(--mikke-line)] px-5 py-8 text-center text-xs leading-7 text-[var(--mikke-muted)]">
     <p>{name} · Media by mikke</p>
     <nav className="mt-2 flex flex-wrap justify-center gap-x-5 gap-y-1" aria-label="運営と利用条件">
-      {legalPath ? <Link href={legalPath} className="underline">利用条件・プライバシー・禁止事項</Link> : <span>利用条件を準備中</span>}
+      <Link href="/legal/media/free/terms/2026-09-09-v1" className="underline">利用条件</Link>
+      <Link href="/legal/media/free/privacy/2026-09-09-v1" className="underline">プライバシー</Link>
+      <Link href="/legal/media/free/content-publication/2026-09-09-v1" className="underline">投稿ルール</Link>
+      <Link href="/legal/media/free/report-data/2026-09-09-v1" className="underline">削除・保存</Link>
       <a href={contact} className="underline">通報・訂正・お問い合わせ</a>
       <Link href="/legal/commercial-disclosure/2026-09-04-v1" className="underline">運営会社</Link>
     </nav>

@@ -8,6 +8,10 @@ const LEGAL_DOCUMENTS = new Set([
   "commercial-disclosure-2026-09-04-v1.md",
   "community-billing-2026-09-04-v1.md",
   "community-terms-2026-09-04-v1.md",
+  "media-free-content-publication-2026-09-09-v1.md",
+  "media-free-privacy-2026-09-09-v1.md",
+  "media-free-report-data-2026-09-09-v1.md",
+  "media-free-terms-2026-09-09-v1.md",
   "privacy-2026-09-04-v1.md"
 ]);
 

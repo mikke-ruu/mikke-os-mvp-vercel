@@ -7,16 +7,16 @@ import { loadPublicMediaArticles, loadPublicMediaSite } from "@/lib/media-app/pu
 type Props = { params: Promise<{ mediaSlug: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  if (process.env.NODE_ENV !== "development") return { title: "Media", robots: { index: false, follow: false } };
+  if (process.env.NODE_ENV !== "development" && process.env.NEXT_PUBLIC_MEDIA_FREE_ENABLED !== "true") return { title: "Media", robots: { index: false, follow: false } };
   const { mediaSlug } = await params;
   const site = await loadPublicMediaSite(mediaSlug);
   const canonical = mediaCanonicalUrl(mediaSlug);
   if (!site || !canonical) return { title: "Media", robots: { index: false, follow: false } };
-  return { title: site.name, description: site.description, alternates: { canonical }, robots: { index: false, follow: false } };
+  return { title: site.name, description: site.description, alternates: { canonical }, robots: { index: true, follow: true } };
 }
 
 export default async function PublicMediaPage({ params }: Props) {
-  if (process.env.NODE_ENV !== "development") notFound();
+  if (process.env.NODE_ENV !== "development" && process.env.NEXT_PUBLIC_MEDIA_FREE_ENABLED !== "true") notFound();
   const { mediaSlug } = await params;
   const [site, articles] = await Promise.all([
     loadPublicMediaSite(mediaSlug),
