@@ -32,7 +32,9 @@ const expectedEarly=[
  '20260826033657_academy_seven_day_trial_foundation.sql'];
 assert.deepEqual(files.filter(x=>x<'20260829000000'),expectedEarly,'baseline-uncovered early migrations');
 assert.equal(new Set(files.map(x=>x.slice(0,14))).size,files.length,'duplicate migration versions');
-const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+// The same dedicated checkout may be read by the sandbox or Docker-capable user.
+// Trust only this explicit checkout for this invocation; never edit global Git policy.
+const git=(...args)=>execFileSync('git',['-c',`safe.directory=${root.replaceAll('\\','/')}`,...args],{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
 const commit=git('rev-parse','HEAD');
 const paths=files.map(file=>`supabase/migrations/${file}`);
 assert.equal(git('status','--porcelain','--',...paths),'','uncommitted replay inputs');

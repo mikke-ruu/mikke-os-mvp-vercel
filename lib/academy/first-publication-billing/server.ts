@@ -11,6 +11,7 @@ import type { SubscriptionContext } from './webhook';
 import { processRenewalJob } from './renewal';
 import type { RenewalJob, RenewalQuote } from './renewal';
 import { quoteFromDatabase, verifyConfirmedQuote } from './quote';
+import { prepareReceiptProof } from './receipt-proof';
 
 function runtime(signal: AbortSignal) {
   const env=process.env;
@@ -61,6 +62,7 @@ export async function serveWorker(request:Request){
       return privateJson({outcome:object(result)&&typeof result.outcome==='string'?result.outcome:'processed'});
     }demand(object(raw),'INVALID_JOB');
     const job=raw as unknown as BillingJob;
+    if(!await prepareReceiptProof(job,r.rpc))return privateJson({outcome:'blocked'});
     const prices:unknown=JSON.parse(process.env.ACADEMY_FIRST_PUBLICATION_PRICE_IDS_JSON??'{}');demand(object(prices)&&Object.values(prices).every(v=>typeof v==='string'),'PRICE_NOT_CONFIGURED');
     const result=await processBillingJob(job,{stripe:r.stripe,now:Date.now,priceIds:prices as Record<string,string>,store:{
       async dispatchCheck(j){const value=await r.rpc('academy_first_publication_outbox_dispatch_check',{p_event_key:j.event_key,p_lease_token:j.lease_token});return object(value)&&value.allowed===true;},
