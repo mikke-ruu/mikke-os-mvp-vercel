@@ -14,15 +14,17 @@ const publicArticlePage = read("app/media/[mediaSlug]/[articleSlug]/page.tsx");
 const authGate = read("components/AuthGate.tsx");
 const sqlTest = read("supabase/tests/media_free_foundation_rls.sql");
 
-assert.match(apps, /hiddenCatalogAppKeys[^\n]*\[[^\]]*"media"/);
+assert.match(apps, /NEXT_PUBLIC_MEDIA_FREE_ENABLED[\s\S]*\["media" as AppKey\]/);
 for (const layout of [managementLayout, publicLayout]) {
   assert.match(layout, /process\.env\.NODE_ENV !== "development"/);
+  assert.match(layout, /NEXT_PUBLIC_MEDIA_FREE_ENABLED/);
   assert.match(layout, /notFound\(\)/);
 }
 assert.match(publicLoader, /import "server-only"/);
 assert.match(publicLoader, /process\.env\.NODE_ENV === "development"/);
 for (const page of [publicSitePage, publicArticlePage]) {
   assert.match(page, /process\.env\.NODE_ENV !== "development"/);
+  assert.match(page, /NEXT_PUBLIC_MEDIA_FREE_ENABLED/);
   assert.match(page, /notFound\(\)/);
   assert.match(page, /generateMetadata/);
   assert.match(page, /mediaCanonicalUrl/);

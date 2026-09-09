@@ -11,6 +11,10 @@ const LEGAL_DOCUMENTS = new Set([
   "commercial-disclosure-2026-09-04-v1.md",
   "community-billing-2026-09-04-v1.md",
   "community-terms-2026-09-04-v1.md",
+  "media-free-content-publication-2026-09-09-v1.md",
+  "media-free-privacy-2026-09-09-v1.md",
+  "media-free-report-data-2026-09-09-v1.md",
+  "media-free-terms-2026-09-09-v1.md",
   "privacy-2026-09-04-v1.md"
 ]);
 
@@ -43,6 +47,18 @@ function renderMarkdown(markdown: string) {
     if (line.startsWith("## ")) {
       const heading = line.slice(3);
       nodes.push(<h2 key={index} id={sectionId(heading)} className="scroll-mt-6 pt-5 text-xl font-bold text-slate-950">{heading}</h2>);
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith("### ")) {
+      nodes.push(<h3 key={index} className="pt-3 text-base font-bold text-slate-950 sm:text-lg">{line.slice(4)}</h3>);
+      index += 1;
+      continue;
+    }
+
+    if (line.startsWith("#")) {
+      nodes.push(<p key={index} className="text-sm font-bold leading-7 text-slate-900 sm:text-base">{line.replace(/^#+\s*/, "")}</p>);
       index += 1;
       continue;
     }

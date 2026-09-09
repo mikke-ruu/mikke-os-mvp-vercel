@@ -39,3 +39,13 @@
 - 実Auth/Storage検証後は専用projectをno-backupで停止。合成利用者、画像、DB volume、container、network、認証keyと結果ファイルを削除し、残存0を確認した。
 - `npm.cmd run lint`、公開RPC、integration、release boundary、画像35負例、本番用Webpack buildがexit 0。既存のthemeColor警告はMedia差分外であり、build失敗ではない。
 - 公開、DB本番適用、課金起動は未実施。一般公開はactive法務revisionと統制最終レビューが揃うまでfail closedを維持する。
+
+## 2026-09-10 法務正本と本番有効化スライス
+
+- PR #90をsquash mergeし、merge commit `fbce7b6653f61844829eab7f0327fe089089dfc2` をVercelへdeployした。Mediaの公開routeはfeature flagなしでは404を維持した。
+- production Supabase `nttqpprkqbynxyldbnjs` へfoundationとprivate publication gateを順番に適用した。private bucketは非公開、active法務revisionは0件の状態で公開操作を拒否した。
+- 本人承認済みのMedia Free利用条件、プライバシー、投稿ルール、通報・削除・保存の4正本を法務室から回収し、ファイルSHA-256がmanifestと一致することを確認した。
+- 法務正本がMedia作成前の同意を求めるため、初回作成画面に4文書への導線と明示同意を追加した。DB側もactiveな4文書bundleへの同意がなければMedia作成RPCを拒否する。
+- 同意と記事公開証跡へ4文書の版、SHA-256、固定URLをsnapshotする追加migrationを作成した。PG17.6隔離検証で未同意拒否、同意後作成、ROLLBACK後残存0を確認した。
+- `npm.cmd run lint`、repository/integration/release boundary/public imageの負例、本番公開flagを有効にしたWebpack production buildが合格した。buildのthemeColor警告は既存差分外。
+- この記録時点では追加migrationの本番適用、VercelのMedia公開flag、法務routeのdeploy、live Auth E2Eは未実施。削除UI、retention worker、自動通報台帳、有料記事、Stripe Connect、アフィリエイト、標準AIは初期Freeに含めない。
