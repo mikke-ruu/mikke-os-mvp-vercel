@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "node --max-old-space-size=6144 node_modules/next/dist/bin/next build --webpack",
+    "build": "node scripts/next-production-build.mjs",
     "start": "next start",
     "test:mikkeos:safe-activity-log": "node scripts/mikkeos-safe-activity-log-test.mjs",
     "test:mikkeos:private-revenue-log": "node scripts/mikkeos-safe-activity-log-test.mjs private_revenue",
