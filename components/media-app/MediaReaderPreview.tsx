@@ -1,9 +1,10 @@
 "use client";
+import { useMediaRepository } from "./MediaRepository";
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
-import { getMediaArticle, getOwnedMedia, listMediaArticles } from "@/lib/media-app/store";
+
 import type { MediaArticle, MediaSite } from "@/lib/media-app/types";
 import { MediaArticleRenderer } from "./MediaArticleRenderer";
 import { MediaLink } from "./MediaNavigation";
@@ -11,20 +12,23 @@ import { normalizeMediaStoryUrl } from "@/lib/media-app/profile-links.js";
 
 export function MediaReaderPreview() {
   const { profile } = useAuth();
+  const repository=useMediaRepository();
+  const {getOwnedMedia,getMediaArticle,listMediaArticles,cloud}=repository;
   const id = useSearchParams().get("article");
   const [data, setData] = useState<{ site: MediaSite; article: MediaArticle; related: MediaArticle[] } | null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
-    const site = getOwnedMedia(profile.id);
-    const article = id ? getMediaArticle(id) : null;
+    let alive=true; setData(null); setLoaded(false); void (async()=>{ try {
+    const site = await getOwnedMedia(profile.id);
+    const article = id ? await getMediaArticle(id) : null;
     // Local preview never promotes a draft into public data or ownership.
     if (site && article?.mediaId === site.id) {
-      const related = listMediaArticles(site.id).filter((item) => item.id !== article.id && item.publishedSnapshot && item.category === article.category).slice(0, 3);
-      setData({ site, article, related });
-    } else setData(null);
-    setLoaded(true);
-  }, [profile.id, id]);
-  if (!loaded || (data && (data.site.ownerProfileId !== profile.id || data.article.id !== id))) return <p className="p-10">記事を開いています…</p>;
+      const related = (await listMediaArticles(site.id)).filter((item) => item.id !== article.id && item.publishedSnapshot && item.category === article.category).slice(0, 3);
+      if(alive)setData({ site, article, related });
+    } else if(alive)setData(null);
+    } catch {if(alive)setData(null);} finally {if(alive)setLoaded(true);} })(); return()=>{alive=false;};
+  }, [profile.id, id,repository,getOwnedMedia,getMediaArticle,listMediaArticles]);
+  if (!loaded || (data && (data.site.ownerProfileId !== (cloud?profile.user_id:profile.id) || data.article.id !== id))) return <p className="p-10">記事を開いています…</p>;
   if (!data) return <main className="mx-auto max-w-3xl p-10"><p>表示できる記事がありません。</p><MediaLink href="/apps/media/articles">記事一覧へ戻る</MediaLink></main>;
   const { site, article, related } = data;
   const storyUrl = site.showStory === true ? normalizeMediaStoryUrl(site.storyUrl ?? "") : "";

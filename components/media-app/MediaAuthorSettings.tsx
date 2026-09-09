@@ -1,24 +1,27 @@
 "use client";
+import { useMediaRepository } from "./MediaRepository";
 
 import { useState } from "react";
 import { MediaLink } from "./MediaNavigation";
-import { updateMediaAuthorProfile } from "@/lib/media-app/store";
+
 import type { MediaSite } from "@/lib/media-app/types";
 
 export function MediaAuthorSettings({ site }: { site: MediaSite }) {
+  const {updateMediaAuthorProfile,cloud}=useMediaRepository();
   const [bio, setBio] = useState(site.authorBio ?? "");
   const [storyUrl, setStoryUrl] = useState(site.storyUrl ?? "");
   const [showStory, setShowStory] = useState(site.showStory === true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const inputClass = "mt-2 w-full rounded-xl border border-[var(--mikke-line)] bg-white p-3 text-sm font-normal";
+  if(cloud) return <p className="mt-6 text-sm">STORYリンクと追加プロフィールのクラウド保存は準備中です。</p>;
   return <section className="mt-8 border-t border-[var(--mikke-line)] py-7">
     <h2 className="text-xl font-bold">書き手のプロフィール</h2>
     <p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">記事の下に自己紹介とSTORYへのリンクを添えられます。匿名やブランド名のMediaでは設定しなくても大丈夫です。</p>
-    <form className="mt-5 space-y-5" onSubmit={(event) => {
+    <form className="mt-5 space-y-5" onSubmit={async (event) => {
       event.preventDefault(); setMessage(""); setError("");
       try {
-        const next = updateMediaAuthorProfile(site.id, { authorBio: bio, storyUrl, showStory });
+        const next = await updateMediaAuthorProfile(site.id, { authorBio: bio, storyUrl, showStory });
         setStoryUrl(next.storyUrl); setMessage("プロフィールを保存しました。読者画面で確認できます。");
       } catch (cause) { setError(cause instanceof Error ? cause.message : "保存できませんでした。"); }
     }}>
