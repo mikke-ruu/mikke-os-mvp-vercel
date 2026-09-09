@@ -11,6 +11,7 @@ export const appSlugs: Record<AppKey, string> = {
   team_works: "team-works",
   fund: "fund",
   page: "page",
+  media: "media",
   library: "library"
 };
 

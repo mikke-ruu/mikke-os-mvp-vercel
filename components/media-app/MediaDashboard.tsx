@@ -1,0 +1,28 @@
+"use client";
+import { useMediaRepository } from "./MediaRepository";
+
+import { MediaLink as Link, useMediaReviewNavigation } from "./MediaNavigation";
+import { useEffect, useState } from "react";
+import { ArrowRight, BookOpen, ExternalLink, PenLine, Plus } from "lucide-react";
+import { useAuth } from "@/components/AuthGate";
+
+import type { MediaArticle, MediaSite } from "@/lib/media-app/types";
+
+export function MediaDashboard() {
+  const { profile } = useAuth();
+  const repository = useMediaRepository();
+  const { getOwnedMedia, listMediaArticles } = repository;
+  const [loadError,setLoadError] = useState("");
+  const [loading,setLoading]=useState(true);
+  const { reviewing } = useMediaReviewNavigation();
+  const [site, setSite] = useState<MediaSite | null>(null);
+  const [articles, setArticles] = useState<MediaArticle[]>([]);
+  useEffect(() => { let alive=true; setLoading(true); setSite(null); setArticles([]); setLoadError(""); void (async()=>{try {const next=await getOwnedMedia(profile.id); const items=next?await listMediaArticles(next.id):[]; if(alive){setSite(next);setArticles(items);}} catch {if(alive)setLoadError("記事を読み込めませんでした。ログインと接続を確認してください。");}finally{if(alive)setLoading(false);}})(); return()=>{alive=false;}; },[profile.id,repository,getOwnedMedia,listMediaArticles]);
+  if(site && site.ownerProfileId !== (repository.cloud?profile.user_id:profile.id)) return <p>記事を読み込んでいます…</p>;
+  if(loading) return <p>記事を読み込んでいます…</p>;
+  if(loadError) return <p role="alert">{loadError}</p>;
+  if (!site) return <section className="mx-auto grid min-h-[62vh] max-w-2xl place-items-center text-center"><div><span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]"><BookOpen size={30} /></span><p className="mt-6 text-xs font-black tracking-[0.14em] text-[var(--mikke-primary)]">MEDIA FREE</p><h1 className="mt-2 text-3xl font-black">発信を、ここから残していく。</h1><p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-[var(--mikke-muted)]">難しい設定なしで、記事を書き、確認して、自分のMediaに公開できます。</p><Link href="/apps/media/new" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-5 py-3 text-sm font-bold text-white"><Plus size={17} />Mediaを作る</Link></div></section>;
+  const drafts = articles.filter((article) => article.status !== "published" || (article.publishedSnapshot && article.updatedAt > article.publishedSnapshot.updatedAt));
+  const published = articles.filter((article) => article.publishedSnapshot);
+  return <div className="space-y-8"><header className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-black tracking-[0.14em] text-[var(--mikke-primary)]">TODAY</p><h1 className="mt-2 text-3xl font-black">{site.name}</h1><p className="mt-2 text-sm text-[var(--mikke-muted)]">今日やることを、ひとつだけ選びます。</p></div><Link href="/apps/media/write" className="inline-flex items-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-4 py-3 text-sm font-bold text-white"><PenLine size={16} />記事を書く</Link></header><section className="grid gap-4 sm:grid-cols-3"><div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5"><p className="text-xs font-bold text-[var(--mikke-muted)]">記事</p><p className="mt-2 text-3xl font-black">{articles.length}</p></div><div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5"><p className="text-xs font-bold text-[var(--mikke-muted)]">書きかけ</p><p className="mt-2 text-3xl font-black">{drafts.length}</p></div><div className="rounded-2xl border border-[var(--mikke-line)] bg-white p-5"><p className="text-xs font-bold text-[var(--mikke-muted)]">公開中</p><p className="mt-2 text-3xl font-black">{published.length}</p></div></section><section className="rounded-3xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm"><div className="flex items-center justify-between gap-3"><div><h2 className="text-lg font-black">次にすること</h2><p className="mt-1 text-sm text-[var(--mikke-muted)]">{drafts[0] ? "書きかけの記事を続けましょう。" : "新しい記事を1本書いてみましょう。"}</p></div>{drafts[0] ? <Link href={`/apps/media/write?article=${drafts[0].id}`} className="inline-flex items-center gap-1 text-sm font-bold text-[var(--mikke-primary)]">続きを書く<ArrowRight size={15} /></Link> : <Link href="/apps/media/write" className="inline-flex items-center gap-1 text-sm font-bold text-[var(--mikke-primary)]">書き始める<ArrowRight size={15} /></Link>}</div>{drafts[0] ? <div className="mt-5 border-t border-[var(--mikke-line-soft)] pt-4"><p className="font-bold">{drafts[0].title || "無題の記事"}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">最終保存 {new Date(drafts[0].updatedAt).toLocaleString("ja-JP")}</p></div> : null}</section><section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[var(--mikke-primary-soft)] p-5"><div><p className="font-bold">公開ページを確認</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">{reviewing ? "公開ページのデザイン見本です。編集中の記事はエディタのプレビューで確認できます。" : "公開済みの記事だけが読者に表示されます。"}</p></div><Link href={reviewing ? "/media/mikkeos-media-preview" : `/media/${site.slug}`} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-[var(--mikke-primary)]"><ExternalLink size={15} />Mediaを見る</Link></section></div>;
+}
