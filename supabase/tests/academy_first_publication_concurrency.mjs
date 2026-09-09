@@ -7,7 +7,7 @@
  * Does not delete immutable evidence, change schemas, call providers or enable dispatch.
  */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
 const container = 'supabase_db_academy-release-auth-20260909';
@@ -22,6 +22,8 @@ assert.ok(/^[0-9a-f]{8}-$/i.test(fixturePrefix??''),'Explicit dedicated fixture 
 for(const value of [owner,commitHq,rollbackHq])assert.ok(UUID.test(value??''),'Dedicated fixture UUIDs are required');
 for(const value of [owner,commitHq,rollbackHq])assert.ok(value.toLowerCase().startsWith(fixturePrefix.toLowerCase()),'Owner/HQ must belong to the explicitly named disposable fixture prefix');
 assert.notEqual(commitHq,rollbackHq,'Commit and rollback cases need separate untouched fixtures');
+const labels=JSON.parse(execFileSync(docker,['inspect','--format','{{json .Config.Labels}}',container],{encoding:'utf8',windowsHide:true}));
+assert.equal(labels['com.supabase.cli.project'],'academy-release-auth-20260909','Strict isolated container label required');
 const sessions=[];
 class Session {
   constructor(label) {
