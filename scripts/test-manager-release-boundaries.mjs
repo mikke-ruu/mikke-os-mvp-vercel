@@ -27,6 +27,10 @@ assert.match(owner, /shouldIncludeGuestMarketNoteData\(isGuest, hasGuestMarketNo
 assert.match(owner, /projectMikkeMenuPreferences\(ownedKeysInStandardOrder, ownerMatches \? preferenceRows : \[\]\)/);
 assert.match(owner, /detectedState && !isGuest && detectedState.ownerId === userId/);
 assert.match(owner, /preferenceOwner === currentPreferenceOwner/);
+assert.match(owner, /getMyMikkeMenuPreferences\(userId\)/);
+const settings = read("components/manager/ManagerSettingsPanel.tsx");
+assert.match(settings, /}, profile\.user_id\)/);
+assert.match(settings, /resetMyMikkeMenuPreferences\(profile\.user_id\)/);
 const history = read("components/manager/ManagerHistoryList.tsx");
 assert.match(history, /logState\?\.ownerId === user.id/);
 assert.match(history, /最新30件/);

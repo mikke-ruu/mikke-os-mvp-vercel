@@ -66,7 +66,7 @@ export function ManagerSettingsPanel() {
       await replaceMyMikkeMenuPreferences({
         orderedAppKeys: menuDraft.map((app) => app.key),
         hiddenAppKeys: menuDraft.filter((app) => app.isHidden).map((app) => app.key)
-      });
+      }, profile.user_id);
       refreshMenuPreferences();
       setMenuSaved(true);
     } catch {
@@ -81,7 +81,7 @@ export function ManagerSettingsPanel() {
     setMenuSaved(false);
     setMenuActionError(null);
     try {
-      await resetMyMikkeMenuPreferences();
+      await resetMyMikkeMenuPreferences(profile.user_id);
       const ownedKeySet = new Set(ownedAppKeys);
       setMenuDraft(mikkeMenuAppOrder
         .filter((key) => ownedKeySet.has(key))

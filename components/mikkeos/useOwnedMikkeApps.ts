@@ -116,7 +116,7 @@ export function useOwnedMikkeApps({
     }
 
     setPreferenceLoading(true);
-    void getMyMikkeMenuPreferences()
+    void getMyMikkeMenuPreferences(userId)
       .then((rows) => {
         if (cancelled) return;
         setPreferenceRows(rows);
