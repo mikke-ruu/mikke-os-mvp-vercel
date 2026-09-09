@@ -42,6 +42,7 @@ export interface MediaPublicTransport {
 }
 
 const siteKeys = ["authorName", "categories", "description", "locale", "name", "slug"];
+const publicImageUrl=(value:string)=>value===""||(/^\/media\/images\/[a-f0-9]{64}$/.test(value)&&!/[\r\n]/.test(value));
 const summaryKeys = ["categoryName", "coverImageUrl", "excerpt", "locale", "publishedAt", "revisionHash", "slug", "title", "updatedAt", "versionNumber"];
 const articleKeys = [...summaryKeys, "blocks"].sort();
 const blockKeys = {
@@ -91,7 +92,7 @@ function validBlock(value: unknown): value is MediaPublicBlockDTO {
       return hasExactKeys(item, blockKeys.heading) && string(item.text, 500) && (item.level === 2 || item.level === 3);
     case "image": {
       const required = item.caption === undefined ? ["alt", "id", "imageUrl", "type"] : blockKeys.image;
-      return hasExactKeys(item, required) && string(item.imageUrl, 2048) && isSafeMediaUrl(item.imageUrl as string)
+      return hasExactKeys(item, required) && string(item.imageUrl, 2048) && publicImageUrl(item.imageUrl as string)
         && string(item.alt, 500) && (item.caption === undefined || string(item.caption, 1000));
     }
     case "quote": {
@@ -116,7 +117,7 @@ function parseSummary(value: unknown): MediaPublicArticleSummaryDTO | null {
   const item = record(value);
   if (!item || !hasExactKeys(item, summaryKeys)) return null;
   if (!string(item.title, 160) || !validSlug(item.slug) || !string(item.excerpt, 500) || !string(item.categoryName, 60)) return null;
-  if (!string(item.coverImageUrl, 2048) || !isSafeMediaUrl(item.coverImageUrl as string) || !string(item.locale, 16)) return null;
+  if (!string(item.coverImageUrl, 2048) || !publicImageUrl(item.coverImageUrl as string) || !string(item.locale, 16)) return null;
   if (!Number.isInteger(item.versionNumber) || (item.versionNumber as number) < 1 || !validRevision(item.revisionHash)) return null;
   if (!validDate(item.publishedAt) || !validDate(item.updatedAt)) return null;
   return item as MediaPublicArticleSummaryDTO;

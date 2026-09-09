@@ -28,6 +28,13 @@ for (const bad of [[], null, [article, article], [{ ...article, owner_id: "priva
   response = bad;
   assert.equal(await reader.article("media", "article"), null);
 }
+const tokenUrl="/media/images/"+"b".repeat(64);
+response=[{...article,cover_image_url:tokenUrl,blocks:[{id:"image",type:"image",imageUrl:tokenUrl,alt:"公開画像"}]}];
+assert.equal((await reader.article("media","article")).coverImageUrl,tokenUrl);
+for(const unsafe of ["/api/media/assets/11111111-1111-1111-1111-111111111111","https://storage.invalid/owner/private.webp",tokenUrl+"\n"]){
+ response=[{...article,cover_image_url:unsafe}];assert.equal(await reader.article("media","article"),null);
+ response=[{...article,blocks:[{id:"image",type:"image",imageUrl:unsafe,alt:"画像"}]}];assert.equal(await reader.article("media","article"),null);
+}
 response = [article];
 assert.equal(await reader.article("media", "article", "en-US"), null);
 assert.equal(await reader.articles("media", "en-US"), null);

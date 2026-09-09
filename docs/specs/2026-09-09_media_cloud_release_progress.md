@@ -25,3 +25,17 @@
 - 法務/本人: Media固有terms/privacy、保持期間の実値、未成年範囲、通報判断担当、最終文言。
 - cloud publishは上記契約完成までrepositoryで明示拒否。production UIは404を維持し、画像もMEDIA_PUBLIC_DATABASE_ENABLEDとprivate bucket未設定時404。フラグをセットしただけで完成にはならない。
 - STORY追加プロフィールのクラウド保存と各アプリへの選択記事配信は後続。課金・Stripe・有料記事・アフィリエイトは今回起動しない。
+
+## 追加DBと公開確認（後続実装）
+
+49805cd後、統制から追加DBの実装所有をMedia室へ移管。Media室がprivate upload/本人画像preview/初回同意/公開snapshot確認UIを実装し、統制室はレビューを担当する。
+
+- 20260909092651追加migration SHA256: 3712057abc936a2a86336e55083c915df51dc6f5f4088b779e765c5c68956050。
+- PG17.6でbaseline+foundation+追加migration+負例をBEGIN/ROLLBACK実行しexit0。ネットワークなし・ポートなし・tmpfsを確認。別接続で追加table/schema/合成role残存0、専用container削除exit0。
+- 明示初回同意、active legal digest、確認snapshot revision一致、private bucket、他人asset、旧RPC迂回、合算容量、hold解除時の自動復活なし、旧版token失効を検証。
+- 公開確認UIは新しいreviewed RPCを利用。旧repository publishは拒否したまま。legal registry初期空のため実利用条件が承認・登録されるまで公開できない。
+- 公開記事の読者レイアウトと通報メール導線を追加。Mediaの本物の利用条件ページは未登録。local-media-test-v1はdevelopmentだけの架空規約であり実契約ではない。
+- 実Auth/Storage環境はMedia専用で127.0.0.1だけに公開して実施。baseline、foundation、追加migration、法的効力がない合成termsの順で適用し、通常利用者2名、匿名拒否、他人のMedia・画像拒否、private Storage、公開DTO、初回同意、古い確認版拒否、公開、公開キャンセル、再公開、hold解除後の自動復活なしを含む13項目が合格した。
+- 実Auth/Storage検証後は専用projectをno-backupで停止。合成利用者、画像、DB volume、container、network、認証keyと結果ファイルを削除し、残存0を確認した。
+- `npm.cmd run lint`、公開RPC、integration、release boundary、画像35負例、本番用Webpack buildがexit 0。既存のthemeColor警告はMedia差分外であり、build失敗ではない。
+- 公開、DB本番適用、課金起動は未実施。一般公開はactive法務revisionと統制最終レビューが揃うまでfail closedを維持する。

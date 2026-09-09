@@ -7,8 +7,9 @@ import { useSearchParams } from "next/navigation";
 import { useMediaRouter as useRouter } from "./MediaNavigation";
 import { ArrowDown, ArrowUp, Copy, Eye, Pencil, Settings2, Heading2, ImageIcon, Link2, List, Minus, Plus, Quote, Send, Trash2, Type } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
-import { MikkeMediaPicker } from "@/components/media/MikkeMediaPicker";
+import { MediaImagePicker as MikkeMediaPicker } from "./MediaImagePicker";
 import { getMediaExcerpt, createMediaBlock, isSafeMediaUrl, normalizeMediaSlug } from "@/lib/media-app/store";
+import { MediaCloudPublication } from "./MediaCloudPublication";
 import { MediaArticleRenderer } from "./MediaArticleRenderer";
 import type { MediaArticle, MediaBlock, MediaBlockType, MediaSite } from "@/lib/media-app/types";
 
@@ -44,6 +45,7 @@ export function MediaEditor() {
   useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;epoch.current++;};},[]);
   const writeQueue=useRef<Promise<unknown>>(Promise.resolve());
   const [rights,setRights]=useState(false);
+  const [publicationId,setPublicationId]=useState<string|null>(null);
   const [privacy,setPrivacy]=useState(false);
   const [noAffiliate,setNoAffiliate]=useState(false);
   const router = useRouter();
@@ -75,7 +77,7 @@ export function MediaEditor() {
 
   useEffect(() => {
     if (requestedId && requestedId === articleId.current && loadedOwner===ownerKey) return;
-    const version=++epoch.current; let alive=true; setLoaded(false); setSite(null); setArticle(null);
+    const version=++epoch.current; let alive=true; setPublicationId(null); setLoaded(false); setSite(null); setArticle(null);
     void (async()=>{try {
       const owned=await getOwnedMedia(profile.id);
       if(owned && owned.ownerProfileId!==ownerKey)throw Error("ログイン状態を確認して原稿を開き直してください。");
@@ -108,11 +110,11 @@ export function MediaEditor() {
     writeQueue.current=operation.catch(()=>{});return operation;
   }
   useEffect(()=>{
-    if(publishing || !loaded || loadedOwner!==ownerKey || !site || !hasContent || serialized===savedPayload.current)return;
+    if(publicationId || publishing || !loaded || loadedOwner!==ownerKey || !site || !hasContent || serialized===savedPayload.current)return;
     let alive=true;
     const timer=window.setTimeout(()=>{void saveDraft().catch(()=>{if(alive){setMessage("未保存の変更があります");setError("保存できませんでした。接続を確認してもう一度保存してください。");}});},900);
     return()=>{alive=false;window.clearTimeout(timer);};
-  },[loaded,loadedOwner,ownerKey,site,hasContent,serialized,repository,publishing]);
+  },[loaded,loadedOwner,ownerKey,site,hasContent,serialized,repository,publishing,publicationId]);
   async function saveNow() {
     try{if(!hasContent)throw Error("タイトルか本文を少し書いてみましょう。");
       if(blocks.some(block=>block.type==="link"&&!isSafeMediaUrl(block.url??"")))throw Error("リンクのURLを確認してください。");
@@ -122,6 +124,7 @@ export function MediaEditor() {
   async function publish() {
     if(publicationBusy.current)return;
     if(!title.trim()){setError("公開前にタイトルを付けてください。");return;}
+    if(cloud){const saved=await saveNow();if(saved)setPublicationId(saved.id);return;}
     const termsVersion=process.env.NEXT_PUBLIC_MEDIA_TERMS_VERSION??"";
     if(cloud&&(!termsVersion||!rights||!privacy||!noAffiliate)){setError("公開前の確認が必要です。利用条件が準備中の場合は公開できません。");return;}
     publicationBusy.current=true;setPublishing(true);
@@ -142,6 +145,7 @@ export function MediaEditor() {
   const count = blocks.reduce((total, block) => total + Array.from(block.text ?? block.items?.join("") ?? "").length, 0);
   if (!loaded || loadedOwner!==ownerKey) return <p className="py-16 text-center">原稿を開いています…</p>;
   if (!site) return error ? <p role="alert">{error}</p> : <Link href="/apps/media/new">先にMediaを作成してください</Link>;
+  if(publicationId&&cloud)return <MediaCloudPublication key={ownerKey+publicationId} articleId={publicationId} onCancel={()=>setPublicationId(null)} onPublished={next=>{setArticle(next);setPublicationId(null);setMessage("記事を公開しました。");}}/>;
   const buttonClass = "inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-[var(--mikke-line)] bg-white px-4 py-2 text-sm font-semibold";
   return <fieldset disabled={publishing} aria-busy={publishing} className="mx-auto min-w-0 max-w-5xl border-0 p-0 pb-16">
     <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[var(--mikke-line)] bg-white/95 py-3">
@@ -156,7 +160,6 @@ export function MediaEditor() {
     </section> : <>
       <div className="mx-auto max-w-3xl pt-8 sm:pt-12">
         <details className="mb-7"><summary className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--mikke-muted)]"><ImageIcon size={17} />{coverImageUrl ? "カバー画像を変更" : "カバー画像を添える（任意）"}</summary><div className="mt-4"><MikkeMediaPicker currentUrl={coverImageUrl} sourceApp="media-cover" onSelect={(asset) => { setCoverImageUrl(asset.publicUrl); setCoverImageAssetId(asset.id); }} /></div></details>
-        {cloud ? <section className="my-5 space-y-3 rounded-xl border border-[var(--mikke-line)] p-5"><h2 className="font-bold">公開前の確認</h2><p className="text-sm">利用条件の確定と初回同意の接続が完了するまで、本番公開はできません。</p><label className="block text-sm"><input type="checkbox" checked={rights} onChange={event=>setRights(event.target.checked)}/> 文章・画像を公開する権利を確認しました</label><label className="block text-sm"><input type="checkbox" checked={privacy} onChange={event=>setPrivacy(event.target.checked)}/> 個人情報や人物の掲載許可を確認しました</label><label className="block text-sm"><input type="checkbox" checked={noAffiliate} onChange={event=>setNoAffiliate(event.target.checked)}/> 広告・PR・アフィリエイトは含んでいません</label></section> : null}
         <WritingArea label="記事タイトル" title value={title} onChange={(value) => setTitle(value.slice(0, 160))} placeholder="タイトルをつけよう" />
         <div className="my-5 flex flex-wrap items-center gap-3 border-b border-[var(--mikke-line)] pb-6"><select aria-label="カテゴリー" value={category} onChange={(event) => setCategory(event.target.value)} className="max-w-full rounded-full border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm"><option value="">カテゴリーなし</option>{site.categories.map((item) => <option key={item}>{item}</option>)}</select><button type="button" aria-expanded={addingCategory} onClick={() => setAddingCategory(!addingCategory)} className="inline-flex items-center gap-1 text-sm text-[var(--mikke-primary)]"><Plus size={15} />カテゴリーを追加</button></div>
         {addingCategory ? <form onSubmit={(event) => { event.preventDefault(); addCategory(); }} className="mb-6 flex flex-wrap gap-2"><input autoFocus aria-label="新しいカテゴリー名" value={newCategory} maxLength={60} onChange={(event) => setNewCategory(event.target.value)} placeholder="例：日々のこと" className="min-w-0 flex-1 rounded-xl border border-[var(--mikke-line)] px-3 py-2" /><button type="submit" className={buttonClass}>追加</button><button type="button" className={buttonClass} onClick={() => setAddingCategory(false)}>やめる</button></form> : null}

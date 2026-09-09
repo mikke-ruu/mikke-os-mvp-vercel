@@ -7,6 +7,8 @@ type Category = { id: string; name: string; sort_order: number };
 type ArticleRow = MediaArticleDraftDatabaseRow & { status: MediaArticle["status"]; current_published_version_id: string | null };
 type Version = { title: string; slug: string; excerpt: string; category_name: string; cover_image_url: string; blocks: MediaArticleSnapshot["blocks"]; published_at: string };
 type Scope = { subject: string; check: () => Promise<void>; step: <T>(action: () => PromiseLike<T>) => Promise<T> };
+export type MediaActiveTerms={termsVersion:string;documentSha256:string;documentUrl:string;accepted:boolean};
+export type MediaPublicationReview={expectedRevision:string;snapshot:{title:string;slug:string;excerpt:string;category:string;coverImageUrl:string;blocks:MediaArticleSnapshot["blocks"];site:{name:string;slug:string;description:string;authorName:string;locale:string}}};
 const articleColumns = "id,site_id,title,slug,excerpt,locale,draft_blocks,category_id,cover_image_url,cover_image_asset_id,created_at,updated_at,status,current_published_version_id";
 const randomSlug = () => crypto.randomUUID().replace(/-/g, "").slice(0, 20);
 
@@ -102,6 +104,19 @@ export function createMediaCloudRepository(client: SupabaseClient, expectedSubje
   }
 
   return {
+    currentTerms: () => run(async scope=>{
+      const {data,error}=await scope.step(()=>client.rpc("media_current_terms"));if(error)throw error;return data as MediaActiveTerms|null;
+    }),
+    acceptTerms: (terms:MediaActiveTerms) => run(async scope=>{
+      const {error}=await scope.step(()=>client.rpc("media_accept_terms",{p_terms_version:terms.termsVersion,p_document_sha256:terms.documentSha256,p_confirmed:true}));if(error)throw error;
+    }),
+    reviewArticle: (id:string) => run(async scope=>{
+      const {data,error}=await scope.step(()=>client.rpc("media_review_article",{p_article_id:id}));if(error)throw error;if(!data)throw Error("公開前の原稿を確認できませんでした。");return data as MediaPublicationReview;
+    }),
+    publishReviewedArticle: (id:string,expectedRevision:string,terms:MediaActiveTerms) => run(async scope=>{
+      const {error}=await scope.step(()=>client.rpc("media_publish_article_reviewed",{p_article_id:id,p_expected_revision:expectedRevision,p_terms_version:terms.termsVersion,p_rights_confirmed:true,p_privacy_confirmed:true,p_affiliate_free_confirmed:true}));
+      if(error)throw error;return requireArticle(scope,id);
+    }),
     getOwnedMedia: (_profileId?: string) => run((scope) => site(scope)),
     getMediaSite: (id: string) => run((scope) => site(scope, id)),
     getMediaArticle: (id: string) => run((scope) => article(scope, id)),
@@ -115,11 +130,13 @@ export function createMediaCloudRepository(client: SupabaseClient, expectedSubje
     }),
     createMediaSite: (input: Pick<MediaSite, "ownerProfileId" | "name" | "slug" | "description" | "authorName">) => run(async (scope) => {
       rejectProfileFields(input);
+      if(input.slug.trim().toLowerCase()==="images")throw Error("この公開URL名は使用できません。別の名前を選択してください。");
       const id = await scope.step(() => db.createMediaSiteInDatabase({ name: input.name.trim(), slug: input.slug.trim().toLowerCase(), description: input.description.trim(), authorName: input.authorName.trim() || input.name.trim() }));
       return requireSite(scope, id);
     }),
     updateMediaSite: (id: string, input: Pick<MediaSite, "name" | "slug" | "description" | "authorName" | "categories">) => run(async (scope) => {
       rejectProfileFields(input);
+      if(input.slug.trim().toLowerCase()==="images")throw Error("この公開URL名は使用できません。別の名前を選択してください。");
       const current = await requireSite(scope, id);
       const wanted = [...new Set(input.categories.map((name) => name.trim()).filter(Boolean))];
       if (current.categories.some((name) => !wanted.includes(name))) throw new Error("カテゴリーの削除と名前変更は準備中です。追加のみ利用できます。");
