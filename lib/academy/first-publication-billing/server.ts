@@ -42,12 +42,18 @@ export async function serveSetup(action:'setup'|'confirm',request:Request){
     });
   }catch{return privateJson({error:'BILLING_NOT_CONFIGURED'},503);}
 }
-export async function serveWorker(request:Request){
-  const expected=process.env.ACADEMY_FIRST_PUBLICATION_WORKER_SECRET, supplied=request.headers.get('authorization');
-  if(request.method!=='POST'||!expected||expected.length<32||!supplied||Buffer.byteLength(supplied)!==Buffer.byteLength(`Bearer ${expected}`)||!timingSafeEqual(Buffer.from(supplied),Buffer.from(`Bearer ${expected}`)))return privateJson({error:'AUTH_REQUIRED'},401);
+function authorizedBearer(request:Request,expected:string|undefined){
+  const supplied=request.headers.get('authorization');
+  return !!expected&&expected.length>=32&&!!supplied&&Buffer.byteLength(supplied)===Buffer.byteLength(`Bearer ${expected}`)&&timingSafeEqual(Buffer.from(supplied),Buffer.from(`Bearer ${expected}`));
+}
+export async function serveWorker(request:Request,options:{scheduled?:boolean}={}){
+  const scheduled=options.scheduled===true;
+  const expected=scheduled?process.env.CRON_SECRET:process.env.ACADEMY_FIRST_PUBLICATION_WORKER_SECRET;
+  if((scheduled?request.method!=='GET':request.method!=='POST')||!authorizedBearer(request,expected))return privateJson({error:'AUTH_REQUIRED'},401);
+  if(scheduled&&process.env.ACADEMY_FIRST_PUBLICATION_SCHEDULER_ENABLED!=='1')return privateJson({outcome:'disabled'});
   try{
     const signal=AbortSignal.any([request.signal,AbortSignal.timeout(45000)]);
-    const input=await readBoundedJson(request,signal);demand(object(input)&&Object.keys(input).length===0,'INVALID_REQUEST');
+    if(!scheduled){const input=await readBoundedJson(request,signal);demand(object(input)&&Object.keys(input).length===0,'INVALID_REQUEST');}
     const r=runtime(signal), raw=await r.rpc('academy_first_publication_outbox_claim',{p_worker_id:randomUUID(),p_lease_seconds:60});
     if(raw===null){
       const next=await r.rpc('academy_first_publication_renewal_claim',{p_worker_id:randomUUID(),p_lease_seconds:60});
@@ -71,6 +77,16 @@ export async function serveWorker(request:Request){
     }},signal);
     return privateJson({outcome:object(result)&&typeof result.outcome==='string'?result.outcome:'processed'});
   }catch{return privateJson({error:'WORKER_RECONCILIATION_REQUIRED'},503);}
+}
+export async function serveSnapshot(request:Request){
+  if(request.method!=='GET'||!authorizedBearer(request,process.env.CRON_SECRET))return privateJson({error:'AUTH_REQUIRED'},401);
+  if(process.env.ACADEMY_FIRST_PUBLICATION_SCHEDULER_ENABLED!=='1'||process.env.ACADEMY_FIRST_PUBLICATION_SNAPSHOT_ENABLED!=='1')return privateJson({outcome:'disabled'});
+  try{
+    const signal=AbortSignal.any([request.signal,AbortSignal.timeout(45000)]),r=runtime(signal);
+    const value=await r.rpc('academy_first_publication_capture_due_snapshots',{p_limit:100});
+    demand(object(value)&&Number.isSafeInteger(value.captured)&&typeof value.snapshot_month==='string','INVALID_SNAPSHOT_RESULT');
+    return privateJson({outcome:'completed',captured:value.captured,snapshotMonth:value.snapshot_month});
+  }catch{return privateJson({error:'SNAPSHOT_RECONCILIATION_REQUIRED'},503);}
 }
 export async function serveWebhook(request:Request){
   try{

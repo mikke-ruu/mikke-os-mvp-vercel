@@ -11,7 +11,8 @@
 - `/academy/api/first-publication/setup`: `{headquartersId,quoteId}` → `{attemptId,setupUrl}`。全IDはUUID。サーバーが固定attempt、専用Stripe customer、hosted Checkout mode=setupを作る。課金subscriptionは作らない。
 - `/academy/api/first-publication/setup/confirm`: `{headquartersId,quoteId,attemptId}` → `{paymentPreparationId,verified:true,quote}`。DB保存sessionを再取得し、SetupIntent succeeded、customer、HQ、owner、quote、modeを検証してproofを保存する。quoteは元の見積DTOで、再発行しない。
 - 戻り先は `/academy/h/{DB由来HQ}/manage/settings?billing=setup_return&quoteId={DB由来quote}&attemptId={DB由来attempt}`。取消戻りは `setup_cancel`。呼出者からreturn URLを受け取らない。返り先への到着だけで成功と判定しない。
-- `/academy/api/first-publication/worker`: scheduler専用Bearer secret、body `{}`。1回に初回outboxを最大1件、なければ更新jobを最大1件処理する。失敗は503であり成功扱いにしない。
+- `/academy/api/first-publication/worker`: 手動実行はPOSTと専用Bearer secret、Vercel CronはGETと`CRON_SECRET`。1回に初回outboxを最大1件、なければ更新jobを最大1件処理する。失敗は503であり成功扱いにしない。
+- `/academy/api/first-publication/snapshot`: Vercel Cron専用GET。前月末の未作成snapshotを最大100本生成する。`ACADEMY_FIRST_PUBLICATION_SCHEDULER_ENABLED=1`と`ACADEMY_FIRST_PUBLICATION_SNAPSHOT_ENABLED=1`の両方がない限り処理しない。
 - `/academy/api/first-publication/webhook/stripe`: raw HMAC-SHA256署名、5分窓、constant-time比較、実本文262144 byte上限。専用DB source contextとprovider再取得から判断し、初回invoiceとsubscription作成時0円invoiceは更新権利へ変換しない。次月invoiceは月末snapshot見積、price、顧客、subscription、期間を照合して専用subscription_event RPCへ送る。
 
 ## 課金処理
@@ -32,7 +33,7 @@ start_paidはDBの受付watermarkと取消優先・leaseを通過してから実
 
 既存: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SECRET_KEY`（またはSERVICE_ROLE_KEY）, `STRIPE_SECRET_KEY`, `PLATFORM_BILLING_STRIPE_MODE`。
 
-新規: `ACADEMY_FIRST_PUBLICATION_API_ENABLED=1`, `ACADEMY_FIRST_PUBLICATION_APPROVAL_ID`, `ACADEMY_FIRST_PUBLICATION_STRIPE_API_VERSION=2025-02-24.acacia`, `ACADEMY_FIRST_PUBLICATION_SETUP_SUCCESS_URL`, `ACADEMY_FIRST_PUBLICATION_SETUP_CANCEL_URL`, `ACADEMY_FIRST_PUBLICATION_PRICE_IDS_JSON`（small/medium/large→既存承認Stripe price）, `ACADEMY_FIRST_PUBLICATION_WORKER_SECRET`（32文字以上）, `ACADEMY_FIRST_PUBLICATION_WEBHOOK_SECRET`。
+新規: `ACADEMY_FIRST_PUBLICATION_API_ENABLED=1`, `ACADEMY_FIRST_PUBLICATION_APPROVAL_ID`, `ACADEMY_FIRST_PUBLICATION_STRIPE_API_VERSION=2025-02-24.acacia`, `ACADEMY_FIRST_PUBLICATION_SETUP_SUCCESS_URL`, `ACADEMY_FIRST_PUBLICATION_SETUP_CANCEL_URL`, `ACADEMY_FIRST_PUBLICATION_PRICE_IDS_JSON`（small/medium/large→既存承認Stripe price）, `ACADEMY_FIRST_PUBLICATION_WORKER_SECRET`（32文字以上）, `ACADEMY_FIRST_PUBLICATION_WEBHOOK_SECRET`, `CRON_SECRET`（32文字以上）。定期実行はさらに`ACADEMY_FIRST_PUBLICATION_SCHEDULER_ENABLED=1`、月末snapshotは`ACADEMY_FIRST_PUBLICATION_SNAPSHOT_ENABLED=1`を必要とする。
 
 両setup URLの設定値は `https://app.mikke-os.com/academy/settings` または正規mikke-os.comの同pathのみ。実際の返り先はHQ付きpathへサーバーで構築する。Stripe API版はline-updateを一次資料とfake HTTPで確認したAcaciaに固定し、任意の未検証版は拒否する。既存priceの新規購入はしない。
 
@@ -44,7 +45,7 @@ DB担当の0293841、2a31d75とplatform bridge c4b7a55が必要。初回paidの�
 
 取消受理がdeadline以前でも未commitでworkerから不可視になる競合には、専用receipt inboxと別transactionのbarrier/proofを接続した。workerはbarrierのRPC応答後にproofを別RPCで取得し、期限一致、未確定transactionなし、取消なしを確認する。fake RPC 7件と所有TS型検査は成功。実多接続・Auth・時計/障害時の検証とactivationは別の未完了ゲートであり、DBのstart_paid強制停止は維持している。受理時刻をlock後に置き換えたり、未承認graceを設定して回避しない。
 
-既存月末snapshot SQLはcapture RPCを定義するがproduction scheduleを作らないことがコメントされている。リポジトリ調査では実scheduler接続を確認できない。専用webhook登録、workerの定期POST、月末snapshot生成schedule、失敗・未処理jobの運用監視、環境設定、policy有効化は統制の本番ゲート。設定不明を稼働済みと扱わない。
+既存月末snapshot SQLはcapture RPCを定義し、アプリにはVercel Cron用のGET入口を用意している。ただし`vercel.json`のscheduleはVercelプラン確認後に追加する。Hobbyは1日1回までのため、7日後の移行処理には使用しない。専用webhook登録、workerの定期GET、月末snapshot生成schedule、失敗・未処理jobの運用監視、環境設定、policy有効化は統制の本番ゲート。設定不明を稼働済みと扱わない。
 
 ## 検証
 
