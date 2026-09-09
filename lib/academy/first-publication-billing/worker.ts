@@ -50,7 +50,7 @@ export async function processBillingJob(job: BillingJob, deps: { stripe: Stripe;
   }
   let invoice = await step('invoice_create','invoices', {
     ...common, customer:proof.customerId, currency:'jpy', auto_advance:'false', collection_method:'charge_automatically',
-    default_payment_method:proof.paymentMethodId, pending_invoice_items_behavior:'exclude', discounts:'', default_tax_rates:'', 'automatic_tax[enabled]':'false',
+    default_payment_method:proof.paymentMethodId, pending_invoice_items_behavior:'exclude', discounts:'', 'automatic_tax[enabled]':'false',
   }, id => `invoices/${id}`);
   const invoiceId = invoice.id;
   demand(typeof invoiceId === 'string' && /^in_[A-Za-z0-9]+$/.test(invoiceId), 'INVALID_INVOICE');
@@ -83,7 +83,7 @@ export async function processBillingJob(job: BillingJob, deps: { stripe: Stripe;
     ...common, customer:proof.customerId, default_payment_method:proof.paymentMethodId,
     'items[0][price]':priceId, 'items[0][quantity]':String(units.quantity), billing_cycle_anchor:String(periodEnd/1000),
     proration_behavior:'none', payment_behavior:'error_if_incomplete', collection_method:'charge_automatically',
-    discounts:'', default_tax_rates:'', 'automatic_tax[enabled]':'false',
+    discounts:'', 'automatic_tax[enabled]':'false',
     cancel_at:String(periodEnd/1000),
   }, id => `subscriptions/${id}`);
   stripe.verifyScope(subscription,job.proof);
