@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { createFirstPublicationCancellationClient, createFirstPublicationCancellationAcknowledgmentClient, createFirstPublicationCancellationStatusClient } from "@/lib/academy/first-publication/cancellation-client";
+import { FIRST_PUBLICATION_CLOCK_FAULT_MESSAGE, createFirstPublicationCancellationClient, createFirstPublicationCancellationAcknowledgmentClient, createFirstPublicationCancellationStatusClient } from "@/lib/academy/first-publication/cancellation-client";
 import { createFirstPublicationRpc } from "@/lib/academy/first-publication/rpc-client";
 import { firstPublicationDate } from "@/lib/academy/first-publication-view";
 import { createFirstPublicationCancellationState, type CancellationView } from "./first-publication-cancellation-state";
@@ -63,6 +63,7 @@ export function useAcademyCancellation({ userId, headquartersId, token, enabled 
 
 export function AcademyCancellationNotice({ cancellation }: { cancellation: ReturnType<typeof useAcademyCancellation> }) {
   const { state } = cancellation;
+  if (state.fault) return <section className="space-y-2 rounded-lg border border-[var(--mikke-line)] bg-white p-4 text-sm" aria-label="取消希望と課金停止"><p role="status">{FIRST_PUBLICATION_CLOCK_FAULT_MESSAGE}</p><p>再操作は不要です。取消完了を意味するものではありません。</p></section>;
   if (!state.receipt && !state.pendingKey && !state.error) return null;
   return <section className="space-y-2 rounded-lg border border-[var(--mikke-line)] bg-white p-4 text-sm" aria-label="有料移行の取消受付">
     <h3 className="font-bold">{state.receipt ? state.receipt.applied ? "有料移行の取消を受付済み" : "取消受付済み・画面反映待ち" : "取消の受付を確認しています"}</h3>
