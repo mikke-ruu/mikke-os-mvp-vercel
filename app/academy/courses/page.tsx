@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { BookOpen, Eye, EyeOff, GraduationCap, LayoutTemplate, PenSquare, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { AcademyListTools } from "@/components/academy/AcademyListTools";
 import { getMyAcademyCourseCreationAccess } from "@/lib/academy/course-creation-access";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
@@ -17,6 +19,9 @@ function CoursesContent() {
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
   const [createAccess, setCreateAccess] = useState<{ allowed: boolean; reason: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const visibleCourses = courses.filter(c => c.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) && (filter === "all" || (filter === "published" ? c.is_published : !c.is_published)));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -44,7 +49,7 @@ function CoursesContent() {
 
   if (!hq) {
     return (
-      <div className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 text-center">
+      <div className="space-y-3 rounded-lg border border-[var(--mikke-line)] bg-white p-5 text-center">
         <p className="text-sm font-bold text-[var(--mikke-text)]">本部がまだありません</p>
         <p className="text-xs text-[var(--mikke-muted)]">契約確認後、Academyのホームから本部を作成してください。</p>
       </div>
@@ -56,64 +61,65 @@ function CoursesContent() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs text-[var(--mikke-muted)]">{hq.name}</p>
-          <h2 className="text-base font-bold text-[var(--mikke-text)]">講座管理</h2>
+          <h2 className="mt-1 text-2xl font-bold text-[var(--mikke-text)]">あなたの講座</h2>
         </div>
         {createAccess?.allowed ? (
-          <Link href="/academy/courses/new" className="flex items-center gap-1 rounded-full bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
-            <Plus size={16} /> 新規
+          <Link href={toCurrentAcademyContextHref("/academy/courses/new")} className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg bg-[var(--mikke-accent)] px-3 py-2 text-sm font-bold text-white">
+            <Plus size={16} /> 講座をつくる
           </Link>
         ) : (
-          <span aria-disabled="true" className="flex items-center gap-1 rounded-full bg-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">
+          <span aria-disabled="true" className="flex items-center gap-1 rounded-lg bg-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-muted)]">
             <Plus size={16} /> 新規
           </span>
         )}
       </div>
 
+      <p className="text-sm leading-7 text-[var(--mikke-muted)]">下書きから少しずつ整えましょう。講座を選ぶと、紹介文・料金・教材を編集できます。</p>
+      <AcademyListTools label="講座" query={query} onQuery={setQuery} filter={filter} onFilter={setFilter} count={visibleCourses.length} options={[
+        {value:"all",label:"すべて",count:courses.length},
+        {value:"draft",label:"下書き",count:courses.filter(c=>!c.is_published).length},
+        {value:"published",label:"公開中",count:courses.filter(c=>c.is_published).length}
+      ]} />
+      {courses.length > 0 && visibleCourses.length === 0 ? <p className="py-6 text-sm">条件に合う講座がありません。検索語や公開状態を変えてください。</p> : null}
       {!createAccess?.allowed && createAccess?.reason ? (
-        <p role="status" className="rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-text-soft)]">
+        <p role="status" className="rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-text-soft)]">
           {createAccess.reason}
         </p>
       ) : null}
 
       {courses.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-8 text-center">
+        <div className="rounded-lg border border-dashed border-[var(--mikke-line)] bg-white p-8 text-center">
           <BookOpen size={28} className="mx-auto text-[var(--mikke-accent)]" />
-          <p className="mt-2 text-sm text-[var(--mikke-text-soft)]">まだ講座がありません。</p>
+          <p className="mt-4 text-xl font-bold text-[var(--mikke-text)]">最初の講座を、ここから。</p>
+          <p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">教えたいことの名前と受講料を決めるだけ。<br />紹介文や写真は後から追加できます。</p>
           {createAccess?.allowed ? (
-            <Link href="/academy/courses/new" className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
+            <Link href={toCurrentAcademyContextHref("/academy/courses/new")} className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
               最初の講座を作る
             </Link>
           ) : null}
         </div>
       ) : (
         <ul className="grid gap-4 md:grid-cols-2">
-          {courses.map((course) => {
+          {visibleCourses.map((course) => {
             const features = resolveAcademyCourseFeaturesForCourse(course);
-            const intake = course.accept_at_honbu && course.accept_at_koushi ? "本部・講師受付" : course.accept_at_koushi ? "講師受付" : "本部受付";
-            const format = course.formats.length === 2 ? "対面・オンライン" : course.formats[0] === "online" ? "オンライン" : "対面";
-            const material = features.kits ? "現物教材を発送" : features.stepLearning ? "ステップ教材" : features.materialLicenses ? "デジタル教材" : "教材なし";
+            const format = course.formats.length === 0 ? "開催方法はこれから" : course.formats.length === 2 ? "対面・オンライン" : course.formats[0] === "online" ? "オンライン" : "対面";
             return (
-            <li key={course.id} className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
+            <li key={course.id} className="overflow-hidden border border-[var(--mikke-line)] bg-white">
               {course.main_image_url ? (
                 <img src={course.main_image_url} alt="" className="h-36 w-full object-cover" />
-              ) : (
-                <div className="flex h-20 items-center justify-center bg-[var(--mikke-surface-soft)]">
-                  <BookOpen size={22} className="text-[var(--mikke-primary-border)]" />
-                </div>
-              )}
+              ) : null}
               <div className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="shrink-0 rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course.code}</span>
-                      <span className="truncate text-sm font-bold text-[var(--mikke-text)]">{course.name}</span>
+                      <span className="break-words text-lg font-bold text-[var(--mikke-text)]">{course.name}</span>
                     </div>
                     <p className="mt-1 text-xs text-[var(--mikke-muted)]">
                       受講料（税込） {course.price.toLocaleString()}円{course.duration_text ? ` ・ ${course.duration_text}` : ""}
                     </p>
                   </div>
                   <span
-                    className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-bold ${
+                    className={`flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-bold ${
                       course.is_published
                         ? "border-[var(--mikke-success)]/30 bg-[var(--mikke-success-soft)] text-[var(--mikke-success)]"
                         : "border-[var(--mikke-line)] bg-white text-[var(--mikke-muted)]"
@@ -125,48 +131,48 @@ function CoursesContent() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
-                  {[intake, format, material, features.certification ? "講師認定" : null, features.classes ? "開催日程管理" : null, course.accept_at_koushi ? "講師の営業・受付" : null].filter(Boolean).map((label) => (
-                    <span key={label} className="rounded-full bg-[var(--mikke-surface-soft)] px-2 py-1 text-[10px] font-bold text-[var(--mikke-text-soft)]">{label}</span>
+                  {[format, features.certification ? "認定講座" : null].filter(Boolean).map((label) => (
+                    <span key={label} className="rounded-lg bg-[var(--mikke-surface-soft)] px-2 py-1 text-xs text-[var(--mikke-text-soft)]">{label}</span>
                   ))}
                 </div>
 
-                <p className="rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2 text-[11px] leading-5 text-[var(--mikke-text-soft)]">
-                  受講料・教材・申込方法は「講座の詳細設定」、受講希望者へ見せる内容は「公開講座ページ」で編集します。
-                </p>
+                <p className="text-sm leading-6 text-[var(--mikke-muted)]">{course.subtitle || (course.is_published ? "公開中の内容を確認・編集できます。" : "下書きを保存済みです。続きをつくりましょう。")}</p>
 
-                <div className="grid grid-cols-2 gap-2 border-t border-[var(--mikke-line-soft)] pt-3">
+                <div className="grid gap-2 border-t border-[var(--mikke-line-soft)] pt-3 sm:grid-cols-2 [&_a]:min-h-11">
                   <Link
-                    href={`/academy/courses/${course.id}`}
-                    className="flex items-center justify-center gap-1.5 rounded-xl bg-[var(--mikke-accent)] px-2 py-2 text-xs font-bold text-white"
+                    href={toCurrentAcademyContextHref(`/academy/courses/${course.id}`)}
+                    className="flex items-center justify-center gap-1.5 rounded-lg bg-[var(--mikke-accent)] px-2 py-2 text-xs font-bold text-white"
                   >
-                    <PenSquare size={14} /> 講座の詳細設定
+                    <PenSquare size={14} /> {course.is_published ? "講座を編集" : "編集を続ける"}
                   </Link>
                   <Link
-                    href={`/academy/courses/${course.id}/lp`}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-accent)] px-2 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
+                    href={toCurrentAcademyContextHref(`/academy/courses/${course.id}/lp`)}
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-[var(--mikke-accent)] px-2 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
                   >
-                    <LayoutTemplate size={14} /> 紹介・申込ページを編集
+                    <LayoutTemplate size={14} /> 紹介ページを整える
                   </Link>
+                </div>
+                <section className="border-t border-[var(--mikke-line)] pt-3"><h3 className="text-sm font-bold text-[var(--mikke-muted)]">教材・受講者向けページ</h3><div className="mt-3 grid gap-2 [&_a]:min-h-11">
                   <Link
                     href={`/academy/c/${course.id}`}
                     target="_blank"
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
                   >
                     <Eye size={14} /> 紹介・申込ページを見る
                   </Link>
                   <Link
-                    href={`/academy/courses/${course.id}/instructor-page`}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+                    href={toCurrentAcademyContextHref(`/academy/courses/${course.id}/instructor-page`)}
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
                   >
                     <GraduationCap size={14} /> 講師用資料ページ編集
                   </Link>
                   <Link
-                    href={`/academy/courses/${course.id}/instructor-page?audience=learner`}
-                    className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
+                    href={toCurrentAcademyContextHref(`/academy/courses/${course.id}/instructor-page?audience=learner`)}
+                    className="flex items-center justify-center gap-1.5 rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
                   >
                     <GraduationCap size={14} /> 復習ページ編集
                   </Link>
-                </div>
+                </div></section>
               </div>
             </li>
             );
@@ -179,7 +185,7 @@ function CoursesContent() {
 
 export default function CoursesPage() {
   return (
-    <HonbuShell title="講座管理">
+    <HonbuShell title="あなたの講座">
       <CoursesContent />
     </HonbuShell>
   );

@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { AcademyPageHelp } from "./AcademyPageHelp";
+import { AcademyUsageStatus } from "./AcademyUsageStatus";
+import { AcademySchemeUsageStatus } from "./AcademySchemeUsageStatus";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -38,11 +41,11 @@ import { supabase } from "@/lib/supabase/client";
 import type { AcademyAccessContext, AcademyHeadquartersAccess } from "@/types/database";
 
 const honbuNav: MikkeShellNavItem[] = [
-  { href: "/academy", label: "ダッシュボード", icon: LayoutDashboard, section: "本部" },
-  { href: "/academy/courses", label: "講座管理", icon: BookOpen, section: "講座" },
+  { href: "/academy", label: "ホーム", icon: LayoutDashboard, section: "はじめる" },
+  { href: "/academy/courses", label: "講座をつくる・編集する", icon: BookOpen, section: "講座づくり" },
   { href: "/academy/classes", label: "開催日程・担当講師", icon: CalendarCheck, section: "講座" },
   { href: "/academy/instructors", label: "講師管理", icon: Users, section: "講座" },
-  { href: "/academy/applications", label: "申込管理", icon: ClipboardList, section: "講座" },
+  { href: "/academy/applications", label: "申込・受注管理", icon: ClipboardList, section: "運営" },
   { href: "/academy/front", label: "ホームページ編集", icon: Store, section: "公開" },
   { href: "/academy/settings", label: "本部設定", icon: Settings, section: "設定" }
 ];
@@ -51,23 +54,23 @@ const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard, section: "マイポータル" },
   { href: "/academy/portal/class-requests", label: "担当する開催日", icon: CalendarCheck, section: "マイポータル" },
   { href: "/academy/portal/study", label: "復習ページ・講師用資料", icon: GraduationCap, section: "マイポータル" },
-  { href: "/academy/portal/url", label: "営業用URL", icon: Link2, section: "募集" },
+  { href: "/academy/portal/url", label: "募集ページ・共有リンク", icon: Link2, section: "募集" },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
-  { href: "/academy/portal/kits", label: "講座仕入れ", icon: Package, section: "発注" }
+  { href: "/academy/portal/kits", label: "教材の注文・履歴", icon: Package, section: "発注" }
 ];
 
 const honbuBottomNav: MikkeShellBottomNavItem[] = [
   { href: "/academy", label: "ホーム", icon: LayoutDashboard },
   { href: "/academy/courses", label: "講座", icon: BookOpen },
   { href: "/academy/instructors", label: "講師", icon: Users },
-  { href: "/academy/applications", label: "申込", icon: ClipboardList }
+  { href: "/academy/applications", label: "申込・受注", icon: ClipboardList }
 ];
 
 const koushiBottomNav: MikkeShellBottomNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard },
   { href: "/academy/portal/study", label: "復習・資料", icon: GraduationCap },
   { href: "/academy/portal/applications", label: "申込", icon: ClipboardList },
-  { href: "/academy/portal/kits", label: "仕入れ", icon: Package }
+  { href: "/academy/portal/kits", label: "教材注文", icon: Package }
 ];
 
 function canShowManageHref(context: AcademyAccessContext | null, href: string) {
@@ -118,6 +121,8 @@ function ShellInner({
   const canonicalSearch = searchParams.toString();
   const routeContext = parseAcademyContextPath(pathname);
   const hasContextPathPrefix = pathname.startsWith("/academy/h/");
+  const workingOnCourse = variant === "honbu" && /\/courses\/[^/]+/.test(pathname);
+  const settingsPage = pathname.endsWith("/settings");
   const { profile, user } = useAuth();
   const { ownedApps, suggestedApps } = useOwnedMikkeApps({ userId: user.id });
   const [homepageHref, setHomepageHref] = useState<string | null>(null);
@@ -325,9 +330,13 @@ function ShellInner({
       const toggle = target.closest('input[type="checkbox"], input[type="radio"]');
       const button = target.closest("button");
       const mutationLabel = button?.textContent ?? toggle?.closest("label")?.textContent ?? "";
+      // Only this local-only panel handles its own in-memory changes; API write guards remain intact.
+      const localPublication = process.env.NODE_ENV === "development" && !accessLocked &&
+        (previewMode === "walkthrough" || previewMode === "dashboard" || previewMode === "trial") &&
+        !!target.closest('#course-publication[data-academy-local-publication="true"]');
       if (
-        toggle ||
-        (button && /保存|削除|公開|非公開|解除|登録|作成|追加|更新|送信|承認|却下|発行|招待|確定|支払|完了|取消|取り消/.test(mutationLabel))
+        !localPublication && (toggle ||
+        (button && /保存|削除|公開|非公開|解除|登録|作成|追加|更新|送信|承認|却下|発行|招待|確定|支払|完了|取消|取り消/.test(mutationLabel)))
       ) {
         event.preventDefault();
         event.stopPropagation();
@@ -430,6 +439,10 @@ function ShellInner({
     );
   }
 
+  if (!hasContextPathPrefix && contextCount > 1) {
+    return <main className="mx-auto max-w-lg px-5 py-12"><div className="rounded-3xl border border-[var(--mikke-line)] bg-white p-6"><GraduationCap className="mb-4 text-[#3f4eb5]" size={32} /><h1 className="text-2xl font-bold">どのAcademyを開きますか？</h1><p className="mt-3 text-sm leading-7 text-[var(--mikke-muted)]">複数のAcademyに所属しています。講座をつくるAcademyを選んでください。</p><Link href="/academy/select" className="mt-5 inline-flex min-h-12 items-center rounded-xl bg-[#f75a3b] px-5 py-3 text-sm font-bold text-white">Academyを選ぶ</Link></div></main>;
+  }
+
   if (!hasPortalAccess) {
     return (
       <main className="mx-auto max-w-lg px-4 py-16">
@@ -450,34 +463,18 @@ function ShellInner({
     );
   }
 
-  if (!hasContextPathPrefix && contextCount > 1) {
-    return (
-      <main className="mx-auto max-w-lg px-4 py-16">
-        <div className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-6 text-center">
-          <p className="text-sm font-bold text-[var(--mikke-text)]">利用するAcademyを特定できません</p>
-          <p className="text-xs leading-5 text-[var(--mikke-muted)]">
-            複数Academyがあるため、所属Academyと画面を選んでください。
-          </p>
-          <Link href="/academy/select" className="inline-flex rounded-xl border border-[var(--mikke-line)] px-4 py-2 text-xs font-bold text-[var(--mikke-text-soft)]">
-            所属Academyと役割を確認する
-          </Link>
-        </div>
-      </main>
-    );
-  }
-
   return (
     <MikkeAppShell
       appName="Academy"
       title={title}
-      subtitle={variant === "honbu" ? "本部管理" : "マイポータル"}
+      subtitle={variant === "honbu" ? "本部｜教室全体の運営" : "マイポータル｜自分の受講・講師活動"}
       theme="blue"
       currentApp={{
         label: "Academy",
         href: contextHref(variant === "honbu" ? "/academy" : "/academy/portal"),
         icon: GraduationCap
       }}
-      menuDescription="講座、講師、申込、教材などAcademy内の管理をまとめています。"
+      menuDescription={variant === "honbu" ? "講座をつくり、教室全体の申込・日程・講師を管理します。" : "自分の受講内容や、講師として担当する講座を確認します。"}
       menuEditItems={navItems.map((item) => ({ title: item.label, href: item.href, icon: item.icon }))}
       ownedApps={ownedApps}
       otherApps={[]}
@@ -486,6 +483,7 @@ function ShellInner({
       onSignOut={() => void signOut()}
       navItems={navItems}
       bottomNavItems={bottomNavItems}
+      showBottomNavLabels
       showSharedUtilities={variant === "koushi"}
       footerLabel="Academy by mikke"
     >
@@ -494,11 +492,14 @@ function ShellInner({
         className="min-w-0 overflow-x-hidden [&_input]:max-w-full [&_input]:text-base [&_select]:max-w-full [&_select]:text-base [&_textarea]:max-w-full [&_textarea]:text-base sm:[&_input]:text-sm sm:[&_select]:text-sm sm:[&_textarea]:text-sm"
       >
       {previewMode === "dashboard" || previewMode === "walkthrough" ? (
-        <div className="mb-4 rounded-xl border border-[var(--mikke-accent)]/35 bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
-          ローカル確認用のサンプル表示です。本部運営者が認定講師も兼ねる例のため、本部画面とマイポータルの両方を確認できます。実データの保存や本番DBの変更は行いません。
+        <div className="mb-2 border-l-2 border-[var(--mikke-accent)] px-2 py-1 text-xs leading-5 text-[var(--mikke-text)]">
+          操作確認用のサンプルです。実データは変更しません。
         </div>
       ) : null}
-      {headquartersAccess?.access_kind === "trial" && !accessBannerDismissed ? (
+      {variant === "honbu" && selectedContext ? (previewMode === "walkthrough" || previewMode === "dashboard" || previewMode === "trial"
+        ? <AcademyUsageStatus access={headquartersAccess} sample href={contextHref("/academy/settings")} />
+        : <AcademySchemeUsageStatus headquartersId={selectedContext.academy_id} userId={user.id} href={contextHref("/academy/settings")} legacy={<AcademyUsageStatus access={headquartersAccess} sample={false} href={contextHref("/academy/settings")} />} />) : null}
+      {variant !== "honbu" && headquartersAccess?.access_kind === "trial" && !accessBannerDismissed ? (
         <div className="relative mb-4 rounded-xl border border-[var(--mikke-yellow)] bg-[var(--mikke-yellow)]/20 text-[var(--mikke-text)]">
           <button
             type="button"
@@ -527,7 +528,7 @@ function ShellInner({
           </Link>
         </div>
       ) : null}
-      {headquartersAccess?.access_kind === "paid" && !accessNotice && !accessBannerDismissed ? (
+      {variant !== "honbu" && settingsPage && headquartersAccess?.access_kind === "paid" && !accessNotice && !accessBannerDismissed ? (
         <div className="mb-4 rounded-xl border border-[var(--mikke-green)] bg-[var(--mikke-green)]/15 px-4 py-3 text-sm leading-6 text-[var(--mikke-text)]">
           <p className="font-bold">
             {headquartersAccess.status === "internal_grant"
@@ -549,11 +550,11 @@ function ShellInner({
           ローカル読み取り確認中です。画面移動はできますが、フォームの保存は停止しています。
         </div>
       ) : null}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-bold text-[var(--mikke-muted)]">
+      <div className={`mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--mikke-line)] bg-white pb-2 ${workingOnCourse ? "hidden" : ""}`}>
+        <div className="min-w-0"><p className="break-words text-xs font-bold text-[var(--mikke-muted)]">
           {selectedContext ? `${selectedContext.academy_name} / ` : ""}
-          {variant === "honbu" ? "本部管理" : "マイポータル"}
-        </p>
+          {variant === "honbu" ? "本部" : "マイポータル"}
+        </p></div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {homepageHref ? (
             <Link
@@ -574,11 +575,12 @@ function ShellInner({
               className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
             >
               {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-              {variant === "honbu" ? "認定講師としてマイポータルへ" : "本部運営に戻る"}
+              {variant === "honbu" ? "自分の受講・講師活動へ →" : "教室全体の運営へ →"}
             </Link>
           ) : null}
         </div>
       </div>
+      {variant === "honbu" ? <AcademyPageHelp pathname={pathname} /> : null}
       <div onSubmitCapture={blockReadonlySubmit}>{children}</div>
       </div>
     </MikkeAppShell>

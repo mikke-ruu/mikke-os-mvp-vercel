@@ -1,0 +1,5 @@
+# Setupの原見積
+
+`academy_first_publication_setup_reserve(owner,HQ,quote)` のservice-only応答へ `quote` を追加する。snake_caseでid、headquarters_id、owner_user_id、policy_version、terms_revision、amount_yen、instructor_count、issued_at、expires_at、plan_key、plan_name、discount_description、consent_revisionを返す。
+
+setup_completeのcamelCase原quoteとの比較に使う。新規見積を発行せず、文字列の補完や変換も行わない。表示metadataのcatalogは未seed。本番未適用。

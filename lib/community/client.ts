@@ -1427,9 +1427,14 @@ export async function acceptCommunityAcademyAccessInvitation(
     legalName?: string;
     phone?: string;
     joinReason?: string;
+    consentMode: "legacy" | "versioned";
+    communityConsentRevision: string | null;
+    termsVersion: number;
+    rulesVersion: number;
+    privacyVersion: number;
   }
 ) {
-  const { data, error } = await client.rpc("community_accept_academy_access_invitation", {
+  const common = {
     p_invitation_id: input.invitationId,
     p_display_name: input.displayName.trim(),
     p_legal_name: input.legalName?.trim() || null,
@@ -1438,7 +1443,16 @@ export async function acceptCommunityAcademyAccessInvitation(
     p_accept_terms: true,
     p_accept_rules: true,
     p_accept_privacy: true
-  });
+  };
+  const { data, error } = input.consentMode === "versioned"
+    ? await client.rpc("community_accept_academy_access_invitation_versioned", {
+        ...common,
+        p_community_consent_revision: input.communityConsentRevision,
+        p_terms_version: input.termsVersion,
+        p_rules_version: input.rulesVersion,
+        p_privacy_version: input.privacyVersion
+      })
+    : await client.rpc("community_accept_academy_access_invitation", common);
   if (error) throw error;
   return data as string;
 }

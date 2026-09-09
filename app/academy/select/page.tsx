@@ -47,9 +47,9 @@ function AcademySelector() {
     <main className="mx-auto max-w-3xl space-y-5 px-4 py-10">
       <div>
         <p className="text-xs font-bold text-[var(--mikke-accent)]">Academy</p>
-        <h1 className="mt-1 text-xl font-bold text-[var(--mikke-text)]">利用できるAcademyと画面を確認</h1>
+        <h1 className="mt-2 text-2xl font-bold text-[var(--mikke-text)]">今日は、何をしましょう？</h1>
         <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">
-          Academyごとの役割を確認します。表示の切替だけでは権限は増えません。
+          講座をつくる・運営する方と、受講する・教える方で入口が分かれています。利用するAcademyからお選びください。
         </p>
       </div>
 
@@ -74,12 +74,12 @@ function AcademySelector() {
                 <div className="flex flex-wrap gap-2">
                   {context.portals.includes("manage") ? (
                     <Link href={toAcademyContextHref("/academy", context.academy_id, "manage")} className="inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
-                      <Store size={14} /> 本部画面
+                      <Store size={18} /> 講座をつくる・運営する
                     </Link>
                   ) : null}
                   {context.portals.includes("teach") ? (
                     <Link href={toAcademyContextHref("/academy/portal", context.academy_id, "teach")} className="inline-flex items-center gap-1 rounded-xl border border-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]">
-                      <GraduationCap size={14} /> マイポータル
+                      <GraduationCap size={18} /> 受講・担当講座を見る
                     </Link>
                   ) : null}
                 </div>

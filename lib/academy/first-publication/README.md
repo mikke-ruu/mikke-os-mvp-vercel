@@ -1,0 +1,23 @@
+# 初公開7日制度のサーバー処理
+
+`service.ts` は新制度へ明示申し込みする本部だけのprepare/publish/unpublish/cancel処理。既存のtrial/paid/internal grantを書き換えない。承認済みpolicyをサーバーから注入し、未設定では新しい申込と公開を拒否する。テストpolicyは商品条件の承認ではない。
+
+公開と起点、owner単位の利用履歴、決済同期待ちoutboxを同一transactionにする。外部プロバイダをtransaction内で呼ばない。DB保存前後の失敗を区別し、commit後の下書き化で起点や申込を戻さない。取消はrollout停止後にも利用可能。
+
+## 接続契約と未完了
+
+`rpc-client.ts` は既存の認証済みユーザーclientを注入して `academy_first_publication_command` を1回呼ぶ接続adapter。actorや時計をブラウザから渡さず、戻りDTOの本部・金額・168h・状態を検査する。status成功時のnullだけを未登録とし、エラーでは例外を返す。serviceのcallbackを複数RESTへ分解して実行しない。
+
+`access-client.ts` は管理権限を持つ既存ロール用のread-only `academy_first_publication_access` を呼ぶ。owner限定の契約詳細statusを旧editorの分岐に使わない。成功nullだけが未登録で、missing migrationや403を旧利用権へフォールバックしない。新制度ではこのscheme/phaseと期限を表示し、互換access_modeのpaidを決済成功の証拠と扱わない。server guardは毎回DBで別途検査する。
+
+- Repository.transactionの本番実装が必要。DBから取得した本人・本部所有者・契約権限・旧制度履歴・料金・支払準備確認を使う。ブラウザのbooleanやactor文字列を認証の根拠にしない。
+- ownerとHQの順でロックし、他HQの同一ownerによる無料枠再利用を拒否する。callback例外はcourse/state/outbox/ledgerを全てROLLBACKする。別々のPostgREST更新で代用しない。
+- 対象制度のDB migration、既存course/access guardの新制度限定分岐、実API認証、永続outbox workerは未接続。既存setCoursePublishedは差し替えていない。
+- 通常の有料期間への接続は決済担当の担当。期限後の公開はこのtrial用serviceでは拒否し、有料accessの経路へ移る。ブラウザへ無条件に成功を返さない。
+- 取消受付と課金dispatchは同じ永続scopeで直列化が必要。このcoreから請求は実行しない。
+- Academy室で商条件と統合公開の一括承認を受領。正式policy/versionは法務文書に結び付けて別途有効化する。fixtureの値を本番既定値にはしない。
+- 初回公開後の有料移行取消は当初の168h期限まで再公開を妨げない。初回公開前の取消と期限後の公開は拒否する。Communityの新規招待停止は別のDB guardで実行する。
+- quoteのpricingRevisionとcontextのcurrentPricingRevisionはサーバーで算定したプラン・料金帯・割引条件の識別子。同一帯内の人数変化は許容するが、同額でも条件が変われば再同意を必要とする。初回表示人数はquoteの監査記録として保持する。
+- 実顧客データや本番DBは使用せず、テストはメモリ上の隔離transactionで実行する。実DBのRLS/同時実行検証と同一視しない。外部請求と取消受付の競合保証は別の統合ゲートであり、本coreのテスト成功だけで有効化しない。
+
+実行: `node scripts/academy-first-publication-core-check.mjs`。typescriptが別worktreeにある場合は `ACADEMY_TYPESCRIPT_PATH` で既存インストールへの絶対パスを指定できる。

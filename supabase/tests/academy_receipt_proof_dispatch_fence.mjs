@@ -1,0 +1,61 @@
+/** Local synthetic role contracts only. No provider calls or committed activation. */
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+const project='academy-release-auth-20260909', container=`supabase_db_${project}`;
+assert.equal(process.env.ACADEMY_RECEIPT_FENCE_RUN,'local-rollback-only');
+const docker='C:/Users/user/AppData/Local/Programs/DockerDesktop/resources/bin/docker.exe';
+const run=(args,input)=>execFileSync(docker,args,{input,encoding:'utf8',windowsHide:true,timeout:30000,stdio:['pipe','pipe','pipe']});
+assert.equal(JSON.parse(run(['inspect','--format','{{json .Config.Labels}}',container]))['com.supabase.cli.project'],project);
+const query=sql=>run(['exec','-i',container,'psql','-X','-q','-A','-t','-v','ON_ERROR_STOP=1','-U','postgres','-d','postgres'],sql).trim();
+if(process.argv.includes('--apply-reviewed-migration')) {
+ const name='supabase/migrations/20260909003954_academy_receipt_proof_dispatch_fence.sql';
+ const sql=readFileSync(new URL('../migrations/20260909003954_academy_receipt_proof_dispatch_fence.sql',import.meta.url),'utf8');
+ assert.equal(query("select to_regclass('academy_publication_private.runtime_epoch_approvals') is null"),'t','Never reapply or overwrite a migrated schema');
+ const hash=createHash('sha256').update(sql).digest('hex');
+ query(`begin; set local lock_timeout='5s'; ${sql} insert into academy_local_replay_test.applied_inputs(name,sha256,source_commit,evidence) values('${name}','${hash}','unpublished-local-only','Parent reviewed isolated local apply; no activation'); commit;`);
+ console.log(`PASS applied unpublished local migration ${hash}`);
+}
+const hq='f9090000-0000-4000-8000-000000000102', cancelled='f9090000-0000-4000-8000-000000000101';
+const policy='local-concurrency-f9090000-batch-1', lease='f9090000-0000-4000-8000-000000009999', event='local-fence-f9090000';
+assert.equal(query(`select count(*)=2 from academy_publication_private.enrollments e join public.academy_headquarters h on h.id=e.headquarters_id where e.headquarters_id in ('${hq}','${cancelled}') and e.policy_version='${policy}' and h.tagline='SYNTHETIC LOCAL CONCURRENCY FIXTURE' and e.trial_ends_at<clock_timestamp();`),'t');
+assert.equal(query(`select count(*) from academy_publication_private.runtime_epoch_approvals`),'0','No pre-existing activation is allowed in this local runner');
+assert.equal(query(`select enabled or dispatch_enabled from academy_publication_private.policies where version='${policy}'`),'f');
+const barrier=JSON.parse(query(`set role service_role; select public.academy_first_publication_receipt_barrier('${hq}');`)).barrier_id;
+assert.equal(JSON.parse(query(`set role service_role; select public.academy_first_publication_receipt_prove('${barrier}');`)).verified,true);
+const setup=(target=hq)=>`
+ insert into academy_publication_private.outbox(event_key,headquarters_id,kind,payload,lease_token,lease_until) values('${event}','${target}','start_paid','{}','${lease}',clock_timestamp()+interval '5 minutes');
+ update academy_publication_private.policies set enabled=true,dispatch_enabled=true where version='${policy}';
+ insert into academy_publication_private.runtime_epoch_approvals(database_signature,approved,not_before,valid_until,evidence_sha256) values(academy_publication_private.runtime_signature(),true,clock_timestamp()-interval '1 minute',clock_timestamp()+interval '5 minutes',repeat('0',64));`;
+const check=`select public.academy_first_publication_outbox_dispatch_check('${event}','${lease}');`;
+const test=(name,mutation,reason,target=hq,prefix='')=>{
+ const result=JSON.parse(query(`begin; ${prefix} ${setup(target)} ${mutation} set local role service_role; ${check} rollback;`).split('\n').filter(s=>s.startsWith('{')).at(-1));
+ assert.equal(result.allowed,reason===null,name); assert.equal(result.reason,reason,name); console.log(`PASS ${name}`);
+};
+test('committed proof permits only synthetic rollback branch','',null);
+test('policy remains required',`update academy_publication_private.policies set dispatch_enabled=false where version='${policy}';`,'dispatch_not_activated');
+test('epoch approval missing blocks',`delete from academy_publication_private.runtime_epoch_approvals;`,'runtime_epoch_not_approved');
+test('epoch signature mismatch blocks',`update academy_publication_private.runtime_epoch_approvals set database_signature='{}';`,'runtime_epoch_not_approved');
+test('expired epoch approval blocks',`update academy_publication_private.runtime_epoch_approvals set not_before=clock_timestamp()-interval '2 hours',valid_until=clock_timestamp()-interval '1 hour';`,'runtime_epoch_not_approved');
+test('unscoped old proof blocks',`update academy_publication_private.receipt_proofs set database_signature=null where headquarters_id='${hq}';`,'receipt_proof_unavailable');
+test('proof epoch mismatch blocks',`update academy_publication_private.receipt_proofs set database_signature='{}' where headquarters_id='${hq}';`,'receipt_proof_unavailable');
+test('proof deadline mismatch blocks',`update academy_publication_private.receipt_proofs set through_at=through_at+interval '1 second' where headquarters_id='${hq}';`,'receipt_proof_unavailable');
+test('sequence mismatch blocks',`update academy_publication_private.receipt_scopes set last_sequence=last_sequence+1 where headquarters_id='${hq}';`,'receipt_proof_unavailable');
+test('clock regression relative to proof blocks',`update academy_publication_private.receipt_proofs set verified_at=clock_timestamp()+interval '1 hour' where headquarters_id='${hq}';`,'receipt_proof_unavailable');
+test('actual same transaction prove cannot dispatch','', 'receipt_proof_unavailable',hq,`select public.academy_first_publication_receipt_prove('${barrier}');`);
+test('latest durable inbox cancellation wins','', 'conversion_cancelled',cancelled);
+query(`begin; ${setup()} do $$ begin perform public.academy_first_publication_outbox_dispatch_check('${event}',gen_random_uuid()); raise exception 'test_expected_stale'; exception when others then if sqlerrm<>'stale_lease' then raise; end if; end $$; rollback;`);
+console.log('PASS stale lease rejected');
+query(`begin; ${setup()} update academy_publication_private.outbox set lease_until=clock_timestamp()-interval '1 second' where event_key='${event}'; do $$ begin perform public.academy_first_publication_outbox_dispatch_check('${event}','${lease}'); raise exception 'test_expected_stale'; exception when others then if sqlerrm<>'stale_lease' then raise; end if; end $$; rollback;`);
+console.log('PASS expired lease rejected');
+assert.equal(JSON.parse(query(`begin; ${setup()} set local role service_role; select public.academy_first_publication_outbox_checkpoint('${event}','${lease}','invoice_create',null); rollback;`)).blocked,false);
+console.log('PASS checkpoint shares committed proof gate without provider calls');
+query(`begin; ${setup()} delete from academy_publication_private.runtime_epoch_approvals; set local role service_role; do $$ begin perform public.academy_first_publication_outbox_checkpoint('${event}','${lease}','invoice_create',null); raise exception 'test_expected_block'; exception when others then if sqlerrm<>'dispatch_blocked' then raise; end if; end $$; rollback;`);
+console.log('PASS checkpoint rejects missing runtime approval');
+query(`begin; ${setup()} set local role service_role; do $$ begin insert into academy_publication_private.runtime_epoch_approvals(database_signature,not_before,valid_until,evidence_sha256) values('{}',now(),now()+interval '1 hour',repeat('0',64)); raise exception 'test_expected_denial'; exception when insufficient_privilege then null; end $$; do $$ begin update academy_publication_private.receipt_proofs set proof_xid=pg_current_xact_id(); raise exception 'test_expected_denial'; exception when insufficient_privilege then null; end $$; rollback;`);
+console.log('PASS service role cannot approve epoch or forge proof');
+assert.equal(query('select count(*) from academy_publication_private.runtime_epoch_approvals'),'0');
+assert.equal(query(`select enabled or dispatch_enabled from academy_publication_private.policies where version='${policy}'`),'f');
+assert.equal(query(`select count(*) from academy_publication_private.outbox where event_key='${event}'`),'0');
+console.log('PASS no activation or outbox residue; role emulation only, not real Auth or external clock/failover certification');

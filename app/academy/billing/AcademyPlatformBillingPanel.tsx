@@ -18,11 +18,13 @@ const policyLabels: Record<AcademyBillingPolicyName, string> = {
 };
 
 export function AcademyPlatformBillingPanel({
-  state, compact = false, quote = null, quoteAccepted = false, quoteBusy = false, checkoutBusy = false,
+  state, compact = false, managementOnly = false, quote = null, quoteAccepted = false, quoteBusy = false, checkoutBusy = false,
   onRequestQuote, onQuoteAccepted, onConfirmCheckout, onOpenPortal, portalBusy = false, actionMessage = "",
 }: {
   state: AcademyPlatformBillingState;
   compact?: boolean;
+  /** Existing contract management only; never offer the legacy checkout flow. */
+  managementOnly?: boolean;
   quote?: AcademyBillingQuote | null;
   quoteAccepted?: boolean;
   quoteBusy?: boolean;
@@ -52,6 +54,19 @@ export function AcademyPlatformBillingPanel({
   const snapshot = state.snapshot;
   const canRequestQuote = state.allowedActions.includes("checkout") && Boolean(onRequestQuote);
   const canOpenPortal = state.allowedActions.includes("portal") && Boolean(onOpenPortal);
+  if (managementOnly) return <section className={card} aria-labelledby="academy-management-title">
+    <h2 id="academy-management-title" className="text-lg font-bold">契約・支払方法の管理</h2>
+    <p className="mt-2 font-semibold" role="status">{status.title}</p>
+    <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+      <div><dt className="text-sm font-semibold">利用終了予定日</dt><dd className="mt-1">{formatAcademyBillingDate(state.accessEndsAt)}</dd></div>
+    </dl>
+    <button type="button" disabled={!canOpenPortal || portalBusy} onClick={onOpenPortal} className={`${canOpenPortal ? actionButton : disabledButton} mt-4`}>
+      {portalBusy ? "請求管理を開いています…" : "請求・支払方法・解約を管理する"}
+    </button>
+    {!canOpenPortal ? <p className="mt-3 text-sm leading-6">現在は請求管理を開けません。契約情報を再確認してください。</p> : null}
+    {actionMessage ? <p className="mt-3 text-sm font-semibold" role="status">{actionMessage}</p> : null}
+    <p className="mt-4 text-sm leading-6">Academy利用料の契約を管理します。Communityの契約や受講者の申し込みには影響しません。</p>
+  </section>;
   return (
     <div className="space-y-5 text-[var(--mikke-text)]">
       {!compact ? <header>
