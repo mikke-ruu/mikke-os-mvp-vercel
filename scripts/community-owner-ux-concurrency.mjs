@@ -58,6 +58,7 @@ function openHeldSql(initialSql, marker) {
   let stderr = "";
   let markerResolve;
   let markerReject;
+  let settled = false;
   const markerSeen = new Promise((resolve, reject) => { markerResolve = resolve; markerReject = reject; });
   const completion = new Promise((resolve) => {
     child.stdout.setEncoding("utf8").on("data", (chunk) => {
@@ -66,7 +67,10 @@ function openHeldSql(initialSql, marker) {
     });
     child.stderr.setEncoding("utf8").on("data", (chunk) => { stderr += chunk; });
     child.on("error", markerReject);
-    child.on("close", (status) => resolve({ status, stdout, stderr }));
+    child.on("close", (status) => {
+      settled = true;
+      resolve({ status, stdout, stderr });
+    });
   });
   child.stdin.write(initialSql);
   return {
@@ -74,6 +78,11 @@ function openHeldSql(initialSql, marker) {
       await Promise.race([markerSeen, new Promise((_, reject) => setTimeout(() => reject(new Error(`${marker} was not observed`)), 10_000))]);
     },
     release(sql) { child.stdin.end(sql); },
+    abort() {
+      if (settled) return;
+      if (!child.stdin.destroyed) child.stdin.end("rollback;\n");
+      else child.kill();
+    },
     completion
   };
 }
@@ -139,28 +148,55 @@ const replayState = JSON.parse(sync(`select json_build_object(
 assert.deepEqual(replayState, { claims: 1, entitlements: 1 });
 
 const revokeStaff = openHeldSql(`begin; set local application_name='owner_ux_revoke_new'; select 1 from public.community_communities where id='${community}' for update; select '__OWNER_UX_NEW_LOCK_HELD__';\n`, "__OWNER_UX_NEW_LOCK_HELD__");
-await revokeStaff.waitUntilHeld();
-const blockedGrant = asyncSql(call(revokedRequest, "owner_ux_blocked_new"));
-await waitForActivity("owner_ux_blocked_new", true);
-revokeStaff.release(`update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;\n`);
-const [revokeResult, blockedResult] = await Promise.all([revokeStaff.completion, blockedGrant]);
-assert.equal(revokeResult.status, 0, "staff revocation transaction must succeed");
-assert.notEqual(blockedResult.status, 0, "grant waiting behind revocation must fail");
-assert.match(blockedResult.stderr, /Community staff authority is required/);
+try {
+  await revokeStaff.waitUntilHeld();
+  const blockedGrant = asyncSql(call(revokedRequest, "owner_ux_blocked_new"));
+  await waitForActivity("owner_ux_blocked_new", true);
+  revokeStaff.release(`update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;\n`);
+  const [revokeResult, blockedResult] = await Promise.all([revokeStaff.completion, blockedGrant]);
+  assert.equal(revokeResult.status, 0, "staff revocation transaction must succeed");
+  assert.notEqual(blockedResult.status, 0, "grant waiting behind revocation must fail");
+  assert.match(blockedResult.stderr, /Community staff authority is required/);
+} finally {
+  revokeStaff.abort();
+}
 
 sync(`update public.community_memberships set status='active' where community_id='${community}' and user_id='${staff}';`);
 const revokeReplayStaff = openHeldSql(`begin; set local application_name='owner_ux_revoke_replay'; select 1 from public.community_communities where id='${community}' for update; select '__OWNER_UX_REPLAY_LOCK_HELD__';\n`, "__OWNER_UX_REPLAY_LOCK_HELD__");
-await revokeReplayStaff.waitUntilHeld();
-const blockedReplay = asyncSql(call(request, "owner_ux_blocked_replay"));
-await waitForActivity("owner_ux_blocked_replay", true);
-revokeReplayStaff.release(`update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;\n`);
-const [revokeReplayResult, blockedReplayResult] = await Promise.all([revokeReplayStaff.completion, blockedReplay]);
-assert.equal(revokeReplayResult.status, 0, "staff revocation before replay must succeed");
-assert.notEqual(blockedReplayResult.status, 0, "idempotent replay waiting behind revocation must fail");
-assert.match(blockedReplayResult.stderr, /Community staff authority is required/);
+try {
+  await revokeReplayStaff.waitUntilHeld();
+  const blockedReplay = asyncSql(call(request, "owner_ux_blocked_replay"));
+  await waitForActivity("owner_ux_blocked_replay", true);
+  revokeReplayStaff.release(`update public.community_memberships set status='suspended' where community_id='${community}' and user_id='${staff}'; commit;\n`);
+  const [revokeReplayResult, blockedReplayResult] = await Promise.all([revokeReplayStaff.completion, blockedReplay]);
+  assert.equal(revokeReplayResult.status, 0, "staff revocation before replay must succeed");
+  assert.notEqual(blockedReplayResult.status, 0, "idempotent replay waiting behind revocation must fail");
+  assert.match(blockedReplayResult.stderr, /Community staff authority is required/);
+} finally {
+  revokeReplayStaff.abort();
+}
 const finalState = JSON.parse(sync(`select json_build_object(
   'revokedRequestClaims',(select count(*) from public.community_payment_claims where manual_request_id='${revokedRequest}'),
   'allClaims',(select count(*) from public.community_payment_claims where community_id='${community}')
 );`));
 assert.deepEqual(finalState, { revokedRequestClaims: 0, allClaims: 1 });
-console.log(JSON.stringify({ result: "community_owner_ux_concurrency_test_ok", ...replayState, ...finalState, liveCalls: 0 }));
+sync(`
+set session_replication_role = replica;
+delete from public.community_payment_claims where community_id='${community}';
+delete from public.community_member_entitlements where community_id='${community}';
+delete from public.community_membership_plans where community_id='${community}';
+delete from public.community_entitlement_definitions where community_id='${community}';
+delete from public.community_memberships where community_id='${community}';
+delete from platform_billing_private.creation_entitlements where resource_id='${community}';
+delete from public.community_communities where id='${community}';
+delete from auth.users where id in ('${owner}','${staff}','${member}');
+set session_replication_role = origin;
+`);
+const residue = JSON.parse(sync(`select json_build_object(
+  'users',(select count(*) from auth.users where id::text like 'df1%'),
+  'communities',(select count(*) from public.community_communities where id::text like 'df1%'),
+  'claims',(select count(*) from public.community_payment_claims where manual_request_id in ('${request}','${revokedRequest}')),
+  'entitlements',(select count(*) from public.community_member_entitlements where community_id='${community}')
+);`));
+assert.deepEqual(residue, { users: 0, communities: 0, claims: 0, entitlements: 0 });
+console.log(JSON.stringify({ result: "community_owner_ux_concurrency_test_ok", ...replayState, ...finalState, residue, liveCalls: 0 }));

@@ -1,5 +1,17 @@
 -- Community owner usability: auditable manual payments and private resource files.
 
+alter table public.community_membership_plans
+  drop constraint community_membership_plans_external_payment_url_check;
+alter table public.community_membership_plans
+  add constraint community_membership_plans_external_payment_url_check
+  check (
+    external_payment_url = ''
+    or (
+      pg_catalog.char_length(external_payment_url) <= 2048
+      and external_payment_url ~ '^https://'
+    )
+  );
+
 alter table public.community_payment_claims
   add column if not exists payment_method text not null default 'external_link';
 
@@ -346,5 +358,5 @@ begin
 end;
 $function$;
 
-revoke all on function public.community_record_manual_payment(uuid, uuid, uuid, text, text, text, uuid) from public;
+revoke all on function public.community_record_manual_payment(uuid, uuid, uuid, text, text, text, uuid) from public, anon, service_role;
 grant execute on function public.community_record_manual_payment(uuid, uuid, uuid, text, text, text, uuid) to authenticated;

@@ -52,13 +52,17 @@ const unpublishedPath = pathFor(required.communityId, required.mimeResourceId, r
 const limitPath = pathFor(required.communityId, required.limitResourceId, required.userId, "large.pdf");
 const otherPath = pathFor(required.otherCommunityId, required.otherResourceId, required.otherUserId, "other.pdf");
 const pdfBytes = new TextEncoder().encode("%PDF-1.4\n% isolated owner UX proof\n");
-const created = [];
+const cleanupTargets = new Map([
+  [pdfPath, required.ownerJwt],
+  [unpublishedPath, required.ownerJwt],
+  [limitPath, required.ownerJwt],
+  [otherPath, required.otherOwnerJwt],
+]);
 
 try {
   for (const [jwt, path] of [[required.ownerJwt, pdfPath], [required.otherOwnerJwt, otherPath]]) {
     const uploaded = await upload(jwt, path, pdfBytes, "application/pdf");
     assert.ok(uploaded.ok, `fixture upload failed with ${uploaded.status}`);
-    created.push([jwt, path]);
   }
 
   const signed = await sign(required.ownerJwt, pdfPath);
@@ -77,7 +81,6 @@ try {
   assert.match(wrongMimeReason, /mime|content.?type|not allowed|invalid/);
   const unpublishedUpload = await upload(required.ownerJwt, unpublishedPath, pdfBytes, "application/pdf");
   assert.ok(unpublishedUpload.ok, `unpublished fixture upload failed with ${unpublishedUpload.status}`);
-  created.push([required.ownerJwt, unpublishedPath]);
 
   const memberSigned = await sign(required.memberJwt, pdfPath);
   assert.ok(memberSigned.ok, "an active member can sign a published resource");
@@ -91,11 +94,11 @@ try {
   const limitReason = await expectDenied(await upload(required.ownerJwt, limitPath, overLimit, "application/pdf"), "upload larger than 50MB");
   assert.match(limitReason, /size|large|limit|maximum|payload/);
 } finally {
-  for (const [jwt, path] of created.reverse()) {
+  for (const [path, jwt] of cleanupTargets) {
     const deleted = await remove(jwt, path);
-    assert.ok(deleted.ok, `fixture cleanup failed with ${deleted.status}`);
+    assert.ok(deleted.ok || deleted.status === 404, `fixture cleanup failed with ${deleted.status}`);
     const residue = await fetch(authenticatedUrl(path), { headers: authHeaders(jwt), redirect: "error" });
-    assert.equal(residue.status, 404, "deleted fixture must not remain readable");
+    assert.equal(residue.status, 404, `fixture must not remain readable: ${path}`);
   }
 }
 

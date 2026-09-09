@@ -22,6 +22,7 @@ $$;
 select pg_temp.community_owner_ux_assert(
   has_function_privilege('authenticated', 'public.community_record_manual_payment(uuid,uuid,uuid,text,text,text,uuid)', 'execute')
   and not has_function_privilege('anon', 'public.community_record_manual_payment(uuid,uuid,uuid,text,text,text,uuid)', 'execute')
+  and not has_function_privilege('service_role', 'public.community_record_manual_payment(uuid,uuid,uuid,text,text,text,uuid)', 'execute')
   and not has_function_privilege('public', 'public.community_record_manual_payment(uuid,uuid,uuid,text,text,text,uuid)', 'execute'),
   'manual payment RPC ACL is narrow'
 );
@@ -94,6 +95,16 @@ insert into platform_billing_private.creation_entitlements(
   statement_timestamp() - interval '1 day', statement_timestamp() + interval '29 days',
   'de110000-0000-4000-8000-000000000001', statement_timestamp()
 );
+
+select pg_temp.community_owner_ux_assert(pg_temp.community_owner_ux_denied(
+  $q$insert into public.community_membership_plans(
+      id, community_id, entitlement_key, name, amount_yen,
+      billing_interval, payment_provider_label, external_payment_url, status, created_by_user_id
+    ) values (
+      'de150000-0000-4000-8000-000000000002', 'de110000-0000-4000-8000-000000000001',
+      'paid:manual', '安全でない決済URL', 10000,
+      'month', '運営者指定', 'http://example.invalid/payment', 'active', 'de100000-0000-4000-8000-000000000001'
+    )$q$, '23514'), 'manual plans allow an empty URL but reject insecure payment URLs');
 
 insert into public.community_entitlement_definitions(id, community_id, key, name)
 values ('de140000-0000-4000-8000-000000000001', 'de110000-0000-4000-8000-000000000001', 'paid:manual', '手動確認会員');
@@ -190,6 +201,19 @@ insert into public.academy_headquarters(id, owner_user_id, name, handle, plan, i
 values ('dea00000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', 'Owner UX Academy', 'owner-ux-academy', 'small', true);
 insert into public.academy_headquarters_access_states(headquarters_id, owner_user_id, access_kind, status, starts_at, paid_started_at)
 values ('dea00000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', 'paid', 'active', statement_timestamp(), statement_timestamp());
+insert into platform_billing_private.internal_resource_grants(
+  actor_user_id, product_key, resource_id, purpose, reason, granted_by, evidence, starts_at
+) values (
+  'de100000-0000-4000-8000-000000000001', 'academy_platform',
+  'dea00000-0000-4000-8000-000000000001', 'test_only',
+  'Community duplicate-payment regression fixture',
+  'de100000-0000-4000-8000-000000000001', 'Isolated rollback test',
+  statement_timestamp() - interval '1 hour'
+);
+select pg_temp.community_owner_ux_assert(
+  private.academy_headquarters_access_mode('dea00000-0000-4000-8000-000000000001') = 'paid',
+  'paid Academy fixture remains eligible for Community mapping: ' || coalesce(private.academy_headquarters_access_mode('dea00000-0000-4000-8000-000000000001'), 'null')
+);
 insert into public.community_access_source_mappings(
   id, community_id, provider_type, provider_owner_key, source_product_key,
   entitlement_key, status, created_by_user_id
