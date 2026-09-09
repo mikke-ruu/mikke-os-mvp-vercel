@@ -1,4 +1,5 @@
 import 'server-only';
+import { priceUnits, verifyVariablePrice } from './price-contract';
 import { object, demand } from './stripe-runtime';
 import type { JsonObject, createFirstPublicationStripe } from './stripe-runtime';
 export type RenewalJob={event_key:string;lease_token:string;kind:'renew_price'|'renew_pay';provider_subscription_id:string;provider_customer_id:string;headquarters_id:string;period_start:string;period_end:string};
@@ -15,9 +16,11 @@ export async function processRenewalJob(job:RenewalJob,deps:{stripe:ReturnType<t
   const quote=await store.quote(job); // Missing immutable month-end snapshot must fail before any provider mutation.
   demand(quote.period_start===job.period_start&&quote.period_end===job.period_end&&Number.isSafeInteger(quote.amount_yen)&&quote.amount_yen>0&&quote.snapshot_id&&quote.price_id,'RENEWAL_QUOTE_NOT_READY');
   demand(/^sub_[A-Za-z0-9]+$/.test(job.provider_subscription_id)&&/^cus_[A-Za-z0-9]+$/.test(job.provider_customer_id),'INVALID_RENEWAL_SCOPE');
+  const units=priceUnits(quote.plan_key,quote.amount_yen);
   const priceId=deps.priceIds[quote.plan_key];demand(priceId&&/^price_[A-Za-z0-9]+$/.test(priceId),'PRICE_NOT_CONFIGURED');
   const price=await stripe.call(`prices/${priceId}`,'GET',{},null,signal);
-  demand(price.id===priceId&&price.livemode===(stripe.mode==='live')&&price.active===true&&price.currency==='jpy'&&price.unit_amount===quote.amount_yen&&object(price.recurring)&&price.recurring.interval==='month'&&price.recurring.interval_count===1,'RENEWAL_PRICE_MISMATCH');
+  demand(price.id===priceId&&price.livemode===(stripe.mode==='live')&&price.active===true&&price.currency==='jpy'&&price.unit_amount===units.unitAmount&&object(price.recurring)&&price.recurring.interval==='month'&&price.recurring.interval_count===1,'RENEWAL_PRICE_MISMATCH');
+  verifyVariablePrice(price,quote.plan_key);
   async function mutate(step:string,path:string,params:Record<string,string>,resourcePath:string,resourceId:string){
     demand(await store.check(job),'RENEWAL_FENCE_REJECTED');const cp=await store.checkpoint(job,step);demand(!cp.blocked,'RENEWAL_FENCE_REJECTED');
     if(!cp.provider_id){stripe.retryable(cp.started_at);demand(cp.operation_key.length>0&&cp.operation_key.length<=255,'INVALID_OPERATION_KEY');await stripe.call(path,'POST',params,cp.operation_key,signal);const saved=await store.checkpoint(job,step,resourceId);demand(!saved.blocked,'RENEWAL_FENCE_REJECTED');}
@@ -31,11 +34,11 @@ export async function processRenewalJob(job:RenewalJob,deps:{stripe:ReturnType<t
     demand(object(value.items)&&Array.isArray(value.items.data)&&value.items.data.length===1&&object(value.items.data[0]),'RENEWAL_ITEM_MISMATCH');return value.items.data[0];
   }
   let item=subscriptionItem(sub);demand(typeof item.id==='string'&&/^si_[A-Za-z0-9]+$/.test(item.id),'RENEWAL_ITEM_MISMATCH');
-  if(!object(item.price)||item.price.id!==priceId||item.quantity!==1){
-    sub=await mutate('price_update',`subscriptions/${job.provider_subscription_id}`,{'items[0][id]':item.id,'items[0][price]':priceId,'items[0][quantity]':'1',proration_behavior:'none','pause_collection[behavior]':'keep_as_draft'},`subscriptions/${job.provider_subscription_id}`,job.provider_subscription_id);
+  if(!object(item.price)||item.price.id!==priceId||item.quantity!==units.quantity){
+    sub=await mutate('price_update',`subscriptions/${job.provider_subscription_id}`,{'items[0][id]':item.id,'items[0][price]':priceId,'items[0][quantity]':String(units.quantity),proration_behavior:'none','pause_collection[behavior]':'keep_as_draft'},`subscriptions/${job.provider_subscription_id}`,job.provider_subscription_id);
     item=subscriptionItem(sub);
   }
-  demand(object(item.price)&&item.price.id===priceId&&item.price.currency==='jpy'&&item.price.unit_amount===quote.amount_yen&&item.quantity===1,'RENEWAL_PRICE_NOT_APPLIED');
+  demand(object(item.price)&&item.price.id===priceId&&item.price.currency==='jpy'&&item.price.unit_amount===units.unitAmount&&item.quantity===units.quantity,'RENEWAL_PRICE_NOT_APPLIED');
   if(job.kind==='renew_price')return store.finish(job,{outcome:'price_ready',price_id:quote.price_id,snapshot_id:quote.snapshot_id});
   demand(job.kind==='renew_pay'&&deps.now()>=Date.parse(job.period_start)&&deps.now()<Date.parse(job.period_end),'RENEWAL_NOT_DUE');
   const listed=await stripe.call('invoices','GET',{subscription:job.provider_subscription_id,limit:'100'},null,signal);
@@ -49,15 +52,15 @@ export async function processRenewalJob(job:RenewalJob,deps:{stripe:ReturnType<t
   demand(invoice.livemode===(stripe.mode==='live'),'RENEWAL_SCOPE_MISMATCH');
   let line=lineOf(invoice);
   const actualPrice=(v:JsonObject)=>object(v.price)?v.price.id:object(v.pricing)&&object(v.pricing.price_details)?v.pricing.price_details.price:null;
-  if(invoice.status==='draft'&&(actualPrice(line)!==priceId||line.amount!==quote.amount_yen)){
+  if(invoice.status==='draft'&&(actualPrice(line)!==priceId||line.amount!==quote.amount_yen||line.quantity!==units.quantity)){
     demand(typeof line.id==='string'&&/^il_[A-Za-z0-9_]+$/.test(line.id),'RENEWAL_LINE_ID_INVALID');
     // Acacia API contract: only an unfinalized line can be repriced. Never assume a subscription update rewrites existing drafts.
-    invoice=await mutate('line_update',`${invoicePath}/lines/${line.id}`,{price:priceId,quantity:'1',discountable:'false',discounts:'',tax_rates:''},invoicePath,id);
+    invoice=await mutate('line_update',`${invoicePath}/lines/${line.id}`,{price:priceId,quantity:String(units.quantity),discountable:'false',discounts:'',tax_rates:''},invoicePath,id);
     line=lineOf(invoice);
   }
-  demand(actualPrice(line)===priceId&&line.amount===quote.amount_yen&&invoice.total===quote.amount_yen&&invoice.amount_due===quote.amount_yen&&invoice.starting_balance===0,'RENEWAL_TOTAL_MISMATCH');
+  demand(actualPrice(line)===priceId&&line.quantity===units.quantity&&line.amount===quote.amount_yen&&invoice.total===quote.amount_yen&&invoice.amount_due===quote.amount_yen&&invoice.starting_balance===0,'RENEWAL_TOTAL_MISMATCH');
   if(invoice.status==='draft')invoice=await mutate('finalize',`${invoicePath}/finalize`,{auto_advance:'false'},invoicePath,id);
-  line=lineOf(invoice);demand(actualPrice(line)===priceId&&line.amount===quote.amount_yen&&invoice.total===quote.amount_yen&&invoice.amount_due===quote.amount_yen,'RENEWAL_TOTAL_MISMATCH');
+  line=lineOf(invoice);demand(actualPrice(line)===priceId&&line.quantity===units.quantity&&line.amount===quote.amount_yen&&invoice.total===quote.amount_yen&&invoice.amount_due===quote.amount_yen,'RENEWAL_TOTAL_MISMATCH');
   if(invoice.status==='open'){
     demand(typeof sub.default_payment_method==='string'&&/^pm_[A-Za-z0-9]+$/.test(sub.default_payment_method),'PAYMENT_METHOD_NOT_READY');
     invoice=await mutate('pay',`${invoicePath}/pay`,{payment_method:sub.default_payment_method,off_session:'true'},invoicePath,id);

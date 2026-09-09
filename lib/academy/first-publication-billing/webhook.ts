@@ -1,4 +1,5 @@
 import 'server-only';
+import { priceUnits, verifyVariablePrice } from './price-contract';
 import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 import { object, demand, nextPaidMonth } from './stripe-runtime';
 import type { JsonObject } from './stripe-runtime';
@@ -8,13 +9,13 @@ import { privateJson } from './http';
 export type SubscriptionContext = {
   scheme: 'academy_first_publication_168h_v1'; headquarters_id:string; owner_user_id:string;
   provider_customer_id:string; provider_subscription_id:string; first_invoice_id:string;
-  price_id:string; amount_yen:number; original_paid_at:string; current_period_start:string; current_period_end:string;
+  price_id:string; plan_key:string; amount_yen:number; original_paid_at:string; current_period_start:string; current_period_end:string;
 };
 export type WebhookDependencies = {
   secret:string; mode:'test'|'live'; now:()=>number;
   read(path:string,signal:AbortSignal):Promise<JsonObject>;
   context(input:{subscriptionId?:string;invoiceId?:string},signal:AbortSignal):Promise<SubscriptionContext | {scheme:'other'} | null>;
-  renewalQuote(context:SubscriptionContext,periodStart:string,signal:AbortSignal):Promise<{priceId:string;amountYen:number;periodEnd:string}>;
+  renewalQuote(context:SubscriptionContext,periodStart:string,signal:AbortSignal):Promise<{priceId:string;planKey:string;amountYen:number;periodEnd:string}>;
   apply(event:Exclude<VerifiedStripeEvent,{kind:'activation'}>&{providerCustomerId:string;invoiceId:string|null;amountYen:number|null},signal:AbortSignal):Promise<void>;
 };
 function subscriptionId(invoice:JsonObject) {
@@ -75,6 +76,11 @@ export async function handleFirstPublicationWebhook(request:Request,deps:Webhook
       demand(Number.isSafeInteger(start)&&Number.isSafeInteger(end),'INVALID_RENEWAL_PERIOD');
       const started=(start as number)*1000,ended=(end as number)*1000;
       const quote=await deps.renewalQuote(context,new Date(started).toISOString(),signal);
+      const units=priceUnits(quote.planKey,quote.amountYen);
+      demand(line.quantity===units.quantity,'RENEWAL_QUANTITY_MISMATCH');
+      const price=await deps.read(`prices/${quote.priceId}`,signal);
+      demand(price.id===quote.priceId&&price.livemode===(deps.mode==='live')&&price.currency==='jpy'&&price.unit_amount===units.unitAmount&&object(price.recurring)&&price.recurring.interval==='month'&&price.recurring.interval_count===1,'RENEWAL_PRICE_MISMATCH');
+      verifyVariablePrice(price,quote.planKey);
       demand(Date.parse(quote.periodEnd)===ended&&linePrice===quote.priceId&&current.total===quote.amountYen&&current.amount_due===quote.amountYen&&line.amount===quote.amountYen,'RENEWAL_PRICE_MISMATCH');
       // A duplicate older invoice can still be sent to the ledger, whose event-id/hash guard is authoritative.
       demand(started>=Date.parse(context.original_paid_at)&&ended>started&&ended===nextAnchoredMonth(Date.parse(context.original_paid_at),started),'INVALID_RENEWAL_PERIOD');
@@ -83,11 +89,13 @@ export async function handleFirstPublicationWebhook(request:Request,deps:Webhook
       await deps.apply({kind:event.type==='invoice.paid'?'invoice_paid':'invoice_failed',eventId:event.id as string,eventHash:hash,subscriptionId:subId,status:event.type==='invoice.paid'?'active':'past_due',periodStart:new Date(started).toISOString(),periodEnd:new Date(ended).toISOString(),cancelAtPeriodEnd:false,occurredAt:new Date((event.created as number)*1000).toISOString(),providerCustomerId:context.provider_customer_id,invoiceId:snapshot.id,amountYen:quote.amountYen},signal);
     }else{
       demand(object(current.items)&&Array.isArray(current.items.data)&&current.items.data.length===1,'INVALID_SUBSCRIPTION_ITEMS');
-      const item=current.items.data[0];demand(object(item)&&object(item.price)&&item.quantity===1,'RENEWAL_PRICE_MISMATCH');
+      const item=current.items.data[0];demand(object(item)&&object(item.price),'RENEWAL_PRICE_MISMATCH');
       const start=item.current_period_start??current.current_period_start,end=item.current_period_end??current.current_period_end;
       demand(Number.isSafeInteger(start)&&Number.isSafeInteger(end)&&typeof current.cancel_at_period_end==='boolean','INVALID_SUBSCRIPTION_PERIOD');
-      const quote=(start as number)*1000>=nextPaidMonth(Date.parse(context.original_paid_at))?await deps.renewalQuote(context,new Date((start as number)*1000).toISOString(),signal):{priceId:context.price_id,amountYen:context.amount_yen,periodEnd:new Date(nextPaidMonth(Date.parse(context.original_paid_at))).toISOString()};
-      demand(item.price.id===quote.priceId&&item.price.currency==='jpy'&&item.price.unit_amount===quote.amountYen&&Date.parse(quote.periodEnd)===(end as number)*1000,'RENEWAL_PRICE_MISMATCH');
+      const quote=(start as number)*1000>=nextPaidMonth(Date.parse(context.original_paid_at))?await deps.renewalQuote(context,new Date((start as number)*1000).toISOString(),signal):{priceId:context.price_id,planKey:context.plan_key,amountYen:context.amount_yen,periodEnd:new Date(nextPaidMonth(Date.parse(context.original_paid_at))).toISOString()};
+      const units=priceUnits(quote.planKey,quote.amountYen);
+      verifyVariablePrice(item.price,quote.planKey);
+      demand(item.quantity===units.quantity&&item.price.id===quote.priceId&&item.price.currency==='jpy'&&item.price.unit_amount===units.unitAmount&&Date.parse(quote.periodEnd)===(end as number)*1000,'RENEWAL_PRICE_MISMATCH');
       const status=current.status==='canceled'?'ended':current.status==='past_due'?'past_due':current.status==='active'?'active':null;demand(status,'PROVIDER_STATE_NOT_READY');
       await deps.apply({kind:'subscription_state',eventId:event.id as string,eventHash:hash,subscriptionId:context.provider_subscription_id,status,periodStart:new Date((start as number)*1000).toISOString(),periodEnd:new Date((end as number)*1000).toISOString(),cancelAtPeriodEnd:current.cancel_at_period_end,occurredAt:new Date((event.created as number)*1000).toISOString(),providerCustomerId:context.provider_customer_id,invoiceId:null,amountYen:null},signal);
     }

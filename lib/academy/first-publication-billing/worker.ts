@@ -1,4 +1,5 @@
 import 'server-only';
+import { priceUnits, verifyVariablePrice } from './price-contract';
 import { createHash } from 'node:crypto';
 import { createFirstPublicationStripe, demand, object, nextPaidMonth } from './stripe-runtime';
 import type { SetupAttempt, JsonObject } from './stripe-runtime';
@@ -24,9 +25,11 @@ export async function processBillingJob(job: BillingJob, deps: { stripe: Stripe;
   if (job.kind === 'synchronize_trial') return store.finish(job,{ outcome:'trial_ready' });
   demand(job.kind === 'start_paid' && deps.now() > Date.parse(job.trial_ends_at), 'DEADLINE_NOT_PASSED');
   demand(Number.isSafeInteger(job.amount_yen) && job.amount_yen > 0, 'INVALID_AMOUNT');
+  const units=priceUnits(job.plan_key,job.amount_yen);
   const priceId = deps.priceIds[job.plan_key]; demand(priceId && /^price_[A-Za-z0-9]+$/.test(priceId), 'PRICE_NOT_CONFIGURED');
   const price = await stripe.call(`prices/${priceId}`,'GET',{},null,signal);
-  demand(price.id === priceId && price.active === true && price.currency === 'jpy' && price.unit_amount === job.amount_yen && object(price.recurring) && price.recurring.interval === 'month' && price.recurring.interval_count === 1, 'PRICE_CONTRACT_MISMATCH');
+  demand(price.id === priceId && price.active === true && price.currency === 'jpy' && price.unit_amount === units.unitAmount && object(price.recurring) && price.recurring.interval === 'month' && price.recurring.interval_count === 1, 'PRICE_CONTRACT_MISMATCH');
+  verifyVariablePrice(price,job.plan_key);
   const common: Record<string,string> = {
     'metadata[scheme]':'academy_first_publication_168h_v1', 'metadata[attempt_id]':job.proof.attempt_id,
     'metadata[headquarters_id]':job.proof.headquarters_id, 'metadata[owner_user_id]':job.proof.owner_user_id,
@@ -78,7 +81,7 @@ export async function processBillingJob(job: BillingJob, deps: { stripe: Stripe;
   // The first month was paid by the standalone invoice. No prorated second charge is allowed.
   let subscription = await step('subscription_create','subscriptions', {
     ...common, customer:proof.customerId, default_payment_method:proof.paymentMethodId,
-    'items[0][price]':priceId, 'items[0][quantity]':'1', billing_cycle_anchor:String(periodEnd/1000),
+    'items[0][price]':priceId, 'items[0][quantity]':String(units.quantity), billing_cycle_anchor:String(periodEnd/1000),
     proration_behavior:'none', payment_behavior:'error_if_incomplete', collection_method:'charge_automatically',
     discounts:'', default_tax_rates:'', 'automatic_tax[enabled]':'false',
     cancel_at:String(periodEnd/1000),
@@ -87,7 +90,7 @@ export async function processBillingJob(job: BillingJob, deps: { stripe: Stripe;
   demand(typeof subscription.id === 'string' && /^sub_[A-Za-z0-9]+$/.test(subscription.id) && subscription.customer === proof.customerId && subscription.status === 'active' && subscription.billing_cycle_anchor === periodEnd/1000, 'SUBSCRIPTION_CONTRACT_MISMATCH');
   demand(object(subscription.items) && Array.isArray(subscription.items.data) && subscription.items.data.length === 1, 'SUBSCRIPTION_ITEMS_MISMATCH');
   const item = subscription.items.data[0];
-  demand(object(item) && object(item.price) && item.price.id === priceId && item.quantity === 1 && (item.current_period_end ?? subscription.current_period_end) === periodEnd/1000, 'SUBSCRIPTION_PERIOD_MISMATCH');
+  demand(object(item) && object(item.price) && item.price.id === priceId && item.quantity === units.quantity && (item.current_period_end ?? subscription.current_period_end) === periodEnd/1000, 'SUBSCRIPTION_PERIOD_MISMATCH');
   // Creation is fail-safe cancelled at the prepaid boundary until this atomic provider update succeeds.
   const createdSubscriptionId=subscription.id;
   subscription=await step('subscription_hold',`subscriptions/${createdSubscriptionId}`,{ 'pause_collection[behavior]':'keep_as_draft',cancel_at:'',proration_behavior:'none' },id=>`subscriptions/${id}`);

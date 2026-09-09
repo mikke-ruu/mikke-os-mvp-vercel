@@ -161,8 +161,15 @@ grant execute on function academy_publication_private.command(uuid,text,uuid,uui
 
 -- Read committed durable inbox immediately. No business projection lag permits
 -- new invites; Community must acquire ingress->owner->HQ->Community locks.
-do $$ declare source text; begin
- source:=pg_get_functiondef('private.academy_first_publication_access(uuid)'::regprocedure);
+do $$ declare source text; access_target regprocedure; begin
+ -- The earlier platform bridge wraps this helper. Patch the original body,
+ -- not its paid-access wrapper. Standalone contract fixtures have no bridge.
+ access_target:=coalesce(
+  to_regprocedure('private.academy_first_publication_access_before_platform_bridge(uuid)'),
+  to_regprocedure('private.academy_first_publication_access(uuid)')
+ );
+ if access_target is null then raise exception 'missing_access_definition'; end if;
+ source:=pg_get_functiondef(access_target);
  if position('v_cancel:=coalesce(v_cancel,e.cancellation_accepted_at);' in source)=0 then raise exception 'unexpected_access_definition'; end if;
  source:=replace(source,'v_cancel:=coalesce(v_cancel,e.cancellation_accepted_at);',
  'select min(t) into v_cancel from (select v_cancel as t union all select e.cancellation_accepted_at union all select request_received_at from academy_publication_private.receipt_inbox where headquarters_id=p_headquarters_id) receipts;');

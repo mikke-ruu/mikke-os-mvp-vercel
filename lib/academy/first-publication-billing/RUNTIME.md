@@ -6,7 +6,7 @@
 
 全てPOST。利用者APIは同一origin、非匿名getUser、HQ owner、実本文4096 byte以内、JSONの厳密キーを検証する。応答はprivate/no-store。
 
-見積metadataは `setup_reserve.quote` の元quote snake投影から読む。`plan_key/plan_name/discount_description/consent_revision` を必須とし、confirmの `planKey/planName/discountDescription/consentRevision` を含む全12項目が元証跡と一致しなければ成功を返さない。値の推測や定数補完はしない。DB metadata差分 dcdf8e3 と後続 reserve.quote 返却が必要。
+見積metadataは `setup_reserve.quote` の元quote snake投影から読む。`plan_key/plan_name/discount_description/consent_revision` を必須とし、confirmの `planKey/planName/discountDescription/consentRevision` を含む全12項目が元証跡と一致しなければ成功を返さない。値の推測や定数補完はしない。DB metadata差分 dcdf8e3 と e28d711 の reserve.quote 返却が必要。
 
 - `/academy/api/first-publication/setup`: `{headquartersId,quoteId}` → `{attemptId,setupUrl}`。全IDはUUID。サーバーが固定attempt、専用Stripe customer、hosted Checkout mode=setupを作る。課金subscriptionは作らない。
 - `/academy/api/first-publication/setup/confirm`: `{headquartersId,quoteId,attemptId}` → `{paymentPreparationId,verified:true,quote}`。DB保存sessionを再取得し、SetupIntent succeeded、customer、HQ、owner、quote、modeを検証してproofを保存する。quoteは元の見積DTOで、再発行しない。
@@ -28,6 +28,8 @@ start_paidはDBの受付watermarkと取消優先・leaseを通過してから実
 
 ## 必要設定
 
+201名以上の既存式 `20000+(人数-200)*100` は人数×100円と一致する。plan_key=variable は月額100円JPYのper_unit/licensed Price（transform_quantity=null）と quantity=確定見積金額/100 で扱う。20000円以下または100円単位でないvariable金額は拒否する。固定3帯は従来通りquantity=1。更新数量は確定snapshot金額だけから算出し、現在人数やclient値で補完しない。variable Price IDの承認済み設定が無ければpay前に停止する。DBのvariable quote/初回bridge/更新plan対応が必要であり、このコードだけで201名以上を公開可能にしない。
+
 既存: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SECRET_KEY`（またはSERVICE_ROLE_KEY）, `STRIPE_SECRET_KEY`, `PLATFORM_BILLING_STRIPE_MODE`。
 
 新規: `ACADEMY_FIRST_PUBLICATION_API_ENABLED=1`, `ACADEMY_FIRST_PUBLICATION_APPROVAL_ID`, `ACADEMY_FIRST_PUBLICATION_STRIPE_API_VERSION=2025-02-24.acacia`, `ACADEMY_FIRST_PUBLICATION_SETUP_SUCCESS_URL`, `ACADEMY_FIRST_PUBLICATION_SETUP_CANCEL_URL`, `ACADEMY_FIRST_PUBLICATION_PRICE_IDS_JSON`（small/medium/large→既存承認Stripe price）, `ACADEMY_FIRST_PUBLICATION_WORKER_SECRET`（32文字以上）, `ACADEMY_FIRST_PUBLICATION_WEBHOOK_SECRET`。
@@ -47,10 +49,11 @@ DB担当の0293841、2a31d75とplatform bridge c4b7a55が必要。初回paidの�
 ## 検証
 
 - `node scripts/academy-first-publication-billing-check.mjs`: 初期adapterの25件。
-- `node scripts/academy-first-publication-runtime-check.mjs`: hosted setup/HTTP/初回課金の17件。
-- `node scripts/academy-first-publication-webhook-check.mjs`: 署名と再照合の14件。
-- `node scripts/academy-first-publication-renewal-check.mjs`: 更新priceとdraft invoice再確認の9件。
+- `node scripts/academy-first-publication-runtime-check.mjs`: hosted setup/HTTP/初回課金の19件。
+- `node scripts/academy-first-publication-webhook-check.mjs`: 署名と再照合の17件。
+- `node scripts/academy-first-publication-renewal-check.mjs`: 更新priceとdraft invoice再確認の12件。
 - `node scripts/academy-first-publication-quote-check.mjs`: 元quote metadataの不変受け渡しと欠落拒否の12件。
+- `node scripts/academy-first-publication-price-check.mjs`: 固定帯・従量式と非対応Price拒否の5件。
 
 上記はfake HTTP/RPCのみ。所有TSのstrict型検査も行う。実Auth、実Stripe、多接続のDB競合、本番公開の証拠にはならない。
 
