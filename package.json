@@ -12,6 +12,7 @@
     "test:ai-tech-lab": "node scripts/ai-tech-lab-contract-test.mjs",
     "test:ai-tech-lab-fetch": "node scripts/ai-tech-lab-fetch-sources.mjs --self-test",
     "ai-tech-lab:fetch": "node scripts/ai-tech-lab-fetch-sources.mjs",
+    "test:mikkeos:menu-preferences": "node --experimental-strip-types scripts/test-mikke-menu-preferences.mjs",
     "dispatcher:setup": "node scripts/setup-mikkeos-consultation-dispatcher.mjs",
     "dispatcher:once": "node scripts/mikkeos-consultation-dispatcher.mjs --once",
     "dispatcher:watch": "node scripts/mikkeos-consultation-dispatcher.mjs --watch",

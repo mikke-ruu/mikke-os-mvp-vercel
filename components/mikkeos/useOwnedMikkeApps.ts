@@ -1,22 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { MikkeOwnerMenuItem, MikkeOwnerMenuSuggestedApp } from "./MikkeOwnerMenu";
 import { getGuestMarketNoteStats } from "@/lib/marketnote-guest";
-import { academyApp, communityApp, marketNoteApp, ninteiKozaApp, storyApp } from "@/lib/mikkeos/released-apps";
+import {
+  MIKKE_GUEST_MENU_PREFERENCES_EVENT,
+  MIKKE_GUEST_MENU_PREFERENCES_KEY,
+  getGuestMikkeMenuPreferences,
+  getMyMikkeMenuPreferences
+} from "@/lib/mikkeos/menu-preferences";
+import {
+  isMikkeMenuAppKey,
+  projectMikkeMenuPreferences,
+  shouldIncludeGuestMarketNoteData,
+  type MikkeMenuAppKey,
+  type MikkeMenuPreferenceRow
+} from "@/lib/mikkeos/menu-preferences-model";
+import { mikkeMenuAppOrder, mikkeMenuAppRegistry } from "@/lib/mikkeos/released-apps";
 import { supabase } from "@/lib/supabase/client";
 
-export type MikkeOwnedAppKey = "marketnote" | "story" | "academy" | "community" | "ninteikoza";
+export type MikkeOwnedAppKey = MikkeMenuAppKey;
 
 const appByKey: Record<MikkeOwnedAppKey, MikkeOwnerMenuItem> = {
-  marketnote: marketNoteApp,
-  story: storyApp,
-  academy: academyApp,
-  community: communityApp,
-  ninteikoza: ninteiKozaApp
+  marketnote: mikkeMenuAppRegistry.marketnote,
+  story: mikkeMenuAppRegistry.story,
+  academy: mikkeMenuAppRegistry.academy,
+  community: mikkeMenuAppRegistry.community,
+  ninteikoza: mikkeMenuAppRegistry.ninteikoza
 };
 
-const appOrder: MikkeOwnedAppKey[] = ["marketnote", "story", "academy", "community", "ninteikoza"];
+const appOrder = mikkeMenuAppOrder;
 
 // 認定講座サイト管理は運営者へ個別付与するため「つなげる候補」には出さない。
 const connectableApps: Record<Exclude<MikkeOwnedAppKey, "ninteikoza">, MikkeOwnerMenuSuggestedApp> = {
@@ -37,8 +50,18 @@ export function useOwnedMikkeApps({
   userId?: string;
   isGuest?: boolean;
 }) {
-  const [detectedKeys, setDetectedKeys] = useState<MikkeOwnedAppKey[]>([]);
+  const [detectedState, setDetectedState] = useState<{ ownerId: string; keys: MikkeOwnedAppKey[] } | null>(null);
   const [hasGuestMarketNoteData, setHasGuestMarketNoteData] = useState(false);
+  const [preferenceRows, setPreferenceRows] = useState<MikkeMenuPreferenceRow[]>([]);
+  const [preferenceOwner, setPreferenceOwner] = useState<string | null>(null);
+  const currentPreferenceOwner = isGuest ? "guest" : userId ?? "signed-out";
+  const [preferenceLoading, setPreferenceLoading] = useState(false);
+  const [preferenceError, setPreferenceError] = useState<string | null>(null);
+  const [preferenceRevision, setPreferenceRevision] = useState(0);
+
+  const refreshMenuPreferences = useCallback(() => {
+    setPreferenceRevision((revision) => revision + 1);
+  }, []);
 
   useEffect(() => {
     function syncGuestMarketNoteData() {
@@ -55,8 +78,69 @@ export function useOwnedMikkeApps({
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    function applyGuestPreferences() {
+      if (cancelled) return;
+      setPreferenceRows(getGuestMikkeMenuPreferences());
+      setPreferenceOwner("guest");
+      setPreferenceError(null);
+      setPreferenceLoading(false);
+    }
+
+    setPreferenceRows([]);
+    setPreferenceOwner(null);
+    setPreferenceError(null);
+
+    if (isGuest) {
+      setPreferenceLoading(true);
+      applyGuestPreferences();
+      window.addEventListener(MIKKE_GUEST_MENU_PREFERENCES_EVENT, applyGuestPreferences);
+      const onStorage = (event: StorageEvent) => {
+        if (event.key === MIKKE_GUEST_MENU_PREFERENCES_KEY) applyGuestPreferences();
+      };
+      window.addEventListener("storage", onStorage);
+      return () => {
+        cancelled = true;
+        window.removeEventListener(MIKKE_GUEST_MENU_PREFERENCES_EVENT, applyGuestPreferences);
+        window.removeEventListener("storage", onStorage);
+      };
+    }
+
+    if (!userId) {
+      setPreferenceOwner("signed-out");
+      setPreferenceLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setPreferenceLoading(true);
+    void getMyMikkeMenuPreferences()
+      .then((rows) => {
+        if (cancelled) return;
+        setPreferenceRows(rows);
+        setPreferenceOwner(userId);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // RPC未適用・通信失敗時は空設定として扱い、全owned appを標準順で表示する。
+        setPreferenceRows([]);
+        setPreferenceOwner(userId);
+        setPreferenceError("アプリ表示設定を読み込めませんでした。標準の並び順で表示しています。");
+      })
+      .finally(() => {
+        if (!cancelled) setPreferenceLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isGuest, preferenceRevision, userId]);
+
+  useEffect(() => {
     if (!userId || isGuest) {
-      setDetectedKeys([]);
+      setDetectedState(null);
       return;
     }
 
@@ -75,7 +159,7 @@ export function useOwnedMikkeApps({
       const now = Date.now();
 
       for (const row of entitlements.data ?? []) {
-        if (row.status !== "active" || !isOwnedAppKey(row.app_key)) continue;
+        if (row.status !== "active" || !isMikkeMenuAppKey(row.app_key)) continue;
         if (row.starts_at && new Date(row.starts_at).getTime() > now) continue;
         if (row.ends_at && new Date(row.ends_at).getTime() <= now) continue;
         next.add(row.app_key);
@@ -86,7 +170,7 @@ export function useOwnedMikkeApps({
       if (Array.isArray(academyContexts.data) && academyContexts.data.length > 0) next.add("academy");
       if ((communityMembership.data?.length ?? 0) > 0 || (communityOwner.data?.length ?? 0) > 0) next.add("community");
 
-      setDetectedKeys(appOrder.filter((key) => next.has(key)));
+      setDetectedState({ ownerId: userId, keys: appOrder.filter((key) => next.has(key)) });
     });
 
     return () => {
@@ -95,16 +179,27 @@ export function useOwnedMikkeApps({
   }, [isGuest, userId]);
 
   return useMemo(() => {
-    const keys = new Set<MikkeOwnedAppKey>(detectedKeys);
-    if (hasGuestMarketNoteData) keys.add("marketnote");
-    const ownedApps = appOrder.filter((key) => keys.has(key)).map((key) => appByKey[key]);
+    const keys = new Set<MikkeOwnedAppKey>(detectedState && !isGuest && detectedState.ownerId === userId ? detectedState.keys : []);
+    if (shouldIncludeGuestMarketNoteData(isGuest, hasGuestMarketNoteData)) keys.add("marketnote");
+    const ownedKeysInStandardOrder = appOrder.filter((key) => keys.has(key));
+    const ownerMatches = preferenceOwner === currentPreferenceOwner;
+    const projection = projectMikkeMenuPreferences(ownedKeysInStandardOrder, ownerMatches ? preferenceRows : []);
+    const visibleOwnedApps = projection.visibleOwnedAppKeys.map((key) => appByKey[key]);
+    const hiddenOwnedApps = projection.hiddenOwnedAppKeys.map((key) => appByKey[key]);
     const suggestedApps = (["marketnote", "story", "academy", "community"] as const)
       .filter((key) => !keys.has(key))
       .map((key) => connectableApps[key]);
-    return { ownedApps, suggestedApps };
-  }, [detectedKeys, hasGuestMarketNoteData]);
-}
-
-function isOwnedAppKey(value: string): value is MikkeOwnedAppKey {
-  return value === "marketnote" || value === "story" || value === "academy" || value === "community" || value === "ninteikoza";
+    return {
+      ownedApps: visibleOwnedApps,
+      suggestedApps,
+      ownedAppKeys: projection.ownedAppKeys,
+      visibleOwnedAppKeys: projection.visibleOwnedAppKeys,
+      hiddenOwnedAppKeys: projection.hiddenOwnedAppKeys,
+      visibleOwnedApps,
+      hiddenOwnedApps,
+      preferenceLoading: preferenceLoading || !ownerMatches,
+      preferenceError: ownerMatches ? preferenceError : null,
+      refreshMenuPreferences
+    };
+  }, [detectedState, userId, hasGuestMarketNoteData, isGuest, currentPreferenceOwner, preferenceOwner, preferenceError, preferenceLoading, preferenceRows, refreshMenuPreferences]);
 }

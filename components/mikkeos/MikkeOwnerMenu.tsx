@@ -5,10 +5,12 @@ import {
   Copy,
   Grid3X3,
   HousePlus,
+  LayoutDashboard,
   Link as LinkIcon,
   LogOut,
   PlusCircle,
   Share2,
+  SlidersHorizontal,
   Settings,
   X
 } from "lucide-react";
@@ -262,8 +264,25 @@ export function MikkeAccountMenu({
 
   return (
     <div className="border-t border-[var(--mikke-line-soft)] pt-4">
+      <div className="flex flex-col gap-1">
+        <Link
+          href="/manager"
+          className="flex min-h-10 items-center gap-2 rounded-lg px-1 text-sm font-bold text-[var(--mikke-muted)] hover:bg-[var(--mikke-surface-soft)]"
+        >
+          <LayoutDashboard size={17} strokeWidth={1.8} />
+          Manager
+        </Link>
+        <Link
+          href="/manager/settings"
+          className="flex min-h-10 items-center gap-2 rounded-lg px-1 text-sm font-bold text-[var(--mikke-muted)] hover:bg-[var(--mikke-surface-soft)]"
+        >
+          <SlidersHorizontal size={17} strokeWidth={1.8} />
+          アプリ表示設定
+        </Link>
+      </div>
+
       {normalizedId ? (
-        <div>
+        <div className="mt-4 border-t border-[var(--mikke-line-soft)] pt-4">
           <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--mikke-muted-light)]">mikke ID</p>
           <div className="mt-2 flex min-w-0 items-center gap-2">
             <p className="min-w-0 flex-1 truncate text-sm font-bold text-[var(--mikke-text)]">@{normalizedId}</p>
@@ -284,7 +303,7 @@ export function MikkeAccountMenu({
         <button
           type="button"
           onClick={onSignOut}
-          className={`${normalizedId ? "mt-4 border-t" : ""} flex w-full items-center gap-2 border-[var(--mikke-line-soft)] pt-4 text-left text-sm font-bold text-[var(--mikke-muted)]`}
+          className="mt-4 flex w-full items-center gap-2 border-t border-[var(--mikke-line-soft)] pt-4 text-left text-sm font-bold text-[var(--mikke-muted)]"
         >
           <LogOut size={17} strokeWidth={1.8} />
           ログアウト
