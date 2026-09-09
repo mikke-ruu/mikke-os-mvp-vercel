@@ -164,7 +164,7 @@ export function CommunityQuickStartView({
         <header className="mt-5">
           <p className="text-xs font-bold tracking-widest text-[var(--mikke-primary)]">COMMUNITY</p>
           <h1 className="mt-2 text-3xl font-bold text-[var(--mikke-primary)]">新しいCommunityを作る</h1>
-          <p className="mt-3 text-base leading-7 text-[var(--mikke-muted)]">まずは30日間、無料で試せます。</p>
+          <p className="mt-3 text-base leading-7 text-[var(--mikke-muted)]">新しいCommunityごとに30日間無料で試せます。</p>
         </header>
 
         <section className="mt-7 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm sm:p-7">
