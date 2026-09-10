@@ -1,4 +1,4 @@
-import { AuthGate } from "@/components/AuthGate";
+import { ManagerAuthGate as AuthGate } from "@/components/manager/ManagerAuthGate";
 import { ManagerDashboard } from "@/components/manager/ManagerDashboard";
 
 export default function ManagerPage() {
