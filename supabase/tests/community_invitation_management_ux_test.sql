@@ -37,7 +37,8 @@ insert into auth.users(id, email, is_anonymous) values
   ('de100000-0000-4000-8000-000000000005', 'invitation-other@example.invalid', false),
   ('de100000-0000-4000-8000-000000000006', 'invitation-anon@example.invalid', true),
   ('de100000-0000-4000-8000-000000000007', 'invitation-expired@example.invalid', false),
-  ('de100000-0000-4000-8000-000000000008', 'invitation-accepted@example.invalid', false);
+  ('de100000-0000-4000-8000-000000000008', 'invitation-accepted@example.invalid', false),
+  ('de100000-0000-4000-8000-000000000009', 'invitation-expired-owner@example.invalid', false);
 
 insert into public.profiles(user_id, handle, display_name) values
   ('de100000-0000-4000-8000-000000000001', 'invite-owner', 'Invite owner'),
@@ -47,16 +48,19 @@ insert into public.profiles(user_id, handle, display_name) values
   ('de100000-0000-4000-8000-000000000005', 'invite-other', 'Other user'),
   ('de100000-0000-4000-8000-000000000006', 'invite-anon', 'Anonymous user'),
   ('de100000-0000-4000-8000-000000000007', 'invite-expired', 'Expired target'),
-  ('de100000-0000-4000-8000-000000000008', 'invite-accepted', 'Accepted target');
+  ('de100000-0000-4000-8000-000000000008', 'invite-accepted', 'Accepted target'),
+  ('de100000-0000-4000-8000-000000000009', 'expired-owner', 'Expired owner');
 
 insert into public.community_communities(id, slug, name, join_mode, owner_user_id) values
   ('de110000-0000-4000-8000-000000000001', 'invitation-community', 'Invitation Community', 'invite_only', 'de100000-0000-4000-8000-000000000001'),
-  ('de110000-0000-4000-8000-000000000002', 'other-invitation-community', 'Other Invitation Community', 'invite_only', 'de100000-0000-4000-8000-000000000004');
+  ('de110000-0000-4000-8000-000000000002', 'other-invitation-community', 'Other Invitation Community', 'invite_only', 'de100000-0000-4000-8000-000000000004'),
+  ('de110000-0000-4000-8000-000000000003', 'expired-owner-community', 'Expired Owner Community', 'invite_only', 'de100000-0000-4000-8000-000000000009');
 
 insert into public.community_memberships(community_id, user_id, role, status) values
   ('de110000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000001', 'owner', 'active'),
   ('de110000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000002', 'moderator', 'active'),
-  ('de110000-0000-4000-8000-000000000002', 'de100000-0000-4000-8000-000000000004', 'owner', 'active');
+  ('de110000-0000-4000-8000-000000000002', 'de100000-0000-4000-8000-000000000004', 'owner', 'active'),
+  ('de110000-0000-4000-8000-000000000003', 'de100000-0000-4000-8000-000000000009', 'owner', 'active');
 
 insert into platform_billing_private.creation_entitlements(
   actor_user_id, product_key, plan_key, source_kind, source_attempt_id,
@@ -73,6 +77,12 @@ insert into platform_billing_private.creation_entitlements(
     'de140000-0000-4000-8000-000000000002', 'de150000-0000-4000-8000-000000000002', 'consumed',
     statement_timestamp() - interval '1 day', statement_timestamp() + interval '29 days',
     'de110000-0000-4000-8000-000000000002', statement_timestamp()
+  ),
+  (
+    'de100000-0000-4000-8000-000000000009', 'community_platform', 'trial', 'verified_trial',
+    'de140000-0000-4000-8000-000000000003', 'de150000-0000-4000-8000-000000000003', 'consumed',
+    statement_timestamp() - interval '31 days', statement_timestamp() - interval '1 day',
+    'de110000-0000-4000-8000-000000000003', statement_timestamp() - interval '30 days'
   );
 
 insert into public.community_entitlement_definitions(id, community_id, key, name, status) values
@@ -81,9 +91,10 @@ insert into public.community_entitlement_definitions(id, community_id, key, name
   ('de120000-0000-4000-8000-000000000003', 'de110000-0000-4000-8000-000000000002', 'other:premium', 'Other premium', 'active');
 
 insert into public.community_invitations(
-  community_id, invited_user_id, invited_by_user_id, invited_mikke_id,
+  id, community_id, invited_user_id, invited_by_user_id, invited_mikke_id,
   entitlement_key, status, expires_at
 ) values (
+  'de130000-0000-4000-8000-000000000003',
   'de110000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000003',
   'de100000-0000-4000-8000-000000000001', 'invite-target', 'invite:basic',
   'pending', statement_timestamp() + interval '7 days'
@@ -104,7 +115,7 @@ select set_config('request.jwt.claims', '{"sub":"de100000-0000-4000-8000-0000000
 select set_config('request.jwt.claim.sub', 'de100000-0000-4000-8000-000000000002', true);
 set local role authenticated;
 select public.community_update_pending_invitation(
-  (select id from public.community_invitations where invited_user_id = 'de100000-0000-4000-8000-000000000003'),
+  'de130000-0000-4000-8000-000000000003',
   'invite:premium', statement_timestamp() + interval '14 days'
 );
 reset role;
@@ -129,6 +140,20 @@ select pg_temp.community_invitation_assert(
   (select count(*) = 1 from public.community_invitations where community_id = 'de110000-0000-4000-8000-000000000001'),
   'invitee can read the own invitation'
 );
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
+    $q$select public.community_update_pending_invitation('de130000-0000-4000-8000-000000000003', 'invite:basic', null)$q$,
+    '42501'
+  ),
+  'invitee cannot update the own invitation'
+);
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
+    $q$select public.community_revoke_pending_invitation('de130000-0000-4000-8000-000000000003')$q$,
+    '42501'
+  ),
+  'invitee cannot revoke the own invitation'
+);
 reset role;
 
 select set_config('request.jwt.claims', '{"sub":"de100000-0000-4000-8000-000000000005","role":"authenticated","is_anonymous":false}', true);
@@ -141,12 +166,19 @@ select pg_temp.community_invitation_assert(
 select pg_temp.community_invitation_assert(
   pg_temp.community_invitation_denied(
     $q$select public.community_update_pending_invitation(
-      (select id from public.community_invitations where invited_user_id = 'de100000-0000-4000-8000-000000000003'),
+      'de130000-0000-4000-8000-000000000003',
       'invite:basic', null
     )$q$,
     '42501'
   ),
   'unrelated account cannot update an invitation'
+);
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
+    $q$select public.community_revoke_pending_invitation('de130000-0000-4000-8000-000000000003')$q$,
+    '42501'
+  ),
+  'unrelated account cannot revoke an invitation'
 );
 reset role;
 
@@ -155,8 +187,15 @@ select set_config('request.jwt.claim.sub', 'de100000-0000-4000-8000-000000000004
 set local role authenticated;
 select pg_temp.community_invitation_assert(
   pg_temp.community_invitation_denied(
+    $q$select public.community_update_pending_invitation('de130000-0000-4000-8000-000000000003', 'invite:basic', null)$q$,
+    '42501'
+  ),
+  'staff from another Community cannot update the invitation'
+);
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
     $q$select public.community_revoke_pending_invitation(
-      (select id from public.community_invitations where invited_user_id = 'de100000-0000-4000-8000-000000000003')
+      'de130000-0000-4000-8000-000000000003'
     )$q$,
     '42501'
   ),
@@ -170,12 +209,19 @@ set local role authenticated;
 select pg_temp.community_invitation_assert(
   pg_temp.community_invitation_denied(
     $q$select public.community_update_pending_invitation(
-      (select id from public.community_invitations where invited_user_id = 'de100000-0000-4000-8000-000000000003'),
+      'de130000-0000-4000-8000-000000000003',
       'invite:basic', null
     )$q$,
     '42501'
   ),
   'anonymous Auth account cannot update an invitation'
+);
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
+    $q$select public.community_revoke_pending_invitation('de130000-0000-4000-8000-000000000003')$q$,
+    '42501'
+  ),
+  'anonymous Auth account cannot revoke an invitation'
 );
 reset role;
 
@@ -184,7 +230,27 @@ insert into public.community_invitations(
   entitlement_key, status, expires_at, accepted_at
 ) values
   ('de130000-0000-4000-8000-000000000001', 'de110000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000007', 'de100000-0000-4000-8000-000000000001', 'invite-expired', 'invite:basic', 'pending', statement_timestamp() - interval '1 minute', null),
-  ('de130000-0000-4000-8000-000000000002', 'de110000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000008', 'de100000-0000-4000-8000-000000000001', 'invite-accepted', 'invite:basic', 'accepted', null, statement_timestamp());
+  ('de130000-0000-4000-8000-000000000002', 'de110000-0000-4000-8000-000000000001', 'de100000-0000-4000-8000-000000000008', 'de100000-0000-4000-8000-000000000001', 'invite-accepted', 'invite:basic', 'accepted', null, statement_timestamp()),
+  ('de130000-0000-4000-8000-000000000004', 'de110000-0000-4000-8000-000000000003', 'de100000-0000-4000-8000-000000000005', 'de100000-0000-4000-8000-000000000009', 'invite-other', null, 'pending', statement_timestamp() + interval '7 days', null);
+
+select set_config('request.jwt.claims', '{"sub":"de100000-0000-4000-8000-000000000009","role":"authenticated","is_anonymous":false}', true);
+select set_config('request.jwt.claim.sub', 'de100000-0000-4000-8000-000000000009', true);
+set local role authenticated;
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
+    $q$select public.community_update_pending_invitation('de130000-0000-4000-8000-000000000004', null, null)$q$,
+    '42501'
+  ),
+  'expired owner contract cannot update an invitation'
+);
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
+    $q$select public.community_revoke_pending_invitation('de130000-0000-4000-8000-000000000004')$q$,
+    '42501'
+  ),
+  'expired owner contract cannot revoke an invitation'
+);
+reset role;
 
 select set_config('request.jwt.claims', '{"sub":"de100000-0000-4000-8000-000000000001","role":"authenticated","is_anonymous":false}', true);
 select set_config('request.jwt.claim.sub', 'de100000-0000-4000-8000-000000000001', true);
@@ -198,6 +264,20 @@ select pg_temp.community_invitation_assert(
 );
 select pg_temp.community_invitation_assert(
   pg_temp.community_invitation_denied(
+    $q$select public.community_revoke_pending_invitation('de130000-0000-4000-8000-000000000001')$q$,
+    '55000'
+  ),
+  'expired pending invitation cannot be revoked'
+);
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
+    $q$select public.community_update_pending_invitation('de130000-0000-4000-8000-000000000002', 'invite:premium', null)$q$,
+    '55000'
+  ),
+  'accepted invitation cannot be updated'
+);
+select pg_temp.community_invitation_assert(
+  pg_temp.community_invitation_denied(
     $q$select public.community_revoke_pending_invitation('de130000-0000-4000-8000-000000000002')$q$,
     '55000'
   ),
@@ -206,7 +286,7 @@ select pg_temp.community_invitation_assert(
 select pg_temp.community_invitation_assert(
   pg_temp.community_invitation_denied(
     $q$select public.community_update_pending_invitation(
-      (select id from public.community_invitations where invited_user_id = 'de100000-0000-4000-8000-000000000003'),
+      'de130000-0000-4000-8000-000000000003',
       'other:premium', null
     )$q$,
     '22023'
@@ -222,8 +302,19 @@ select pg_temp.community_invitation_assert(
   ),
   'authenticated clients cannot directly mutate invitation identity'
 );
+select pg_temp.community_invitation_assert(
+  exists (
+    select 1 from public.community_invitations
+    where id = 'de130000-0000-4000-8000-000000000003'
+      and invited_user_id = 'de100000-0000-4000-8000-000000000003'
+      and invited_mikke_id = 'invite-target'
+      and entitlement_key = 'invite:premium'
+      and status = 'pending'
+  ),
+  'denied operations leave the real invitation unchanged'
+);
 select public.community_revoke_pending_invitation(
-  (select id from public.community_invitations where invited_user_id = 'de100000-0000-4000-8000-000000000003')
+  'de130000-0000-4000-8000-000000000003'
 );
 reset role;
 

@@ -44,6 +44,7 @@ import type {
 } from "./types";
 export { communityErrorMessage } from "./error-message";
 import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
+import { visiblePendingCommunityInvitationRows } from "./invitation-summary";
 
 type DbClient = SupabaseClient<any, "public", any>;
 
@@ -471,10 +472,7 @@ export async function listMyPendingCommunityInvitations(client: DbClient, userId
     .eq("status", "pending")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  const now = Date.now();
-  return (data ?? [])
-    .map(mapInvitationSummary)
-    .filter((invitation) => invitation.community.status === "active" && (!invitation.expiresAt || new Date(invitation.expiresAt).getTime() > now));
+  return visiblePendingCommunityInvitationRows(data ?? []).map(mapInvitationSummary);
 }
 
 export async function createCommunity(client: DbClient, userId: string, input: { name: string; slug: string; description: string; displayName: string }): Promise<Community> {
