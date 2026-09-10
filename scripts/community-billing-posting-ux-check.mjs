@@ -18,6 +18,8 @@ const checks = [
   [app.includes("有料契約の解約") && app.includes("Communityから退会") && app.includes("mikkeアカウントの削除"), "three exit actions are distinguished"],
   [app.includes('claim.paymentMethod === "external_link"') && app.includes("approvedExternalPlanIds.has(plan.id)"), "portal link is not shown for manual or unrelated entitlements"],
   [app.includes("権限元は「Community有料会員」") && app.includes("Payment Linkの申請承認とは別です"), "external-link claims and manual payment sources are explained separately"],
+  [app.includes('key === "paid:member"') && app.includes('return "有料会員"'), "legacy paid member label is shown in Japanese"],
+  [app.includes("{entitlementLabel(data, item.entitlementKey)} ・ {entitlementSourceLabel(item.source)}") && !app.includes("{item.entitlementKey} ・ {entitlementSourceLabel(item.source)}"), "member entitlement badges hide internal English keys"],
   [app.includes("function canCreateRoomPost") && app.includes("room.memberCanPost || isOwnerLike(data, userId)") && app.includes("data.rooms.filter((room) => canCreateRoomPost(data, userId, room))"), "staff can compose in every writable thread room"],
   [app.includes('<h3 className="text-base font-bold tracking-normal">投稿を作成</h3>') && !app.includes("告知を作る"), "owner composer uses natural post wording"],
   [client.includes("external_customer_portal_url") && client.includes("payment_setup_checklist") && types.includes("CommunityPaymentSetupChecklist"), "client and types project billing guidance"],
