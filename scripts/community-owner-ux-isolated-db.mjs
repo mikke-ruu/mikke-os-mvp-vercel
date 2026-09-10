@@ -81,7 +81,7 @@ function command(args, input, allowFailure = false) {
   return result;
 }
 function psql(sql) {
-  return command(["exec", "-i", container, "psql", "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", database], sql).stdout;
+  return command(["exec", "-i", container, "psql", "-h", "127.0.0.1", "-X", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", database], sql).stdout;
 }
 function snapshot() {
   return JSON.parse(psql(`select json_build_object(
@@ -148,10 +148,17 @@ try {
   created = true;
   let ready = false;
   for (let attempt = 0; attempt < 60; attempt++) {
-    if (command(["exec", container, "pg_isready", "-U", "postgres", "-d", database], undefined, true).status === 0) { ready = true; break; }
+    const tcpReady = command(["exec", container, "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", database], undefined, true);
+    if (tcpReady.status === 0) {
+      const sqlProbe = command([
+        "exec", container, "psql", "-h", "127.0.0.1", "-X", "-q", "-A", "-t",
+        "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", database, "-c", "select 1;"
+      ], undefined, true);
+      if (sqlProbe.status === 0 && sqlProbe.stdout.trim() === "1") { ready = true; break; }
+    }
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
   }
-  if (!ready) throw new Error("Disposable PostgreSQL did not become ready");
+  if (!ready) throw new Error("Disposable PostgreSQL did not become ready over TCP with a successful SQL probe");
   const inspected = JSON.parse(command(["inspect", container]).stdout)[0];
   assert.equal(inspected.HostConfig.NetworkMode, "none");
   assert.deepEqual(inspected.HostConfig.PortBindings ?? {}, {});

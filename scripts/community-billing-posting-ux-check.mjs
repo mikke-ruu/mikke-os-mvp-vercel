@@ -6,6 +6,7 @@ const client = fs.readFileSync("lib/community/client.ts", "utf8");
 const types = fs.readFileSync("lib/community/types.ts", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20260909235910_community_membership_billing_guidance.sql", "utf8");
 const sqlTest = fs.readFileSync("supabase/tests/community_membership_billing_guidance_test.sql", "utf8");
+const isolatedRunner = fs.readFileSync("scripts/community-owner-ux-isolated-db.mjs", "utf8");
 
 const checks = [
   [app.includes("Stripeの決済設定を順番に確認") && app.includes("商品を作る") && app.includes("毎月の料金を設定する") && app.includes("入会リンクを作る") && app.includes("契約管理・解約を設定する") && app.includes("テストする"), "ordered payment setup guide exists"],
@@ -24,6 +25,7 @@ const checks = [
   [client.includes("normalizeSharedStripeCustomerPortalUrl") && client.includes("parsed.username") && client.includes("parsed.search"), "client rejects individual or credential-bearing portal URLs"],
   [migration.includes("members can read active or own contracted plans") && migration.includes("claim.payment_method = 'external_link'") && migration.includes(") is true"), "RLS preserves contract management and checklist NULL cannot pass"],
   [sqlTest.includes("JSON null in a required checklist key is rejected") && sqlTest.includes("non-boolean checklist value is rejected") && sqlTest.includes("userinfo credentials in a portal URL are rejected"), "SQL negative tests cover malformed checklists and portal credentials"],
+  [isolatedRunner.includes('"pg_isready", "-h", "127.0.0.1"') && isolatedRunner.includes('"-c", "select 1;"') && isolatedRunner.includes('sqlProbe.stdout.trim() === "1"'), "isolated PostgreSQL waits for the final TCP server and a real SQL probe"],
   [sqlTest.includes("saving links and checklist never grants an entitlement") && sqlTest.includes("insecure management URL is rejected") && sqlTest.includes("checklist cannot masquerade as provider verification"), "SQL negative tests cover the safety boundary"],
 ];
 
