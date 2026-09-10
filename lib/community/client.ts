@@ -13,6 +13,7 @@ import type {
   CommunityInquiry,
   CommunityInquiryStatus,
   CommunityInvitation,
+  CommunityInvitationSummary,
   CommunityJoinApplication,
   CommunityMemberDataRequest,
   CommunityMemberEntitlement,
@@ -22,6 +23,7 @@ import type {
   CommunityMembershipStatus,
   CommunityOperatorProfile,
   CommunityPaymentClaim,
+  CommunityPaymentMethod,
   CommunityPost,
   CommunityPostAttachment,
   CommunityPostKind,
@@ -42,8 +44,37 @@ import type {
 } from "./types";
 export { communityErrorMessage } from "./error-message";
 import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
+import { visiblePendingCommunityInvitationRows } from "./invitation-summary";
 
 type DbClient = SupabaseClient<any, "public", any>;
+
+function normalizeSharedStripeCustomerPortalUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error("契約管理・解約URLにはStripeの共有ログインURLを入力してください。");
+  }
+
+  const sharedLoginPath = /^\/p\/login\/[A-Za-z0-9_-]+\/?$/;
+  if (
+    parsed.protocol !== "https:"
+    || parsed.hostname !== "billing.stripe.com"
+    || parsed.port
+    || parsed.username
+    || parsed.password
+    || parsed.search
+    || parsed.hash
+    || !sharedLoginPath.test(parsed.pathname)
+  ) {
+    throw new Error("契約管理・解約URLにはStripeの共有ログインURL（https://billing.stripe.com/p/login/...）だけを入力してください。個人用URLや認証情報を含むURLは保存できません。");
+  }
+
+  return trimmed;
+}
 
 function mapCommunity(row: any): Community {
   return {
@@ -171,7 +202,29 @@ function mapMembershipPlan(row: any): CommunityMembershipPlan {
     id: row.id, communityId: row.community_id, entitlementKey: row.entitlement_key,
     name: row.name, description: row.description ?? null, amountYen: row.amount_yen,
     billingInterval: row.billing_interval, paymentProviderLabel: row.payment_provider_label,
-    externalPaymentUrl: row.external_payment_url, status: row.status, sortOrder: row.sort_order ?? 0
+    externalPaymentUrl: row.external_payment_url,
+    externalCustomerPortalUrl: row.external_customer_portal_url ?? "",
+    cancellationGuidance: row.cancellation_guidance ?? null,
+    paymentSetupChecklist: {
+      productCreated: row.payment_setup_checklist?.productCreated === true,
+      recurringPriceConfirmed: row.payment_setup_checklist?.recurringPriceConfirmed === true,
+      paymentLinkTested: row.payment_setup_checklist?.paymentLinkTested === true,
+      customerPortalEnabled: row.payment_setup_checklist?.customerPortalEnabled === true,
+      customerPortalTested: row.payment_setup_checklist?.customerPortalTested === true
+    },
+    status: row.status, sortOrder: row.sort_order ?? 0
+  };
+}
+
+function mapInvitationSummary(row: any): CommunityInvitationSummary {
+  const community = Array.isArray(row.community_communities) ? row.community_communities[0] : row.community_communities;
+  return {
+    ...mapInvitation(row),
+    community: {
+      slug: community.slug,
+      name: community.name,
+      status: community.status
+    }
   };
 }
 
@@ -179,7 +232,8 @@ function mapPaymentClaim(row: any): CommunityPaymentClaim {
   return {
     id: row.id, communityId: row.community_id, planId: row.plan_id, userId: row.user_id,
     payerName: row.payer_name, externalReference: row.external_reference ?? null, note: row.note ?? null,
-    status: row.status, reviewNote: row.review_note ?? null, createdAt: row.created_at
+    status: row.status, reviewNote: row.review_note ?? null,
+    paymentMethod: row.payment_method ?? "external_link", createdAt: row.created_at
   };
 }
 
@@ -342,6 +396,10 @@ function mapResource(row: any): CommunityResource {
     description: row.description ?? null,
     kind: row.kind,
     externalUrl: row.external_url,
+    storagePath: row.storage_path ?? null,
+    fileName: row.file_name ?? null,
+    mimeType: row.mime_type ?? null,
+    fileSizeBytes: row.file_size_bytes ?? null,
     isPublished: Boolean(row.is_published),
     sortOrder: row.sort_order ?? 0,
     publishedAt: row.published_at ?? null
@@ -404,6 +462,17 @@ export async function listMyManagedCommunities(client: DbClient, userId: string)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []).map(mapCommunity);
+}
+
+export async function listMyPendingCommunityInvitations(client: DbClient, userId: string): Promise<CommunityInvitationSummary[]> {
+  const { data, error } = await client
+    .from("community_invitations")
+    .select("*, community_communities(slug,name,status)")
+    .eq("invited_user_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return visiblePendingCommunityInvitationRows(data ?? []).map(mapInvitationSummary);
 }
 
 export async function createCommunity(client: DbClient, userId: string, input: { name: string; slug: string; description: string; displayName: string }): Promise<Community> {
@@ -884,6 +953,24 @@ export async function inviteCommunityMemberByMikkeId(client: DbClient, community
   return data;
 }
 
+export async function updatePendingCommunityInvitation(client: DbClient, invitationId: string, entitlementKey?: string, expiresAt?: string | null) {
+  const { data, error } = await client.rpc("community_update_pending_invitation", {
+    p_invitation_id: invitationId,
+    p_entitlement_key: entitlementKey?.trim() || null,
+    p_expires_at: expiresAt ?? null
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function revokePendingCommunityInvitation(client: DbClient, invitationId: string) {
+  const { data, error } = await client.rpc("community_revoke_pending_invitation", {
+    p_invitation_id: invitationId
+  });
+  if (error) throw error;
+  return data;
+}
+
 export async function createCommunityMembershipPlan(client: DbClient, communityId: string, userId: string, input: {
   entitlementKey: string;
   name: string;
@@ -892,8 +979,12 @@ export async function createCommunityMembershipPlan(client: DbClient, communityI
   billingInterval: CommunityMembershipPlan["billingInterval"];
   paymentProviderLabel: string;
   externalPaymentUrl: string;
+  externalCustomerPortalUrl: string;
+  cancellationGuidance: string;
+  paymentSetupChecklist: CommunityMembershipPlan["paymentSetupChecklist"];
   status: CommunityMembershipPlan["status"];
 }) {
+  const externalCustomerPortalUrl = normalizeSharedStripeCustomerPortalUrl(input.externalCustomerPortalUrl);
   const { error } = await client.from("community_membership_plans").insert({
     community_id: communityId,
     entitlement_key: input.entitlementKey,
@@ -903,10 +994,65 @@ export async function createCommunityMembershipPlan(client: DbClient, communityI
     billing_interval: input.billingInterval,
     payment_provider_label: input.paymentProviderLabel.trim() || "外部決済",
     external_payment_url: input.externalPaymentUrl.trim(),
+    external_customer_portal_url: externalCustomerPortalUrl,
+    cancellation_guidance: input.cancellationGuidance.trim() || null,
+    payment_setup_checklist: input.paymentSetupChecklist,
     status: input.status,
     created_by_user_id: userId
   });
   if (error) throw error;
+}
+
+export async function updateCommunityMembershipPlan(client: DbClient, planId: string, input: {
+  entitlementKey: string;
+  name: string;
+  description: string;
+  amountYen: number;
+  billingInterval: CommunityMembershipPlan["billingInterval"];
+  paymentProviderLabel: string;
+  externalPaymentUrl: string;
+  externalCustomerPortalUrl: string;
+  cancellationGuidance: string;
+  paymentSetupChecklist: CommunityMembershipPlan["paymentSetupChecklist"];
+  status: CommunityMembershipPlan["status"];
+}) {
+  const externalCustomerPortalUrl = normalizeSharedStripeCustomerPortalUrl(input.externalCustomerPortalUrl);
+  const { error } = await client.from("community_membership_plans").update({
+    entitlement_key: input.entitlementKey,
+    name: input.name.trim(),
+    description: input.description.trim() || null,
+    amount_yen: input.amountYen,
+    billing_interval: input.billingInterval,
+    payment_provider_label: input.paymentProviderLabel.trim() || "運営者指定",
+    external_payment_url: input.externalPaymentUrl.trim(),
+    external_customer_portal_url: externalCustomerPortalUrl,
+    cancellation_guidance: input.cancellationGuidance.trim() || null,
+    payment_setup_checklist: input.paymentSetupChecklist,
+    status: input.status
+  }).eq("id", planId);
+  if (error) throw error;
+}
+
+export async function recordCommunityManualPayment(client: DbClient, input: {
+  communityId: string;
+  planId: string;
+  memberUserId: string;
+  paymentMethod: Exclude<CommunityPaymentMethod, "external_link">;
+  externalReference?: string;
+  note?: string;
+  requestId: string;
+}) {
+  const { data, error } = await client.rpc("community_record_manual_payment", {
+    p_community_id: input.communityId,
+    p_plan_id: input.planId,
+    p_member_user_id: input.memberUserId,
+    p_payment_method: input.paymentMethod,
+    p_external_reference: input.externalReference?.trim() || null,
+    p_note: input.note?.trim() || null,
+    p_request_id: input.requestId
+  });
+  if (error) throw error;
+  return mapPaymentClaim(Array.isArray(data) ? data[0] : data);
 }
 
 export async function createCommunityPaymentClaim(client: DbClient, communityId: string, planId: string, userId: string, payerName: string, externalReference: string, note: string) {
@@ -1386,6 +1532,69 @@ export async function createCommunityResource(client: DbClient, communityId: str
     published_at: new Date().toISOString()
   });
   if (error) throw error;
+}
+
+const COMMUNITY_RESOURCE_BUCKET = "community-resources";
+const COMMUNITY_RESOURCE_MAX_BYTES = 50 * 1024 * 1024;
+const communityResourceMimeTypes = new Set(["application/pdf", "video/mp4", "video/webm", "video/quicktime"]);
+
+export async function createCommunityResourceFile(client: DbClient, input: {
+  communityId: string;
+  userId: string;
+  title: string;
+  description: string;
+  kind: "pdf" | "video";
+  file: File;
+}) {
+  if (input.file.size <= 0 || input.file.size > COMMUNITY_RESOURCE_MAX_BYTES) {
+    throw new Error("PDF・動画ファイルは50MB以下にしてください。");
+  }
+  if (!communityResourceMimeTypes.has(input.file.type)) {
+    throw new Error("PDF、MP4、WebM、MOV形式のファイルを選んでください。");
+  }
+  if (input.kind === "pdf" && input.file.type !== "application/pdf") {
+    throw new Error("PDF資料にはPDFファイルを選んでください。");
+  }
+  if (input.kind === "video" && !input.file.type.startsWith("video/")) {
+    throw new Error("動画資料には動画ファイルを選んでください。");
+  }
+
+  const resourceId = crypto.randomUUID();
+  const rawExtension = input.file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ?? "";
+  const extension = rawExtension.slice(0, 10) || (input.kind === "pdf" ? "pdf" : "mp4");
+  const storagePath = `${input.communityId}/${resourceId}/${input.userId}/${crypto.randomUUID()}.${extension}`;
+  const { data, error } = await client.from("community_resources").insert({
+    id: resourceId,
+    community_id: input.communityId,
+    title: input.title.trim(),
+    description: input.description.trim() || null,
+    kind: input.kind,
+    external_url: "",
+    storage_path: storagePath,
+    file_name: input.file.name.slice(0, 255),
+    mime_type: input.file.type,
+    file_size_bytes: input.file.size,
+    is_published: true,
+    published_at: new Date().toISOString()
+  }).select("*").single();
+  if (error) throw error;
+
+  const { error: uploadError } = await client.storage.from(COMMUNITY_RESOURCE_BUCKET).upload(storagePath, input.file, {
+    cacheControl: "3600",
+    contentType: input.file.type,
+    upsert: false
+  });
+  if (uploadError) {
+    await client.from("community_resources").delete().eq("id", resourceId);
+    throw uploadError;
+  }
+  return mapResource(data);
+}
+
+export async function createCommunityResourceViewUrl(client: DbClient, storagePath: string) {
+  const { data, error } = await client.storage.from(COMMUNITY_RESOURCE_BUCKET).createSignedUrl(storagePath, 60 * 15);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 export async function updateCommunityResourceVisibility(client: DbClient, resourceId: string, isPublished: boolean) {

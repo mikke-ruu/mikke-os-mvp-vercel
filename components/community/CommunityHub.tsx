@@ -7,11 +7,11 @@ import { LogOut } from "lucide-react";
 import { CommunityDirectory } from "./CommunityDirectory";
 import { CommunityAuthBoundary, communityScopedClient } from "./CommunityAuthBoundary";
 import type { CommunityAuthLease } from "@/lib/community/auth-scope";
-import { communityErrorMessage, createCommunity, listMyCommunities, listMyManagedCommunities } from "@/lib/community/client";
+import { communityErrorMessage, createCommunity, listMyCommunities, listMyManagedCommunities, listMyPendingCommunityInvitations } from "@/lib/community/client";
 import { communityPlatformActionBlock, loadCommunityPlatformStatus, type CommunityPlatformReadState } from "@/lib/community/platform-billing";
 import { communityPlatformBrowserTransport } from "@/lib/community/platform-billing-browser";
 import { communityBasePath } from "@/lib/community/routes";
-import type { Community } from "@/lib/community/types";
+import type { Community, CommunityInvitationSummary } from "@/lib/community/types";
 import { assertMikkeNameIsNotReserved, isMikkeReservedDisplayName, isMikkeReservedSlug } from "@/lib/mikkeos/reserved-names";
 import { supabase } from "@/lib/supabase/client";
 
@@ -37,8 +37,10 @@ export function CommunityHubPage({ organizer = false }: { organizer?: boolean })
   const router = useRouter();
   const [user, setUser] = useState<HubUser | null>(null);
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [invitations, setInvitations] = useState<CommunityInvitationSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [invitationError, setInvitationError] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -47,7 +49,9 @@ export function CommunityHubPage({ organizer = false }: { organizer?: boolean })
     async function load(sessionUser: HubUser | null) {
       const request = ++generation;
       setCommunities([]);
+      setInvitations([]);
       setError("");
+      setInvitationError("");
       setLoading(true);
       setUser(sessionUser);
       if (!sessionUser) {
@@ -55,8 +59,16 @@ export function CommunityHubPage({ organizer = false }: { organizer?: boolean })
         return;
       }
       try {
-        const result = await (organizer ? listMyManagedCommunities(supabase, sessionUser.id) : listMyCommunities(supabase, sessionUser.id));
-        if (mounted && request === generation) setCommunities(result);
+        const [communityResult, invitationResult] = await Promise.allSettled([
+          organizer ? listMyManagedCommunities(supabase, sessionUser.id) : listMyCommunities(supabase, sessionUser.id),
+          organizer ? Promise.resolve([]) : listMyPendingCommunityInvitations(supabase, sessionUser.id)
+        ]);
+        if (mounted && request === generation) {
+          if (communityResult.status === "fulfilled") setCommunities(communityResult.value);
+          else setError(communityErrorMessage(communityResult.reason, "Community一覧を読み込めませんでした。"));
+          if (invitationResult.status === "fulfilled") setInvitations(invitationResult.value);
+          else setInvitationError("招待一覧を読み込めませんでした。参加済みのCommunity一覧はそのまま利用できます。");
+        }
       } catch (nextError) {
         if (mounted && request === generation) setError(communityErrorMessage(nextError, "Community一覧を読み込めませんでした。"));
       } finally {
@@ -89,6 +101,8 @@ export function CommunityHubPage({ organizer = false }: { organizer?: boolean })
       </div>
       {loading ? <p className="mt-8 text-sm text-[var(--mikke-muted)]">読み込んでいます...</p> : null}
       {error ? <p className="mt-5 rounded-lg bg-[var(--mikke-accent-soft)] p-4 text-sm font-bold text-[var(--mikke-accent-strong)]">{error}</p> : null}
+      {invitationError ? <p className="mt-5 rounded-lg bg-amber-50 p-4 text-sm font-bold text-amber-800">{invitationError}</p> : null}
+      {!organizer && invitations.length > 0 ? <section className="mt-6 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4"><h2 className="font-bold text-[var(--mikke-primary)]">受け取った招待</h2><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">Community内に届いている招待です。メールや共通通知は自動送信されません。</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{invitations.map((invitation) => <article key={invitation.id} className="rounded-lg border border-[var(--mikke-line-soft)] bg-white p-4"><p className="font-bold">{invitation.community.name}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">招待状態: 手続き待ち</p><Link href={`/community/c/${invitation.community.slug}/join`} className="mt-3 inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white">招待を確認して参加手続きへ</Link></article>)}</div></section> : null}
       {!loading && !error && user ? <CommunityDirectory communities={communities} organizer={organizer} userId={user.id} /> : null}
     </HubFrame>
   );

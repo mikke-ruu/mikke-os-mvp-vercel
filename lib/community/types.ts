@@ -14,6 +14,14 @@ export type CommunityAcademyRole = "learner" | "instructor" | "staff" | "contrac
 export type CommunityInvitationStatus = "pending" | "accepted" | "declined" | "revoked" | "expired";
 export type CommunityMembershipPlanStatus = "draft" | "active" | "archived";
 export type CommunityPaymentClaimStatus = "pending" | "approved" | "rejected" | "cancelled";
+export type CommunityPaymentMethod = "external_link" | "uword_points" | "bank_transfer" | "cash" | "other";
+export type CommunityPaymentSetupChecklist = {
+  productCreated: boolean;
+  recurringPriceConfirmed: boolean;
+  paymentLinkTested: boolean;
+  customerPortalEnabled: boolean;
+  customerPortalTested: boolean;
+};
 export type CommunityDataRequestStatus = "received" | "identity_check" | "processing" | "completed" | "rejected" | "cancelled";
 export type CommunityHomeMetric = "unread" | "today_activity" | "upcoming_events" | "rooms" | "posts" | "comments" | "chat_messages" | "resources";
 export type CommunityApprovalMode = "auto" | "manual";
@@ -99,6 +107,14 @@ export type CommunityInvitation = {
   createdAt: string;
 };
 
+export type CommunityInvitationSummary = CommunityInvitation & {
+  community: {
+    slug: string;
+    name: string;
+    status: "active" | "archived";
+  };
+};
+
 export type CommunityAcademyAccessInvitation = {
   id: string;
   status: "pending" | "accepted" | "declined" | "cancelled" | "revoked" | "expired";
@@ -147,6 +163,9 @@ export type CommunityMembershipPlan = {
   billingInterval: "month" | "year" | "one_time";
   paymentProviderLabel: string;
   externalPaymentUrl: string;
+  externalCustomerPortalUrl: string;
+  cancellationGuidance: string | null;
+  paymentSetupChecklist: CommunityPaymentSetupChecklist;
   status: CommunityMembershipPlanStatus;
   sortOrder: number;
 };
@@ -161,6 +180,7 @@ export type CommunityPaymentClaim = {
   note: string | null;
   status: CommunityPaymentClaimStatus;
   reviewNote: string | null;
+  paymentMethod: CommunityPaymentMethod;
   createdAt: string;
 };
 
@@ -407,6 +427,10 @@ export type CommunityResource = {
   description: string | null;
   kind: CommunityResourceKind;
   externalUrl: string;
+  storagePath: string | null;
+  fileName: string | null;
+  mimeType: string | null;
+  fileSizeBytes: number | null;
   isPublished: boolean;
   sortOrder: number;
   publishedAt: string | null;
