@@ -46,7 +46,7 @@ insert into auth.users(id, email, is_anonymous) values
 insert into public.profiles(user_id, handle, display_name) values
   ('df100000-0000-4000-8000-000000000001', 'owner-community-billing-guide', 'Owner billing guide'),
   ('df100000-0000-4000-8000-000000000002', 'member-community-billing-guide', 'Member billing guide'),
-  ('df100000-0000-4000-8000-000000000003', 'manual-member-community-billing-guide', 'Manual member billing guide');
+  ('df100000-0000-4000-8000-000000000003', 'manual-member-billing-guide', 'Manual member billing guide');
 
 insert into public.community_communities(id, slug, name, join_mode, owner_user_id)
 values ('df110000-0000-4000-8000-000000000001', 'community-billing-guide', 'Community billing guide', 'paid', 'df100000-0000-4000-8000-000000000001');

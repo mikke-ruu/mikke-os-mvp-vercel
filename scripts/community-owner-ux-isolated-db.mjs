@@ -170,6 +170,7 @@ try {
     const rollbackOutput = psql(["begin;", "set local lock_timeout='5s';", "set local statement_timeout='180s';", "set local idle_in_transaction_session_timeout='240s';", baseline, ...migrationSql, test.sql].join("\n"));
     assert.ok(rollbackOutput.split(/\r?\n/).includes(test.sentinel), `SQL regression sentinel missing: ${test.sentinel}`);
     assert.deepEqual(snapshot(), before, `SQL regression must rollback every schema and fixture change: ${test.path}`);
+    console.log(JSON.stringify({ result: "community_owner_ux_sql_test_ok", path: test.path, sentinel: test.sentinel, rollbackResidue: 0 }));
   }
 
   psql([baseline, ...migrationSql].join("\n"));
