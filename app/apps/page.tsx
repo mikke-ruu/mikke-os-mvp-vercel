@@ -1,11 +1,13 @@
 import { AppCard } from "@/components/mikkeos/AppCard";
+import { AuthGate } from "@/components/AuthGate";
 import { MikkeAppShell } from "@/components/mikkeos/MikkeAppShell";
 import { MetricCard } from "@/components/mikkeos/MetricCard";
 import { catalogMikkeApps } from "@/lib/mikkeos/apps";
 
 export default function AppsPage() {
   return (
-    <MikkeAppShell
+    <AuthGate>
+      <MikkeAppShell
       appName="Apps"
       title="Apps"
       subtitle="各アプリが共通台帳へ送る内容を確認する入口です。"
@@ -30,6 +32,7 @@ export default function AppsPage() {
           <AppCard key={app.key} app={app} />
         ))}
       </section>
-    </MikkeAppShell>
+      </MikkeAppShell>
+    </AuthGate>
   );
 }
