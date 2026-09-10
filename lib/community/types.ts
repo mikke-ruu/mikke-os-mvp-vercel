@@ -107,6 +107,14 @@ export type CommunityInvitation = {
   createdAt: string;
 };
 
+export type CommunityInvitationSummary = CommunityInvitation & {
+  community: {
+    slug: string;
+    name: string;
+    status: "active" | "archived";
+  };
+};
+
 export type CommunityAcademyAccessInvitation = {
   id: string;
   status: "pending" | "accepted" | "declined" | "cancelled" | "revoked" | "expired";

@@ -15,6 +15,7 @@ const storageBootstrapPath = "supabase/tests/media_private_gate_local_storage_bo
 const tests = [
   { path: "supabase/tests/community_owner_membership_resources_ux_test.sql", sentinel: "community_owner_membership_resources_ux_test_ok" },
   { path: "supabase/tests/community_membership_billing_guidance_test.sql", sentinel: "community_membership_billing_guidance_test_ok" },
+  { path: "supabase/tests/community_invitation_management_ux_test.sql", sentinel: "community_invitation_management_ux_test_ok" },
 ];
 const expectedBaselineSha = "521BF5A61EB8FE572011526FAA469A679328F581E3BC291191AEF18379C97299";
 const migrationNames = [
@@ -73,6 +74,7 @@ const migrationNames = [
   "20260909141552_community_creation_bind_before_children.sql",
   "20260909163047_community_owner_membership_resources_ux.sql",
   "20260909235910_community_membership_billing_guidance.sql",
+  "20260910014050_community_invitation_management_ux.sql",
 ];
 
 function command(args, input, allowFailure = false) {

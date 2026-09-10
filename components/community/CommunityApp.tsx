@@ -70,6 +70,7 @@ import {
   loadCommunityPublicEntry,
   markCommunityRoomSeen,
   revokeMemberEntitlement,
+  revokePendingCommunityInvitation,
   reorderCommunityRooms,
   restoreCommunityRoom,
   reviewCommunityPaymentClaim,
@@ -88,6 +89,7 @@ import {
   updateCommunityEventStatus,
   updateCommunityMembership,
   updateCommunityMembershipPlan,
+  updatePendingCommunityInvitation,
   updateCommunityComment,
   updateCommunityChatMessage,
   updateCommunityPost,
@@ -101,7 +103,7 @@ import {
 } from "@/lib/community/client";
 import { submitCommunityJoinApplication } from "@/lib/community/client";
 import { CommunityHelpView, CommunityRulesView, OwnerCommunityModerationView, OwnerCommunitySafetyView } from "@/components/community/CommunitySafetyViews";
-import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEntitlementSource, CommunityEvent, CommunityHomeMetric, CommunityMemberEntitlement, CommunityMembershipPlan, CommunityPaymentMethod, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind, CommunitySearchResult } from "@/lib/community/types";
+import type { CommunityActivity, CommunityChatMessage, CommunityConversationMode, CommunityDashboard, CommunityEntitlementSource, CommunityEvent, CommunityHomeMetric, CommunityInvitation, CommunityInvitationStatus, CommunityMemberEntitlement, CommunityMembershipPlan, CommunityPaymentMethod, CommunityPost, CommunityPublicEntry, CommunityResource, CommunityResourceKind, CommunityRoom, CommunityRoomAccessType, CommunityRoomColor, CommunityRoomKind, CommunitySearchResult } from "@/lib/community/types";
 import { supabase } from "@/lib/supabase/client";
 import { syncMikkeMediaUsages, uploadMikkeMediaImage } from "@/lib/media/client";
 import { ensureProfile } from "@/lib/profile";
@@ -252,6 +254,19 @@ function formatDateTimeInput(value: string | null) {
 
 function isOwnerLike(data: CommunityDashboard | null, userId?: string) {
   return data?.community.ownerUserId === userId || data?.membership?.role === "owner" || data?.membership?.role === "moderator";
+}
+
+function effectiveInvitationStatus(invitation: CommunityInvitation): CommunityInvitationStatus {
+  if (invitation.status === "pending" && invitation.expiresAt && new Date(invitation.expiresAt).getTime() <= Date.now()) return "expired";
+  return invitation.status;
+}
+
+function invitationStatusLabel(status: CommunityInvitationStatus) {
+  if (status === "pending") return "手続き待ち";
+  if (status === "accepted") return "参加済み";
+  if (status === "declined") return "辞退";
+  if (status === "revoked") return "取消済み";
+  return "期限切れ";
 }
 
 function canCreateRoomPost(data: CommunityDashboard, userId: string, room: CommunityRoom) {
@@ -525,7 +540,7 @@ function JoinPanel({ community, email, defaultName, error, onJoin }: { community
   const [acceptRules, setAcceptRules] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
   const [saving, setSaving] = useState(false);
-  const invited = community.invitations.some((invitation) => invitation.status === "pending");
+  const invited = community.invitations.some((invitation) => effectiveInvitationStatus(invitation) === "pending");
   const canSelfJoin = community.community.joinMode === "open_free" || invited;
   const safety = community.safetySettings;
   const pending = community.myJoinApplication?.status === "pending";
@@ -2319,6 +2334,72 @@ function PaymentSetupChecklistFields({ value, onChange }: { value: CommunityMemb
   );
 }
 
+function InvitationManagementCard({ data, invitation, inviteUrl, actorClient, actorIsCurrent, onReload, onMessage, onError }: {
+  data: CommunityDashboard;
+  invitation: CommunityInvitation;
+  inviteUrl: string;
+  actorClient: ReturnType<typeof communityScopedClient>;
+  actorIsCurrent: () => boolean;
+  onReload: () => Promise<void>;
+  onMessage: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  const status = effectiveInvitationStatus(invitation);
+  const [entitlementKey, setEntitlementKey] = useState(invitation.entitlementKey ?? "");
+  const [saving, setSaving] = useState(false);
+  const entitlementName = invitation.entitlementKey
+    ? data.entitlementDefinitions.find((item) => item.key === invitation.entitlementKey)?.name ?? invitation.entitlementKey
+    : "参加のみ（追加権限なし）";
+
+  async function copyInvitationUrl() {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      onMessage("招待URLをコピーしました。自動通知は送信していないため、このURLを本人へお知らせください。");
+    } catch {
+      onError("招待URLをコピーできませんでした。ブラウザの設定を確認してください。");
+    }
+  }
+
+  async function saveInvitation() {
+    setSaving(true);
+    try {
+      await updatePendingCommunityInvitation(actorClient, invitation.id, entitlementKey || undefined, invitation.expiresAt);
+      if (!actorIsCurrent()) return;
+      onMessage("招待の付与予定権限を更新しました。自動通知は送信していません。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "招待を更新できませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function revokeInvitation() {
+    if (!window.confirm(`@${invitation.invitedMikkeId}への招待を取り消しますか？`)) return;
+    setSaving(true);
+    try {
+      await revokePendingCommunityInvitation(actorClient, invitation.id);
+      if (!actorIsCurrent()) return;
+      onMessage("招待を取り消しました。自動通知は送信していません。");
+      await onReload();
+    } catch (error) {
+      onError(communityErrorMessage(error, "招待を取り消せませんでした。"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <article className="rounded-lg border border-[var(--mikke-line-soft)] bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><p className="font-bold">@{invitation.invitedMikkeId}</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">付与予定: {entitlementName}</p><p className="mt-1 text-xs text-[var(--mikke-muted-light)]">登録: {formatDateTime(invitation.createdAt)}{invitation.expiresAt ? ` / 期限: ${formatDateTime(invitation.expiresAt)}` : " / 期限なし"}</p></div>
+        <MikkeStatusBadge tone={status === "accepted" ? "success" : status === "pending" ? "primary" : "muted"}>{invitationStatusLabel(status)}</MikkeStatusBadge>
+      </div>
+      {status === "pending" ? <div className="mt-3"><button type="button" onClick={copyInvitationUrl} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">招待URLをコピー</button><details className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><summary className="cursor-pointer text-sm font-bold text-[var(--mikke-primary)]">招待を管理</summary><p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">手続き待ちの間だけ、付与予定権限の変更と取消ができます。</p><div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]"><select value={entitlementKey} onChange={(event) => setEntitlementKey(event.target.value)} disabled={saving} className="rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm"><option value="">参加のみ（追加権限なし）</option>{data.entitlementDefinitions.filter((item) => item.status === "active").map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select><button type="button" disabled={saving} onClick={saveInvitation} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60">権限を保存</button></div><div className="mt-3 border-t border-[var(--mikke-line)] pt-3"><button type="button" disabled={saving} onClick={revokeInvitation} className="rounded-lg border border-[var(--mikke-danger)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-60">この招待を取り消す</button></div></details></div> : <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">参加済み・取消済み・辞退・期限切れの招待は編集できません。</p>}
+    </article>
+  );
+}
+
 function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent, onReload, onMessage, onError }: ViewMutationProps & { ownerLike: boolean; actorClient: ReturnType<typeof communityScopedClient>; actorIsCurrent: () => boolean }) {
   const [keyName, setKeyName] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -2366,7 +2447,7 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
       await inviteCommunityMemberByMikkeId(actorClient, data.community.id, inviteMikkeId, inviteEntitlement || undefined);
       if (!actorIsCurrent()) return;
       setInviteMikkeId("");
-      onMessage("mikke IDへ招待を登録しました。参加者は招待URLから規約同意と参加登録を行います。");
+      onMessage("mikke IDへの招待を登録しました。自動通知は送信していません。招待URLを本人へお知らせください。");
       await onReload();
     } catch (error) {
       onError(communityErrorMessage(error, "mikke IDで招待できませんでした。"));
@@ -2410,6 +2491,8 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
       setSaving(false);
     }
   }
+  const currentInvitations = data.invitations.filter((invitation) => effectiveInvitationStatus(invitation) === "pending");
+  const invitationHistory = data.invitations.filter((invitation) => effectiveInvitationStatus(invitation) !== "pending");
   if (!ownerLike) return <MikkeEmptyState title="運営権限が必要です" helper="参加者と利用権限はownerまたはmoderatorが管理できます。" />;
   return (
     <section className="border-t border-[var(--mikke-line)] pt-5">
@@ -2421,12 +2504,16 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
         <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">このURLを参加者へ渡してください。登録・規約同意・参加申請を通るため、URLだけで権限が付くことはありません。</p>
       </section>
       <form onSubmit={inviteByMikkeId} className="mt-4 grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:grid-cols-[1fr_1fr_auto]">
-        <div className="md:col-span-3"><p className="font-bold">mikke IDで招待</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">メールアドレスは表示しません。招待された本人が上のURLから参加手続きを完了します。</p></div>
+        <div className="md:col-span-3"><p className="font-bold">mikke IDで招待</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">メールアドレスは表示しません。登録してもメールや共通通知は自動送信されないため、上の招待URLを本人へお知らせください。</p></div>
         <input required value={inviteMikkeId} onChange={(event) => setInviteMikkeId(event.target.value)} placeholder="@mikke-id" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <select value={inviteEntitlement} onChange={(event) => setInviteEntitlement(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="">参加のみ（追加権限なし）</option>{data.entitlementDefinitions.map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}</select>
         <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">招待する</button>
-        {data.invitations.length > 0 ? <div className="md:col-span-3 flex flex-wrap gap-2">{data.invitations.map((invitation) => <span key={invitation.id} className="rounded-full bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold">@{invitation.invitedMikkeId} ・ {invitation.status === "pending" ? "手続き待ち" : invitation.status === "accepted" ? "参加済み" : invitation.status === "revoked" ? "取消済み" : invitation.status === "expired" ? "期限切れ" : "辞退"}</span>)}</div> : null}
       </form>
+      <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold">手続き待ちの招待</h3><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">招待先、付与予定権限、状態を確認し、URLのコピーや内容変更、取消ができます。</p></div><MikkeStatusBadge tone="primary">{currentInvitations.length}件</MikkeStatusBadge></div>
+        {currentInvitations.length > 0 ? <div className="mt-3 grid gap-3 lg:grid-cols-2">{currentInvitations.map((invitation) => <InvitationManagementCard key={invitation.id} data={data} invitation={invitation} inviteUrl={inviteUrl} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div> : <p className="mt-3 text-sm text-[var(--mikke-muted)]">手続き待ちの招待はありません。</p>}
+      </section>
+      {invitationHistory.length > 0 ? <details className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><summary className="cursor-pointer font-bold">招待履歴を確認</summary><div className="mt-3 grid gap-3 lg:grid-cols-2">{invitationHistory.map((invitation) => <InvitationManagementCard key={invitation.id} data={data} invitation={invitation} inviteUrl={inviteUrl} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div></details> : null}
       <form onSubmit={createDefinition} className="mt-4 grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:grid-cols-[1fr_1fr_auto]">
         <div className="md:col-span-3"><p className="font-bold">利用権限ランク</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">Roomの公開範囲、有料プラン、Academy等の外部会員資格を同じ権限キーで結びます。</p></div>
         <input required value={displayName} onChange={(event) => setDisplayName(event.target.value)} placeholder="表示名 例: プレミアム" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
@@ -2452,10 +2539,10 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
       {data.membershipPlans.length > 0 ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">公開済みメンバーシップ</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">特典や金額を編集できます。削除は履歴を残すため「公開終了」として処理します。</p><div className="mt-3 space-y-3">{data.membershipPlans.map((plan) => <MembershipPlanEditor key={plan.id} data={data} plan={plan} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div></section> : null}
       {data.paymentClaims.some((claim) => claim.status === "pending") ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">支払い確認待ち</h3><div className="mt-3 space-y-3">{data.paymentClaims.filter((claim) => claim.status === "pending").map((claim) => { const member = data.ownerMembers.find((item) => item.membership.userId === claim.userId); const plan = data.membershipPlans.find((item) => item.id === claim.planId); return <div key={claim.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><div><p className="text-sm font-bold">{member?.profile?.displayName ?? claim.payerName} / {plan?.name ?? "有料プラン"}</p><p className="text-xs text-[var(--mikke-muted)]">名義: {claim.payerName}{claim.externalReference ? ` / 番号: ${claim.externalReference}` : ""}</p></div><div className="flex gap-2"><button type="button" disabled={saving} onClick={() => reviewClaim(claim.id, true)} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white">承認</button><button type="button" disabled={saving} onClick={() => reviewClaim(claim.id, false)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)]">却下</button></div></div>; })}</div></section> : null}
       {data.paymentClaims.some((claim) => claim.status !== "pending") ? <details className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><summary className="cursor-pointer font-bold">支払い確認の履歴</summary><div className="mt-3 space-y-2">{data.paymentClaims.filter((claim) => claim.status !== "pending").map((claim) => { const member = data.ownerMembers.find((item) => item.membership.userId === claim.userId); const plan = data.membershipPlans.find((item) => item.id === claim.planId); return <p key={claim.id} className="rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs text-[var(--mikke-muted)]"><b className="text-[var(--mikke-text)]">{member?.profile?.displayName ?? claim.payerName}</b> ・ {plan?.name ?? "メンバーシップ"} ・ {paymentMethodLabel(claim.paymentMethod)} ・ {claim.status === "approved" ? "承認済み" : claim.status === "rejected" ? "却下" : "取消済み"}{claim.externalReference ? ` ・ ${claim.externalReference}` : ""}</p>; })}</div></details> : null}
-      <div className="mt-5 space-y-3">
+      <section className="mt-5"><h3 className="text-lg font-bold">メンバー管理</h3><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">一覧を見るだけでなく、役割の変更、利用権限の付与・停止、外部や振込の支払い確認ができます。危険な操作と支払い確認は各メンバーの折りたたみを開いて行います。</p><div className="mt-3 space-y-3">
         {data.ownerMembers.map((member) => <MemberAccessEditor key={member.membership.id} data={data} member={member} operatorUserId={userId} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />)}
         {data.ownerMembers.length === 0 ? <MikkeEmptyState title="参加者はまだいません" helper="無料登録した参加者がここに表示されます。" /> : null}
-      </div>
+      </div></section>
     </section>
   );
 }
@@ -2562,6 +2649,7 @@ function MemberAccessEditor({ data, member, operatorUserId, actorClient, actorIs
     }
   }
   async function revoke(id: string) {
+    if (!window.confirm("この利用権限を停止しますか？")) return;
     try {
       await revokeMemberEntitlement(actorClient, id);
       if (!actorIsCurrent()) return;
@@ -2612,18 +2700,18 @@ function MemberAccessEditor({ data, member, operatorUserId, actorClient, actorIs
   }
   return (
     <article className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold">{member.profile?.displayName ?? "参加者"}</p><p className="text-xs text-[var(--mikke-muted)]">{membershipRoleLabel(member.membership.role)} ・ {membershipStatusLabel(member.membership.status)}</p></div><div className="flex flex-wrap gap-2">{active.map((item) => item.source !== "academy_subscription" ? <button key={item.id} type="button" onClick={() => revoke(item.id)} className="rounded-full border border-[var(--mikke-line)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)} ×</button> : <span key={item.id} className="rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)}</span>)}</div></div>
-      <div className="mt-3 grid gap-2 md:grid-cols-[160px_auto_auto]">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold">{member.profile?.displayName ?? "参加者"}</p><p className="text-xs text-[var(--mikke-muted)]">{membershipRoleLabel(member.membership.role)} ・ {membershipStatusLabel(member.membership.status)}</p></div><div className="flex flex-wrap gap-2">{active.map((item) => <span key={item.id} className="rounded-full border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-1 text-xs font-bold text-[var(--mikke-primary)]">{item.entitlementKey} ・ {entitlementSourceLabel(item.source)}</span>)}</div></div>
+      <div className="mt-4"><p className="text-xs font-bold text-[var(--mikke-muted)]">役割を変更</p><div className="mt-2 grid gap-2 md:grid-cols-[200px_auto]">
         <select value={isCanonicalOwner ? "owner" : role} disabled={isCanonicalOwner || !operatorIsCanonicalOwner} onChange={(event) => setRole(event.target.value as typeof role)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm disabled:bg-[var(--mikke-surface-soft)] disabled:text-[var(--mikke-muted)]">
           <option value="member">参加者</option>
           <option value="moderator">モデレーター（共同運営）</option>
           {isCanonicalOwner ? <option value="owner">オーナー</option> : null}
         </select>
         <button type="button" disabled={savingMembership || isCanonicalOwner || !operatorIsCanonicalOwner} onClick={() => saveMembership()} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-primary)] disabled:opacity-60">役割を保存</button>
-        <button type="button" disabled={savingMembership || isSelf || isCanonicalOwner} onClick={() => saveMembership(member.membership.status === "suspended" ? "active" : "suspended")} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-60">{isCanonicalOwner ? "オーナーは停止不可" : isSelf ? "自分は停止不可" : member.membership.status === "suspended" ? "復帰" : "停止"}</button>
-      </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_auto]"><EntitlementSelect data={data} value={keyName} onChange={setKeyName} /><button type="button" disabled={!keyName} onClick={grant} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60">付与</button></div>
+      </div></div>
+      <div className="mt-4"><p className="text-xs font-bold text-[var(--mikke-muted)]">利用権限を追加</p><div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]"><EntitlementSelect data={data} value={keyName} onChange={setKeyName} /><button type="button" disabled={!keyName} onClick={grant} className="rounded-lg bg-[var(--mikke-primary)] px-3 py-2 text-xs font-bold text-white disabled:opacity-60">選んだ権限を付与</button></div></div>
       {activePlans.length > 0 ? <details className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] p-3"><summary className="cursor-pointer text-sm font-bold text-[var(--mikke-primary)]">外部・振込の支払いを確認</summary><p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">ユーワードポイントや銀行振込など、運営者が入金を確認した時に使います。確認履歴を残し、選んだメンバーシップの権限を付与します。</p>{!manualDraftStorageAvailable ? <p className="mt-2 rounded-md border border-[var(--mikke-warning)] bg-white px-3 py-2 text-xs leading-5 text-[var(--mikke-muted)]">この端末では再送情報を保存できません。完了表示を確認できないまま画面を閉じた場合は、支払い履歴を確認してからもう一度操作してください。</p> : null}<div className="mt-3 grid gap-2 md:grid-cols-2"><select value={manualPlanId} onChange={(event) => setManualPlanId(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm">{activePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}</select><select value={manualPaymentMethod} onChange={(event) => setManualPaymentMethod(event.target.value as Exclude<CommunityPaymentMethod, "external_link">)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"><option value="uword_points">ユーワードポイント</option><option value="bank_transfer">銀行振込</option><option value="cash">現金</option><option value="other">その他</option></select><input value={manualReference} onChange={(event) => setManualReference(event.target.value)} placeholder="決済番号・振込日など（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><input value={manualNote} onChange={(event) => setManualNote(event.target.value)} placeholder="運営メモ（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm"/><button type="button" disabled={savingMembership || !manualPlanId} onClick={confirmManualPayment} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-xs font-bold text-white disabled:opacity-60 md:col-span-2">支払い確認を記録して権限を付与</button></div></details> : null}
+      <details className="mt-3 rounded-lg border border-[var(--mikke-line)] p-3"><summary className="cursor-pointer text-sm font-bold text-[var(--mikke-danger)]">権限・参加状態の停止</summary><p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">利用できなくなる操作です。対象を確認してから実行してください。</p>{active.some((item) => item.source !== "academy_subscription") ? <div className="mt-3 flex flex-wrap gap-2">{active.filter((item) => item.source !== "academy_subscription").map((item) => <button key={item.id} type="button" onClick={() => revoke(item.id)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)]">{item.entitlementKey}を停止</button>)}</div> : <p className="mt-3 text-xs text-[var(--mikke-muted)]">この画面から停止できる利用権限はありません。</p>}<button type="button" disabled={savingMembership || isSelf || isCanonicalOwner} onClick={() => saveMembership(member.membership.status === "suspended" ? "active" : "suspended")} className="mt-3 rounded-lg border border-[var(--mikke-danger)] px-3 py-2 text-xs font-bold text-[var(--mikke-danger)] disabled:opacity-60">{isCanonicalOwner ? "オーナーは停止不可" : isSelf ? "自分は停止不可" : member.membership.status === "suspended" ? "参加状態を復帰" : "参加状態を停止"}</button></details>
     </article>
   );
 }

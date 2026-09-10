@@ -13,6 +13,7 @@ import type {
   CommunityInquiry,
   CommunityInquiryStatus,
   CommunityInvitation,
+  CommunityInvitationSummary,
   CommunityJoinApplication,
   CommunityMemberDataRequest,
   CommunityMemberEntitlement,
@@ -211,6 +212,18 @@ function mapMembershipPlan(row: any): CommunityMembershipPlan {
       customerPortalTested: row.payment_setup_checklist?.customerPortalTested === true
     },
     status: row.status, sortOrder: row.sort_order ?? 0
+  };
+}
+
+function mapInvitationSummary(row: any): CommunityInvitationSummary {
+  const community = Array.isArray(row.community_communities) ? row.community_communities[0] : row.community_communities;
+  return {
+    ...mapInvitation(row),
+    community: {
+      slug: community.slug,
+      name: community.name,
+      status: community.status
+    }
   };
 }
 
@@ -448,6 +461,20 @@ export async function listMyManagedCommunities(client: DbClient, userId: string)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []).map(mapCommunity);
+}
+
+export async function listMyPendingCommunityInvitations(client: DbClient, userId: string): Promise<CommunityInvitationSummary[]> {
+  const { data, error } = await client
+    .from("community_invitations")
+    .select("*, community_communities(slug,name,status)")
+    .eq("invited_user_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  const now = Date.now();
+  return (data ?? [])
+    .map(mapInvitationSummary)
+    .filter((invitation) => invitation.community.status === "active" && (!invitation.expiresAt || new Date(invitation.expiresAt).getTime() > now));
 }
 
 export async function createCommunity(client: DbClient, userId: string, input: { name: string; slug: string; description: string; displayName: string }): Promise<Community> {
@@ -923,6 +950,24 @@ export async function inviteCommunityMemberByMikkeId(client: DbClient, community
     p_mikke_id: mikkeId.trim(),
     p_entitlement_key: entitlementKey?.trim() || null,
     p_expires_at: null
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePendingCommunityInvitation(client: DbClient, invitationId: string, entitlementKey?: string, expiresAt?: string | null) {
+  const { data, error } = await client.rpc("community_update_pending_invitation", {
+    p_invitation_id: invitationId,
+    p_entitlement_key: entitlementKey?.trim() || null,
+    p_expires_at: expiresAt ?? null
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function revokePendingCommunityInvitation(client: DbClient, invitationId: string) {
+  const { data, error } = await client.rpc("community_revoke_pending_invitation", {
+    p_invitation_id: invitationId
   });
   if (error) throw error;
   return data;
