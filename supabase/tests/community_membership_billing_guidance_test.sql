@@ -40,18 +40,21 @@ select pg_temp.community_billing_guidance_assert(
 
 insert into auth.users(id, email, is_anonymous) values
   ('df100000-0000-4000-8000-000000000001', 'owner-community-billing-guide@example.invalid', false),
-  ('df100000-0000-4000-8000-000000000002', 'member-community-billing-guide@example.invalid', false);
+  ('df100000-0000-4000-8000-000000000002', 'member-community-billing-guide@example.invalid', false),
+  ('df100000-0000-4000-8000-000000000003', 'manual-member-community-billing-guide@example.invalid', false);
 
 insert into public.profiles(user_id, handle, display_name) values
   ('df100000-0000-4000-8000-000000000001', 'owner-community-billing-guide', 'Owner billing guide'),
-  ('df100000-0000-4000-8000-000000000002', 'member-community-billing-guide', 'Member billing guide');
+  ('df100000-0000-4000-8000-000000000002', 'member-community-billing-guide', 'Member billing guide'),
+  ('df100000-0000-4000-8000-000000000003', 'manual-member-community-billing-guide', 'Manual member billing guide');
 
 insert into public.community_communities(id, slug, name, join_mode, owner_user_id)
 values ('df110000-0000-4000-8000-000000000001', 'community-billing-guide', 'Community billing guide', 'paid', 'df100000-0000-4000-8000-000000000001');
 
 insert into public.community_memberships(community_id, user_id, role, status) values
   ('df110000-0000-4000-8000-000000000001', 'df100000-0000-4000-8000-000000000001', 'owner', 'active'),
-  ('df110000-0000-4000-8000-000000000001', 'df100000-0000-4000-8000-000000000002', 'member', 'active');
+  ('df110000-0000-4000-8000-000000000001', 'df100000-0000-4000-8000-000000000002', 'member', 'active'),
+  ('df110000-0000-4000-8000-000000000001', 'df100000-0000-4000-8000-000000000003', 'member', 'active');
 
 insert into public.community_entitlement_definitions(id, community_id, key, name, status)
 values ('df120000-0000-4000-8000-000000000001', 'df110000-0000-4000-8000-000000000001', 'paid:guide', 'Paid guide', 'active');
@@ -82,6 +85,35 @@ insert into public.community_membership_plans(
 );
 reset role;
 
+insert into public.community_payment_claims(
+  id, community_id, plan_id, user_id, payer_name, status,
+  reviewed_by_user_id, reviewed_at, payment_method
+) values (
+  'df160000-0000-4000-8000-000000000001',
+  'df110000-0000-4000-8000-000000000001',
+  'df150000-0000-4000-8000-000000000001',
+  'df100000-0000-4000-8000-000000000002',
+  'Member billing guide', 'approved',
+  'df100000-0000-4000-8000-000000000001', statement_timestamp(), 'external_link'
+);
+
+insert into public.community_payment_claims(
+  id, community_id, plan_id, user_id, payer_name, status,
+  reviewed_by_user_id, reviewed_at, payment_method, manual_request_id
+) values (
+  'df160000-0000-4000-8000-000000000002',
+  'df110000-0000-4000-8000-000000000001',
+  'df150000-0000-4000-8000-000000000001',
+  'df100000-0000-4000-8000-000000000003',
+  'Manual member billing guide', 'approved',
+  'df100000-0000-4000-8000-000000000001', statement_timestamp(), 'bank_transfer',
+  'df170000-0000-4000-8000-000000000001'
+);
+
+update public.community_membership_plans
+set status = 'archived'
+where id = 'df150000-0000-4000-8000-000000000001';
+
 select set_config('request.jwt.claims', '{"sub":"df100000-0000-4000-8000-000000000002","role":"authenticated","is_anonymous":false}', true);
 set local role authenticated;
 select pg_temp.community_billing_guidance_assert(
@@ -93,7 +125,19 @@ select pg_temp.community_billing_guidance_assert(
       and external_customer_portal_url = 'https://billing.stripe.com/p/login/test-portal'
       and payment_setup_checklist->>'customerPortalTested' = 'true'
   ),
-  'active members receive the separate enrollment and management projections'
+  'a member with an approved external contract retains the management projection after enrollment closes'
+);
+reset role;
+
+select set_config('request.jwt.claims', '{"sub":"df100000-0000-4000-8000-000000000003","role":"authenticated","is_anonymous":false}', true);
+set local role authenticated;
+select pg_temp.community_billing_guidance_assert(
+  not exists (
+    select 1
+    from public.community_membership_plans
+    where id = 'df150000-0000-4000-8000-000000000001'
+  ),
+  'a manual-payment claimant cannot read an archived Stripe management projection'
 );
 reset role;
 
@@ -117,6 +161,54 @@ select pg_temp.community_billing_guidance_assert(
   pg_temp.community_billing_guidance_denied(
     $q$insert into public.community_membership_plans(
       community_id, entitlement_key, name, amount_yen, billing_interval,
+      payment_provider_label, external_payment_url, external_customer_portal_url,
+      status, created_by_user_id
+    ) values (
+      'df110000-0000-4000-8000-000000000001', 'paid:guide', 'Personal portal session', 10000, 'month',
+      'Stripe', 'https://buy.stripe.com/test-payment', 'https://billing.stripe.com/p/session/private-customer',
+      'draft', 'df100000-0000-4000-8000-000000000001'
+    )$q$,
+    '23514'
+  ),
+  'personal portal session URL is rejected'
+);
+
+select pg_temp.community_billing_guidance_assert(
+  pg_temp.community_billing_guidance_denied(
+    $q$insert into public.community_membership_plans(
+      community_id, entitlement_key, name, amount_yen, billing_interval,
+      payment_provider_label, external_payment_url, external_customer_portal_url,
+      status, created_by_user_id
+    ) values (
+      'df110000-0000-4000-8000-000000000001', 'paid:guide', 'Credential portal URL', 10000, 'month',
+      'Stripe', 'https://buy.stripe.com/test-payment', 'https://member:secret@billing.stripe.com/p/login/test-portal',
+      'draft', 'df100000-0000-4000-8000-000000000001'
+    )$q$,
+    '23514'
+  ),
+  'userinfo credentials in a portal URL are rejected'
+);
+
+select pg_temp.community_billing_guidance_assert(
+  pg_temp.community_billing_guidance_denied(
+    $q$insert into public.community_membership_plans(
+      community_id, entitlement_key, name, amount_yen, billing_interval,
+      payment_provider_label, external_payment_url, external_customer_portal_url,
+      status, created_by_user_id
+    ) values (
+      'df110000-0000-4000-8000-000000000001', 'paid:guide', 'Personalized portal URL', 10000, 'month',
+      'Stripe', 'https://buy.stripe.com/test-payment', 'https://billing.stripe.com/p/login/test-portal?prefilled_email=member@example.invalid',
+      'draft', 'df100000-0000-4000-8000-000000000001'
+    )$q$,
+    '23514'
+  ),
+  'personalizing query strings in a portal URL are rejected'
+);
+
+select pg_temp.community_billing_guidance_assert(
+  pg_temp.community_billing_guidance_denied(
+    $q$insert into public.community_membership_plans(
+      community_id, entitlement_key, name, amount_yen, billing_interval,
       payment_provider_label, external_payment_url, payment_setup_checklist,
       status, created_by_user_id
     ) values (
@@ -128,6 +220,73 @@ select pg_temp.community_billing_guidance_assert(
     '23514'
   ),
   'checklist cannot masquerade as provider verification'
+);
+
+select pg_temp.community_billing_guidance_assert(
+  pg_temp.community_billing_guidance_denied(
+    $q$insert into public.community_membership_plans(
+      community_id, entitlement_key, name, amount_yen, billing_interval,
+      payment_provider_label, external_payment_url, payment_setup_checklist,
+      status, created_by_user_id
+    ) values (
+      'df110000-0000-4000-8000-000000000001', 'paid:guide', 'Missing checklist key', 10000, 'month',
+      'Stripe', 'https://buy.stripe.com/test-payment',
+      '{"productCreated":true,"recurringPriceConfirmed":true,"paymentLinkTested":true,"customerPortalEnabled":true}'::jsonb,
+      'draft', 'df100000-0000-4000-8000-000000000001'
+    )$q$,
+    '23514'
+  ),
+  'checklist cannot omit a required key'
+);
+
+select pg_temp.community_billing_guidance_assert(
+  pg_temp.community_billing_guidance_denied(
+    $q$insert into public.community_membership_plans(
+      community_id, entitlement_key, name, amount_yen, billing_interval,
+      payment_provider_label, external_payment_url, payment_setup_checklist,
+      status, created_by_user_id
+    ) values (
+      'df110000-0000-4000-8000-000000000001', 'paid:guide', 'Empty checklist object', 10000, 'month',
+      'Stripe', 'https://buy.stripe.com/test-payment', '{}'::jsonb,
+      'draft', 'df100000-0000-4000-8000-000000000001'
+    )$q$,
+    '23514'
+  ),
+  'empty checklist object is rejected'
+);
+
+select pg_temp.community_billing_guidance_assert(
+  pg_temp.community_billing_guidance_denied(
+    $q$insert into public.community_membership_plans(
+      community_id, entitlement_key, name, amount_yen, billing_interval,
+      payment_provider_label, external_payment_url, payment_setup_checklist,
+      status, created_by_user_id
+    ) values (
+      'df110000-0000-4000-8000-000000000001', 'paid:guide', 'Null checklist value', 10000, 'month',
+      'Stripe', 'https://buy.stripe.com/test-payment',
+      '{"productCreated":true,"recurringPriceConfirmed":true,"paymentLinkTested":true,"customerPortalEnabled":true,"customerPortalTested":null}'::jsonb,
+      'draft', 'df100000-0000-4000-8000-000000000001'
+    )$q$,
+    '23514'
+  ),
+  'JSON null in a required checklist key is rejected'
+);
+
+select pg_temp.community_billing_guidance_assert(
+  pg_temp.community_billing_guidance_denied(
+    $q$insert into public.community_membership_plans(
+      community_id, entitlement_key, name, amount_yen, billing_interval,
+      payment_provider_label, external_payment_url, payment_setup_checklist,
+      status, created_by_user_id
+    ) values (
+      'df110000-0000-4000-8000-000000000001', 'paid:guide', 'Wrong checklist type', 10000, 'month',
+      'Stripe', 'https://buy.stripe.com/test-payment',
+      '{"productCreated":true,"recurringPriceConfirmed":true,"paymentLinkTested":true,"customerPortalEnabled":true,"customerPortalTested":"yes"}'::jsonb,
+      'draft', 'df100000-0000-4000-8000-000000000001'
+    )$q$,
+    '23514'
+  ),
+  'non-boolean checklist value is rejected'
 );
 
 select pg_temp.community_billing_guidance_assert(

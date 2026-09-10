@@ -1487,6 +1487,18 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
     }
   }
 
+  const approvedExternalPlanIds = new Set(
+    data.paymentClaims
+      .filter((claim) => claim.userId === userId && claim.status === "approved" && claim.paymentMethod === "external_link")
+      .map((claim) => claim.planId)
+  );
+  const activeMembershipPlans = data.membershipPlans.filter(
+    (plan) => plan.status === "active" && !approvedExternalPlanIds.has(plan.id)
+  );
+  const managedMembershipPlans = data.membershipPlans.filter(
+    (plan) => approvedExternalPlanIds.has(plan.id) && Boolean(plan.externalCustomerPortalUrl)
+  );
+
   return (
     <section className="max-w-3xl space-y-6 border-t border-[var(--mikke-line)] pt-5">
       <div><p className="text-xs font-bold text-[var(--mikke-muted-light)]">ACCOUNT</p><h2 className="mt-1 text-2xl font-bold tracking-normal">MY PAGE</h2><p className="mt-2 text-sm text-[var(--mikke-muted)]">プロフィール、会員プラン、退会・個人データの手続きをまとめています。</p></div>
@@ -1514,22 +1526,27 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
         </div>
       </section>
 
-      {data.membershipPlans.filter((plan) => plan.status === "active").length > 0 ? <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
-        <h3 className="text-lg font-bold">メンバーシップ</h3>
+      {managedMembershipPlans.length > 0 ? <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+        <h3 className="text-lg font-bold">契約中・契約履歴</h3>
+        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">本人の支払い確認が承認された契約だけを表示します。募集終了後や利用権限の終了後も、外部サービス側の契約が残っていないか確認してください。</p>
+        <div className="mt-4 grid gap-3">
+          {managedMembershipPlans.map((plan) => <article key={plan.id} className="rounded-lg border border-[var(--mikke-line-soft)] p-4"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-bold">{plan.name}</p><MikkeStatusBadge tone="muted">{planStatusLabel(plan.status)}</MikkeStatusBadge></div><a href={plan.externalCustomerPortalUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold text-[var(--mikke-primary)]">契約管理・支払い方法の変更・解約</a>{plan.cancellationGuidance ? <p className="mt-3 text-xs leading-5 text-[var(--mikke-muted)]">{plan.cancellationGuidance}</p> : null}</article>)}
+        </div>
+      </section> : null}
+
+      {activeMembershipPlans.length > 0 ? <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
+        <h3 className="text-lg font-bold">新しく申し込めるメンバーシップ</h3>
         <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">プランを選び、運営者が案内する方法で支払います。支払い後に確認を申請すると、運営者の承認後に限定Roomを閲覧できます。</p>
         <div className="mt-4 grid gap-3">
-          {data.membershipPlans.filter((plan) => plan.status === "active").map((plan) => {
+          {activeMembershipPlans.map((plan) => {
             const matchingEntitlements = data.entitlements.filter((item) => isEffectiveEntitlement(item) && item.entitlementKey === plan.entitlementKey);
             const isAlreadyEntitled = matchingEntitlements.length > 0;
-            const hasApprovedExternalPayment = data.paymentClaims.some((claim) => claim.planId === plan.id && claim.userId === userId && claim.status === "approved" && claim.paymentMethod === "external_link");
             return (
               <article key={plan.id} className="rounded-lg border border-[var(--mikke-line-soft)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold">{plan.name}</p><p className="mt-1 text-sm text-[var(--mikke-muted)]">{plan.description}</p></div><p className="font-bold text-[var(--mikke-primary)]">{billingIntervalLabel(plan.billingInterval)} {plan.amountYen.toLocaleString()}円</p></div>
                 {isAlreadyEntitled ? (
                   <div className="mt-3 space-y-3">
                     <div className="rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]">この利用範囲は利用中です（{[...new Set(matchingEntitlements.map((item) => entitlementSourceLabel(item.source)))].join("・")}）</div>
-                    {plan.externalCustomerPortalUrl && hasApprovedExternalPayment ? <a href={plan.externalCustomerPortalUrl} target="_blank" rel="noreferrer" className="inline-flex rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold text-[var(--mikke-primary)]">契約管理・支払い方法の変更・解約</a> : null}
-                    {plan.cancellationGuidance ? <p className="text-xs leading-5 text-[var(--mikke-muted)]">{plan.cancellationGuidance}</p> : null}
                   </div>
                 ) : (
                   <>
@@ -2278,7 +2295,8 @@ function PaymentSetupGuide() {
       <div className="mt-3 rounded-lg border border-[var(--mikke-line-soft)] bg-white p-3">
         <p className="text-sm font-bold">現在の決済と権限の連動</p>
         <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--mikke-muted)]">
-          <li>・支払い成功：Stripe画面で確認後、参加者の「支払い確認申請」を承認します。</li>
+          <li>・Payment Link：Stripe画面で本人の支払いを確認後、参加者の「支払い確認申請」を承認します。権限元は「Community有料会員」として記録されます。</li>
+          <li>・ポイント・振込・現金：参加者欄の「外部・振込の支払いを確認」から記録します。権限元は「招待・外部連携」として記録され、Payment Linkの申請承認とは別です。</li>
           <li>・解約予約：支払い済み期間が終わるまで権限は残します。</li>
           <li>・契約終了：Stripeの利用終了日を確認して、対象の利用権限を停止します。</li>
           <li>・支払い失敗：新規申請は承認せず、既存会員は運用方針に沿って確認します。</li>
@@ -2426,7 +2444,7 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
         <select value={planInterval} onChange={(event) => setPlanInterval(event.target.value as typeof planInterval)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="month">月額</option><option value="year">年額</option><option value="one_time">1回</option></select>
         <input required value={paymentProvider} onChange={(event) => setPaymentProvider(event.target.value)} placeholder="支払い方法・サービス名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <label className="text-sm font-bold"><span>入会・決済URL</span><input type="url" value={paymentUrl} onChange={(event) => setPaymentUrl(event.target.value)} placeholder="https://buy.stripe.com/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">会員が新たに支払うためのリンクです。</span></label>
-        <label className="text-sm font-bold"><span>契約管理・解約URL</span><input type="url" value={customerPortalUrl} onChange={(event) => setCustomerPortalUrl(event.target.value)} placeholder="https://billing.stripe.com/p/login/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">契約後のカード変更や解約に使う別のリンクです。</span></label>
+        <label className="text-sm font-bold"><span>契約管理・解約URL</span><input type="url" pattern="https://billing[.]stripe[.]com/p/login/[A-Za-z0-9_-]+/?" value={customerPortalUrl} onChange={(event) => setCustomerPortalUrl(event.target.value)} placeholder="https://billing.stripe.com/p/login/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">Stripeの共有用カスタマーポータル・ログインリンクだけを入力します。個人専用セッションURLは保存できません。</span></label>
         <label className="text-sm font-bold md:col-span-2"><span>解約後の利用終了案内</span><textarea value={cancellationGuidance} onChange={(event) => setCancellationGuidance(event.target.value)} placeholder="例：解約予約後も、Stripeに表示される利用終了日まで利用できます。" rows={2} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">実際の決済設定と利用規約に合う文言だけを入力してください。</span></label>
         <PaymentSetupChecklistFields value={paymentSetupChecklist} onChange={setPaymentSetupChecklist} />
         <button disabled={saving || !planEntitlement} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">メンバーシップを公開</button>
@@ -2497,7 +2515,7 @@ function MembershipPlanEditor({ data, plan, actorClient, actorIsCurrent, onReloa
         <select value={billingInterval} onChange={(event) => setBillingInterval(event.target.value as CommunityMembershipPlan["billingInterval"])} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="month">月額</option><option value="year">年額</option><option value="one_time">1回</option></select>
         <input required value={paymentProviderLabel} onChange={(event) => setPaymentProviderLabel(event.target.value)} placeholder="支払い方法・サービス名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <label className="text-sm font-bold"><span>入会・決済URL</span><input type="url" value={externalPaymentUrl} onChange={(event) => setExternalPaymentUrl(event.target.value)} placeholder="https://buy.stripe.com/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /></label>
-        <label className="text-sm font-bold"><span>契約管理・解約URL</span><input type="url" value={externalCustomerPortalUrl} onChange={(event) => setExternalCustomerPortalUrl(event.target.value)} placeholder="https://billing.stripe.com/p/login/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /></label>
+        <label className="text-sm font-bold"><span>契約管理・解約URL</span><input type="url" pattern="https://billing[.]stripe[.]com/p/login/[A-Za-z0-9_-]+/?" value={externalCustomerPortalUrl} onChange={(event) => setExternalCustomerPortalUrl(event.target.value)} placeholder="https://billing.stripe.com/p/login/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">Stripeの共有用ログインリンクのみ対応します。</span></label>
         <label className="text-sm font-bold md:col-span-2"><span>解約後の利用終了案内</span><textarea value={cancellationGuidance} onChange={(event) => setCancellationGuidance(event.target.value)} rows={2} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /></label>
         <PaymentSetupChecklistFields value={paymentSetupChecklist} onChange={setPaymentSetupChecklist} />
         <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">{saving ? "保存中..." : "変更を保存"}</button>

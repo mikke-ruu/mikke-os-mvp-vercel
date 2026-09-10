@@ -46,6 +46,34 @@ import { assertMikkeNameIsNotReserved } from "@/lib/mikkeos/reserved-names";
 
 type DbClient = SupabaseClient<any, "public", any>;
 
+function normalizeSharedStripeCustomerPortalUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new Error("契約管理・解約URLにはStripeの共有ログインURLを入力してください。");
+  }
+
+  const sharedLoginPath = /^\/p\/login\/[A-Za-z0-9_-]+\/?$/;
+  if (
+    parsed.protocol !== "https:"
+    || parsed.hostname !== "billing.stripe.com"
+    || parsed.port
+    || parsed.username
+    || parsed.password
+    || parsed.search
+    || parsed.hash
+    || !sharedLoginPath.test(parsed.pathname)
+  ) {
+    throw new Error("契約管理・解約URLにはStripeの共有ログインURL（https://billing.stripe.com/p/login/...）だけを入力してください。個人用URLや認証情報を含むURLは保存できません。");
+  }
+
+  return trimmed;
+}
+
 function mapCommunity(row: any): Community {
   return {
     id: row.id,
@@ -913,6 +941,7 @@ export async function createCommunityMembershipPlan(client: DbClient, communityI
   paymentSetupChecklist: CommunityMembershipPlan["paymentSetupChecklist"];
   status: CommunityMembershipPlan["status"];
 }) {
+  const externalCustomerPortalUrl = normalizeSharedStripeCustomerPortalUrl(input.externalCustomerPortalUrl);
   const { error } = await client.from("community_membership_plans").insert({
     community_id: communityId,
     entitlement_key: input.entitlementKey,
@@ -922,7 +951,7 @@ export async function createCommunityMembershipPlan(client: DbClient, communityI
     billing_interval: input.billingInterval,
     payment_provider_label: input.paymentProviderLabel.trim() || "外部決済",
     external_payment_url: input.externalPaymentUrl.trim(),
-    external_customer_portal_url: input.externalCustomerPortalUrl.trim(),
+    external_customer_portal_url: externalCustomerPortalUrl,
     cancellation_guidance: input.cancellationGuidance.trim() || null,
     payment_setup_checklist: input.paymentSetupChecklist,
     status: input.status,
@@ -944,6 +973,7 @@ export async function updateCommunityMembershipPlan(client: DbClient, planId: st
   paymentSetupChecklist: CommunityMembershipPlan["paymentSetupChecklist"];
   status: CommunityMembershipPlan["status"];
 }) {
+  const externalCustomerPortalUrl = normalizeSharedStripeCustomerPortalUrl(input.externalCustomerPortalUrl);
   const { error } = await client.from("community_membership_plans").update({
     entitlement_key: input.entitlementKey,
     name: input.name.trim(),
@@ -952,7 +982,7 @@ export async function updateCommunityMembershipPlan(client: DbClient, planId: st
     billing_interval: input.billingInterval,
     payment_provider_label: input.paymentProviderLabel.trim() || "運営者指定",
     external_payment_url: input.externalPaymentUrl.trim(),
-    external_customer_portal_url: input.externalCustomerPortalUrl.trim(),
+    external_customer_portal_url: externalCustomerPortalUrl,
     cancellation_guidance: input.cancellationGuidance.trim() || null,
     payment_setup_checklist: input.paymentSetupChecklist,
     status: input.status
