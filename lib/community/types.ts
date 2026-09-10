@@ -15,6 +15,13 @@ export type CommunityInvitationStatus = "pending" | "accepted" | "declined" | "r
 export type CommunityMembershipPlanStatus = "draft" | "active" | "archived";
 export type CommunityPaymentClaimStatus = "pending" | "approved" | "rejected" | "cancelled";
 export type CommunityPaymentMethod = "external_link" | "uword_points" | "bank_transfer" | "cash" | "other";
+export type CommunityPaymentSetupChecklist = {
+  productCreated: boolean;
+  recurringPriceConfirmed: boolean;
+  paymentLinkTested: boolean;
+  customerPortalEnabled: boolean;
+  customerPortalTested: boolean;
+};
 export type CommunityDataRequestStatus = "received" | "identity_check" | "processing" | "completed" | "rejected" | "cancelled";
 export type CommunityHomeMetric = "unread" | "today_activity" | "upcoming_events" | "rooms" | "posts" | "comments" | "chat_messages" | "resources";
 export type CommunityApprovalMode = "auto" | "manual";
@@ -148,6 +155,9 @@ export type CommunityMembershipPlan = {
   billingInterval: "month" | "year" | "one_time";
   paymentProviderLabel: string;
   externalPaymentUrl: string;
+  externalCustomerPortalUrl: string;
+  cancellationGuidance: string | null;
+  paymentSetupChecklist: CommunityPaymentSetupChecklist;
   status: CommunityMembershipPlanStatus;
   sortOrder: number;
 };

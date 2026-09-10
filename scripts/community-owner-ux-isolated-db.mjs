@@ -12,7 +12,10 @@ const image = "postgres:17.6";
 const baselinePath = "G:/Musubiプロジェクト/mikke-os-mvp-db-baseline-20260829/supabase/baseline/20260829000000_mikkeos_schema_baseline.sql";
 const bootstrapPath = "G:/Musubiプロジェクト/mikke-os-mvp-hq-access-management-20260831/supabase/tests/hq_local_auth_bootstrap.sql";
 const storageBootstrapPath = "supabase/tests/media_private_gate_local_storage_bootstrap.sql";
-const testPath = "supabase/tests/community_owner_membership_resources_ux_test.sql";
+const tests = [
+  { path: "supabase/tests/community_owner_membership_resources_ux_test.sql", sentinel: "community_owner_membership_resources_ux_test_ok" },
+  { path: "supabase/tests/community_membership_billing_guidance_test.sql", sentinel: "community_membership_billing_guidance_test_ok" },
+];
 const expectedBaselineSha = "521BF5A61EB8FE572011526FAA469A679328F581E3BC291191AEF18379C97299";
 const migrationNames = [
   "20260820110909_academy_instructor_registration_ledger.sql",
@@ -69,6 +72,7 @@ const migrationNames = [
   "20260909141538_community_per_resource_trial.sql",
   "20260909141552_community_creation_bind_before_children.sql",
   "20260909163047_community_owner_membership_resources_ux.sql",
+  "20260909235910_community_membership_billing_guidance.sql",
 ];
 
 function command(args, input, allowFailure = false) {
@@ -100,7 +104,7 @@ const bootstrap = readFileSync(bootstrapPath, "utf8");
 const storageBootstrap = `${readFileSync(storageBootstrapPath, "utf8")}\n` +
   "grant select, insert, delete on storage.objects to authenticated;\n";
 const migrations = migrationNames.map((name) => ({ name, sql: readFileSync(path.join("supabase/migrations", name), "utf8") }));
-const test = readFileSync(testPath, "utf8");
+const sqlTests = tests.map((test) => ({ ...test, sql: readFileSync(test.path, "utf8") }));
 const manifestSha256 = createHash("sha256").update(JSON.stringify(migrations.map(({ name, sql }) => [name, createHash("sha256").update(sql).digest("hex")]))).digest("hex");
 const internalGrantPreflightFixtures = `
 insert into auth.users(id,email,is_anonymous) values
@@ -155,9 +159,11 @@ try {
 
   psql(`${bootstrap}\n${storageBootstrap}`);
   const before = snapshot();
-  const rollbackOutput = psql(["begin;", "set local lock_timeout='5s';", "set local statement_timeout='180s';", "set local idle_in_transaction_session_timeout='240s';", baseline, ...migrationSql, test].join("\n"));
-  assert.ok(rollbackOutput.split(/\r?\n/).includes("community_owner_membership_resources_ux_test_ok"), "SQL regression sentinel missing");
-  assert.deepEqual(snapshot(), before, "SQL regression must rollback every schema and fixture change");
+  for (const test of sqlTests) {
+    const rollbackOutput = psql(["begin;", "set local lock_timeout='5s';", "set local statement_timeout='180s';", "set local idle_in_transaction_session_timeout='240s';", baseline, ...migrationSql, test.sql].join("\n"));
+    assert.ok(rollbackOutput.split(/\r?\n/).includes(test.sentinel), `SQL regression sentinel missing: ${test.sentinel}`);
+    assert.deepEqual(snapshot(), before, `SQL regression must rollback every schema and fixture change: ${test.path}`);
+  }
 
   psql([baseline, ...migrationSql].join("\n"));
   const concurrency = spawnSync(process.execPath, ["scripts/community-owner-ux-concurrency.mjs", "--run-isolated"], {
@@ -167,7 +173,7 @@ try {
   if (concurrency.status !== 0) throw new Error(concurrency.stderr || concurrency.stdout || "Concurrency test failed");
   assert.match(concurrency.stdout, /community_owner_ux_concurrency_test_ok/);
   assert.match(concurrency.stdout, /"users":0/);
-  console.log(JSON.stringify({ result: "community_owner_ux_isolated_db_ok", postgres: psql("show server_version;").trim(), baselineSha256: expectedBaselineSha, migrationCount: migrations.length, manifestSha256, sqlRollbackResidue: 0, concurrencyFixtureResidue: 0, network: "none", publishedPorts: 0 }));
+  console.log(JSON.stringify({ result: "community_owner_ux_isolated_db_ok", postgres: psql("show server_version;").trim(), baselineSha256: expectedBaselineSha, migrationCount: migrations.length, sqlTestCount: sqlTests.length, manifestSha256, sqlRollbackResidue: 0, concurrencyFixtureResidue: 0, network: "none", publishedPorts: 0 }));
 } finally {
   if (created) command(["rm", "-f", "-v", container], undefined, true);
   if (command(["inspect", container], undefined, true).status === 0) throw new Error("Disposable Community DB container remains after cleanup");

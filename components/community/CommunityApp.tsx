@@ -254,6 +254,13 @@ function isOwnerLike(data: CommunityDashboard | null, userId?: string) {
   return data?.community.ownerUserId === userId || data?.membership?.role === "owner" || data?.membership?.role === "moderator";
 }
 
+function canCreateRoomPost(data: CommunityDashboard, userId: string, room: CommunityRoom) {
+  return !room.isArchived
+    && !room.isLocked
+    && room.conversationMode === "thread"
+    && (room.memberCanPost || isOwnerLike(data, userId));
+}
+
 type CommunityAppProps = { view: CommunityView; roomId?: string; postId?: string; communitySlug: string };
 
 export function CommunityApp(props: CommunityAppProps) {
@@ -896,7 +903,7 @@ function RoomView({ data, userId, roomId, onReload, onMessage, onError }: ViewMu
         <ChatRoomView data={data} room={room} userId={userId} staff={staff} onMessage={onMessage} onError={onError} />
       ) : (
         <>
-          {room.memberCanPost ? <div className="mt-5"><PostComposer data={data} userId={userId} defaultRoomId={room.id} onReload={onReload} onMessage={onMessage} onError={onError} /></div> : null}
+          {canCreateRoomPost(data, userId, room) ? <div className="mt-5"><PostComposer data={data} userId={userId} defaultRoomId={room.id} onReload={onReload} onMessage={onMessage} onError={onError} /></div> : null}
           <div className="mt-5 divide-y divide-[var(--mikke-line-soft)] border-y border-[var(--mikke-line)] bg-white">
             {posts.length > 0 ? posts.map((post) => <ThreadListItem key={post.id} post={post} href={`${base}/rooms/${room.id}/posts/${post.id}`} />) : <div className="py-4"><MikkeEmptyState title="このRoomの投稿はまだありません" helper={room.memberCanPost ? "最初の話題を投稿できます。" : "運営者からのお知らせをお待ちください。"} /></div>}
           </div>
@@ -1112,7 +1119,7 @@ function ThreadListItem({ post, href }: { post: CommunityPost; href: string }) {
 }
 
 function PostComposer({ data, userId, defaultRoomId, onReload, onMessage, onError }: ViewMutationProps & { defaultRoomId?: string }) {
-  const writableRooms = data.rooms.filter((room) => !room.isArchived && room.conversationMode === "thread" && room.memberCanPost && !room.isLocked);
+  const writableRooms = data.rooms.filter((room) => canCreateRoomPost(data, userId, room));
   const [roomId, setRoomId] = useState(defaultRoomId ?? writableRooms[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -1168,7 +1175,7 @@ function PostComposer({ data, userId, defaultRoomId, onReload, onMessage, onErro
 }
 
 function ComposeView({ base, data, userId, onReload, onMessage, onError }: ViewMutationProps & { base: string }) {
-  const canPost = data.rooms.some((room) => !room.isArchived && !room.isLocked && room.conversationMode === "thread" && room.memberCanPost);
+  const canPost = data.rooms.some((room) => canCreateRoomPost(data, userId, room));
   return (
     <section className="mx-auto max-w-2xl">
       <Link href={`${base}/rooms`} className="inline-flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><ArrowLeft size={16} /> Room一覧へ戻る</Link>
@@ -1514,11 +1521,16 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
           {data.membershipPlans.filter((plan) => plan.status === "active").map((plan) => {
             const matchingEntitlements = data.entitlements.filter((item) => isEffectiveEntitlement(item) && item.entitlementKey === plan.entitlementKey);
             const isAlreadyEntitled = matchingEntitlements.length > 0;
+            const hasApprovedExternalPayment = data.paymentClaims.some((claim) => claim.planId === plan.id && claim.userId === userId && claim.status === "approved" && claim.paymentMethod === "external_link");
             return (
               <article key={plan.id} className="rounded-lg border border-[var(--mikke-line-soft)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-bold">{plan.name}</p><p className="mt-1 text-sm text-[var(--mikke-muted)]">{plan.description}</p></div><p className="font-bold text-[var(--mikke-primary)]">{billingIntervalLabel(plan.billingInterval)} {plan.amountYen.toLocaleString()}円</p></div>
                 {isAlreadyEntitled ? (
-                  <div className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]">この利用範囲は利用中です（{[...new Set(matchingEntitlements.map((item) => entitlementSourceLabel(item.source)))].join("・")}）</div>
+                  <div className="mt-3 space-y-3">
+                    <div className="rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]">この利用範囲は利用中です（{[...new Set(matchingEntitlements.map((item) => entitlementSourceLabel(item.source)))].join("・")}）</div>
+                    {plan.externalCustomerPortalUrl && hasApprovedExternalPayment ? <a href={plan.externalCustomerPortalUrl} target="_blank" rel="noreferrer" className="inline-flex rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold text-[var(--mikke-primary)]">契約管理・支払い方法の変更・解約</a> : null}
+                    {plan.cancellationGuidance ? <p className="text-xs leading-5 text-[var(--mikke-muted)]">{plan.cancellationGuidance}</p> : null}
+                  </div>
                 ) : (
                   <>
                     {plan.externalPaymentUrl ? <a href={plan.externalPaymentUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white">{plan.paymentProviderLabel}の案内を開く</a> : <p className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-muted)]">支払い方法は運営者へご確認ください。</p>}
@@ -1534,6 +1546,11 @@ function ProfileView({ data, userId, onReload, onMessage, onError }: ViewMutatio
 
       <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
         <h3 className="text-lg font-bold">データと退会</h3>
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <div className="rounded-lg bg-[var(--mikke-surface-soft)] p-3"><p className="text-sm font-bold">有料契約の解約</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">上の契約管理ボタンから手続きします。Community退会とは別です。</p></div>
+          <div className="rounded-lg bg-[var(--mikke-surface-soft)] p-3"><p className="text-sm font-bold">Communityから退会</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">このCommunityの閲覧・投稿を終了します。外部の有料契約は自動解約されません。</p></div>
+          <div className="rounded-lg bg-[var(--mikke-surface-soft)] p-3"><p className="text-sm font-bold">mikkeアカウントの削除</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">すべてのmikkeアプリに関わる別手続きです。このCommunityの退会ボタンでは削除されません。</p><Link href="/manager/account" className="mt-2 inline-flex text-xs font-bold text-[var(--mikke-primary)]">基本情報を確認</Link></div>
+        </div>
         <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">退会すると閲覧・投稿権限はすぐ停止します。会話の整合性や不正対応の記録として投稿が残る場合があります。データ開示・個人データ削除は本人確認後に運営が処理します。</p>
         <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={requesting} onClick={() => requestData("data_export")} className="rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold text-[var(--mikke-primary)]">データ開示を申請</button><button type="button" disabled={requesting} onClick={() => requestData("personal_data_delete")} className="rounded-lg border border-[var(--mikke-line)] px-4 py-2 text-sm font-bold text-[var(--mikke-danger)]">個人データ削除を申請</button><button type="button" disabled={requesting} onClick={leave} className="rounded-lg bg-[var(--mikke-danger)] px-4 py-2 text-sm font-bold text-white">Communityを退会</button></div>
         {data.dataRequests.length > 0 ? <div className="mt-4 space-y-2">{data.dataRequests.map((request) => <p key={request.id} className="text-xs text-[var(--mikke-muted)]">{request.requestType === "data_export" ? "データ開示" : "個人データ削除"}: {request.status}</p>)}</div> : null}
@@ -1621,10 +1638,10 @@ function OwnerPostManager({ data, userId, onReload, onMessage, onError }: ViewMu
       setTitle("");
       setBody("");
       setUrl("");
-      onMessage("告知を投稿しました。");
+      onMessage("投稿しました。");
       await onReload();
     } catch (error) {
-      onError(communityErrorMessage(error, "告知を投稿できませんでした。"));
+      onError(communityErrorMessage(error, "投稿できませんでした。"));
     } finally {
       setSaving(false);
     }
@@ -1632,7 +1649,7 @@ function OwnerPostManager({ data, userId, onReload, onMessage, onError }: ViewMu
 
   return (
     <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-5">
-      <h3 className="text-base font-bold tracking-normal">告知を作る</h3>
+      <h3 className="text-base font-bold tracking-normal">投稿を作成</h3>
       <form onSubmit={submit} className="mt-4 space-y-3">
         <select required value={roomId} onChange={(event) => setRoomId(event.target.value)} className="w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-sm">
           <option value="">投稿先Room</option>
@@ -1645,7 +1662,7 @@ function OwnerPostManager({ data, userId, onReload, onMessage, onError }: ViewMu
           <input type="checkbox" checked={isPinned} onChange={(event) => setIsPinned(event.target.checked)} />
           HOMEに固定表示する
         </label>
-        <button disabled={saving || !roomId} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">{saving ? "投稿中..." : "告知を投稿"}</button>
+        <button disabled={saving || !roomId} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">{saving ? "投稿中..." : "投稿する"}</button>
       </form>
       <div className="mt-5 space-y-2">
         {data.posts.slice(0, 5).map((post) => <OwnerPostRow key={post.id} post={post} onReload={onReload} onMessage={onMessage} onError={onError} />)}
@@ -2234,6 +2251,56 @@ function EntitlementSelect({ data, value, onChange }: { data: CommunityDashboard
   return <select required value={value} onChange={(event) => onChange(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="">利用権限を選択</option>{data.entitlementDefinitions.map((item) => <option key={item.key} value={item.key}>{item.name} ({item.key})</option>)}</select>;
 }
 
+const PAYMENT_SETUP_ITEMS: Array<{ key: keyof CommunityMembershipPlan["paymentSetupChecklist"]; label: string }> = [
+  { key: "productCreated", label: "商品を作成した" },
+  { key: "recurringPriceConfirmed", label: "「継続・毎月」の料金になっている" },
+  { key: "paymentLinkTested", label: "入会リンクをテストした" },
+  { key: "customerPortalEnabled", label: "カスタマーポータルを有効にした" },
+  { key: "customerPortalTested", label: "カード変更・解約画面をテストした" }
+];
+
+function PaymentSetupGuide() {
+  return (
+    <details className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-4">
+      <summary className="cursor-pointer font-bold text-[var(--mikke-primary)]">Stripeの決済設定を順番に確認</summary>
+      <ol className="mt-4 space-y-3 text-sm leading-6">
+        <li><b>1. 商品を作る</b><span className="block text-[var(--mikke-muted)]">プラン名と特典内容をStripeの商品に登録します。</span></li>
+        <li><b>2. 毎月の料金を設定する</b><span className="block text-[var(--mikke-muted)]">月額会員は「1回限り」ではなく「継続・毎月」を選びます。</span></li>
+        <li><b>3. 入会リンクを作る</b><span className="block text-[var(--mikke-muted)]">Payment Linkを作成し、この画面の「入会・決済URL」へ入れます。</span></li>
+        <li><b>4. 契約管理・解約を設定する</b><span className="block text-[var(--mikke-muted)]">カスタマーポータルを有効化し、カード変更と解約の許可、解約時期を自分の契約条件に合わせます。</span></li>
+        <li><b>5. テストする</b><span className="block text-[var(--mikke-muted)]">入会、支払い、ポータル表示、カード変更、解約予約、利用終了日をテストモードで確認します。</span></li>
+      </ol>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <a href="https://docs.stripe.com/payment-links/create" target="_blank" rel="noreferrer" className="rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">Stripe入会リンクの手順</a>
+        <a href="https://docs.stripe.com/customer-management/integrate-customer-portal" target="_blank" rel="noreferrer" className="rounded-lg border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-primary)]">Stripe契約管理の手順</a>
+      </div>
+      <p className="mt-4 rounded-lg bg-white px-3 py-2 text-xs leading-5 text-[var(--mikke-muted)]">URLを保存しただけでは、決済確認や有料Roomの権限付与は自動化されません。現在は参加者の申請を運営者が確認する方式です。</p>
+      <div className="mt-3 rounded-lg border border-[var(--mikke-line-soft)] bg-white p-3">
+        <p className="text-sm font-bold">現在の決済と権限の連動</p>
+        <ul className="mt-2 space-y-1 text-xs leading-5 text-[var(--mikke-muted)]">
+          <li>・支払い成功：Stripe画面で確認後、参加者の「支払い確認申請」を承認します。</li>
+          <li>・解約予約：支払い済み期間が終わるまで権限は残します。</li>
+          <li>・契約終了：Stripeの利用終了日を確認して、対象の利用権限を停止します。</li>
+          <li>・支払い失敗：新規申請は承認せず、既存会員は運用方針に沿って確認します。</li>
+        </ul>
+        <p className="mt-2 text-xs font-bold text-[var(--mikke-danger)]">決済完了後の戻り画面だけを根拠に承認しないでください。</p>
+      </div>
+    </details>
+  );
+}
+
+function PaymentSetupChecklistFields({ value, onChange }: { value: CommunityMembershipPlan["paymentSetupChecklist"]; onChange: (value: CommunityMembershipPlan["paymentSetupChecklist"]) => void }) {
+  const completed = PAYMENT_SETUP_ITEMS.filter((item) => value[item.key]).length;
+  return (
+    <fieldset className="rounded-lg border border-[var(--mikke-line-soft)] p-3 md:col-span-2">
+      <legend className="px-1 text-sm font-bold">募集開始前の確認 {completed}/{PAYMENT_SETUP_ITEMS.length}</legend>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        {PAYMENT_SETUP_ITEMS.map((item) => <label key={item.key} className="flex items-start gap-2 text-xs leading-5"><input type="checkbox" checked={value[item.key]} onChange={(event) => onChange({ ...value, [item.key]: event.target.checked })} className="mt-1" /><span>{item.label}</span></label>)}
+      </div>
+    </fieldset>
+  );
+}
+
 function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent, onReload, onMessage, onError }: ViewMutationProps & { ownerLike: boolean; actorClient: ReturnType<typeof communityScopedClient>; actorIsCurrent: () => boolean }) {
   const [keyName, setKeyName] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -2246,6 +2313,15 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
   const [planInterval, setPlanInterval] = useState<"month" | "year" | "one_time">("month");
   const [paymentProvider, setPaymentProvider] = useState("運営者指定");
   const [paymentUrl, setPaymentUrl] = useState("");
+  const [customerPortalUrl, setCustomerPortalUrl] = useState("");
+  const [cancellationGuidance, setCancellationGuidance] = useState("");
+  const [paymentSetupChecklist, setPaymentSetupChecklist] = useState<CommunityMembershipPlan["paymentSetupChecklist"]>({
+    productCreated: false,
+    recurringPriceConfirmed: false,
+    paymentLinkTested: false,
+    customerPortalEnabled: false,
+    customerPortalTested: false
+  });
   const [saving, setSaving] = useState(false);
   const inviteUrl = `https://mikke-os.com/community/c/${data.community.slug}`;
   async function createDefinition(event: FormEvent<HTMLFormElement>) {
@@ -2287,10 +2363,14 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
       await createCommunityMembershipPlan(actorClient, data.community.id, userId, {
         entitlementKey: planEntitlement, name: planName, description: planDescription,
         amountYen: Number(planAmount), billingInterval: planInterval,
-        paymentProviderLabel: paymentProvider, externalPaymentUrl: paymentUrl, status: "active"
+        paymentProviderLabel: paymentProvider, externalPaymentUrl: paymentUrl,
+        externalCustomerPortalUrl: customerPortalUrl,
+        cancellationGuidance,
+        paymentSetupChecklist,
+        status: "active"
       });
       if (!actorIsCurrent()) return;
-      setPlanName(""); setPlanDescription(""); setPaymentUrl("");
+      setPlanName(""); setPlanDescription(""); setPaymentUrl(""); setCustomerPortalUrl(""); setCancellationGuidance("");
       onMessage("有料会員プランを公開しました。");
       await onReload();
     } catch (error) {
@@ -2335,6 +2415,7 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
         <input required value={keyName} onChange={(event) => setKeyName(event.target.value)} placeholder="キー 例: paid:premium" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <button disabled={saving} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60">権限を追加</button>
       </form>
+      <PaymentSetupGuide />
       <form onSubmit={createPlan} className="mt-4 grid gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:grid-cols-2">
         <div className="md:col-span-2"><p className="font-bold">参加者向けメンバーシップ</p><p className="mt-1 text-xs leading-5 text-[var(--mikke-muted)]">公開すると参加者のマイページに表示されます。外部決済後の申請を承認する方法と、ユーワードポイント・銀行振込などを運営者が確認して付与する方法を使えます。</p></div>
         <p className="rounded-lg bg-[var(--mikke-surface-soft)] px-3 py-2 text-xs leading-5 text-[var(--mikke-muted)] md:col-span-2">参加者の流れ：招待URLから参加 → 下部の「マイページ」→ メンバーシップを選ぶ → 支払い確認を申請 → 運営者が承認 → 限定Roomを閲覧</p>
@@ -2344,7 +2425,10 @@ function OwnerMembersView({ data, userId, ownerLike, actorClient, actorIsCurrent
         <input required min="0" type="number" value={planAmount} onChange={(event) => setPlanAmount(event.target.value)} placeholder="金額（円）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <select value={planInterval} onChange={(event) => setPlanInterval(event.target.value as typeof planInterval)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="month">月額</option><option value="year">年額</option><option value="one_time">1回</option></select>
         <input required value={paymentProvider} onChange={(event) => setPaymentProvider(event.target.value)} placeholder="支払い方法・サービス名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
-        <input type="url" value={paymentUrl} onChange={(event) => setPaymentUrl(event.target.value)} placeholder="決済・案内URL（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <label className="text-sm font-bold"><span>入会・決済URL</span><input type="url" value={paymentUrl} onChange={(event) => setPaymentUrl(event.target.value)} placeholder="https://buy.stripe.com/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">会員が新たに支払うためのリンクです。</span></label>
+        <label className="text-sm font-bold"><span>契約管理・解約URL</span><input type="url" value={customerPortalUrl} onChange={(event) => setCustomerPortalUrl(event.target.value)} placeholder="https://billing.stripe.com/p/login/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">契約後のカード変更や解約に使う別のリンクです。</span></label>
+        <label className="text-sm font-bold md:col-span-2"><span>解約後の利用終了案内</span><textarea value={cancellationGuidance} onChange={(event) => setCancellationGuidance(event.target.value)} placeholder="例：解約予約後も、Stripeに表示される利用終了日まで利用できます。" rows={2} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /><span className="mt-1 block text-[11px] font-normal leading-5 text-[var(--mikke-muted)]">実際の決済設定と利用規約に合う文言だけを入力してください。</span></label>
+        <PaymentSetupChecklistFields value={paymentSetupChecklist} onChange={setPaymentSetupChecklist} />
         <button disabled={saving || !planEntitlement} className="rounded-lg bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">メンバーシップを公開</button>
       </form>
       {data.membershipPlans.length > 0 ? <section className="mt-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h3 className="font-bold">公開済みメンバーシップ</h3><p className="mt-1 text-xs text-[var(--mikke-muted)]">特典や金額を編集できます。削除は履歴を残すため「公開終了」として処理します。</p><div className="mt-3 space-y-3">{data.membershipPlans.map((plan) => <MembershipPlanEditor key={plan.id} data={data} plan={plan} actorClient={actorClient} actorIsCurrent={actorIsCurrent} onReload={onReload} onMessage={onMessage} onError={onError} />)}</div></section> : null}
@@ -2375,6 +2459,9 @@ function MembershipPlanEditor({ data, plan, actorClient, actorIsCurrent, onReloa
   const [billingInterval, setBillingInterval] = useState(plan.billingInterval);
   const [paymentProviderLabel, setPaymentProviderLabel] = useState(plan.paymentProviderLabel);
   const [externalPaymentUrl, setExternalPaymentUrl] = useState(plan.externalPaymentUrl);
+  const [externalCustomerPortalUrl, setExternalCustomerPortalUrl] = useState(plan.externalCustomerPortalUrl);
+  const [cancellationGuidance, setCancellationGuidance] = useState(plan.cancellationGuidance ?? "");
+  const [paymentSetupChecklist, setPaymentSetupChecklist] = useState(plan.paymentSetupChecklist);
   const [saving, setSaving] = useState(false);
 
   async function save(status = plan.status) {
@@ -2382,7 +2469,8 @@ function MembershipPlanEditor({ data, plan, actorClient, actorIsCurrent, onReloa
     try {
       await updateCommunityMembershipPlan(actorClient, plan.id, {
         entitlementKey, name, description, amountYen: Number(amountYen), billingInterval,
-        paymentProviderLabel, externalPaymentUrl, status
+        paymentProviderLabel, externalPaymentUrl, externalCustomerPortalUrl,
+        cancellationGuidance, paymentSetupChecklist, status
       });
       if (!actorIsCurrent()) return;
       setEditing(false);
@@ -2408,7 +2496,10 @@ function MembershipPlanEditor({ data, plan, actorClient, actorIsCurrent, onReloa
         <input required min="0" type="number" value={amountYen} onChange={(event) => setAmountYen(event.target.value)} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
         <select value={billingInterval} onChange={(event) => setBillingInterval(event.target.value as CommunityMembershipPlan["billingInterval"])} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2"><option value="month">月額</option><option value="year">年額</option><option value="one_time">1回</option></select>
         <input required value={paymentProviderLabel} onChange={(event) => setPaymentProviderLabel(event.target.value)} placeholder="支払い方法・サービス名" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
-        <input type="url" value={externalPaymentUrl} onChange={(event) => setExternalPaymentUrl(event.target.value)} placeholder="決済・案内URL（任意）" className="rounded-lg border border-[var(--mikke-line)] px-3 py-2" />
+        <label className="text-sm font-bold"><span>入会・決済URL</span><input type="url" value={externalPaymentUrl} onChange={(event) => setExternalPaymentUrl(event.target.value)} placeholder="https://buy.stripe.com/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /></label>
+        <label className="text-sm font-bold"><span>契約管理・解約URL</span><input type="url" value={externalCustomerPortalUrl} onChange={(event) => setExternalCustomerPortalUrl(event.target.value)} placeholder="https://billing.stripe.com/p/login/..." className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /></label>
+        <label className="text-sm font-bold md:col-span-2"><span>解約後の利用終了案内</span><textarea value={cancellationGuidance} onChange={(event) => setCancellationGuidance(event.target.value)} rows={2} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] px-3 py-2 font-normal" /></label>
+        <PaymentSetupChecklistFields value={paymentSetupChecklist} onChange={setPaymentSetupChecklist} />
         <button disabled={saving} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white disabled:opacity-60 md:col-span-2">{saving ? "保存中..." : "変更を保存"}</button>
       </form> : null}
     </article>

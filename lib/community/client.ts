@@ -172,7 +172,17 @@ function mapMembershipPlan(row: any): CommunityMembershipPlan {
     id: row.id, communityId: row.community_id, entitlementKey: row.entitlement_key,
     name: row.name, description: row.description ?? null, amountYen: row.amount_yen,
     billingInterval: row.billing_interval, paymentProviderLabel: row.payment_provider_label,
-    externalPaymentUrl: row.external_payment_url, status: row.status, sortOrder: row.sort_order ?? 0
+    externalPaymentUrl: row.external_payment_url,
+    externalCustomerPortalUrl: row.external_customer_portal_url ?? "",
+    cancellationGuidance: row.cancellation_guidance ?? null,
+    paymentSetupChecklist: {
+      productCreated: row.payment_setup_checklist?.productCreated === true,
+      recurringPriceConfirmed: row.payment_setup_checklist?.recurringPriceConfirmed === true,
+      paymentLinkTested: row.payment_setup_checklist?.paymentLinkTested === true,
+      customerPortalEnabled: row.payment_setup_checklist?.customerPortalEnabled === true,
+      customerPortalTested: row.payment_setup_checklist?.customerPortalTested === true
+    },
+    status: row.status, sortOrder: row.sort_order ?? 0
   };
 }
 
@@ -898,6 +908,9 @@ export async function createCommunityMembershipPlan(client: DbClient, communityI
   billingInterval: CommunityMembershipPlan["billingInterval"];
   paymentProviderLabel: string;
   externalPaymentUrl: string;
+  externalCustomerPortalUrl: string;
+  cancellationGuidance: string;
+  paymentSetupChecklist: CommunityMembershipPlan["paymentSetupChecklist"];
   status: CommunityMembershipPlan["status"];
 }) {
   const { error } = await client.from("community_membership_plans").insert({
@@ -909,6 +922,9 @@ export async function createCommunityMembershipPlan(client: DbClient, communityI
     billing_interval: input.billingInterval,
     payment_provider_label: input.paymentProviderLabel.trim() || "外部決済",
     external_payment_url: input.externalPaymentUrl.trim(),
+    external_customer_portal_url: input.externalCustomerPortalUrl.trim(),
+    cancellation_guidance: input.cancellationGuidance.trim() || null,
+    payment_setup_checklist: input.paymentSetupChecklist,
     status: input.status,
     created_by_user_id: userId
   });
@@ -923,6 +939,9 @@ export async function updateCommunityMembershipPlan(client: DbClient, planId: st
   billingInterval: CommunityMembershipPlan["billingInterval"];
   paymentProviderLabel: string;
   externalPaymentUrl: string;
+  externalCustomerPortalUrl: string;
+  cancellationGuidance: string;
+  paymentSetupChecklist: CommunityMembershipPlan["paymentSetupChecklist"];
   status: CommunityMembershipPlan["status"];
 }) {
   const { error } = await client.from("community_membership_plans").update({
@@ -933,6 +952,9 @@ export async function updateCommunityMembershipPlan(client: DbClient, planId: st
     billing_interval: input.billingInterval,
     payment_provider_label: input.paymentProviderLabel.trim() || "運営者指定",
     external_payment_url: input.externalPaymentUrl.trim(),
+    external_customer_portal_url: input.externalCustomerPortalUrl.trim(),
+    cancellation_guidance: input.cancellationGuidance.trim() || null,
+    payment_setup_checklist: input.paymentSetupChecklist,
     status: input.status
   }).eq("id", planId);
   if (error) throw error;
