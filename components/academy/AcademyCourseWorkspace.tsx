@@ -11,12 +11,12 @@ const courseTabs = [
   { id: "page", label: "紹介ページを整える", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
   {
     id: "learner",
-    label: "復習ページ",
+    label: "講座復習ページ",
     href: (courseId: string) => `/academy/courses/${courseId}/instructor-page?audience=learner`
   },
   {
     id: "instructor",
-    label: "講師用資料ページ",
+    label: "講師マニュアルページ",
     href: (courseId: string) => `/academy/courses/${courseId}/instructor-page`
   },
   { id: "materials", label: "講師用ファイル", href: (courseId: string) => `/academy/materials?course=${courseId}` }
@@ -35,7 +35,7 @@ export function AcademyCourseWorkspace({
 }) {
   const features = resolveAcademyCourseFeaturesForCourse(course);
   const visibleTabs = courseTabs.filter((tab) => {
-    if (tab.id === "program") return false;
+    if (tab.id === "program" || tab.id === "materials") return false;
     if (tab.id === "page") return features.publicCoursePage;
     return true;
   });
@@ -99,11 +99,10 @@ export function AcademyCourseWorkspace({
           );
         })}
       </nav>
-      <div className="mx-auto w-full max-w-3xl">{children}</div>
-      <section className="rounded-sm border border-[var(--mikke-line)] bg-white px-4 py-3">
+      <div className="mx-auto w-full max-w-5xl">{children}</div>
+      <section className="border-t border-[var(--mikke-line)] bg-white py-4">
         <h2 className="text-sm font-bold">教材・講師向けのページを整える</h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">教材を渡す場合や、講師と一緒に運営する場合に使います。</p>
-        <nav aria-label="教材・講師用メニュー" className="mt-3 grid gap-2 sm:grid-cols-3">{visibleTabs.filter(tab => tab.id !== "settings" && tab.id !== "page").map(tab => <Link key={tab.id} href={tab.href(course.id)} aria-current={activeTab === tab.id ? "page" : undefined} className={`flex min-h-11 items-center justify-center rounded-sm border p-3 text-sm font-bold ${activeTab === tab.id ? "bg-[#3f4eb5] text-white" : "bg-white"}`}>{tab.label}</Link>)}</nav>
+        <nav aria-label="教材・講師用メニュー" className="mt-3 grid gap-2 sm:grid-cols-2">{visibleTabs.filter(tab => tab.id !== "settings" && tab.id !== "page").map(tab => <Link key={tab.id} href={tab.href(course.id)} aria-current={activeTab === tab.id ? "page" : undefined} className={`flex min-h-11 items-center justify-center rounded-sm border p-3 text-sm font-bold ${activeTab === tab.id ? "bg-[#3f4eb5] text-white" : "bg-white"}`}>{tab.label}</Link>)}</nav>
       </section>
 
 

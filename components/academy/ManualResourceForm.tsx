@@ -15,7 +15,7 @@ const inputClass =
   "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
 const labelClass = "block text-xs font-bold text-[var(--mikke-text-soft)]";
 
-function NewMaterialContent() {
+export function ManualResourceForm({ courseId, onSaved, onCancel }: { courseId: string; onSaved: () => void; onCancel: () => void }) {
   const searchParams = useSearchParams();
   const { profile } = useAuth();
   const router = useRouter();
@@ -26,7 +26,7 @@ function NewMaterialContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState<MaterialInput>({
-    courseId: searchParams.get("course") ?? "",
+    courseId,
     kind: "pdf",
     title: "",
     url: "",
@@ -57,7 +57,7 @@ function NewMaterialContent() {
     setSaving(true);
     try {
       await createMaterial(profile, hq!.id, form);
-      router.push(toCurrentAcademyContextHref(`/academy/courses/${encodeURIComponent(form.courseId)}/instructor-page#resources`));
+      onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
       setSaving(false);
@@ -70,11 +70,11 @@ function NewMaterialContent() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <Link className="inline-flex min-h-11 items-center text-sm text-[var(--mikke-primary)]" href={toCurrentAcademyContextHref(form.courseId ? `/academy/courses/${encodeURIComponent(form.courseId)}/instructor-page#resources` : "/academy/courses")}>← 講師マニュアルページに戻る</Link>
-      <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
+      <button type="button" className="min-h-11 text-sm text-[var(--mikke-primary)]" onClick={onCancel}>← マニュアルの編集に戻る</button>
+      <section className="space-y-3 border-b border-[var(--mikke-line)] bg-white py-4">
         <div>
           <label className={labelClass}>講座*</label>
-          <select className={inputClass} value={form.courseId} onChange={(e) => set("courseId", e.target.value)}>
+          <select disabled className={inputClass} value={form.courseId} onChange={(e) => set("courseId", e.target.value)}>
             <option value="">選択してください</option>
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
@@ -163,17 +163,5 @@ function NewMaterialContent() {
         {saving ? "保存中…" : "マニュアルの資料リンクを追加する"}
       </button>
     </form>
-  );
-}
-
-export default function NewMaterialPage() {
-  return (
-    <HonbuShell title="マニュアルの資料リンクを追加">
-      <div className="mx-auto max-w-2xl">
-        <Suspense fallback={<p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>}>
-          <NewMaterialContent />
-        </Suspense>
-      </div>
-    </HonbuShell>
   );
 }

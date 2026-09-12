@@ -16,10 +16,12 @@ import {
   Type
 } from "lucide-react";
 import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
+import { EditorPreview } from "./EditorPreview";
+import { PageBlocks } from "./PageBlocks";
 import type { AcademyLpBlock } from "@/types/database";
 
 const inputClass =
-  "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
+  "min-w-0 w-full rounded-none border-0 border-b border-transparent bg-transparent px-1 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
 
 export const LP_BLOCK_LABEL: Record<AcademyLpBlock["type"], string> = {
   heading: "見出し",
@@ -50,6 +52,7 @@ export function LpBlockEditor({ block, onChange }: { block: AcademyLpBlock; onCh
     return (
       <>
         <AcademyImageUploader compact currentUrl={block.url || undefined} onUploaded={(url) => onChange({ ...block, url })} />
+        <label className="block text-xs">画像のリンク先（任意・https:// から入力）<input type="url" className={inputClass} value={block.linkUrl ?? ""} onChange={(e) => onChange({ ...block, linkUrl: e.target.value })} /></label>
         <input className={inputClass} placeholder="キャプション（任意）" value={block.caption ?? ""} onChange={(e) => onChange({ ...block, caption: e.target.value })} />
       </>
     );
@@ -58,6 +61,7 @@ export function LpBlockEditor({ block, onChange }: { block: AcademyLpBlock; onCh
     return (
       <>
         <AcademyImageUploader compact currentUrl={block.imageUrl || undefined} onUploaded={(url) => onChange({ ...block, imageUrl: url })} />
+        <label className="block text-xs">画像のリンク先（任意・https:// から入力）<input type="url" className={inputClass} value={block.linkUrl ?? ""} onChange={(e) => onChange({ ...block, linkUrl: e.target.value })} /></label>
         <input className={inputClass} placeholder="見出し（任意）" value={block.heading ?? ""} onChange={(e) => onChange({ ...block, heading: e.target.value })} />
         <textarea className={`${inputClass} min-h-16`} placeholder="文章" value={block.text} onChange={(e) => onChange({ ...block, text: e.target.value })} />
       </>
@@ -68,6 +72,7 @@ export function LpBlockEditor({ block, onChange }: { block: AcademyLpBlock; onCh
       <div className="space-y-2">
         {block.images.map((img, i) => (
           <div key={i} className="min-w-0 space-y-1 overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-2">
+            <label className="block text-xs">画像のリンク先（任意・https:// から入力）<input type="url" className={inputClass} value={img.linkUrl ?? ""} onChange={(e) => onChange({ ...block, images: block.images.map((x, j) => j === i ? { ...x, linkUrl: e.target.value } : x) })} /></label>
             <AcademyImageUploader
               compact
               currentUrl={img.url || undefined}
@@ -136,6 +141,7 @@ export function LpBlocksEditor({ blocks, onChange }: { blocks: AcademyLpBlock[];
   }
 
   return (
+    <EditorPreview preview={<><p className="mb-4 text-xs text-[var(--mikke-muted)]">追加コンテンツ部分の仕上がりです。ページ上部の基本情報と申込フォームは含みません。</p><PageBlocks blocks={blocks} /></>}>
     <div className="space-y-3">
       {blocks.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-6 text-center text-sm text-[var(--mikke-muted)]">
@@ -144,7 +150,7 @@ export function LpBlocksEditor({ blocks, onChange }: { blocks: AcademyLpBlock[];
       ) : (
         <ul className="space-y-2">
           {blocks.map((block, i) => (
-            <li key={i} className="min-w-0 space-y-2 overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+            <li key={i} className="min-w-0 space-y-2 overflow-hidden border-b border-[var(--mikke-line)] bg-white py-5">
               <div className="flex items-center justify-between">
                 <span className="rounded-full bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">
                   {LP_BLOCK_LABEL[block.type]}
@@ -174,5 +180,6 @@ export function LpBlocksEditor({ blocks, onChange }: { blocks: AcademyLpBlock[];
         ))}
       </div>
     </div>
+    </EditorPreview>
   );
 }

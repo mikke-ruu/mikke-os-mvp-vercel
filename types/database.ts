@@ -189,7 +189,7 @@ export type AcademyFormField = {
 export type AcademyPaymentProvider = "manual" | "stripe" | "square" | "paycas";
 
 // 講座LP・講師専用ページ共通: 画像グリッドの1枚
-export type AcademyGalleryImage = { url: string; caption?: string };
+export type AcademyGalleryImage = { url: string; caption?: string; linkUrl?: string };
 
 // 講座LPのビルド式ブロック（MIRACOビルド式踏襲・ざっくり版）
 // Wave C (AC-C1): 見出し/文章/画像に加え、画像+文章(2カラム)・画像グリッド・CTAを追加。
@@ -197,8 +197,8 @@ export type AcademyGalleryImage = { url: string; caption?: string };
 export type AcademyLpBlock =
   | { type: "heading"; text: string }
   | { type: "text"; text: string }
-  | { type: "image"; url: string; caption?: string }
-  | { type: "image-text"; imageUrl: string; heading?: string; text: string }
+  | { type: "image"; url: string; caption?: string; linkUrl?: string }
+  | { type: "image-text"; imageUrl: string; heading?: string; text: string; linkUrl?: string }
   | { type: "gallery"; images: AcademyGalleryImage[] }
   | { type: "cta"; heading: string; buttonLabel: string; buttonUrl: string };
 
@@ -210,10 +210,10 @@ export type AcademyPageLink = { label: string; url: string };
 export type AcademyPageBlock =
   | { type: "heading"; text: string }
   | { type: "text"; text: string }
-  | { type: "image"; url: string; caption?: string }
+  | { type: "image"; url: string; caption?: string; linkUrl?: string }
   | { type: "video"; url: string; caption?: string }
   | { type: "links"; title?: string; items: AcademyPageLink[] }
-  | { type: "image-text"; imageUrl: string; heading?: string; text: string }
+  | { type: "image-text"; imageUrl: string; heading?: string; text: string; linkUrl?: string }
   | { type: "gallery"; images: AcademyGalleryImage[] }
   | { type: "cta"; heading: string; buttonLabel: string; buttonUrl: string }
   | { type: "materials-list" };
@@ -610,7 +610,8 @@ export type AcademyMaterial = {
   user_id: string;
   kind: "pdf" | "video" | "link";
   title: string;
-  url: string;
+  url: string | null;
+  delivery_mode?: "external_url" | "private_file";
   description: string | null;
   requires_active: boolean;
   is_published: boolean;

@@ -115,7 +115,7 @@ function PortalDashboard() {
       <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
         <p className="text-sm text-[var(--mikke-muted)]">{profile.display_name}さんのマイポータル</p>
         <h2 className="mt-2 text-2xl font-bold">{currentView === "learner" ? "学びの続きを、ここから。" : "担当する講座と、今日の仕事。"}</h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{currentView === "learner" ? "受講した講座を確認し、復習ページで学びを振り返れます。" : "自分に届いた申込を確認し、開催準備や教材の注文を進められます。"}</p>
+        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{currentView === "learner" ? "受講した講座を確認し、講座復習ページで学びを振り返れます。" : "自分に届いた申込を確認し、開催準備や教材の注文を進められます。"}</p>
         <AcademyHelp title="本部とマイポータルの違い">本部は教室全体の講座・講師・申込を管理する場所です。マイポータルは自分の受講や講師活動のための場所です。両方の役割がある場合も、アカウントを作り直す必要はありません。</AcademyHelp>
       </section>
 
@@ -140,7 +140,7 @@ function PortalDashboard() {
 
       <div className="grid grid-cols-2 gap-3">
         <section className="rounded-lg border border-[var(--mikke-line)] border-t-4 border-t-[#8bc7ad] bg-white p-4"><h3 className="text-sm font-bold">{currentView === "learner" ? "受講した講座" : "講師として登録された講座"}</h3><p className="mt-2 text-2xl font-bold">{currentView === "learner" ? learnerCourseIds.length : records.length}<span className="ml-1 text-sm font-normal">件</span></p></section>
-        <section className="rounded-lg border border-[var(--mikke-line)] border-t-4 border-t-[#ffd370] bg-white p-4"><h3 className="text-sm font-bold">{currentView === "learner" ? "次にできること" : "新しい担当申込"}</h3>{currentView === "learner" ? <Link href="/academy/portal/study?view=learner" className="mt-2 inline-flex min-h-11 items-center text-sm text-[var(--mikke-primary)]">復習ページを開く →</Link> : <p className="mt-2 text-2xl font-bold">{pendingApps.length}<span className="ml-1 text-sm font-normal">件</span></p>}</section>
+        <section className="rounded-lg border border-[var(--mikke-line)] border-t-4 border-t-[#ffd370] bg-white p-4"><h3 className="text-sm font-bold">{currentView === "learner" ? "次にできること" : "新しい担当申込"}</h3>{currentView === "learner" ? <Link href="/academy/portal/study?view=learner" className="mt-2 inline-flex min-h-11 items-center text-sm text-[var(--mikke-primary)]">講座復習ページを開く →</Link> : <p className="mt-2 text-2xl font-bold">{pendingApps.length}<span className="ml-1 text-sm font-normal">件</span></p>}</section>
       </div>
       <h2 className="text-base font-bold text-[var(--mikke-text)]">{currentView === "learner" ? "受講中・修了した講座" : "講師として登録された講座"}</h2>
       <div className="grid gap-3 md:grid-cols-2">
@@ -154,7 +154,7 @@ function PortalDashboard() {
                 <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{course?.name}</p>
               </div>
               <p className="mt-1.5 text-xs text-[var(--mikke-muted)]">
-                {application?.status === "completed" || application?.status === "certified" || application?.status === "instructor_added" ? "修了済み" : "受講中"} ・ 復習ページを確認できます
+                {application?.status === "completed" || application?.status === "certified" || application?.status === "instructor_added" ? "修了済み" : "受講中"} ・ 講座復習ページを確認できます
               </p>
             </div>
           );
@@ -178,7 +178,8 @@ function PortalDashboard() {
 
       {/* クイックメニュー */}
       <div className="grid gap-3 md:grid-cols-2">
-        <QuickCard href={currentView === "learner" ? "/academy/portal/study?view=learner" : "/academy/portal/study?view=instructor"} icon={GraduationCap} title={currentView === "learner" ? "復習ページ" : "講師用資料"} desc={currentView === "learner" ? "受講した講座の復習内容を確認" : "講座運営に必要なマニュアル、PDF、動画、リンクを確認"} />
+        <QuickCard href={currentView === "learner" ? "/academy/portal/study?view=learner" : "/academy/portal/study?view=instructor"} icon={GraduationCap} title={currentView === "learner" ? "講座復習ページ" : "講師マニュアルページ"} desc={currentView === "learner" ? "受講した講座の復習内容を確認" : "講座運営に必要なマニュアル、PDF、動画、リンクを確認"} />
+        {currentView === "instructor" ? <QuickCard href="/academy/portal/study?view=learner" icon={GraduationCap} title="講座復習ページ" desc="自分が受講した講座の教材を確認。講師マニュアルページとは別のページです" /> : null}
         {currentView === "instructor" && canOperate ? (
           <>
             <QuickCard href="/academy/portal/class-requests" icon={CalendarCheck} title="開催日・担当依頼" desc="自分が担当する日程と、本部からの依頼を確認" />

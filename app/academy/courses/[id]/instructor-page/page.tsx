@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -22,14 +22,35 @@ import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
 import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
+import { EditorPreview } from "@/components/academy/EditorPreview";
+import { ManualResources } from "@/components/academy/ManualResources";
+import { PrivateMaterialFiles } from "@/components/academy/PrivateMaterialFiles";
+import { privateMaterialUiEnabled } from "@/lib/academy/private-material-ui";
+import { PageBlocks } from "@/components/academy/PageBlocks";
+import { safeImageLink } from "@/components/academy/LinkedImage";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import { getInstructorPage, saveInstructorPageBlocks } from "@/lib/academy/instructor-page";
 import { getLearnerPage, saveLearnerPage } from "@/lib/academy/learner-page";
-import type { AcademyCourse, AcademyHeadquarters, AcademyPageBlock } from "@/types/database";
+import type { AcademyCourse, AcademyHeadquarters, AcademyPageBlock, AcademyMaterial } from "@/types/database";
 
 const inputClass =
-  "w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)]";
+  "w-full rounded-none border-0 border-b border-transparent bg-transparent px-1 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-primary)]";
+
+function ImageLinkField({ value, onChange }: { value?: string; onChange: (value: string) => void }) {
+  return <label className="block text-xs text-[var(--mikke-muted)]">画像を押したときのリンク（任意）
+    <input type="url" className={inputClass} placeholder="https://（材料の購入先など）" value={value ?? ""} onChange={(event) => onChange(event.target.value)} />
+    {value?.trim() && !safeImageLink(value) ? <span role="alert" className="text-[var(--mikke-danger)]">https:// または http:// で始まるURLを入力してください。このままではリンクになりません。</span> : null}
+  </label>;
+}
+
+function WritingArea({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (ref.current) { ref.current.style.height = "auto"; ref.current.style.height = `${Math.max(160, ref.current.scrollHeight)}px`; }
+  }, [value]);
+  return <textarea ref={ref} aria-label="本文" className={`${inputClass} min-h-40 resize-y leading-7`} placeholder="ここから自由に書き始められます。改行や文章の貼り付けもできます。" value={value} onChange={(event) => onChange(event.target.value)} />;
+}
 
 function newBlock(type: AcademyPageBlock["type"]): AcademyPageBlock {
   if (type === "heading") return { type: "heading", text: "" };
@@ -66,12 +87,13 @@ function BlockEditor({
     return <input className={inputClass} placeholder="見出しテキスト" value={block.text} onChange={(e) => onChange({ ...block, text: e.target.value })} />;
 
   if (block.type === "text")
-    return <textarea className={`${inputClass} min-h-20`} placeholder="本文（開講手順・補足事項など）" value={block.text} onChange={(e) => onChange({ ...block, text: e.target.value })} />;
+    return <WritingArea value={block.text} onChange={(text) => onChange({ ...block, text })} />;
 
   if (block.type === "image")
     return (
       <>
         <AcademyImageUploader compact currentUrl={block.url || undefined} onUploaded={(url) => onChange({ ...block, url })} />
+        <ImageLinkField value={block.linkUrl} onChange={(linkUrl) => onChange({ ...block, linkUrl })} />
         <input className={inputClass} placeholder="キャプション（任意）" value={block.caption ?? ""} onChange={(e) => onChange({ ...block, caption: e.target.value })} />
       </>
     );
@@ -88,6 +110,7 @@ function BlockEditor({
     return (
       <>
         <AcademyImageUploader compact currentUrl={block.imageUrl || undefined} onUploaded={(url) => onChange({ ...block, imageUrl: url })} />
+        <ImageLinkField value={block.linkUrl} onChange={(linkUrl) => onChange({ ...block, linkUrl })} />
         <input className={inputClass} placeholder="見出し（任意）" value={block.heading ?? ""} onChange={(e) => onChange({ ...block, heading: e.target.value })} />
         <textarea className={`${inputClass} min-h-16`} placeholder="文章" value={block.text} onChange={(e) => onChange({ ...block, text: e.target.value })} />
       </>
@@ -98,6 +121,7 @@ function BlockEditor({
       <div className="space-y-2">
         {block.images.map((img, i) => (
           <div key={i} className="space-y-1 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-2">
+            <ImageLinkField value={img.linkUrl} onChange={(linkUrl) => onChange({ ...block, images: block.images.map((x, j) => j === i ? { ...x, linkUrl } : x) })} />
             <AcademyImageUploader
               compact
               currentUrl={img.url || undefined}
@@ -181,9 +205,12 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [course, setCourse] = useState<AcademyCourse | null>(null);
   const [blocks, setBlocks] = useState<AcademyPageBlock[]>([]);
+  const [previewMaterials, setPreviewMaterials] = useState<AcademyMaterial[]>([]);
+  const [learnerPageId, setLearnerPageId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [isPublished, setIsPublished] = useState(false);
 
   useEffect(() => {
@@ -194,6 +221,7 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
         setCourse(await getCourse(foundHq.id, courseId));
         if (audience === "learner") {
           const page = await getLearnerPage(foundHq.id, courseId);
+          setLearnerPageId(page?.id ?? null);
           setBlocks(page?.blocks ?? []);
           setIsPublished(page?.is_published ?? false);
         } else {
@@ -233,13 +261,17 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
   async function save() {
     if (!hq || !course) return;
     setSaving(true);
+    setSaveError("");
     try {
       if (audience === "learner") {
-        await saveLearnerPage(profile, hq.id, course.id, blocks, isPublished);
+        const page = await saveLearnerPage(profile, hq.id, course.id, blocks, isPublished);
+        setLearnerPageId(page.id);
       } else {
         await saveInstructorPageBlocks(profile, hq.id, course.id, blocks);
       }
       setSaved(true);
+    } catch {
+      setSaveError("保存できませんでした。入力内容はこの画面に残っています。通信状態を確認して、もう一度保存してください。");
     } finally {
       setSaving(false);
     }
@@ -253,12 +285,12 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
       <div className="space-y-4">
       <div>
         <p className="truncate text-xs text-[var(--mikke-muted)]">{course.code} {course.name}</p>
-        <h2 className="text-base font-bold text-[var(--mikke-text)]">{audience === "learner" ? "復習ページ" : "講師用資料ページ"}</h2>
+        <h2 className="text-base font-bold text-[var(--mikke-text)]">{audience === "learner" ? "講座復習ページ" : "講師マニュアルページ"}</h2>
       </div>
       <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
         {audience === "learner"
           ? "受講した人が、講座の振り返りや配布資料、本部からのお知らせを確認するページです。認定講師用の資料とは別です。"
-          : "講座の進め方、材料の購入先、営業方法などを、この講座の認定講師に共有するページです。受講者の復習ページとは別です。"}
+          : "講座の進め方、材料の購入先、営業方法などを、この講座の認定講師に共有するページです。受講者の講座復習ページとは別です。"}
       </p>
 
       {audience === "learner" ? (
@@ -278,28 +310,15 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
         </fieldset>
       ) : null}
 
-      {/* AC-C4: academy_materials を講師用ファイルとして編集する導線。 */}
-      {audience === "instructor" ? <div className="rounded-xl border border-dashed border-[var(--mikke-line)] bg-white p-3">
-        <p className="text-xs font-bold text-[var(--mikke-text)]">PDF・動画・リンクは「講師用ファイル」で追加します</p>
-        <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">
-          表示対象と表示状態を選び、講師のマイポータルに追加できます。
-        </p>
-        <Link
-          href={`/academy/materials?course=${course.id}`}
-          className="mt-2 inline-flex items-center gap-1 rounded-full bg-[var(--mikke-accent-soft)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent-strong)]"
-        >
-          <FolderOpen size={13} /> この講座の教材を管理する
-        </Link>
-      </div> : null}
-
+      <EditorPreview preview={<PageBlocks blocks={[...blocks.filter((block) => block.type !== "materials-list"), ...(audience === "instructor" && previewMaterials.some((material) => material.is_published) ? [{ type: "materials-list" } as const] : [])]} materials={previewMaterials.filter((material) => material.is_published)} />}>
       {blocks.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-6 text-center text-sm text-[var(--mikke-muted)]">
-          まだブロックがありません。下のボタンで追加します。
+          <button type="button" className="min-h-11 text-[var(--mikke-primary)]" onClick={() => add("text")}>ここから文章を書き始める ＋</button>
         </p>
       ) : (
         <ul className="space-y-2">
-          {blocks.map((block, i) => (
-            <li key={i} className="space-y-2 rounded-2xl border border-[var(--mikke-line)] bg-white p-3">
+          {blocks.map((block, i) => block.type === "materials-list" ? null : (
+            <li key={i} className="group space-y-2 border-b border-[var(--mikke-line)] bg-white py-5">
               <div className="flex items-center justify-between">
                 <span className="rounded-full bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{BLOCK_LABEL[block.type]}</span>
                 <div className="flex items-center gap-2 text-[var(--mikke-muted)]">
@@ -339,17 +358,17 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
         <button type="button" onClick={() => add("cta")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
           <MousePointerClick size={14} /> CTA
         </button>
-        {audience === "instructor" ? <button type="button" onClick={() => add("materials-list")} className="flex flex-col items-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white py-2 text-[10px] font-bold text-[var(--mikke-text-soft)]">
-          <FolderOpen size={14} /> 教材リスト
-        </button> : null}
       </div>
-
+      {audience === "instructor" ? <section id="resources" className="border-t border-[var(--mikke-line)] pt-6"><ManualResources courseId={course.id} onChange={setPreviewMaterials} /></section> : null}
+      {audience === "learner" && privateMaterialUiEnabled ? <section className="border-t border-[var(--mikke-line)] py-4"><h3 className="font-bold">受講生向けPDF資料</h3>{learnerPageId ? <PrivateMaterialFiles parent={{ audience: "learner", parentId: learnerPageId }} editable /> : <p className="mt-2 text-sm">最初に講座復習ページを保存すると、PDFを追加できます。</p>}</section> : null}
+      </EditorPreview>
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-          {saving ? "保存中…" : audience === "learner" ? "復習ページを保存" : "講師用資料ページを保存"}
+          {saving ? "保存中…" : audience === "learner" ? "講座復習ページを保存" : "講師マニュアルページを保存"}
         </button>
         {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
       </div>
+      {saveError ? <p role="alert" className="text-sm text-[var(--mikke-danger)]">{saveError}</p> : null}
       </div>
     </AcademyCourseWorkspace>
   );
@@ -360,8 +379,8 @@ export default function InstructorPageBuilder({ params }: { params: Promise<{ id
   const searchParams = useSearchParams();
   const audience = searchParams.get("audience") === "learner" ? "learner" : "instructor";
   return (
-    <HonbuShell title={audience === "learner" ? "復習ページ" : "講師用資料ページ"}>
-      <BuilderContent courseId={id} audience={audience} />
+    <HonbuShell title={audience === "learner" ? "講座復習ページ" : "講師マニュアルページ"}>
+      <BuilderContent key={`${id}:${audience}`} courseId={id} audience={audience} />
     </HonbuShell>
   );
 }

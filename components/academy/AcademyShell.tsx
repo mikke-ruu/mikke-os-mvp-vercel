@@ -53,7 +53,7 @@ const honbuNav: MikkeShellNavItem[] = [
 const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard, section: "マイポータル" },
   { href: "/academy/portal/class-requests", label: "担当する開催日", icon: CalendarCheck, section: "マイポータル" },
-  { href: "/academy/portal/study", label: "復習ページ・講師用資料", icon: GraduationCap, section: "マイポータル" },
+  { href: "/academy/portal/study", label: "講座復習ページ・講師マニュアルページ", icon: GraduationCap, section: "マイポータル" },
   { href: "/academy/portal/url", label: "募集ページ・共有リンク", icon: Link2, section: "募集" },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
   { href: "/academy/portal/kits", label: "教材の注文・履歴", icon: Package, section: "発注" }
@@ -389,7 +389,7 @@ function ShellInner({
     .map((item) => ({
       ...item,
       label: variant === "koushi" && item.href.startsWith("/academy/portal/study")
-        ? personalView === "learner" ? "復習ページ" : "講師用資料"
+        ? "講座復習ページ・講師マニュアルページ"
         : item.label,
       href: contextHref(
         variant === "koushi" && (item.href === "/academy/portal" || item.href.startsWith("/academy/portal/study"))
@@ -403,7 +403,7 @@ function ShellInner({
     .map((item) => ({
       ...item,
       label: variant === "koushi" && item.href.startsWith("/academy/portal/study")
-        ? personalView === "learner" ? "復習" : "講師資料"
+        ? "復習・資料"
         : item.label,
       href: contextHref(
         variant === "koushi" && (item.href === "/academy/portal" || item.href.startsWith("/academy/portal/study"))

@@ -4,6 +4,12 @@
 
 ## UIへの契約
 
+- UI統合: `PrivateMaterialFiles` / `PrivateInstructorResourceForm`、`lib/academy/private-material-client.ts`。本番画面は `NEXT_PUBLIC_ACADEMY_PRIVATE_MATERIALS_ENABLED=true` が必要で既定off。開発用サンプルではUIのみ表示し、client側で送信/取得を拒否する。
+- API既定offと画面既定offは別。画面フラグだけを有効にしない。実Storage E2E/保持運用/DB適用/API有効化を確認してから同時に展開する。
+- `AcademyMaterial.url` はnullable、`delivery_mode` は旧データ互換でoptional。private_fileの表示では外部アンカーを作らない。削除APIがないためprivate親の削除操作も表示しない。
+- 講師用は同一編集画面で下書き親を作成し、そのIDへアップロード。通信結果不明時に自動で親/ファイルを再作成しない。受講生用は復習ページ保存で得たIDを使用する。
+- ダウンロード済みの端末ファイルは回収不可。画面UI接続のテスト成功を実Storage E2E成功と扱わない。
+
 - 型: `lib/academy/private-material-contract.ts`。既存 `types/database.ts` はAcademy室で更新する。
 - `audience=learner` の `parentId` は保存済み `academy_learner_pages.id`。
 - `audience=instructor` の `parentId` は保存済み `academy_materials.id`。

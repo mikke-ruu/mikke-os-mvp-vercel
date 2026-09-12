@@ -1,4 +1,5 @@
 import { ExternalLink, FileText, Link2, Video } from "lucide-react";
+import { LinkedImage } from "./LinkedImage";
 import type { AcademyMaterial, AcademyPageBlock } from "@/types/database";
 
 function kindIcon(kind: AcademyMaterial["kind"]) {
@@ -35,7 +36,7 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
         if (b.type === "image")
           return b.url ? (
             <figure key={i}>
-              <img src={b.url} alt={b.caption ?? ""} className="w-full rounded-xl" />
+              <LinkedImage src={b.url} caption={b.caption} linkUrl={b.linkUrl} className="w-full rounded-xl" />
               {b.caption ? <figcaption className="mt-1 text-xs text-[var(--mikke-muted)]">{b.caption}</figcaption> : null}
             </figure>
           ) : null;
@@ -53,7 +54,7 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
         if (b.type === "image-text")
           return (
             <div key={i} className="grid gap-3 sm:grid-cols-2 sm:items-center">
-              {b.imageUrl ? <img src={b.imageUrl} alt="" className="w-full rounded-xl" /> : null}
+              {b.imageUrl ? <LinkedImage src={b.imageUrl} caption={b.heading} linkUrl={b.linkUrl} className="w-full rounded-xl" /> : null}
               <div>
                 {b.heading ? <h4 className="text-sm font-bold text-[var(--mikke-text)]">{b.heading}</h4> : null}
                 <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text)]">{b.text}</p>
@@ -66,7 +67,7 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
             <div key={i} className="grid grid-cols-2 gap-2 md:grid-cols-3">
               {b.images.filter((img) => img.url).map((img, j) => (
                 <figure key={j}>
-                  <img src={img.url} alt={img.caption ?? ""} className="aspect-square w-full rounded-xl object-cover" />
+                  <LinkedImage src={img.url} caption={img.caption} linkUrl={img.linkUrl} className="aspect-square w-full rounded-xl object-cover" />
                   {img.caption ? <figcaption className="mt-1 text-xs text-[var(--mikke-muted)]">{img.caption}</figcaption> : null}
                 </figure>
               ))}
@@ -86,11 +87,11 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
         if (b.type === "materials-list")
           return materials.length ? (
             <div key={i}>
-              <p className="mb-1 text-xs font-bold text-[var(--mikke-accent)]">講師用ファイル</p>
+              <p className="mb-1 text-xs font-bold text-[var(--mikke-accent)]">添付資料・リンク</p>
               <ul className="grid gap-1.5 md:grid-cols-2">
                 {materials.map((m) => (
                   <li key={m.id}>
-                    <a
+                    {m.delivery_mode === "private_file" || !m.url ? <p className="text-sm">{m.title}（限定PDF）</p> : <a
                       href={m.url}
                       target="_blank"
                       rel="noreferrer"
@@ -99,7 +100,7 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
                       {kindIcon(m.kind)}
                       <span className="min-w-0 flex-1 truncate">{m.title}</span>
                       <ExternalLink size={12} className="shrink-0 text-[var(--mikke-muted)]" />
-                    </a>
+                    </a>}
                   </li>
                 ))}
               </ul>

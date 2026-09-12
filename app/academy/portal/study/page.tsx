@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ExternalLink, FileText, Link2, Video } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
@@ -11,6 +13,7 @@ import { listMyLearnerApplications } from "@/lib/academy/learner-portal";
 import { listMyCourseAccessGrants, resolveCourseAccessGrant } from "@/lib/academy/course-access";
 import { getAcademyRouteContext } from "@/lib/academy/access-context";
 import { PageBlocks } from "@/components/academy/PageBlocks";
+import { PrivateMaterialFiles } from "@/components/academy/PrivateMaterialFiles";
 import { isAcademyLocalReview, academyPreviewCourses } from "@/lib/academy/preview";
 import type { AcademyApplication, AcademyCourse, AcademyCourseAccessGrant, AcademyInstructor, AcademyInstructorPage, AcademyLearnerPage, AcademyMaterial } from "@/types/database";
 
@@ -33,6 +36,7 @@ function kindIcon(kind: AcademyMaterial["kind"]) {
 
 function StudyContent() {
   const { profile } = useAuth();
+  const searchParams = useSearchParams();
   const [records, setRecords] = useState<AcademyInstructor[]>([]);
   const [learnerApps, setLearnerApps] = useState<AcademyApplication[]>([]);
   const [courseMap, setCourseMap] = useState<Record<string, AcademyCourse>>({});
@@ -44,8 +48,9 @@ function StudyContent() {
   const [view, setView] = useState<"learner" | "instructor">("learner");
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requestedView = params.get("view") ?? params.get("sample");
+    const requestedView = searchParams.get("view") ?? searchParams.get("sample");
+    setLoading(true);
+    let cancelled = false;
     if (requestedView) setView(requestedView === "instructor" ? "instructor" : "learner");
     async function load() {
       const academyId = getAcademyRouteContext()?.academyId;
@@ -53,6 +58,7 @@ function StudyContent() {
         getMyInstructorRecords(profile.user_id, academyId),
         listMyLearnerApplications(profile.user_id, academyId)
       ]);
+      if (cancelled) return;
       setRecords(myRecords);
       setLearnerApps(myLearnerApps);
       if (!requestedView) setView(myLearnerApps.length > 0 ? "learner" : "instructor");
@@ -66,6 +72,7 @@ function StudyContent() {
         Promise.all(learnerCourseIds.map((courseId) => getLearnerPageForViewer(courseId).catch(() => null))),
         listMyCourseAccessGrants(learnerCourseIds)
       ]);
+      if (cancelled) return;
       setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
       setMaterials(mats);
       setPageMap(Object.fromEntries(pages.filter((p): p is AcademyInstructorPage => !!p).map((p) => [p.course_id, p])));
@@ -74,13 +81,14 @@ function StudyContent() {
       setLoading(false);
     }
     load();
-  }, [profile.user_id]);
+    return () => { cancelled = true; };
+  }, [profile.user_id, searchParams]);
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
   if (view === "learner") {
     const learnerCourseIds = [...new Set(learnerApps.map((application) => application.course_id))];
     if (learnerCourseIds.length === 0) {
-      return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">受講中・修了した講座はありません。</p>;
+      return <div className="rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-sm leading-7"><h2 className="font-bold">講座復習ページを表示できる受講履歴がありません</h2><p>講座復習ページは、受講の登録と教材の閲覧権限がある講座に表示されます。講師として登録されているだけでは表示されません。</p><p>受講済みなのに表示されない場合は、本部に受講登録のアカウントをご確認ください。本部で作成中のページは編集画面の「プレビュー」から確認できます。</p><Link className="mt-3 inline-block text-[var(--mikke-primary)]" href="?view=instructor">講師マニュアルページを確認する →</Link></div>;
     }
     return (
       <div className="mx-auto max-w-3xl space-y-4">
@@ -99,7 +107,8 @@ function StudyContent() {
                 {access.grant.ends_at ? `閲覧期限：${formatAccessDate(access.grant.ends_at)}` : "閲覧期限：期限なし"}
               </p>
               <div className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] p-4 md:p-5">
-                {page?.blocks.length ? <PageBlocks blocks={page.blocks} /> : <p className="text-sm text-[var(--mikke-muted)]">本部が復習ページを準備中です。</p>}
+                {page?.blocks.length ? <PageBlocks blocks={page.blocks} /> : <p className="text-sm text-[var(--mikke-muted)]">本部が講座復習ページを準備中です。</p>}
+                {page ? <PrivateMaterialFiles parent={{ audience: "learner", parentId: page.id }} /> : null}
               </div>
             </>
           ) : access.state === "upcoming" ? (
@@ -127,7 +136,7 @@ function StudyContent() {
         const course = courseMap[rec.course_id];
         const courseMaterials = materials.filter((m) => m.course_id === rec.course_id);
         const page = pageMap[rec.course_id];
-        // 講師用ファイルは設置ブロックに依存させず、講師用資料ページの定位置に必ず表示する。
+        // 添付資料・リンクは設置ブロックに依存させず、講師マニュアルページの定位置に必ず表示する。
         const contentBlocks = (page?.blocks ?? []).filter((block) => block.type !== "materials-list");
         return (
           <section key={rec.id} className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
@@ -145,17 +154,17 @@ function StudyContent() {
                     <PageBlocks blocks={contentBlocks} />
                   </div>
                 ) : (
-                  <p className="text-sm text-[var(--mikke-muted)]">本部からの講師用資料はまだありません。</p>
+                  <p className="text-sm text-[var(--mikke-muted)]">本部からの講師マニュアルページはまだありません。</p>
                 )}
 
                 <div className="rounded-xl border border-[var(--mikke-line)] bg-white p-4">
-                    <p className="text-sm font-bold text-[var(--mikke-text)]">講師用ファイル</p>
+                    <p className="text-sm font-bold text-[var(--mikke-text)]">添付資料・リンク</p>
                     <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">PDF、動画、ダウンロード資料、外部URLなど、本部がこの講座で共有した内容です。</p>
                   {courseMaterials.length ? (
                     <ul className="mt-2 grid gap-1.5 md:grid-cols-2">
                       {courseMaterials.map((m) => (
                         <li key={m.id}>
-                          <a
+                          {m.delivery_mode === "private_file" ? <><p className="text-sm font-bold">{m.title}</p><PrivateMaterialFiles parent={{ audience: "instructor", parentId: m.id }} /></> : m.url ? <a
                             href={m.url}
                             target="_blank"
                             rel="noreferrer"
@@ -164,12 +173,12 @@ function StudyContent() {
                             {kindIcon(m.kind)}
                             <span className="min-w-0 flex-1 truncate">{m.title}</span>
                             <ExternalLink size={12} className="shrink-0 text-[var(--mikke-muted)]" />
-                          </a>
+                          </a> : <p className="text-sm">{m.title}</p>}
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-3 text-sm text-[var(--mikke-muted)]">現在、表示できる講師用ファイルはありません。</p>
+                    <p className="mt-3 text-sm text-[var(--mikke-muted)]">現在、表示できる添付資料・リンクはありません。</p>
                   )}
                 </div>
               </>
@@ -183,7 +192,11 @@ function StudyContent() {
 
 export default function StudyPage() {
   return (
-    <KoushiShell title="復習ページ・講師用資料">
+    <KoushiShell title="講座復習ページ・講師マニュアルページ">
+      <nav aria-label="教材ページの切り替え" className="mx-auto mb-4 flex max-w-3xl flex-wrap gap-2">
+        <Link className="rounded-lg border border-[var(--mikke-line)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]" href="?view=learner">講座復習ページ</Link>
+        <Link className="rounded-lg border border-[var(--mikke-line)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]" href="?view=instructor">講師マニュアルページ</Link>
+      </nav>
       <StudyContent />
     </KoushiShell>
   );
