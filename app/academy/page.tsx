@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyOperationsDashboard } from "@/components/academy/AcademyOperationsDashboard";
@@ -41,6 +41,7 @@ import type {
 
 function DashboardContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, profile, isGuest } = useAuth();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [courses, setCourses] = useState<AcademyCourse[]>([]);
@@ -104,7 +105,7 @@ function DashboardContent() {
       } catch { setLoadError(true); } finally { setLoading(false); }
     }
     load();
-  }, [profile.user_id]);
+  }, [profile.user_id, pathname]);
 
   async function initHq() {
     setLoading(true);
@@ -210,5 +211,6 @@ export default function AcademyDashboardPage() {
 
 function DashboardIdentity() {
   const { user } = useAuth();
-  return <DashboardContent key={user.id} />;
+  const pathname = usePathname();
+  return <DashboardContent key={`${user.id}:${pathname}`} />;
 }

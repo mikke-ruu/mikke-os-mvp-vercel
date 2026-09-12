@@ -142,9 +142,11 @@ function mergeSnsLinks(value: unknown): StoryProfileLink[] {
   return [...fixed, ...parsed.filter((item) => !storySnsDefaults.some((fixedItem) => fixedItem.key === item.key))];
 }
 
-export function loadStoryProfileDraft(): StoryProfileView {
+export function loadStoryProfileDraft(userId: string): StoryProfileView {
   if (typeof window === "undefined") return defaultStoryProfile;
-  const stored = window.localStorage.getItem(storyProfileStorageKey) ?? window.localStorage.getItem("mikkeos.story.profile.v2");
+  if (!userId) return defaultStoryProfile;
+  // Legacy device-wide drafts have no provable owner. Never import them.
+  const stored = window.localStorage.getItem(`${storyProfileStorageKey}:${userId}`);
   if (!stored) return defaultStoryProfile;
   try {
     const parsed = JSON.parse(stored) as Partial<StoryProfileView>;
@@ -163,7 +165,8 @@ export function loadStoryProfileDraft(): StoryProfileView {
   }
 }
 
-export function saveStoryProfileDraft(profile: StoryProfileView) {
-  window.localStorage.setItem(storyProfileStorageKey, JSON.stringify(profile));
+export function saveStoryProfileDraft(userId: string, profile: StoryProfileView) {
+  if (!userId) throw new Error("STORY draft requires an account");
+  window.localStorage.setItem(`${storyProfileStorageKey}:${userId}`, JSON.stringify(profile));
   window.dispatchEvent(new Event("mikkeos-story-profile-updated"));
 }
