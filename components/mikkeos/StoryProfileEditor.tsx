@@ -148,7 +148,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
     setConfirmOpen(false); setSaving(publish ? "publish" : "draft"); setMessage("");
     saveStoryProfileDraft(user.id, next);
     try {
-      const saved = await saveMyStoryProfile(supabase, next);
+      const saved = await saveMyStoryProfile(supabase, next, user.id);
       setForm(saved); setTagsInput(saved.tags.join("、")); saveStoryProfileDraft(user.id, saved); setIsError(false);
       const savedPaths = storyMediaPaths(saved);
       const removedPaths = persistedMediaPaths.filter((path) => !savedPaths.includes(path));
