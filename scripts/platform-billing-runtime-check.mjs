@@ -57,7 +57,7 @@ await store.saveQuote(quote,expected,now,signal);
 assert.deepEqual(await store.loadQuote(owner,quote.quoteId,signal),quote);
 let creates=0,retrieves=0;
 const providerSession={id:'cs_test_runtimefixture',url:'https://checkout.stripe.com/c/localfixture',expiresAt:quote.expiresAt};
-const dependencies={...store,now:()=>new Date(),selectAuthorizedContext:async()=>expected,
+const dependencies={...store,providerMode:'test',now:()=>new Date(),selectAuthorizedContext:async()=>expected,
   createTestSession:async()=>{creates++;return providerSession;},retrieveTestSession:async()=>{retrieves++;return providerSession;}};
 const input={version:1,product:scope.productKey,resourceId:resource,planKey:'fixture',requestId:request,
   consent:{quoteId:quote.quoteId,revision:1,termsVersion:'fixture-v1',accepted:true}};

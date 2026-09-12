@@ -14,11 +14,13 @@ insert into auth.users (
   raw_user_meta_data, created_at, updated_at, is_sso_user, is_anonymous
 ) values
   ('a9600000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'open-trial@example.invalid', now(), '{}'::jsonb, '{}'::jsonb, now(), now(), false, false),
-  ('a9600000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'anonymous-trial@example.invalid', now(), '{}'::jsonb, '{}'::jsonb, now(), now(), false, true);
+  ('a9600000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'anonymous-trial@example.invalid', now(), '{}'::jsonb, '{}'::jsonb, now(), now(), false, true),
+  ('a9600000-0000-4000-8000-000000000003', 'authenticated', 'authenticated', 'expired-trial@example.invalid', now(), '{}'::jsonb, '{}'::jsonb, now(), now(), false, false);
 
 insert into public.profiles (id, user_id, display_name, handle, member_number) values
   ('b9600000-0000-4000-8000-000000000001', 'a9600000-0000-4000-8000-000000000001', 'Open Trial', 'open_trial', 999600001),
-  ('b9600000-0000-4000-8000-000000000002', 'a9600000-0000-4000-8000-000000000002', 'Anonymous Trial', 'anonymous_trial', 999600002);
+  ('b9600000-0000-4000-8000-000000000002', 'a9600000-0000-4000-8000-000000000002', 'Anonymous Trial', 'anonymous_trial', 999600002),
+  ('b9600000-0000-4000-8000-000000000003', 'a9600000-0000-4000-8000-000000000003', 'Expired Trial', 'expired_trial', 999600003);
 
 set local role authenticated;
 select set_config(
@@ -89,28 +91,36 @@ $$;
 select pg_temp.academy_open_trial_assert(true, 'anonymous auth is rejected');
 
 reset role;
-update public.academy_headquarters_access_states
-set starts_at = now() - interval '8 days',
-    trial_ends_at = now() - interval '1 day',
-    updated_at = now()
-where owner_user_id = 'a9600000-0000-4000-8000-000000000001';
+insert into public.academy_headquarters (
+  id, owner_user_id, owner_profile_id, name, handle, plan, is_active
+) values (
+  'c9600000-0000-4000-8000-000000000003',
+  'a9600000-0000-4000-8000-000000000003',
+  'b9600000-0000-4000-8000-000000000003',
+  'Expired Trial Academy', 'expired-trial-academy', 'small', false
+);
+insert into public.academy_headquarters_access_states (
+  headquarters_id, owner_user_id, access_kind, status, starts_at, trial_ends_at
+) values (
+  'c9600000-0000-4000-8000-000000000003',
+  'a9600000-0000-4000-8000-000000000003',
+  'trial', 'expired', now() - interval '8 days', now() - interval '1 day'
+);
 
 set local role authenticated;
 select set_config(
   'request.jwt.claims',
-  '{"sub":"a9600000-0000-4000-8000-000000000001","role":"authenticated","is_anonymous":false}',
+  '{"sub":"a9600000-0000-4000-8000-000000000003","role":"authenticated","is_anonymous":false}',
   true
 );
 select pg_temp.academy_open_trial_assert(
   public.academy_get_my_headquarters_role(
-    (select id from public.academy_headquarters
-     where owner_user_id = 'a9600000-0000-4000-8000-000000000001')
+    'c9600000-0000-4000-8000-000000000003'
   ) = 'owner'
   and
   (select status = 'expired' and not can_manage_drafts and not can_use_live_features
    from public.academy_get_my_headquarters_access(
-     (select id from public.academy_headquarters
-      where owner_user_id = 'a9600000-0000-4000-8000-000000000001')
+     'c9600000-0000-4000-8000-000000000003'
    )),
   'expired trial remains readable but not writable'
 );

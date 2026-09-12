@@ -1,5 +1,68 @@
--- Academy monthly billing snapshot/RLS test.
--- Run after academy_release_candidate_e2e.sql in the same BEGIN/ROLLBACK.
+-- Academy monthly billing snapshot/RLS test against the current final schema.
+-- The caller owns the outer BEGIN/ROLLBACK transaction.
+
+create or replace function pg_temp.academy_assert(p_condition boolean, p_message text)
+returns void language plpgsql as $$
+begin
+  if not coalesce(p_condition, false) then
+    raise exception 'academy_e2e_assertion_failed: %', p_message;
+  end if;
+end;
+$$;
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at, raw_app_meta_data,
+  raw_user_meta_data, created_at, updated_at, is_sso_user, is_anonymous
+) values (
+  'a1000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated',
+  'academy-billing-owner@example.invalid', now(), '{}'::jsonb, '{}'::jsonb,
+  now(), now(), false, false
+);
+
+insert into public.profiles (id, user_id, display_name, handle, member_number)
+values (
+  'b1000000-0000-4000-8000-000000000001',
+  'a1000000-0000-4000-8000-000000000001',
+  'Academy Billing Owner', 'academy_billing_owner', 991000000
+);
+
+insert into public.academy_headquarters (
+  id, owner_user_id, owner_profile_id, name, handle, plan, is_active, created_at
+) values (
+  'c1000000-0000-4000-8000-000000000001',
+  'a1000000-0000-4000-8000-000000000001',
+  'b1000000-0000-4000-8000-000000000001',
+  'Academy Billing HQ', 'academy-billing-hq', 'small', true,
+  '2025-12-01 00:00:00+09'
+);
+
+insert into public.academy_headquarters_access_states (
+  headquarters_id, owner_user_id, access_kind, status, starts_at, paid_started_at
+) values (
+  'c1000000-0000-4000-8000-000000000001',
+  'a1000000-0000-4000-8000-000000000001',
+  'paid', 'active', '2025-12-01 00:00:00+09', '2025-12-01 00:00:00+09'
+);
+
+insert into platform_billing_private.internal_resource_grants (
+  actor_user_id, product_key, resource_id, purpose, reason,
+  granted_by, evidence, starts_at
+) values (
+  'a1000000-0000-4000-8000-000000000001', 'academy_platform',
+  'c1000000-0000-4000-8000-000000000001', 'test_only',
+  'rollback-only billing fixture',
+  'a1000000-0000-4000-8000-000000000001',
+  'isolated current-master SQL test', '2025-12-01 00:00:00+09'
+);
+
+insert into public.academy_courses (
+  id, headquarters_id, user_id, code, name, formats, is_published
+) values (
+  'd1000000-0000-4000-8000-000000000001',
+  'c1000000-0000-4000-8000-000000000001',
+  'a1000000-0000-4000-8000-000000000001',
+  'BILLING', 'Billing Fixture', array['online'], false
+);
 
 create temporary table academy_billing_test_people (
   n integer primary key,
