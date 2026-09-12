@@ -2,7 +2,7 @@
 
 import type { User } from "@supabase/supabase-js";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, Suspense, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, Suspense, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ensureProfile } from "@/lib/profile";
 import { MARKETNOTE_GUEST_USER_ID, marketNoteGuestProfile } from "@/lib/marketnote-guest";
 import { supabase } from "@/lib/supabase/client";
@@ -143,10 +143,12 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authUnavailable, setAuthUnavailable] = useState(false);
+  const identityGeneration = useRef(0);
 
   async function loadProfile(nextUser: User) {
+    const generation = identityGeneration.current;
     const nextProfile = await ensureProfile(nextUser);
-    setProfile(nextProfile);
+    if (generation === identityGeneration.current) setProfile(nextProfile);
   }
 
   async function refreshProfile() {
@@ -164,8 +166,9 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
       };
     }
 
+    const initialGeneration = identityGeneration.current;
     getSessionWithRetry().then(async ({ data, error }) => {
-      if (!mounted) return;
+      if (!mounted || initialGeneration !== identityGeneration.current) return;
       if (error) throw error;
       const nextUser = data.session?.user ?? null;
       setUser(nextUser);
@@ -183,32 +186,35 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
       try {
         await loadProfile(nextUser);
       } catch {
-        if (mounted) setAuthUnavailable(true);
+        if (mounted && initialGeneration === identityGeneration.current) setAuthUnavailable(true);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted && initialGeneration === identityGeneration.current) setLoading(false);
       }
     }).catch(() => {
-      if (!mounted) return;
+      if (!mounted || initialGeneration !== identityGeneration.current) return;
       setLoading(false);
       setAuthUnavailable(true);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      identityGeneration.current += 1;
+      const generation = identityGeneration.current;
       const nextUser = session?.user ?? null;
       setUser(nextUser);
       setAuthUnavailable(false);
       if (nextUser) {
         window.setTimeout(() => {
-          if (!mounted) return;
+          if (!mounted || generation !== identityGeneration.current) return;
           void loadProfile(nextUser).then(() => {
-            if (mounted) setLoading(false);
+            if (mounted && generation === identityGeneration.current) setLoading(false);
           }).catch(() => {
-            if (mounted) { setLoading(false); setAuthUnavailable(true); }
+            if (mounted && generation === identityGeneration.current) { setLoading(false); setAuthUnavailable(true); }
           });
         }, 0);
         return;
       }
       if (!nextUser) {
+        setLoading(false);
         if (allowGuest) {
           setUser(marketNoteGuestUser);
           setProfile(marketNoteGuestProfile);
@@ -221,6 +227,7 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
 
     return () => {
       mounted = false;
+      identityGeneration.current += 1;
       listener.subscription.unsubscribe();
     };
   }, [allowGuest, localFixtureReview, nextPath, pathname, router]);
@@ -228,7 +235,7 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
   const value = useMemo(() => {
     const nextUser = localFixtureUser ?? user;
     const nextProfile = localFixtureProfile ?? profile;
-    if (!nextUser || !nextProfile) return null;
+    if (!nextUser || !nextProfile || nextProfile.user_id !== nextUser.id) return null;
     return { user: nextUser, profile: nextProfile, isGuest: nextProfile.id === marketNoteGuestProfile.id, refreshProfile };
   }, [localFixtureProfile, localFixtureUser, user, profile]);
 
@@ -246,5 +253,5 @@ function AuthGateInner({ children, allowGuest }: { children: React.ReactNode; al
 
   if ((!localFixtureReview && loading) || !value) return <LoadingScreen />;
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider key={value.user.id} value={value}>{children}</AuthContext.Provider>;
 }

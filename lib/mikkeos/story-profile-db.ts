@@ -75,8 +75,17 @@ export async function getPublishedStoryProfile(client: DbClient, handle: string)
   return data ? hydrateStoryProfileMedia(client, mapStoryProfileRow(data as unknown as StoryProfileRow)) : null;
 }
 
-export async function saveMyStoryProfile(client: DbClient, story: StoryProfileView) {
-  const { data, error } = await withStoryProfileTimeout(client.rpc("story_profile_save_mine", storyProfilePayload(story)), "Saving STORY profile");
+export async function saveMyStoryProfile(client: DbClient, story: StoryProfileView, expectedUserId: string) {
+  const { data: sessionData, error: sessionError } = await client.auth.getSession();
+  const session = sessionData.session;
+  if (sessionError || !session || session.user.id !== expectedUserId) {
+    throw new Error("STORY account changed before saving");
+  }
+  // Pin the request to the checked identity even if another tab switches accounts
+  // while the request is waiting for auth/transport initialization.
+  const request = client.rpc("story_profile_save_mine", storyProfilePayload(story))
+    .setHeader("Authorization", `Bearer ${session.access_token}`);
+  const { data, error } = await withStoryProfileTimeout(request, "Saving STORY profile");
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
   if (!row) throw new Error("Saving STORY profile returned no profile.");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthGate, useAuth } from "@/components/AuthGate";
 import { StoryNameCard } from "@/components/mikkeos/StoryNameCard";
 import { StoryAppShell } from "@/components/mikkeos/StoryAppShell";
 import { getMyStoryProfile } from "@/lib/mikkeos/story-profile-db";
@@ -13,12 +13,13 @@ export default function StoryPage() {
 }
 
 function StoryOwnerPage() {
+  const { user } = useAuth();
   const [story, setStory] = useState<StoryProfileView>(defaultStoryProfile);
 
   useEffect(() => {
     let cancelled = false;
     const load = () => {
-      setStory(loadStoryProfileDraft());
+      setStory(loadStoryProfileDraft(user.id));
       getMyStoryProfile(supabase)
         .then((remote) => { if (!cancelled && remote) setStory(remote); })
         .catch(() => undefined);
@@ -29,7 +30,7 @@ function StoryOwnerPage() {
       cancelled = true;
       window.removeEventListener("mikkeos-story-profile-updated", load);
     };
-  }, []);
+  }, [user.id]);
 
   return <StoryNameCard story={story} isOwner />;
 }

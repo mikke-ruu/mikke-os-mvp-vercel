@@ -45,13 +45,14 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   const [tagsInput, setTagsInput] = useState("");
 
   useEffect(() => {
-    if (mode === "start") setIntroStep(window.localStorage.getItem(introSeenKey) === "1" ? null : 0);
-  }, [mode]);
+    if (mode === "start") setIntroStep(window.localStorage.getItem(`${introSeenKey}:${user.id}`) === "1" ? null : 0);
+  }, [mode, user.id]);
 
   useEffect(() => {
     let cancelled = false;
     const commonDisplayName = profile.display_name?.trim() ?? "";
-    const savedDraft = loadStoryProfileDraft();
+    setLoading(true);
+    const savedDraft = loadStoryProfileDraft(user.id);
     const localDraft = {
       ...savedDraft,
       handle: profile.handle,
@@ -65,7 +66,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
         setForm(next);
         setTagsInput(next.tags.join("、"));
         setPersistedMediaPaths(storyMediaPaths(next));
-        saveStoryProfileDraft(next);
+        saveStoryProfileDraft(user.id, next);
         setIntroStep(null);
       }
     }).catch(() => {
@@ -131,17 +132,24 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   };
 
   const persist = async (publish: boolean) => {
+    const { data: identity, error: identityError } = await supabase.auth.getUser();
+    if (identityError || identity.user?.id !== user.id) {
+      setConfirmOpen(false);
+      setIsError(true);
+      setMessage("ログイン状態が変わりました。画面を読み込み直してから保存してください。");
+      return;
+    }
     if (!publish && (!form.displayName.trim() || !form.handle)) {
-      saveStoryProfileDraft({ ...form, isPublished: false });
+      saveStoryProfileDraft(user.id, { ...form, isPublished: false });
       setIsError(false); setMessage("この端末に下書きを保存しました。表示名を入力するとサーバーにも保存できます。");
       return;
     }
     const next = { ...form, isPublished: publish || form.isPublished };
     setConfirmOpen(false); setSaving(publish ? "publish" : "draft"); setMessage("");
-    saveStoryProfileDraft(next);
+    saveStoryProfileDraft(user.id, next);
     try {
-      const saved = await saveMyStoryProfile(supabase, next);
-      setForm(saved); setTagsInput(saved.tags.join("、")); saveStoryProfileDraft(saved); setIsError(false);
+      const saved = await saveMyStoryProfile(supabase, next, user.id);
+      setForm(saved); setTagsInput(saved.tags.join("、")); saveStoryProfileDraft(user.id, saved); setIsError(false);
       const savedPaths = storyMediaPaths(saved);
       const removedPaths = persistedMediaPaths.filter((path) => !savedPaths.includes(path));
       if (removedPaths.length) void removeStoryImages(supabase, removedPaths).catch(() => undefined);
@@ -156,7 +164,7 @@ export function StoryProfileEditor({ mode }: { mode: "start" | "edit" }) {
   };
 
   if (loading || introStep === undefined) return <main className="min-h-screen bg-white" />;
-  if (introStep !== null) return <StoryIntro step={introStep} onStep={setIntroStep} onBegin={() => { window.localStorage.setItem(introSeenKey, "1"); setIntroStep(null); }} />;
+  if (introStep !== null) return <StoryIntro step={introStep} onStep={setIntroStep} onBegin={() => { window.localStorage.setItem(`${introSeenKey}:${user.id}`, "1"); setIntroStep(null); }} />;
 
   const theme = storyThemes[form.themeKey];
   const initials = form.displayName.trim().slice(0, 2) || "ST";
