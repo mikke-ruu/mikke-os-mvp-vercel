@@ -21,4 +21,3 @@ export function MikkeInsertMenu({ position, onInsert, allowedTypes }: {position:
     {open ? <div id={`media-insert-${position}`} role="group" aria-label="挿入する内容" style={placement.left?{right:"calc(100% + 8px)",top:placement.top}:undefined} className={(placement.left?"absolute w-40 grid-cols-1 ":"relative mt-2 w-full grid-cols-2 ")+"z-30 grid gap-0 rounded-lg border border-[var(--mikke-line)] bg-white p-1 shadow-lg"}>{options.filter(option=>!allowedTypes||allowedTypes.includes(option.type)).map(({type,label,icon:Icon,level})=><button key={label} type="button" style={{fontSize:12,lineHeight:"18px",minHeight:0,padding:"3px 8px"}} onClick={()=>{onInsert(type,level);setOpen(false);}} className="flex items-center min-h-0 gap-2 rounded px-2 py-1 text-left text-[12px] leading-[18px] hover:bg-[var(--mikke-primary-soft)] focus:bg-[var(--mikke-primary-soft)]"><Icon size={14} className="shrink-0"/>{label}</button>)}</div>:null}
   </div>;
 }
-

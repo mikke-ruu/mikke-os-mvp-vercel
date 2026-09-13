@@ -93,7 +93,7 @@ function FrontContent() {
           target="_blank"
           className="flex shrink-0 items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent)]"
         >
-          <ExternalLink size={13} /> プレビュー
+          <ExternalLink size={13} /> 保存済みのホームページを見る
         </Link>
       </div>
 
@@ -138,9 +138,9 @@ function FrontContent() {
       </section>
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
-        <p className="text-xs font-bold text-[var(--mikke-accent)]">ホームページの自由ブロック</p>
+        <p className="text-xs font-bold text-[var(--mikke-accent)]">ホームページの本文</p>
         <p className="text-[11px] text-[var(--mikke-muted)]">
-          上のヒーローエリアと講座一覧の間に表示される自由なセクションです（見出し・文章・画像・画像+文章・画像グリッド・CTA）。
+          メイン画像と講座一覧の間に表示されます。「＋」から文章・画像・動画などを挿入し、自由に組み立てられます。
         </p>
 
         <LpBlocksEditor blocks={blocks} onChange={handleBlocksChange} />

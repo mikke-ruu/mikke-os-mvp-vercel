@@ -21,4 +21,3 @@ export function MikkeBlockFields({ block, onChange, onSplit, ImagePicker, LinkEd
   if (block.type === "link" || block.type === "video") return <LinkEditor block={block} onChange={onChange}/>;
   return <WritingArea onSplit={onSplit} onUrlPaste={url=>onChange({id:block.id,type:"link",url,title:""})} label="本文の文章" value={block.text ?? ""} onChange={(text) => onChange({ ...block, text })} placeholder="本文を書いてみましょう" />;
 }
-

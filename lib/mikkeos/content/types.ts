@@ -22,4 +22,3 @@ export type MikkeContentBlock = {
   columns?: 2 | 3;
   buttonLabel?: string;
 };
-
