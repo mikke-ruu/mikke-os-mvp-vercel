@@ -11,7 +11,7 @@ function load(relative) {
   const result = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }, reportDiagnostics: true });
   assert.equal((result.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error).length, 0, relative);
   const module = { exports: {} };
-  const localRequire = name => name.startsWith('.') ? load(path.relative(root, path.resolve(path.dirname(filename), name + '.tsx'))) : require(name);
+  const localRequire = name => name.startsWith('@/') ? load(name.slice(2) + '.tsx') : name.startsWith('.') ? load(path.relative(root, path.resolve(path.dirname(filename), name + '.tsx'))) : require(name);
   new Function('require', 'module', 'exports', result.outputText)(localRequire, module, module.exports);
   return module.exports;
 }

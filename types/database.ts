@@ -194,20 +194,22 @@ export type AcademyGalleryImage = { url: string; caption?: string; linkUrl?: str
 // 講座LPのビルド式ブロック（MIRACOビルド式踏襲・ざっくり版）
 // Wave C (AC-C1): 見出し/文章/画像に加え、画像+文章(2カラム)・画像グリッド・CTAを追加。
 // 既存のheading/text/imageは変更しない（旧データがそのまま読み込める）。
-export type AcademyLpBlock =
+// Optional versioned presentation payload; legacy fields remain readable by older clients.
+export type AcademyContentExtension = { content?: import("@/lib/mikkeos/content/types").MikkeContentBlock; contentVersion?: 1 };
+export type AcademyLpBlock = AcademyContentExtension & (
   | { type: "heading"; text: string }
   | { type: "text"; text: string }
   | { type: "image"; url: string; caption?: string; linkUrl?: string }
   | { type: "image-text"; imageUrl: string; heading?: string; text: string; linkUrl?: string }
   | { type: "gallery"; images: AcademyGalleryImage[] }
-  | { type: "cta"; heading: string; buttonLabel: string; buttonUrl: string };
+  | { type: "cta"; heading: string; buttonLabel: string; buttonUrl: string });
 
 // 講師専用ページ（本部が作る復習・共有ページ）のビルド式ブロック
 // Wave C (AC-C2): image-text/gallery/ctaをLPと同じ形で追加。
 // Wave C (AC-C3): materials-list（設定項目なし。この講座のacademy_materialsを自動表示）を追加。
 // 既存のheading/text/image/video/linksは変更しない（旧データがそのまま読み込める）。
 export type AcademyPageLink = { label: string; url: string };
-export type AcademyPageBlock =
+export type AcademyPageBlock = AcademyContentExtension & (
   | { type: "heading"; text: string }
   | { type: "text"; text: string }
   | { type: "image"; url: string; caption?: string; linkUrl?: string }
@@ -216,7 +218,7 @@ export type AcademyPageBlock =
   | { type: "image-text"; imageUrl: string; heading?: string; text: string; linkUrl?: string }
   | { type: "gallery"; images: AcademyGalleryImage[] }
   | { type: "cta"; heading: string; buttonLabel: string; buttonUrl: string }
-  | { type: "materials-list" };
+  | { type: "materials-list" });
 
 export type AcademyInstructorPage = {
   id: string;
