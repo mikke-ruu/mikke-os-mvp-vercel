@@ -575,13 +575,13 @@ function ShellInner({
               className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
             >
               {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-              {variant === "honbu" ? "受講生・講師ポータルへ →" : "教室全体の運営へ →"}
+              {variant === "honbu" ? "自分の受講生・講師ポータルへ →" : "教室全体の運営へ →"}
             </Link>
           ) : null}
         </div>
       </div>
       {variant === "honbu" ? <AcademyPageHelp pathname={pathname} /> : null}
-      <div onSubmitCapture={blockReadonlySubmit}>{children}</div>
+      <div onSubmitCapture={blockReadonlySubmit} className="font-medium text-[var(--mikke-text)] [--mikke-muted:var(--mikke-text)] [--mikke-text-soft:var(--mikke-text)] max-sm:[&_section]:rounded-lg max-sm:[&_input]:rounded-lg max-sm:[&_select]:rounded-lg max-sm:[&_textarea]:rounded-lg max-sm:[&_button]:rounded-lg max-sm:[&_.p-6]:p-3 max-sm:[&_.p-5]:p-3 max-sm:[&_.space-y-6]:space-y-3 max-sm:[&_.space-y-5]:space-y-3">{children}</div>
       </div>
     </MikkeAppShell>
   );

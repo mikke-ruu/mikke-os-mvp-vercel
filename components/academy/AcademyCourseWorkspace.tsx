@@ -8,7 +8,7 @@ import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feat
 const courseTabs = [
   { id: "settings", label: "講座の内容を整える", href: (courseId: string) => `/academy/courses/${courseId}` },
   { id: "program", label: "ステップ教材", href: (courseId: string) => `/academy/courses/${courseId}/program` },
-  { id: "page", label: "紹介ページを整える", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
+  { id: "page", label: "講座ページを整える", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
   {
     id: "learner",
     label: "講座復習ページ",
@@ -41,8 +41,8 @@ export function AcademyCourseWorkspace({
   });
 
   return (
-    <div className="space-y-5">
-      <header className="border-b border-[var(--mikke-line)] pb-4">
+    <div className="space-y-3">
+      <header className="border-b border-[var(--mikke-line)] pb-2">
         <Link
           href="/academy/courses"
           className="inline-flex items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]"
@@ -74,10 +74,10 @@ export function AcademyCourseWorkspace({
             className="inline-flex items-center gap-1 self-start rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)] lg:self-auto"
           >
             <ExternalLink size={14} />
-            公開講座ページを見る
+            講座ページを見る
           </Link>
         </div>
-        <p className="mt-4 text-sm leading-7 text-[var(--mikke-muted)]">{activeTab === "settings" ? "下の道順に沿って、一つずつ整えます。途中でも保存でき、順番を戻して修正できます。" : activeTab === "page" ? "受講を考えている人へ、講座の魅力を伝えるページをつくります。" : activeTab === "learner" ? "受講者が講座の後も見返せる、教材や復習内容をまとめます。" : "教える人が使う進め方や資料をまとめます。"}</p>
+        <p className="mt-2 text-sm leading-5 text-[var(--mikke-muted)]">{activeTab === "settings" ? "下の道順に沿って、一つずつ整えます。途中でも保存でき、順番を戻して修正できます。" : activeTab === "page" ? "受講を考えている人へ、講座の魅力を伝えるページをつくります。" : activeTab === "learner" ? "受講者が講座の後も見返せる、教材や復習内容をまとめます。" : "教える人が使う進め方や資料をまとめます。"}</p>
       </header>
 
       <nav aria-label="講座内メニュー" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
@@ -88,7 +88,7 @@ export function AcademyCourseWorkspace({
               key={tab.id}
               href={tab.href(course.id)}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-11 items-center justify-center rounded-sm border px-3 py-2 text-sm font-bold ${
+              className={`flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-sm font-bold ${
                 active
                   ? "border-[var(--mikke-primary)] bg-white text-[var(--mikke-primary)]"
                   : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text-soft)]"
@@ -102,7 +102,7 @@ export function AcademyCourseWorkspace({
       <div className="mx-auto w-full max-w-5xl">{children}</div>
       <section className="border-t border-[var(--mikke-line)] bg-white py-4">
         <h2 className="text-sm font-bold">教材・講師向けのページを整える</h2>
-        <nav aria-label="教材・講師用メニュー" className="mt-3 grid gap-2 sm:grid-cols-2">{visibleTabs.filter(tab => tab.id !== "settings" && tab.id !== "page").map(tab => <Link key={tab.id} href={tab.href(course.id)} aria-current={activeTab === tab.id ? "page" : undefined} className={`flex min-h-11 items-center justify-center rounded-sm border p-3 text-sm font-bold ${activeTab === tab.id ? "bg-[#3f4eb5] text-white" : "bg-white"}`}>{tab.label}</Link>)}</nav>
+        <nav aria-label="教材・講師用メニュー" className="mt-3 grid gap-2 sm:grid-cols-2">{visibleTabs.filter(tab => tab.id !== "settings" && tab.id !== "page").map(tab => <Link key={tab.id} href={tab.href(course.id)} aria-current={activeTab === tab.id ? "page" : undefined} className={`flex min-h-11 items-center justify-center rounded-lg border p-3 text-sm font-bold ${activeTab === tab.id ? "bg-[#3f4eb5] text-white" : "bg-white"}`}>{tab.label}</Link>)}</nav>
       </section>
 
 

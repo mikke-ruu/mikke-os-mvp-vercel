@@ -60,10 +60,10 @@ function LpBuilderContent({ courseId }: { courseId: string }) {
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="truncate text-xs text-[var(--mikke-muted)]">{course.code} {course.name}</p>
-          <h2 className="text-base font-bold text-[var(--mikke-text)]">公開講座ページの編集</h2>
+          <h2 className="text-base font-bold text-[var(--mikke-text)]">講座ページの編集</h2>
         </div>
         <Link href={`/academy/c/${course.id}`} target="_blank" className="flex items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]">
-          <ExternalLink size={14} /> 公開講座ページを見る
+          <ExternalLink size={14} /> 講座ページを見る
         </Link>
       </div>
 
@@ -75,7 +75,7 @@ function LpBuilderContent({ courseId }: { courseId: string }) {
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-          {saving ? "保存中…" : "公開講座ページを保存する"}
+          {saving ? "保存中…" : "講座ページを保存する"}
         </button>
         {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
       </div>
@@ -87,7 +87,7 @@ function LpBuilderContent({ courseId }: { courseId: string }) {
 export default function LpBuilderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return (
-    <HonbuShell title="公開講座ページの編集">
+    <HonbuShell title="講座ページの編集">
       <LpBuilderContent courseId={id} />
     </HonbuShell>
   );

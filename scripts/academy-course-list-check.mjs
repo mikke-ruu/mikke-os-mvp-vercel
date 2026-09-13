@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const list=read('app/academy/courses/page.tsx');
+for(const word of ['講座一覧','講座ページを編集','講座復習ページ','講師マニュアルページ','受講生・講師の表示を確認','portal-preview','overflow-hidden rounded-lg'])assert.ok(list.includes(word),word);
+for(const word of ['あなたの講座','下書きから少しずつ整えましょう','講師用資料ページ編集','紹介ページを整える'])assert.ok(!list.includes(word),word);
+const tools=read('components/academy/AcademyListTools.tsx');
+assert.ok(!tools.includes('border-y'));
+assert.ok(tools.includes('rounded-lg'));
+assert.ok(tools.includes('aria-pressed'));
+const preview=read('app/academy/courses/[id]/portal-preview/page.tsx');
+for(const word of ['getOwnedHeadquarters(profile.user_id)','getCourse(hq.id,id)','getLearnerPage(hq.id,id)','getInstructorPage(hq.id,id)','active=false','他の人のアカウントには入りません','下書きの確認中','materials-list'])assert.ok(preview.includes(word),word);
+assert.ok(!/saveLearner|saveInstructor|\.upsert\(|\.update\(|service_role|PrivateMaterialFiles/.test(preview));
+console.log('PASS: compact course list labels, rounded search, owner-scoped read-only sample and no impersonation/writes');
