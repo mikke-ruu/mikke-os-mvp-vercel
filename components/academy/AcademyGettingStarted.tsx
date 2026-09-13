@@ -26,7 +26,7 @@ export function AcademyGettingStarted({ empty, scope }: { empty: boolean; scope:
   }
   function openGuide() { setStep(0); dialog.current?.showModal(); }
   return <section>
-    <button type="button" onClick={openGuide} className="min-h-11 text-sm font-bold text-[var(--mikke-primary)]">？ 使い方ガイド</button>
+    <button type="button" onClick={openGuide} className="min-h-11 text-sm font-bold text-[var(--mikke-text)]">？ 使い方ガイド</button>
     {empty && !dismissed ? <div className="mt-2 border border-[var(--mikke-line)] p-4">
       <p className="font-bold">はじめての講座づくりをお手伝いします</p>
       <p className="mt-2 text-sm leading-7">何から始めるかを、3つの短い案内で確認できます。</p>

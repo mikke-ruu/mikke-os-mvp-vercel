@@ -575,7 +575,7 @@ function ShellInner({
               className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
             >
               {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-              {variant === "honbu" ? "自分の受講・講師活動へ →" : "教室全体の運営へ →"}
+              {variant === "honbu" ? "受講生・講師ポータルへ →" : "教室全体の運営へ →"}
             </Link>
           ) : null}
         </div>
