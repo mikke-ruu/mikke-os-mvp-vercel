@@ -567,6 +567,7 @@ function ShellInner({
             </Link>
           ) : null}
           {canSwitchPortal ? (
+            <div className="flex flex-col items-end gap-1">
             <Link
               href={contextHref(
                 variant === "honbu" ? "/academy/portal" : "/academy",
@@ -575,8 +576,15 @@ function ShellInner({
               className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
             >
               {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-              {variant === "honbu" ? "自分の受講生・講師ポータルへ →" : "教室全体の運営へ →"}
+              {variant === "honbu" ? "マイポータルへ →" : "教室全体の運営へ →"}
             </Link>
+            {variant === "honbu" ? (
+              <details className="max-w-sm text-xs text-[var(--mikke-text)]">
+                <summary className="cursor-pointer list-none text-right py-1">？ポータルとは</summary>
+                <p className="py-2 leading-relaxed">自分が受講する講座や、講師として担当する講座を確認する画面です。本部の運営権限もある方は、本部とマイポータルを行き来できます。受講生・講師の権限だけでは本部へ入れません。受講生・講師側の見本は、講座一覧の「受講生・講師ポータル確認」から開けます。</p>
+              </details>
+            ) : null}
+            </div>
           ) : null}
         </div>
       </div>

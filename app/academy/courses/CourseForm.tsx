@@ -122,8 +122,8 @@ export function CourseForm({
   const [step, setStep] = useState(0);
   const guideRef = useRef<HTMLDivElement>(null);
   const steps = [
-    ["講座を紹介する", "誰に、何を教える講座ですか？写真や紹介文は後からでも保存できます。"],
-    ["開催方法を決める", "対面・オンライン、所要時間を案内します。具体的な日付や担当講師は、保存後に「開催日程」で登録します。"],
+    ["講座を紹介する", "ここでは講座のタイトル、紹介文を決めます。あとから編集も可能です。"],
+    ["開催方法を決める", "対面・オンライン、所要時間を設定します。日付や担当講師は、保存後に「開催日程」で登録します。"],
     ["料金・申込を整える", "受講料と申込の受け付け方を確認します。決済会社を選ぶだけでは自動集金されません。"],
     ["教材・講師を整える", "教材を渡す、講師に教えてもらう、認定する場合の設定です。使わない機能は選ばず次へ進めます。"],
     ["内容を確認する", "入力した内容を確認して保存します。この確認だけで公開や課金は行いません。"]
@@ -250,14 +250,11 @@ export function CourseForm({
         requestAnimationFrame(() => { target.focus(); target.reportValidity(); });
       }
     }} className="min-w-0 space-y-4">
-      <div ref={guideRef} className="scroll-mt-20 border-b border-[var(--mikke-line)] bg-white pb-4">
-        <p className="text-sm text-[var(--mikke-muted)]">講座づくりの道順 · {step + 1} / {steps.length}</p>
-        <nav aria-label="講座づくりの手順" className="my-3 grid grid-cols-2 gap-1 sm:grid-cols-5">
-          {steps.map(([title], index) => <button key={title} type="button" onClick={() => goToStep(index)} aria-current={step === index ? "step" : undefined} className={`min-h-12 border-b-2 px-2 py-2 text-left text-sm ${step === index ? "border-[var(--mikke-primary)] font-bold text-[var(--mikke-primary)]" : "border-transparent text-[var(--mikke-muted)]"}`}>{index + 1}. {title}</button>)}
+      <div ref={guideRef} className="scroll-mt-20 bg-white">
+        <p className="text-xs">講座づくりの道順 · {step + 1} / {steps.length}</p>
+        <nav aria-label="講座づくりの手順" className="my-1 grid grid-cols-2 gap-x-2 gap-y-0 sm:grid-cols-5">
+          {steps.map(([title], index) => <button key={title} type="button" onClick={() => goToStep(index)} aria-current={step === index ? "step" : undefined} className={`min-h-9 border-b-[3px] px-1 py-1 text-left text-xs! leading-4! ${step === index ? "border-[var(--mikke-pink)] font-bold!" : "border-transparent"}`}>{index + 1}. {title}</button>)}
         </nav>
-        <h2 className="text-xl font-bold">{steps[step][0]}</h2>
-        <p className="mt-2 text-sm leading-7 text-[var(--mikke-muted)]">{steps[step][1]}</p>
-        <p className="mt-2 text-xs text-[var(--mikke-muted)]">手順の切替では入力を保持します。再読み込みや別ページへ移る前に保存してください。</p>
       </div>
       {error ? (
         <div ref={errorRef} tabIndex={-1} role="alert" aria-live="assertive" className="rounded-sm border border-[var(--mikke-danger)] bg-red-50 px-4 py-3 outline-none">
@@ -265,24 +262,26 @@ export function CourseForm({
           <p className="mt-1 text-sm leading-6 text-[var(--mikke-text)]">原因: {error}</p>
         </div>
       ) : null}
+      <div className="space-y-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4 sm:p-6 [&>section]:border-0! [&>section]:p-0! [&_button[aria-expanded]]:text-xs! [&_button[aria-expanded]]:min-h-8! [&_button[aria-expanded]_span[aria-hidden]]:size-4! [&_[role=note]]:text-xs! [&_[role=note]]:leading-5!">
+        <header className="space-y-2">
+          <h2 className="text-lg font-bold">{step + 1} {steps[step][0]}</h2>
+          <p className="text-xs leading-5">{steps[step][1]}</p>
+        </header>
       <section hidden={step !== 0} data-course-step={0} className="space-y-4 rounded-sm border border-[var(--mikke-line)] bg-white p-4 sm:p-6">
-        <h3 className="text-lg font-bold">講座の紹介</h3>
-        <p className="text-sm leading-6 text-[var(--mikke-muted)]">どんな人に、何を教える講座ですか？短い説明から始めましょう。</p>
         <div className="grid gap-3 sm:grid-cols-3 sm:gap-2">
 
           <div className="min-w-0 sm:col-span-3">
             <label htmlFor="academy-course-name" className={labelClass}>講座名*</label>
             <input id="academy-course-name" className={inputClass} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="コンテナアロマキャンドル認定講座" />
-            <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">講座名を入力してください。後から変更できます。</p>
           </div>
         </div>
         <div>
-          <label htmlFor="academy-course-subtitle" className={labelClass}>ひとことで紹介（任意）</label>
+          <label htmlFor="academy-course-subtitle" className={labelClass}>簡易紹介文（任意）</label>
           <input id="academy-course-subtitle" className={inputClass} value={form.subtitle} onChange={(e) => set("subtitle", e.target.value)} />
         </div>
         <div>
           <label className={labelClass}>講座の写真（任意）</label>
-          <AcademyImageUploader currentUrl={form.mainImageUrl || undefined} onUploaded={(url) => set("mainImageUrl", url)} />
+          <AcademyImageUploader helperText="1600px × 900px推奨　15MBまで　自動調整します。" currentUrl={form.mainImageUrl || undefined} onUploaded={(url) => set("mainImageUrl", url)} />
         </div>
         <div>
           <label htmlFor="academy-course-description" className={labelClass}>講座説明</label>
@@ -322,7 +321,6 @@ export function CourseForm({
         <p className="text-sm leading-6 text-[var(--mikke-muted)]">Stripe・Squareは設定済みの外部決済リンクを使います。選択だけでは自動連携されません。</p>
       </section>
       <section hidden={step !== 1} data-course-step={1} className="space-y-4 rounded-sm border border-[var(--mikke-line)] bg-white p-4 sm:p-6">
-        <h3 className="text-base font-bold">開催方法・受講後にできること</h3>
         <div>
           <label className={labelClass}>所要時間（目安）</label>
           <AcademyHelp title="所要時間（目安）">1回の講座にかかる時間や回数を書きます。例：90分、全3回・各2時間。具体的な開催日は、保存後に「開催日程・担当講師」で登録します。</AcademyHelp>
@@ -352,7 +350,7 @@ export function CourseForm({
           <label className={labelClass}>認定の条件</label>
           <AcademyHelp title="認定の条件">修了者を認定講師として登録する場合に、必要な条件を説明します。認定制度を使わない講座には不要です。記入だけで誰かが自動認定されることはありません。</AcademyHelp>
           <textarea className={`${inputClass} min-h-16`} value={form.certificationConditions} onChange={(e) => set("certificationConditions", e.target.value)} />
-          <p className="mt-1 text-[11px] leading-5 text-[var(--mikke-muted)]">例：講座修了、本人の講師活動への意思、規約への同意、mikke Communityまたは外部コミュニティへの参加、本部の承認。認定証の自動発送を設定する項目ではありません。</p>
+          <p className="mt-1 text-[11px] leading-5">例えば認定講師になる条件として、課題の提出やCommunity参加、年会費の支払いなどがある場合に記載します。ただし、これらを自動で判定するシステムではありません。</p>
         </div> : null}
         <div>
           <label className={labelClass}>受講後にできること</label>
@@ -573,23 +571,16 @@ export function CourseForm({
         </dl>
         <p className="text-sm leading-7">保存後は「紹介ページを整える」で見せ方を整え、「公開状態」で公開するかを選びます。日程の登録はホームの「開催日程・担当講師」から進めます。</p>
       </section> : null}
+        {saved ? <p role="status" className="text-sm">変更を保存しました</p> : null}
+        <button type="submit" disabled={saving} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{saving ? "保存中…" : submitLabel}</button>
+      </div>
       <div className="flex items-center justify-between gap-3 border-t border-[var(--mikke-line)] pt-4">
         <button type="button" disabled={step === 0} onClick={() => goToStep(step - 1)} className="min-h-11 px-3 text-sm disabled:opacity-30">← 前へ</button>
-        {step < steps.length - 1 ? <button type="button" onClick={() => goToStep(step + 1)} className="min-h-11 border border-[var(--mikke-primary)] px-4 text-sm font-bold text-[var(--mikke-primary)]">次へ：{steps[step + 1][0]} →</button> : <span className="text-sm">確認できたら、下のボタンで保存</span>}
+        {step < steps.length - 1 ? <button type="button" onClick={() => goToStep(step + 1)} className="min-h-11 border border-[var(--mikke-primary)] px-4 text-sm font-bold text-[var(--mikke-primary)]">次へ：{steps[step + 1][0]} →</button> : null}
       </div>
       {step === 2 ? <button type="button" className="min-h-11 text-sm text-[var(--mikke-primary)]" onClick={() => goToStep(4)}>教材・講師の追加設定は変更せず、内容確認へ →</button> : null}
       {error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">保存できなかった原因は、この画面の上部にも表示しています。</p> : null}
 
-      <div className="sticky bottom-[calc(5rem+env(safe-area-inset-bottom))] z-10 rounded-sm border border-[var(--mikke-line)] bg-white p-3 shadow-sm min-[900px]:bottom-4">
-      <p role="status" className="mb-2 text-center text-sm text-[var(--mikke-muted)]">{saved ? "変更を保存しました" : "編集した内容は、保存すると反映されます"}</p>
-      <button
-        type="submit"
-        disabled={saving}
-        className="w-full rounded-sm bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
-      >
-        {saving ? "保存中…" : submitLabel}
-      </button>
-      </div>
     </form>
   );
 }

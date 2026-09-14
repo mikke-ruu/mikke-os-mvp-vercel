@@ -103,7 +103,7 @@ function CoursesContent() {
             const features = resolveAcademyCourseFeaturesForCourse(course);
             const format = course.formats.length === 0 ? "開催方法はこれから" : course.formats.length === 2 ? "対面・オンライン" : course.formats[0] === "online" ? "オンライン" : "対面";
             return (
-            <li key={course.id} className="overflow-hidden rounded-lg border border-[var(--mikke-line)] bg-white">
+            <li key={course.id} className="overflow-hidden rounded-lg border border-[var(--mikke-line)] border-l-[3px] border-l-[var(--mikke-green)] bg-white">
               {course.main_image_url ? (
                 <img src={course.main_image_url} alt="" className="h-36 w-full object-cover" />
               ) : null}
@@ -171,7 +171,7 @@ function CoursesContent() {
                   >
                     <GraduationCap size={14} /> 講座復習ページ
                   </Link>
-                <Link href={toCurrentAcademyContextHref(`/academy/courses/${course.id}/portal-preview`)} className="flex items-center justify-center gap-1 rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold"><Eye size={14} />受講生・講師の表示を確認</Link></div></section>
+                <Link href={toCurrentAcademyContextHref(`/academy/courses/${course.id}/portal-preview`)} className="flex items-center justify-center gap-1 rounded-lg border border-[var(--mikke-line)] px-2 py-2 text-xs font-bold"><Eye size={14} />受講生・講師ポータル確認</Link></div></section>
               </div>
             </li>
             );

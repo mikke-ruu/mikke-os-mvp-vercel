@@ -6,9 +6,9 @@ import type { AcademyCourse } from "@/types/database";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 
 const courseTabs = [
-  { id: "settings", label: "講座の内容を整える", href: (courseId: string) => `/academy/courses/${courseId}` },
+  { id: "settings", label: "講座内容編集", href: (courseId: string) => `/academy/courses/${courseId}` },
   { id: "program", label: "ステップ教材", href: (courseId: string) => `/academy/courses/${courseId}/program` },
-  { id: "page", label: "講座ページを整える", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
+  { id: "page", label: "講座ページ編集", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
   {
     id: "learner",
     label: "講座復習ページ",
@@ -77,10 +77,10 @@ export function AcademyCourseWorkspace({
             講座ページを見る
           </Link>
         </div>
-        <p className="mt-2 text-sm leading-5 text-[var(--mikke-muted)]">{activeTab === "settings" ? "下の道順に沿って、一つずつ整えます。途中でも保存でき、順番を戻して修正できます。" : activeTab === "page" ? "受講を考えている人へ、講座の魅力を伝えるページをつくります。" : activeTab === "learner" ? "受講者が講座の後も見返せる、教材や復習内容をまとめます。" : "教える人が使う進め方や資料をまとめます。"}</p>
+        {activeTab !== "settings" ? <p className="mt-2 text-sm leading-5">{activeTab === "page" ? "受講を考えている人へ、講座の魅力を伝えるページをつくります。" : activeTab === "learner" ? "受講者が講座の後も見返せる、教材や復習内容をまとめます。" : "教える人が使う進め方や資料をまとめます。"}</p> : null}
       </header>
 
-      <nav aria-label="講座内メニュー" className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+      <nav aria-label="講座内メニュー" className="grid grid-cols-2 gap-1 border-b border-[var(--mikke-accent)] sm:flex">
         {visibleTabs.filter(tab => tab.id === "settings" || tab.id === "page").map((tab) => {
           const active = tab.id === activeTab;
           return (
@@ -88,9 +88,9 @@ export function AcademyCourseWorkspace({
               key={tab.id}
               href={tab.href(course.id)}
               aria-current={active ? "page" : undefined}
-              className={`flex min-h-11 items-center justify-center rounded-lg border px-3 py-2 text-sm font-bold ${
+              className={`relative -mb-px flex min-h-10 items-center justify-center rounded-t-lg border px-3 py-2 text-sm font-bold ${
                 active
-                  ? "border-[var(--mikke-primary)] bg-white text-[var(--mikke-primary)]"
+                  ? "border-[var(--mikke-accent)] border-b-white bg-white text-[var(--mikke-text)]"
                   : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text-soft)]"
               }`}
             >

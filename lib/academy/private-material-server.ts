@@ -21,7 +21,7 @@ function json(body: unknown, status=200) { return Response.json(body,{status,hea
 async function context(request: Request) {
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL, anon=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const secret=process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (process.env.ACADEMY_PRIVATE_MATERIALS_ENABLED !== 'true' || !url || !anon || !secret)
+  if (process.env.NODE_ENV !== 'development' || process.env.ACADEMY_PRIVATE_MATERIALS_ENABLED !== 'true' || !url || !anon || !secret)
     throw new HttpError(503,'資料アップロードは準備中です。');
   const token=request.headers.get('authorization')?.match(/^Bearer ([^\s]+)$/)?.[1];
   if (!token) throw new HttpError(401,'ログインしてからお試しください。');
