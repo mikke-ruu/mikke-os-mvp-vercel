@@ -53,7 +53,7 @@ const honbuNav: MikkeShellNavItem[] = [
 const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard, section: "マイポータル" },
   { href: "/academy/portal/class-requests", label: "担当する開催日", icon: CalendarCheck, section: "マイポータル" },
-  { href: "/academy/portal/study", label: "復習ページ・講師用資料", icon: GraduationCap, section: "マイポータル" },
+  { href: "/academy/portal/study", label: "講座復習ページ・講師マニュアルページ", icon: GraduationCap, section: "マイポータル" },
   { href: "/academy/portal/url", label: "募集ページ・共有リンク", icon: Link2, section: "募集" },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
   { href: "/academy/portal/kits", label: "教材の注文・履歴", icon: Package, section: "発注" }
@@ -389,7 +389,7 @@ function ShellInner({
     .map((item) => ({
       ...item,
       label: variant === "koushi" && item.href.startsWith("/academy/portal/study")
-        ? personalView === "learner" ? "復習ページ" : "講師用資料"
+        ? "講座復習ページ・講師マニュアルページ"
         : item.label,
       href: contextHref(
         variant === "koushi" && (item.href === "/academy/portal" || item.href.startsWith("/academy/portal/study"))
@@ -403,7 +403,7 @@ function ShellInner({
     .map((item) => ({
       ...item,
       label: variant === "koushi" && item.href.startsWith("/academy/portal/study")
-        ? personalView === "learner" ? "復習" : "講師資料"
+        ? "復習・資料"
         : item.label,
       href: contextHref(
         variant === "koushi" && (item.href === "/academy/portal" || item.href.startsWith("/academy/portal/study"))
@@ -567,6 +567,7 @@ function ShellInner({
             </Link>
           ) : null}
           {canSwitchPortal ? (
+            <div className="flex flex-col items-end gap-1">
             <Link
               href={contextHref(
                 variant === "honbu" ? "/academy/portal" : "/academy",
@@ -575,13 +576,20 @@ function ShellInner({
               className="inline-flex items-center gap-1 rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)]"
             >
               {variant === "honbu" ? <GraduationCap size={14} /> : <Store size={14} />}
-              {variant === "honbu" ? "自分の受講・講師活動へ →" : "教室全体の運営へ →"}
+              {variant === "honbu" ? "マイポータルへ →" : "教室全体の運営へ →"}
             </Link>
+            {variant === "honbu" ? (
+              <details className="max-w-sm text-xs text-[var(--mikke-text)]">
+                <summary className="cursor-pointer list-none text-right py-1">？ポータルとは</summary>
+                <p className="py-2 leading-relaxed">自分が受講する講座や、講師として担当する講座を確認する画面です。本部の運営権限もある方は、本部とマイポータルを行き来できます。受講生・講師の権限だけでは本部へ入れません。受講生・講師側の見本は、講座一覧の「受講生・講師ポータル確認」から開けます。</p>
+              </details>
+            ) : null}
+            </div>
           ) : null}
         </div>
       </div>
       {variant === "honbu" ? <AcademyPageHelp pathname={pathname} /> : null}
-      <div onSubmitCapture={blockReadonlySubmit}>{children}</div>
+      <div onSubmitCapture={blockReadonlySubmit} className="font-medium text-[var(--mikke-text)] [--mikke-muted:var(--mikke-text)] [--mikke-text-soft:var(--mikke-text)] max-sm:[&_section]:rounded-lg max-sm:[&_input]:rounded-lg max-sm:[&_select]:rounded-lg max-sm:[&_textarea]:rounded-lg max-sm:[&_button]:rounded-lg max-sm:[&_.p-6]:p-3 max-sm:[&_.p-5]:p-3 max-sm:[&_.space-y-6]:space-y-3 max-sm:[&_.space-y-5]:space-y-3">{children}</div>
       </div>
     </MikkeAppShell>
   );

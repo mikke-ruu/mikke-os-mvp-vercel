@@ -87,13 +87,13 @@ function FrontContent() {
   return (
     <div className="mx-auto min-w-0 max-w-2xl space-y-4 overflow-x-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="min-w-0 text-sm font-bold leading-6 text-[var(--mikke-text)]">本部全体を紹介するホームページを編集します。各講座の公開講座ページとは別のページです。</p>
+        <p className="min-w-0 text-sm font-bold leading-6 text-[var(--mikke-text)]">本部全体を紹介するホームページを編集します。各講座の講座ページとは別のページです。</p>
         <Link
           href={`/academy/site/${encodeURIComponent(hq.handle)}`}
           target="_blank"
           className="flex shrink-0 items-center gap-1 rounded-full border border-[var(--mikke-line)] bg-white px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent)]"
         >
-          <ExternalLink size={13} /> プレビュー
+          <ExternalLink size={13} /> 保存済みのホームページを見る
         </Link>
       </div>
 
@@ -138,9 +138,9 @@ function FrontContent() {
       </section>
 
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
-        <p className="text-xs font-bold text-[var(--mikke-accent)]">ホームページの自由ブロック</p>
+        <p className="text-xs font-bold text-[var(--mikke-accent)]">ホームページの本文</p>
         <p className="text-[11px] text-[var(--mikke-muted)]">
-          上のヒーローエリアと講座一覧の間に表示される自由なセクションです（見出し・文章・画像・画像+文章・画像グリッド・CTA）。
+          メイン画像と講座一覧の間に表示されます。「＋」から文章・画像・動画などを挿入し、自由に組み立てられます。
         </p>
 
         <LpBlocksEditor blocks={blocks} onChange={handleBlocksChange} />
@@ -154,8 +154,8 @@ function FrontContent() {
       </section>
 
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
-        <p className="text-sm font-bold text-[var(--mikke-text)]">公開講座ページ</p>
-        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">ホームページには、公開中の講座が一覧で並びます。講座ごとの紹介と申込受付は、それぞれの公開講座ページで編集します。</p>
+        <p className="text-sm font-bold text-[var(--mikke-text)]">講座ページ</p>
+        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">ホームページには、公開中の講座が一覧で並びます。講座ごとの紹介と申込受付は、それぞれの講座ページで編集します。</p>
         <ul className="mt-3 space-y-2">
           {courses.map((c) => (
             <li key={c.id} className="flex min-w-0 flex-col items-stretch gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -169,7 +169,7 @@ function FrontContent() {
                 href={`/academy/courses/${c.id}/lp`}
                 className="flex shrink-0 items-center justify-center gap-1 rounded-full bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
               >
-                <LayoutTemplate size={13} /> 公開講座ページを編集
+                <LayoutTemplate size={13} /> 講座ページを編集
               </Link>
             </li>
           ))}

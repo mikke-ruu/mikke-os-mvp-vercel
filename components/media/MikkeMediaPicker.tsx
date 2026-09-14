@@ -12,7 +12,8 @@ import {
 } from "@/lib/media/client";
 import type { MikkeMediaAsset, MikkeMediaUsage } from "@/lib/media/types";
 
-export function MikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = false }: {
+export function MikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = false, helperText }: {
+  helperText?: string;
   currentUrl?: string;
   onSelect: (asset: MikkeMediaAsset) => void;
   sourceApp: string;
@@ -97,7 +98,7 @@ export function MikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = fa
               <Images size={15} />以前の画像から選ぶ
             </button>
           </div>
-          <p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">URL入力不要。15MBまでの画像をWebP・長辺2000px・最大3MBへ自動調整します。</p>
+          <p className="mt-1 text-[10px] leading-4 text-[var(--mikke-muted)]">{helperText ?? "URL入力不要。15MBまでの画像をWebP・長辺2000px・最大3MBへ自動調整します。"}</p>
         </div>
       </div>
       <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => void chooseFile(event.target.files?.[0])} />

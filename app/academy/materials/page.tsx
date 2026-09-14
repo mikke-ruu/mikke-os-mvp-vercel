@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, ExternalLink, Eye, EyeOff, GraduationCap, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { PrivateMaterialFiles } from "@/components/academy/PrivateMaterialFiles";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
@@ -134,10 +135,10 @@ function MaterialsContent() {
                         {MATERIAL_KIND_LABELS[m.kind]}
                       </span>
                     </div>
-                    <a href={m.url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 text-sm font-bold text-[var(--mikke-text)]">
+                    {m.delivery_mode === "private_file" ? <><p className="font-bold">{m.title}</p><PrivateMaterialFiles parent={{ audience: "instructor", parentId: m.id }} editable /></> : m.url ? <a href={m.url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 text-sm font-bold text-[var(--mikke-text)]">
                       <span className="truncate">{m.title}</span>
                       <ExternalLink size={12} className="shrink-0 text-[var(--mikke-muted)]" />
-                    </a>
+                    </a> : <p>{m.title}</p>}
                     <p className="mt-1 text-xs font-bold text-[var(--mikke-text-soft)]">見せる対象：{m.requires_active ? "活動中の講師だけ" : "この講座の認定講師全員"}</p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
@@ -151,9 +152,9 @@ function MaterialsContent() {
                       {m.is_published ? <Eye size={12} /> : <EyeOff size={12} />}
                       {m.is_published ? "マイポータルに表示" : "下書き"}
                     </button>
-                    <button onClick={() => remove(m)} disabled={busyId === m.id} className="text-[var(--mikke-danger)]">
+                    {m.delivery_mode !== "private_file" ? <button onClick={() => remove(m)} disabled={busyId === m.id} className="text-[var(--mikke-danger)]">
                       <Trash2 size={15} />
-                    </button>
+                    </button> : null}
                   </div>
                 </div>
               </li>

@@ -7,7 +7,8 @@
 // （段階移行。既存データを壊さない）。
 import { MikkeMediaPicker } from "@/components/media/MikkeMediaPicker";
 
-export function AcademyImageUploader({ currentUrl, onUploaded, compact = false }: {
+export function AcademyImageUploader({ currentUrl, onUploaded, compact = false, helperText }: {
+  helperText?: string;
   currentUrl?: string;
   onUploaded: (url: string) => void;
   compact?: boolean;
@@ -17,6 +18,7 @@ export function AcademyImageUploader({ currentUrl, onUploaded, compact = false }
       currentUrl={currentUrl || undefined}
       sourceApp="academy"
       compact={compact}
+      helperText={helperText}
       onSelect={(asset) => onUploaded(asset.publicUrl)}
     />
   );

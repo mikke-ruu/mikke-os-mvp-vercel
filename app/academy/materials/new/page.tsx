@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
@@ -56,7 +57,7 @@ function NewMaterialContent() {
     setSaving(true);
     try {
       await createMaterial(profile, hq!.id, form);
-      router.push(toCurrentAcademyContextHref(`/academy/materials?course=${encodeURIComponent(form.courseId)}`));
+      router.push(toCurrentAcademyContextHref(`/academy/courses/${encodeURIComponent(form.courseId)}/instructor-page#resources`));
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
       setSaving(false);
@@ -69,6 +70,7 @@ function NewMaterialContent() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <Link className="inline-flex min-h-11 items-center text-sm text-[var(--mikke-primary)]" href={toCurrentAcademyContextHref(form.courseId ? `/academy/courses/${encodeURIComponent(form.courseId)}/instructor-page#resources` : "/academy/courses")}>← 講師マニュアルページに戻る</Link>
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <div>
           <label className={labelClass}>講座*</label>
@@ -113,7 +115,7 @@ function NewMaterialContent() {
       </section>
 
       <section className="space-y-2 rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
-        <p className="text-xs font-bold text-[var(--mikke-accent)]">講師用ファイルの表示設定</p>
+        <p className="text-xs font-bold text-[var(--mikke-accent)]">マニュアルの資料リンクの表示設定</p>
         <div>
           <p className={labelClass}>見せる講師</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -158,7 +160,7 @@ function NewMaterialContent() {
       {error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">{error}</p> : null}
 
       <button type="submit" disabled={saving} className="w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-        {saving ? "保存中…" : "講師用ファイルを追加する"}
+        {saving ? "保存中…" : "マニュアルの資料リンクを追加する"}
       </button>
     </form>
   );
@@ -166,7 +168,7 @@ function NewMaterialContent() {
 
 export default function NewMaterialPage() {
   return (
-    <HonbuShell title="講師用ファイルを追加">
+    <HonbuShell title="マニュアルの資料リンクを追加">
       <div className="mx-auto max-w-2xl">
         <Suspense fallback={<p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>}>
           <NewMaterialContent />

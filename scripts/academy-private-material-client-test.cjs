@@ -1,0 +1,33 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const ts = require('typescript');
+let userId = 'owner', sample = false, called = 0, status = 200;
+const calls = [];
+const mockSupabase = {auth:{getSession:async()=>({data:{session:{user:{id:userId},access_token:'synthetic-token'}},error:null})}};
+global.fetch = async (url, init) => { called++; calls.push({url,init}); return new Response(JSON.stringify({assets:[],material:{id:'parent'},asset:{id:'asset'}}),{status}); };
+const source = fs.readFileSync('lib/academy/private-material-client.ts','utf8');
+const compiled = ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const mod = {exports:{}};
+new Function('require','module','exports',compiled)(name=> {
+  if(name==='@/lib/supabase/client') return {supabase:mockSupabase};
+  if(name==='./preview') return {isAcademyLocalReview:()=>sample};
+  throw Error('Unexpected dependency '+name);
+},mod,mod.exports);
+(async()=>{
+  const api=mod.exports,parent={audience:'learner',parentId:'parent'};
+  assert.deepEqual(await api.listPrivateMaterials(parent,'owner'),[]);
+  assert.equal(calls[0].init.cache,'no-store');
+  assert.equal(calls[0].init.credentials,'omit');
+  assert.equal(calls[0].init.headers.Authorization,'Bearer synthetic-token');
+  assert.ok(!calls[0].url.includes('synthetic-token'));
+  const file=new File(['%PDF-1.7\n%%EOF'],'教材.pdf',{type:'application/pdf'});
+  await api.uploadPrivateMaterial(parent,file,'owner');
+  assert.equal(calls[1].init.body,file);
+  assert.equal(calls[1].init.headers['X-Academy-Filename'],encodeURIComponent(file.name));
+  sample=true; await assert.rejects(()=>api.listPrivateMaterials(parent,'owner'),/サンプル/); assert.equal(called,2);
+  sample=false; userId='other'; await assert.rejects(()=>api.listPrivateMaterials(parent,'owner'),/ログイン状態/); assert.equal(called,2);
+  userId='owner'; status=503; await assert.rejects(()=>api.listPrivateMaterials(parent,'owner'),/準備中/);
+  global.fetch=async()=>{userId='other';return new Response(JSON.stringify({assets:[]}));};
+  await assert.rejects(()=>api.listPrivateMaterials(parent,'owner'),/ログイン状態/);
+  console.log('PASS: private PDF client identity pinning, no-store, bearer-only, upload encoding, sample guard, fail-closed response');
+})().catch(error=>{console.error(error);process.exitCode=1;});
