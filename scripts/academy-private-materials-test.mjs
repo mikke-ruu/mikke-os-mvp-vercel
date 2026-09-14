@@ -58,6 +58,8 @@ assert(contract.isPdfBytes(pdf));assert(!contract.isPdfBytes(new TextEncoder().e
 assert.equal(contract.pdfFilename('%E0%A4%A'),null);assert.equal(contract.pdfFilename('..%2Fa.pdf'),null);assert.equal(contract.pdfFilename('x%0D%0A.pdf'),null);
 assert.equal(contract.privateMaterialParent(new URL(base+'?audience=other&parentId='+uid(1))),null);
 env.ACADEMY_PRIVATE_MATERIALS_ENABLED='false';await error(await api.privateMaterials(request()),503);assert.equal(state.calls.length,0);env.ACADEMY_PRIVATE_MATERIALS_ENABLED='true';
+env.NODE_ENV='production';reset();await error(await api.privateMaterials(request()),503);assert.equal(state.calls.length,0);
+env.NODE_ENV='development';
 reset();state.authenticated=false;await error(await api.privateMaterials(request()),401);assert(!state.calls.some(c=>c.admin));
 reset();state.anonymous=true;await error(await api.privateMaterials(request()),401);
 reset();state.ready=false;await error(await api.privateMaterials(request()),503);assert(!state.calls.some(c=>c.kind==='upload'));
