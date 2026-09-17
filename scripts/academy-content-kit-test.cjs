@@ -6,6 +6,7 @@ const React = require('react');
 const {renderToStaticMarkup} = require('react-dom/server');
 const root = path.resolve(__dirname,'..');
 function load(name) {
+  if (name.endsWith('.css')) return new Proxy({}, { get: (_, key) => key });
   let file = path.resolve(root,name);
   if (!fs.existsSync(file)) file = ['.tsx','.ts','.js'].map(ext=>file+ext).find(fs.existsSync);
   const result = ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}});
@@ -49,6 +50,9 @@ for(const token of ['font-weight:700','line-through','text-align:center','<block
 const unsafe = [{id:'bad',type:'paragraph',text:'危険',richText:[{text:'危険',href:'javascript:alert(1)'}]},{id:'url',type:'link',url:'javascript:alert(1)'}];
 assert.ok(!renderToStaticMarkup(React.createElement(PageBlocks,{blocks:contentToAcademy(unsafe)})).includes('javascript:'));
 const oldHtml=renderToStaticMarkup(React.createElement(PageBlocks,{blocks:legacy}));
+const anchorHtml=renderToStaticMarkup(React.createElement(PageBlocks,{blocks:contentToAcademy([{id:'anchor',type:'cta',buttonLabel:'申し込む',url:'#application'}])}));
+assert.ok(anchorHtml.includes('href="#application"'));
+assert.ok(anchorHtml.includes('申し込む'));
 assert.ok(oldHtml.includes('旧見出し'));
 assert.ok(!oldHtml.includes('添付資料・リンク'));
 for(const dir of ['components/mikkeos/content','lib/mikkeos/content']) for(const file of fs.readdirSync(path.join(root,dir))) {

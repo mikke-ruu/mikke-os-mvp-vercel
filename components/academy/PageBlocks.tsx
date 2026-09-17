@@ -1,6 +1,6 @@
 import { ExternalLink, FileText, Link2, Video } from "lucide-react";
 import { LinkedImage } from "./LinkedImage";
-import { AcademyContentRenderer } from "./AcademyContentRenderer";
+import { AcademyLpContent } from "./AcademyLpContent";
 import type { AcademyMaterial, AcademyPageBlock } from "@/types/database";
 
 function kindIcon(kind: AcademyMaterial["kind"]) {
@@ -30,7 +30,7 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
   return (
     <div className="space-y-4">
       {blocks.map((b, i) => {
-        if (b.type !== "materials-list" && b.contentVersion === 1 && b.content) return <AcademyContentRenderer key={i} blocks={[b.content]} />;
+        if (b.type !== "materials-list" && b.contentVersion === 1 && b.content) return <AcademyLpContent key={i} blocks={[b.content]} />;
         if (b.type === "heading") return <h3 key={i} className="text-base font-bold text-[var(--mikke-text)]">{b.text}</h3>;
 
         if (b.type === "text") return <p key={i} className="whitespace-pre-wrap text-sm leading-6 text-[var(--mikke-text)]">{b.text}</p>;
