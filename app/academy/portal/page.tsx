@@ -1,234 +1,42 @@
 "use client";
-
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, CalendarCheck, ClipboardList, GraduationCap, Link2, Package, Users } from "lucide-react";
-import { AcademyHelp } from "@/components/academy/AcademyHelp";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
-import { INSTRUCTOR_STATUS_LABELS } from "@/lib/academy/instructors";
-import { getCoursesByIds, getMyInstructorRecords, listMyApplications } from "@/lib/academy/instructor-portal";
-import { listMyKitOrders } from "@/lib/academy/kits";
-import { APPLICATION_STATUS_LABELS } from "@/lib/academy/applications";
-import { isAcademyLocalReview } from "@/lib/academy/preview";
-import { getAcademyRouteContext, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
+import { AcademyPersonalHome } from "@/components/academy/AcademyPersonalHome";
+import { getCoursesByIds, getMyInstructorRecords } from "@/lib/academy/instructor-portal";
 import { listMyLearnerApplications } from "@/lib/academy/learner-portal";
-import type { AcademyApplication, AcademyCourse, AcademyInstructor, AcademyKitOrder } from "@/types/database";
-
-function QuickCard({
-  href,
-  icon: Icon,
-  title,
-  desc
-}: {
-  href: string;
-  icon: typeof GraduationCap;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <Link href={toCurrentAcademyContextHref(href)} className="flex items-center gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 transition hover:border-[var(--mikke-accent)]/40">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#ffd370] text-[var(--mikke-text)]">
-        <Icon size={18} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-bold text-[var(--mikke-text)]">{title}</span>
-        <span className="mt-1 block text-sm leading-6 text-[var(--mikke-muted)]">{desc}</span>
-      </span>
-      <ArrowRight size={15} className="shrink-0 text-[var(--mikke-accent)]" />
-    </Link>
-  );
-}
+import { getAcademyRouteContext } from "@/lib/academy/access-context";
+import type { AcademyApplication, AcademyCourse, AcademyInstructor } from "@/types/database";
 
 function PortalDashboard() {
   const { profile } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [records, setRecords] = useState<AcademyInstructor[]>([]);
-  const [learnerApps, setLearnerApps] = useState<AcademyApplication[]>([]);
-  const [courseMap, setCourseMap] = useState<Record<string, AcademyCourse>>({});
-  const [apps, setApps] = useState<AcademyApplication[]>([]);
-  const [kits, setKits] = useState<AcademyKitOrder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sampleView, setSampleView] = useState<"learner" | "instructor">("learner");
-  const [localSample, setLocalSample] = useState(false);
-
+  const params = useSearchParams();
+  const requested = params.get("view") ?? params.get("sample");
+  const [data, setData] = useState<{ records: AcademyInstructor[]; applications: AcademyApplication[]; courses: Record<string, AcademyCourse> } | null>(null);
+  const [error, setError] = useState(false);
   useEffect(() => {
-    setLocalSample(isAcademyLocalReview());
-    const requestedView = searchParams.get("view") ?? searchParams.get("sample");
-    if (requestedView === "learner" || requestedView === "instructor") setSampleView(requestedView);
+    let active = true;
+    setData(null); setError(false);
     async function load() {
-      const academyId = getAcademyRouteContext()?.academyId;
-      const [myRecords, myLearnerApps] = await Promise.all([
-        getMyInstructorRecords(profile.user_id, academyId),
-        listMyLearnerApplications(profile.user_id, academyId)
-      ]);
-      setRecords(myRecords);
-      setLearnerApps(myLearnerApps);
-      if (!requestedView) setSampleView(myLearnerApps.length > 0 ? "learner" : "instructor");
-      const courseIds = [...new Set([...myRecords.map((record) => record.course_id), ...myLearnerApps.map((application) => application.course_id)])];
-      const [courses, myApps, myKits] = await Promise.all([
-        getCoursesByIds(courseIds),
-        listMyApplications(myRecords.map((r) => r.id)),
-        listMyKitOrders(myRecords.map((r) => r.id))
-      ]);
-      setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
-      setApps(myApps);
-      setKits(myKits);
-      setLoading(false);
+      try {
+        const academyId = getAcademyRouteContext()?.academyId;
+        const [records, applications] = await Promise.all([getMyInstructorRecords(profile.user_id, academyId), listMyLearnerApplications(profile.user_id, academyId)]);
+        const ids = [...new Set([...records.map(record => record.course_id), ...applications.map(application => application.course_id)])];
+        const courses = await getCoursesByIds(ids);
+        if (active) setData({ records, applications, courses: Object.fromEntries(courses.map(course => [course.id, course])) });
+      } catch { if (active) setError(true); }
     }
-    load();
-  }, [profile.user_id, searchParams]);
-
-  function switchView(nextView: "learner" | "instructor") {
-    setSampleView(nextView);
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("view", nextView);
-    nextParams.delete("sample");
-    router.replace(`${pathname}?${nextParams.toString()}`);
-  }
-
-  if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
-
-  if (records.length === 0 && learnerApps.length === 0) {
-    return (
-      <div className="mx-auto max-w-md rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-center">
-        <p className="text-sm font-bold text-[var(--mikke-text)]">表示できる講座がありません</p>
-        <p className="mt-1 text-xs text-[var(--mikke-muted)]">受講が確定した講座や、認定講師として登録された講座がここに表示されます。</p>
-        <Link href={toCurrentAcademyContextHref("/academy/offering-applications/mine")} className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]">申し込んだ募集を確認する →</Link>
-      </div>
-    );
-  }
-
-  const pendingApps = apps.filter((a) => a.status === "received");
-  const recentApps = apps.slice(0, 5);
-  const hasLearnerView = localSample || learnerApps.length > 0;
-  const hasInstructorView = localSample || records.length > 0;
-  const showViewSwitch = hasLearnerView && hasInstructorView;
-  const currentView = showViewSwitch ? sampleView : hasLearnerView ? "learner" : "instructor";
-  const canOperate = records.some((record) => record.is_active && record.status === "active");
-  const learnerCourseIds = [...new Set(learnerApps.map((application) => application.course_id))];
-
-  return (
-    <div className="space-y-6">
-      <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
-        <p className="text-sm text-[var(--mikke-muted)]">{profile.display_name}さんのマイポータル</p>
-        <h2 className="mt-2 text-2xl font-bold">{currentView === "learner" ? "学びの続きを、ここから。" : "担当する講座と、今日の仕事。"}</h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{currentView === "learner" ? "受講した講座を確認し、講座復習ページで学びを振り返れます。" : "自分に届いた申込を確認し、開催準備や教材の注文を進められます。"}</p>
-        <AcademyHelp title="本部とマイポータルの違い">本部は教室全体の講座・講師・申込を管理する場所です。マイポータルは自分の受講や講師活動のための場所です。両方の役割がある場合も、アカウントを作り直す必要はありません。</AcademyHelp>
-      </section>
-
-      {showViewSwitch ? (
-        <div className="grid grid-cols-2 gap-2 rounded-lg border border-[var(--mikke-line)] bg-white p-2" aria-label="マイポータルの表示切り替え">
-          {([
-            ["learner", "学ぶ｜受講した講座"],
-            ["instructor", "教える｜講師の仕事"]
-          ] as const).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={sampleView === value}
-              onClick={() => switchView(value)}
-              className={`min-h-12 rounded-lg border px-3 py-2 text-sm font-bold ${sampleView === value ? "border-[#3f4eb5] text-[#3f4eb5]" : "border-transparent bg-white text-[var(--mikke-text-soft)]"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      <div className="grid grid-cols-2 gap-3">
-        <section className="rounded-lg border border-[var(--mikke-line)] border-t-4 border-t-[#8bc7ad] bg-white p-4"><h3 className="text-sm font-bold">{currentView === "learner" ? "受講した講座" : "講師として登録された講座"}</h3><p className="mt-2 text-2xl font-bold">{currentView === "learner" ? learnerCourseIds.length : records.length}<span className="ml-1 text-sm font-normal">件</span></p></section>
-        <section className="rounded-lg border border-[var(--mikke-line)] border-t-4 border-t-[#ffd370] bg-white p-4"><h3 className="text-sm font-bold">{currentView === "learner" ? "次にできること" : "新しい担当申込"}</h3>{currentView === "learner" ? <Link href="/academy/portal/study?view=learner" className="mt-2 inline-flex min-h-11 items-center text-sm text-[var(--mikke-primary)]">講座復習ページを開く →</Link> : <p className="mt-2 text-2xl font-bold">{pendingApps.length}<span className="ml-1 text-sm font-normal">件</span></p>}</section>
-      </div>
-      <h2 className="text-base font-bold text-[var(--mikke-text)]">{currentView === "learner" ? "受講中・修了した講座" : "講師として登録された講座"}</h2>
-      <div className="grid gap-3 md:grid-cols-2">
-        <QuickCard href="/academy/offering-applications/mine" icon={ClipboardList} title="申し込んだ募集" desc="募集ページからの申込内容と入金状況を確認" />
-        {currentView === "learner" ? learnerCourseIds.map((courseId) => {
-          const course = courseMap[courseId];
-          const application = learnerApps.find((item) => item.course_id === courseId);
-          return (
-            <div key={courseId} className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
-                <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{course?.name}</p>
-              </div>
-              <p className="mt-1.5 text-xs text-[var(--mikke-muted)]">
-                {application?.status === "completed" || application?.status === "certified" || application?.status === "instructor_added" ? "修了済み" : "受講中"} ・ 講座復習ページを確認できます
-              </p>
-            </div>
-          );
-        }) : records.map((rec) => {
-          const course = courseMap[rec.course_id];
-          const activityLabel = rec.is_active ? INSTRUCTOR_STATUS_LABELS[rec.status] : "活動なし";
-          return (
-            <div key={rec.id} className="rounded-lg border border-[var(--mikke-line)] bg-white p-4">
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
-                <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{course?.name}</p>
-              </div>
-              <p className="mt-1.5 text-[11px] text-[var(--mikke-muted)]">
-                {rec.is_certified ? "認定済み" : "未認定"} ・ {activityLabel}
-                {rec.instructor_number ? ` ・ No.${rec.instructor_number}` : ""}
-              </p>
-              <Link href={toCurrentAcademyContextHref(`/academy/portal/study?view=instructor&course=${encodeURIComponent(rec.course_id)}`)} className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]">この講座のマニュアルを見る →</Link>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* クイックメニュー */}
-      <div className="grid gap-3 md:grid-cols-2">
-        <QuickCard href={currentView === "learner" ? "/academy/portal/study?view=learner" : "/academy/portal/study?view=instructor"} icon={GraduationCap} title={currentView === "learner" ? "講座復習ページ" : "講師マニュアルページ"} desc={currentView === "learner" ? "受講した講座の復習内容を確認" : "講座運営に必要なマニュアル、PDF、動画、リンクを確認"} />
-        {currentView === "instructor" ? <QuickCard href="/academy/portal/study?view=learner" icon={GraduationCap} title="講座復習ページ" desc="自分が受講した講座の教材を確認。講師マニュアルページとは別のページです" /> : null}
-        {currentView === "instructor" ? <QuickCard href="/community" icon={Users} title="Communityを開く" desc="参加しているCommunityを確認。Academyの講師登録とは別に招待・参加が必要です" /> : null}
-        {currentView === "instructor" ? <QuickCard href="/academy/portal/offering-applications" icon={ClipboardList} title="自分の募集ページからの申込" desc="担当する募集の申込内容と入金状況を確認" /> : null}
-        {currentView === "instructor" && canOperate ? (
-          <>
-            <QuickCard href="/academy/portal/class-requests" icon={CalendarCheck} title="開催日・担当依頼" desc="自分が担当する日程と、本部からの依頼を確認" />
-            <QuickCard href="/academy/portal/url" icon={Link2} title="営業プロフィール・紹介URL・QR" desc="プロフィールを編集し、紹介リンクやQRコードで講座を案内" />
-            <QuickCard href="/academy/portal/applications" icon={ClipboardList} title="申込管理" desc={`担当申込 ${apps.length}件${pendingApps.length ? `（未対応 ${pendingApps.length}件）` : ""}`} />
-            <QuickCard href="/academy/portal/kits" icon={Package} title="教材を注文する" desc={`講座に使う教材の注文・履歴を確認（${kits.length}件）`} />
-          </>
-        ) : null}
-      </div>
-
-      {/* 最近の担当申込 */}
-      {currentView === "instructor" && canOperate ? <section className="rounded-lg border border-[var(--mikke-line)] bg-white p-4 md:p-5">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-[var(--mikke-text)]">最近の担当申込</h2>
-          <Link href="/academy/portal/applications" className="flex items-center gap-1 text-xs font-bold text-[var(--mikke-accent)]">
-            一覧を見る <ArrowRight size={13} />
-          </Link>
-        </div>
-        {recentApps.length === 0 ? (
-          <p className="mt-4 text-xs text-[var(--mikke-muted)]">まだ担当申込がありません。営業用URLから申込が入るとここに表示されます。</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-[var(--mikke-surface-soft)]">
-            {recentApps.map((a) => (
-              <li key={a.id} className="flex items-center justify-between gap-2 py-2.5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-bold text-[var(--mikke-text)]">{a.applicant_name}</p>
-                  <p className="text-sm text-[var(--mikke-muted)]">{courseMap[a.course_id]?.name ?? "講座名を確認"}</p>
-                </div>
-                <span className="shrink-0 rounded-lg bg-[var(--mikke-accent-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">
-                  {APPLICATION_STATUS_LABELS[a.status]}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section> : null}
-    </div>
-  );
+    void load();
+    return () => { active = false; };
+  }, [profile.user_id, pathname]);
+  if (error) return <div role="alert"><p>マイページを読み込めませんでした。</p><button type="button" className="my-3 min-h-11 rounded-lg border px-4" onClick={() => window.location.reload()}>再読み込み</button></div>;
+  if (!data) return <p className="py-12 text-center text-sm">読み込み中…</p>;
+  const canSwitch = data.records.length > 0 && data.applications.length > 0;
+  const view = requested === "instructor" && data.records.length > 0 ? "instructor" : data.applications.length > 0 ? "learner" : data.records.length > 0 ? "instructor" : "learner";
+  return <AcademyPersonalHome name={profile.display_name} view={view} records={data.records} learnerApps={data.applications} courses={data.courses} canSwitch={canSwitch} onSwitch={next => { const query = new URLSearchParams(params.toString()); query.set("view", next); query.delete("sample"); router.replace(`${pathname}?${query.toString()}`); }} />;
 }
-
-export default function PortalPage() {
-  return (
-    <KoushiShell title="マイポータル">
-      <PortalDashboard />
-    </KoushiShell>
-  );
-}
+export default function PortalPage() { return <KoushiShell title="マイページ"><PortalIdentity /></KoushiShell>; }
+function PortalIdentity() { const { profile } = useAuth(); const pathname = usePathname(); return <PortalDashboard key={`${profile.user_id}:${pathname}`} />; }

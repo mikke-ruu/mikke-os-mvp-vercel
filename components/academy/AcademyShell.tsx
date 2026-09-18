@@ -55,15 +55,15 @@ const honbuNav: MikkeShellNavItem[] = [
 ];
 
 const koushiNav: MikkeShellNavItem[] = [
-  { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard, section: "マイポータル" },
-  { href: "/academy/portal/class-requests", label: "担当する開催日", icon: CalendarCheck, section: "マイポータル" },
-  { href: "/academy/portal/study", label: "講座復習ページ・講師マニュアルページ", icon: GraduationCap, section: "マイポータル" },
-  { href: "/academy/offering-applications/mine", label: "申し込んだ募集", icon: ClipboardList, section: "マイポータル" },
-  { href: "/academy/portal/offerings", label: "自分の募集ページ", icon: Store, section: "募集" },
-  { href: "/academy/portal/url", label: "募集ページ・共有リンク", icon: Link2, section: "募集" },
-  { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
-  { href: "/academy/portal/offering-applications", label: "募集ページからの申込", icon: ClipboardList, section: "募集" },
-  { href: "/academy/portal/kits", label: "教材の注文・履歴", icon: Package, section: "発注" }
+  { href: "/academy/portal", label: "マイページ", icon: LayoutDashboard },
+  { href: "/academy/portal/study", label: "レッスン・教材", icon: GraduationCap },
+  { href: "/academy/offering-applications/mine", label: "自分の申込", icon: ClipboardList },
+  { href: "/academy/portal/offerings", label: "募集ページ", icon: Megaphone },
+  { href: "/academy/portal/offering-applications", label: "募集の申込", icon: ClipboardList },
+  { href: "/academy/portal/class-requests", label: "担当依頼", icon: CalendarCheck },
+  { href: "/academy/portal/url", label: "プロフィール・QR", icon: Link2 },
+  { href: "/academy/portal/kits", label: "教材注文", icon: Package },
+  { href: "/academy/portal/applications", label: "従来の申込", icon: ClipboardList }
 ];
 
 const honbuBottomNav: MikkeShellBottomNavItem[] = [
@@ -403,7 +403,7 @@ function ShellInner({
     .map((item) => ({
       ...item,
       label: variant === "koushi" && item.href.startsWith("/academy/portal/study")
-        ? "講座復習ページ・講師マニュアルページ"
+        ? personalView === "learner" ? "レッスン・教材" : "講師マニュアル"
         : item.label,
       href: contextHref(
         variant === "koushi" && (item.href === "/academy/portal" || item.href.startsWith("/academy/portal/study"))
@@ -490,7 +490,7 @@ function ShellInner({
       }}
       menuDescription={variant === "honbu" ? "講座をつくり、教室全体の申込・日程・講師を管理します。" : "自分の受講内容や、講師として担当する講座を確認します。"}
       menuEditItems={navItems.map((item) => ({ title: item.label, href: item.href, icon: item.icon }))}
-      ownedApps={variant === "honbu" ? [] : ownedApps}
+      ownedApps={[]}
       otherApps={[]}
       suggestedApps={suggestedApps}
       mikkeId={profile.handle}
@@ -498,7 +498,7 @@ function ShellInner({
       navItems={navItems}
       bottomNavItems={bottomNavItems}
       showBottomNavLabels
-      simpleMenu={variant === "honbu"}
+      simpleMenu
       showSharedUtilities={variant === "koushi"}
       footerLabel="Academy by mikke"
     >

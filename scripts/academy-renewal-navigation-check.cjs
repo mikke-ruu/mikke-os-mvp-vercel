@@ -13,7 +13,8 @@ assert.equal(honbuNav.map(item => item.label).join('|'), 'ダッシュボード|
 assert.equal(honbuBottomNav.map(item => item.label).join('|'), '講座|募集|開催日時|申込');
 assert(!manageVisible({capabilities:['academy:headquarters:manage']}, '/academy/portal'));
 assert(manageVisible({capabilities:['academy:learner_portal:view']}, '/academy/portal'));
-assert(source.includes('simpleMenu={variant === "honbu"}'), 'Keep the personal portal share and QR utilities');
+assert(source.includes('simpleMenu'), 'Both workspaces use compact navigation');
+assert(koushiNav.some(item => item.href === '/academy/portal/url' && item.label === 'プロフィール・QR'), 'Keep profile and QR reachable');
 const learner = { capabilities: ['academy:learner_portal:view'] };
 const teacher = { capabilities: ['academy:instructor_portal:view', 'academy:instructor:operate'] };
 assert(visible(learner, '/academy/offering-applications/mine', 'learner'));
