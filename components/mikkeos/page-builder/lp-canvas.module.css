@@ -47,3 +47,15 @@
 .box .select{opacity:0;position:absolute;top:0;left:0}.box:hover>.select,.box:focus-within>.select,.box[data-selected=true]>.select{opacity:1}.box[data-selected=true]{padding-top:24px}.box img{max-width:100%;height:auto}.box [contenteditable=true]{min-height:1.4em}
 .box .box[data-selected=true]{padding-top:24px}
 .root .previewReturn{position:fixed;bottom:calc(76px + env(safe-area-inset-bottom,0px));right:16px;display:flex;align-items:center;gap:8px;background:var(--mikke-surface);border:1px solid var(--mikke-line);box-shadow:0 2px 12px #0002;z-index:31;padding:8px 12px}.root .inspector>header>.inspectorToggle{margin-right:auto}
+
+/* Keep mobile overrides after the desktop defaults. Reserve enough scroll
+   space to bring the last BOX above the bottom sheet and app navigation. */
+@media(max-width:700px){
+  .root[data-mobile-sheet=true] .stage{padding-bottom:calc(36dvh + 80px + env(safe-area-inset-bottom,0px))}
+  .root[data-mobile-sheet=true][data-sheet-collapsed=true] .stage{padding-bottom:calc(116px + env(safe-area-inset-bottom,0px))}
+  .root .fields input,.root .fields textarea,.root .fields select{font-size:16px}
+  .root .pageTitle{padding:16px}
+  .root .pageTitle h1{font-size:24px}
+  .root .inspectorToggle{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .root .inspectorClose{flex-shrink:0}
+}
