@@ -31,6 +31,16 @@ export function LpCanvas({ blocks, onChange, renderContent, renderFields, title,
   const instance = useId();
   const [mobile, setMobile] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const stage = useRef<HTMLDivElement>(null);
+  const [stageVisible, setStageVisible] = useState(true);
+  useEffect(() => {
+    if (!mobile || !stage.current) return;
+    const observer = new IntersectionObserver(([entry]) => setStageVisible(entry.isIntersecting), {
+      rootMargin: "-64px 0px -68px 0px",
+    });
+    observer.observe(stage.current);
+    return () => observer.disconnect();
+  }, [mobile]);
   useEffect(() => {
     const query = window.matchMedia("(max-width:700px)");
     const sync = () => setMobile(query.matches);
@@ -43,6 +53,7 @@ export function LpCanvas({ blocks, onChange, renderContent, renderFields, title,
   const [reading, setReading] = useState(false);
   const [insertAt, setInsertAt] = useState<number | null>(null);
   const [past, setPast] = useState<LpBlock[][]>([]), [future, setFuture] = useState<LpBlock[][]>([]);
+  const [inspectorFocused, setInspectorFocused] = useState(false);
   const picker = useRef<HTMLDialogElement>(null);
   const block = selected ? findLpBlock(blocks, selected) : undefined;
   useEffect(() => { if (insertAt !== null) picker.current?.showModal(); else picker.current?.close(); }, [insertAt]);
@@ -58,7 +69,7 @@ export function LpCanvas({ blocks, onChange, renderContent, renderFields, title,
       <span>{label(b)}</span>
       {([{ action: "up", name: "上へ", Icon: ArrowUp }, { action: "down", name: "下へ", Icon: ArrowDown }, { action: "copy", name: "複製", Icon: Copy }, { action: "delete", name: "削除", Icon: Trash2 }] as const).map(({ action, name, Icon }) => <button key={action} type="button" title={name} aria-label={name} onClick={() => operate(action)}><Icon size={14} aria-hidden="true"/></button>)}
     </div>}
-    {content}{b.lp?.children?.length === 0 && <p className={styles.emptyBox}>右側から内容を追加</p>}
+    {content}{b.lp?.children?.length === 0 && <p className={styles.emptyBox}>{mobile ? "下の設定から内容を追加" : "右側から内容を追加"}</p>}
   </div>;
   const canvasContent = (items: LpBlock[]) => items.map(b => !reading && !fixedIds.includes(b.id) && !b.lp?.reference && selected === b.id && (b.type === "heading" || b.type === "paragraph") ? <MikkeRichWriting key={b.id} compact onDesign={() => { setTab("design"); setCollapsed(false); }} block={b} onChange={change}/> : <div key={b.id}>{renderContent([b])}</div>);
   const inspector = <><header title={blockPath(blocks, selected).join(" › ")}>
@@ -71,12 +82,12 @@ export function LpCanvas({ blocks, onChange, renderContent, renderFields, title,
           {!block ? <p>中央のBOXを選んでください。</p> : fixedIds.includes(block.id) || block.lp?.reference ? renderFields(block, change, tab) : tab === "content" && block.lp?.children ? <><label>セクション名<input value={block.title ?? ""} onChange={e => change({ ...block, title: e.target.value })}/></label>{(block.lp.template === "faq" || block.title === "よくある質問") && <button type="button" className={styles.faqAdd} onClick={() => change({ ...block, lp: { ...block.lp, children: [...block.lp!.children!, newFaqItem()] } })}>＋ 質問と回答を追加</button>}<div className={styles.parts}>{(["heading", "paragraph", "image", "image-text", "cta", "gallery"] as const).map(type => <button key={type} type="button" onClick={() => addPart(type)}>＋ {labels[type]}</button>)}</div><ul className={styles.childList}>{block.lp.children.map(child => <li key={child.id}><button type="button" onClick={() => select(child.id)}>{label(child)}　{child.text?.slice(0,18)}</button></li>)}</ul></> : mobile && tab === "content" && (block.type === "heading" || block.type === "paragraph") ? <p>ページの文字をタップして編集</p> : renderFields(block, change, tab)}
         </div>
       </>;
-  return <div className={styles.root} data-mobile-sheet={mobile && !reading && Boolean(block)}>
+  return <div className={styles.root} data-mobile-sheet={mobile && !reading && Boolean(block)} data-sheet-collapsed={collapsed}>
     <div className={styles.toolbar}><div><button type="button" disabled={!past.length} onClick={() => { const previous = past.at(-1)!; setFuture(f => [...f, structuredClone(blocks)]); setPast(p => p.slice(0,-1)); onChange(previous); }}>戻す</button><button type="button" disabled={!future.length} onClick={() => { const next = future.at(-1)!; setPast(p => [...p, structuredClone(blocks)]); setFuture(f => f.slice(0,-1)); onChange(next); }}>やり直す</button></div><div aria-label="LP表示サイズ"><button type="button" aria-pressed={device === "desktop"} onClick={() => setDevice("desktop")}>PC</button><button type="button" aria-pressed={device === "mobile"} onClick={() => setDevice("mobile")}>スマホ</button></div><button type="button" aria-pressed={reading} onClick={() => setReading(!reading)}>{reading ? "編集に戻る" : "プレビュー"}</button></div>
     <div className={styles.layout} data-reading={reading}>
       {!reading && <nav className={styles.outline} aria-label="LPの構成"><strong>セクション</strong>{blocks.map((b, i) => <button type="button" key={b.id} aria-pressed={selected === b.id} onClick={() => { select(b.id); document.getElementById(`${instance}-section-${b.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }); }}><small>{String(i+1).padStart(2,"0")}</small>{b.title || b.text?.slice(0,18) || label(b)}</button>)}<button type="button" onClick={() => setInsertAt(blocks.length)}>＋ 追加</button></nav>}
-      <div className={styles.stage}><div className={styles.page} data-device={device}>{!hidePageTitle && <header className={styles.pageTitle}><small>{pageLabel}</small><h1>{title || "ページ名"}</h1></header>}{!reading && !hidePageTitle && <button type="button" className={styles.insert} onClick={() => setInsertAt(0)}>＋ セクション</button>}{blocks.map((b, i) => <div key={b.id} id={`${instance}-section-${b.id}`}><LpContent blocks={[b]} render={canvasContent} decorate={reading ? undefined : decorate}/>{!reading && b.id !== fixedIds.at(-1) && <button type="button" className={styles.insert} aria-label={`${i+1}番目の後にセクションを追加`} onClick={() => setInsertAt(i+1)}>＋</button>}</div>)}{footer}</div></div>
-      {!reading && <aside className={styles.inspector} data-collapsed={mobile && collapsed} data-active={Boolean(block)} aria-label="選択したBOXの編集">{inspector}</aside>}
+      <div ref={stage} className={styles.stage}><div className={styles.page} data-device={device}>{!hidePageTitle && <header className={styles.pageTitle}><small>{pageLabel}</small><h1>{title || "ページ名"}</h1></header>}{!reading && !hidePageTitle && <button type="button" className={styles.insert} onClick={() => setInsertAt(0)}>＋ セクション</button>}{blocks.map((b, i) => <div key={b.id} id={`${instance}-section-${b.id}`}><LpContent blocks={[b]} render={canvasContent} decorate={reading ? undefined : decorate}/>{!reading && b.id !== fixedIds.at(-1) && <button type="button" className={styles.insert} aria-label={`${i+1}番目の後にセクションを追加`} onClick={() => setInsertAt(i+1)}>＋</button>}</div>)}{footer}</div></div>
+      {!reading && <aside className={styles.inspector} data-collapsed={mobile && collapsed} data-active={Boolean(block) && (!mobile || stageVisible || inspectorFocused)} onFocusCapture={() => setInspectorFocused(true)} onBlurCapture={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setInspectorFocused(false); }} aria-label="選択したBOXの編集">{inspector}</aside>}
 
     </div>
     {reading && selected && <button type="button" className={styles.previewReturn} onClick={() => setReading(false)}><EyeOff size={16} aria-hidden="true"/>編集に戻る</button>}<dialog ref={picker} className={styles.picker} onCancel={() => setInsertAt(null)} aria-label="セクションのテンプレート"><header><h2>セクションを追加</h2><button type="button" aria-label="テンプレートを閉じる" onClick={() => setInsertAt(null)}>×</button></header><div className={styles.templates}>{extraTemplates.map(item => <button type="button" key={item.label} onClick={() => insertBlock(item.create())}><div className={styles.thumbnail}><strong>{item.label}</strong><span>{item.description}</span></div></button>)}{sectionChoices.map(kind => <button type="button" key={kind} onClick={() => insertBlock(sectionTemplate(kind))}><div aria-hidden="true" className={styles.thumbnail} data-kind={kind}>{examples[kind].map(text => <span key={text}>{text}</span>)}</div><strong>{kind}</strong></button>)}</div></dialog>
