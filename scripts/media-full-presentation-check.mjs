@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+const filename=new URL('../lib/media-app/public-contract.ts',import.meta.url);
+const code=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const module={exports:{}};
+vm.runInNewContext(code,{module,exports:module.exports,require:id=>id==='./public-blocks'?{validBlock:()=>true}:id==='./validation.js'?{isSafeMediaUrl:()=>true}:null});
+const {parseMediaPublicSite}=module.exports;
+const base={name:'Media',slug:'example',description:'',authorName:'発信者',locale:'ja-JP',categories:['A']};
+assert.ok(parseMediaPublicSite(base),'Old public payload remains compatible');
+const presentation={bannerImageUrl:'/media/site-images/'+'a'.repeat(64),bannerPosition:50,logoImageUrl:'',authorAvatarUrl:'',authorBio:'紹介',storyUrl:'',articles:[{slug:'one',categories:['A'],pinned:true,publicationOrder:1,displayDate:'2026-09-18T00:00:00Z'}],collections:[{id:'11111111-1111-1111-1111-111111111111',name:'特集',slugs:['one']}]};
+assert.ok(parseMediaPublicSite({...base,presentation}));
+for(const update of [{bannerImageUrl:'/api/media/assets/owner-image'},{logoImageUrl:'https://evil.invalid/logo'},{owner_id:'private-owner'},{storyUrl:'javascript:alert(1)'},{bannerPosition:101},{articles:[{...presentation.articles[0],article_id:'internal'}]},{collections:[{...presentation.collections[0],draft_blocks:[]}]}])assert.equal(parseMediaPublicSite({...base,presentation:{...presentation,...update}}),null);
+console.log('PASS: public presentation metadata, backward compatibility and private field rejection');
+
+const pageSource=ts.transpileModule(fs.readFileSync(new URL('../lib/media-app/public-page.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+const pageModule={exports:{}};vm.runInNewContext(pageSource,{module:pageModule,exports:pageModule.exports,require:()=>module.exports});
+const {parsePublicMediaPage}=pageModule.exports;
+const article={title:'A',slug:'a',excerpt:'',categoryName:'A',coverImageUrl:'',locale:'ja-JP',versionNumber:1,revisionHash:'a'.repeat(64),publishedAt:'2026-09-18T00:00:00Z',updatedAt:'2026-09-18T00:00:00Z'};
+const item={article,categories:['A','B'],pinned:true,publicationOrder:0,displayDate:article.publishedAt};
+assert.ok(parsePublicMediaPage({total:57,items:[item]}));
+assert.equal(parsePublicMediaPage({total:57,items:Array(13).fill(item)}),null);
+assert.equal(parsePublicMediaPage({total:57,items:[{...item,owner_id:'private'}]}),null);
+assert.equal(parsePublicMediaPage({total:57,items:[{...item,article:{...article,site_id:'private'}}]}),null);
+console.log('PASS: paged public summary size and private field rejection');

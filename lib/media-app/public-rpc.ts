@@ -1,6 +1,6 @@
 import type { MediaPublicTransport } from "./public-contract";
 
-type PublicRpcName = "media_public_site" | "media_public_articles" | "media_public_article";
+type PublicRpcName = "media_public_site" | "media_public_articles" | "media_public_article" | "media_public_presentation";
 export type MediaPublicRpcCaller = (
   name: PublicRpcName,
   args: Record<string, string | number | null>
@@ -59,7 +59,8 @@ export function createMediaPublicRpcTransport(call: MediaPublicRpcCaller): Media
       if (!item || item.slug !== mediaSlug || (requestedLocale && item.locale !== requestedLocale) || !Array.isArray(item.categories)) return null;
       const categories = item.categories.map((value) => row(value, ["name", "slug"]));
       if (categories.some((category) => !category || typeof category.slug !== "string" || !slug(category.slug))) return null;
-      return { name: item.name, slug: item.slug, description: item.description, authorName: item.author_name,
+      const presentation=await request("media_public_presentation",{p_slug:mediaSlug});
+      return { ...(presentation?{presentation}:{}), name: item.name, slug: item.slug, description: item.description, authorName: item.author_name,
         locale: item.locale, categories: categories.map((category) => category!.name) };
     },
     async readArticles(mediaSlug, requestedLocale) {

@@ -1,4 +1,5 @@
 "use client";
+import {MediaReaderLibrary} from "./MediaReaderLibrary";
 import { useMediaRepository } from "./MediaRepository";
 
 import { useEffect, useState } from "react";
@@ -16,10 +17,12 @@ export function MediaReaderPreview() {
   const {getOwnedMedia,getMediaArticle,listMediaArticles,cloud}=repository;
   const id = useSearchParams().get("article");
   const [data, setData] = useState<{ site: MediaSite; article: MediaArticle; related: MediaArticle[] } | null>(null);
+  const [library,setLibrary]=useState<{site:MediaSite;articles:MediaArticle[]}|null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     let alive=true; setData(null); setLoaded(false); void (async()=>{ try {
     const site = await getOwnedMedia(profile.id);
+    if(site&&!id){if(cloud){window.location.replace(`/media/${site.slug}`);return;}const articles=await listMediaArticles(site.id);if(alive)setLibrary({site,articles:articles.filter(a=>a.publishedSnapshot)});return;}
     const article = id ? await getMediaArticle(id) : null;
     // Local preview never promotes a draft into public data or ownership.
     if (site && article?.mediaId === site.id) {
@@ -29,6 +32,7 @@ export function MediaReaderPreview() {
     } catch {if(alive)setData(null);} finally {if(alive)setLoaded(true);} })(); return()=>{alive=false;};
   }, [profile.id, id,repository,getOwnedMedia,getMediaArticle,listMediaArticles]);
   if (!loaded || (data && (data.site.ownerProfileId !== (cloud?profile.user_id:profile.id) || data.article.id !== id))) return <p className="p-10">記事を開いています…</p>;
+  if(!id&&library)return <MediaReaderLibrary site={library.site} articles={library.articles}/>;
   if (!data) return <main className="mx-auto max-w-3xl p-10"><p>表示できる記事がありません。</p><MediaLink href="/apps/media/articles">記事一覧へ戻る</MediaLink></main>;
   const { site, article, related } = data;
   const storyUrl = site.showStory === true ? normalizeMediaStoryUrl(site.storyUrl ?? "") : "";

@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { supabase } from "@/lib/supabase/client";
 const privatePath=/^\/api\/media\/assets\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
-type Props={src:string;alt:string;className?:string};
+type Props={src:string;alt:string;className?:string;style?:CSSProperties};
 function OwnerImage(props:Props){
   const {profile}=useAuth();const [image,setImage]=useState<{subject:string;src:string;url:string}|null>(null);
   useEffect(()=>{let alive=true;let url="";const controller=new AbortController();
@@ -18,6 +18,7 @@ function OwnerImage(props:Props){
 export function MediaImage(props:Props){
   if(/[\r\n]/.test(props.src))return null;
   if(privatePath.test(props.src)&&!/[\r\n]/.test(props.src))return <OwnerImage {...props}/>;
-  if(!props.src.startsWith("https://")&&!/^\/media\/images\/[a-f0-9]{64}$/.test(props.src))return null;
+  if(process.env.NODE_ENV==="development"&&/^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/=]+$/.test(props.src))return <img {...props}/>;
+  if(!props.src.startsWith("https://")&&!/^\/media\/(?:images|site-images)\/[a-f0-9]{64}$/.test(props.src))return null;
   return <img {...props}/>;
 }

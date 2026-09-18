@@ -1,15 +1,13 @@
-import { isSafeMediaUrl } from "./validation.js";
+import { validPublicBlock as validBlock, type MediaPublicBlockDTO } from "./public-blocks";
+export type { MediaPublicBlockDTO } from "./public-blocks";
 
-export type MediaPublicBlockDTO =
-  | { id: string; type: "paragraph"; text: string }
-  | { id: string; type: "heading"; text: string; level: 2 | 3 }
-  | { id: string; type: "image"; imageUrl: string; alt: string; caption?: string }
-  | { id: string; type: "quote"; text: string; attribution?: string }
-  | { id: string; type: "list"; items: string[] }
-  | { id: string; type: "divider" }
-  | { id: string; type: "link"; url: string; title?: string };
-
+export type MediaPresentation = {
+ bannerImageUrl:string;bannerPosition:number;logoImageUrl:string;authorAvatarUrl:string;authorBio:string;storyUrl:string;
+ articles:{slug:string;categories:string[];pinned:boolean;publicationOrder:number;displayDate:string}[];
+ collections:{id:string;name:string;slugs:string[]}[];
+};
 export type MediaPublicSiteDTO = {
+ presentation?:MediaPresentation;
   name: string;
   slug: string;
   description: string;
@@ -32,6 +30,7 @@ export type MediaPublicArticleSummaryDTO = {
 };
 
 export type MediaPublicArticleDTO = MediaPublicArticleSummaryDTO & {
+  categories?: string[];
   blocks: MediaPublicBlockDTO[];
 };
 
@@ -45,16 +44,6 @@ const siteKeys = ["authorName", "categories", "description", "locale", "name", "
 const publicImageUrl=(value:string)=>value===""||(/^\/media\/images\/[a-f0-9]{64}$/.test(value)&&!/[\r\n]/.test(value));
 const summaryKeys = ["categoryName", "coverImageUrl", "excerpt", "locale", "publishedAt", "revisionHash", "slug", "title", "updatedAt", "versionNumber"];
 const articleKeys = [...summaryKeys, "blocks"].sort();
-const blockKeys = {
-  paragraph: ["id", "text", "type"],
-  heading: ["id", "level", "text", "type"],
-  image: ["alt", "caption", "id", "imageUrl", "type"],
-  quote: ["attribution", "id", "text", "type"],
-  list: ["id", "items", "type"],
-  divider: ["id", "type"],
-  link: ["id", "title", "type", "url"]
-} as const;
-
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
@@ -80,39 +69,6 @@ function validDate(value: unknown) {
   return typeof value === "string" && !Number.isNaN(Date.parse(value));
 }
 
-function validBlock(value: unknown): value is MediaPublicBlockDTO {
-  const item = record(value);
-  if (!item || !string(item.id, 80) || typeof item.type !== "string" || !string(item.type, 20) || !(item.type in blockKeys)) return false;
-  const type = item.type as keyof typeof blockKeys;
-
-  switch (type) {
-    case "paragraph":
-      return hasExactKeys(item, blockKeys.paragraph) && string(item.text, 20000);
-    case "heading":
-      return hasExactKeys(item, blockKeys.heading) && string(item.text, 500) && (item.level === 2 || item.level === 3);
-    case "image": {
-      const required = item.caption === undefined ? ["alt", "id", "imageUrl", "type"] : blockKeys.image;
-      return hasExactKeys(item, required) && string(item.imageUrl, 2048) && publicImageUrl(item.imageUrl as string)
-        && string(item.alt, 500) && (item.caption === undefined || string(item.caption, 1000));
-    }
-    case "quote": {
-      const required = item.attribution === undefined ? ["id", "text", "type"] : blockKeys.quote;
-      return hasExactKeys(item, required) && string(item.text, 20000)
-        && (item.attribution === undefined || string(item.attribution, 500));
-    }
-    case "list":
-      return hasExactKeys(item, blockKeys.list) && Array.isArray(item.items) && item.items.length <= 100
-        && item.items.every((entry) => string(entry, 2000));
-    case "divider":
-      return hasExactKeys(item, blockKeys.divider);
-    case "link": {
-      const required = item.title === undefined ? ["id", "type", "url"] : blockKeys.link;
-      return hasExactKeys(item, required) && string(item.url, 2048) && isSafeMediaUrl(item.url as string)
-        && (item.title === undefined || string(item.title, 500));
-    }
-  }
-}
-
 function parseSummary(value: unknown): MediaPublicArticleSummaryDTO | null {
   const item = record(value);
   if (!item || !hasExactKeys(item, summaryKeys)) return null;
@@ -125,7 +81,8 @@ function parseSummary(value: unknown): MediaPublicArticleSummaryDTO | null {
 
 export function parseMediaPublicSite(value: unknown): MediaPublicSiteDTO | null {
   const item = record(value);
-  if (!item || !hasExactKeys(item, siteKeys)) return null;
+  if (!item || !hasExactKeys(item, item.presentation===undefined?siteKeys:[...siteKeys,"presentation"])) return null;
+  if(item.presentation!==undefined&&!validPresentation(item.presentation))return null;
   if (!string(item.name, 120) || !validSlug(item.slug) || !string(item.description, 500) || !string(item.authorName, 120) || !string(item.locale, 16)) return null;
   if (!Array.isArray(item.categories) || item.categories.length > 100 || item.categories.some((entry) => !string(entry, 60))) return null;
   return item as MediaPublicSiteDTO;
@@ -167,4 +124,12 @@ export function mediaCanonicalPath(mediaSlug: string, articleSlug?: string) {
 export function mediaCanonicalUrl(mediaSlug: string, articleSlug?: string) {
   const path = mediaCanonicalPath(mediaSlug, articleSlug);
   return path ? `https://app.mikke-os.com${path}` : null;
+}
+
+export function validPresentation(value:unknown):value is MediaPresentation {
+ const v=record(value);if(!v||!hasExactKeys(v,["bannerImageUrl","bannerPosition","logoImageUrl","authorAvatarUrl","authorBio","storyUrl","articles","collections"]))return false;
+ if(![v.bannerImageUrl,v.logoImageUrl,v.authorAvatarUrl].every(x=>typeof x==="string"&&(x===""||/^\/media\/site-images\/[a-f0-9]{64}$/.test(x))))return false;
+ if(!Number.isInteger(v.bannerPosition)||Number(v.bannerPosition)<0||Number(v.bannerPosition)>100||!string(v.authorBio,500)||typeof v.storyUrl!=="string"||(v.storyUrl!==""&&!/^https:\/\/app\.mikke-os\.com\/story\/[a-z0-9_-]+$/.test(v.storyUrl)))return false;
+ if(!Array.isArray(v.articles)||!v.articles.every(x=>{const a=record(x);return a&&hasExactKeys(a,["slug","categories","pinned","publicationOrder","displayDate"])&&validSlug(a.slug)&&Array.isArray(a.categories)&&a.categories.length<=100&&a.categories.every(c=>string(c,60))&&typeof a.pinned==="boolean"&&Number.isInteger(a.publicationOrder)&&validDate(a.displayDate);} ))return false;
+ return Array.isArray(v.collections)&&v.collections.length<=500&&v.collections.every(x=>{const c=record(x);return c&&hasExactKeys(c,["id","name","slugs"])&&typeof c.id==="string"&&/^[a-f0-9-]{36}$/.test(c.id)&&string(c.name,120)&&Array.isArray(c.slugs)&&c.slugs.every(validSlug);});
 }

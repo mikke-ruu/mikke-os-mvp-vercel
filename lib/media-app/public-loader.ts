@@ -30,5 +30,25 @@ export async function loadPublicMediaArticles(mediaSlug: string, locale?: string
 }
 export async function loadPublicMediaArticle(mediaSlug: string, articleSlug: string, locale?: string) {
   if (!mediaCanonicalPath(mediaSlug,articleSlug)) return null;
-  return reader(mediaSlug)?.article(mediaSlug,articleSlug,locale) ?? null;
+  const article=await reader(mediaSlug)?.article(mediaSlug,articleSlug,locale)??null;
+  if(!article)return null;
+  if(process.env.NODE_ENV==="development"&&mediaSlug==="mikkeos-media-preview")return article;
+  const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;if(!url||!key)return null;
+  const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch:(input,init)=>fetch(input,{...init,cache:"no-store"})}});
+  const {data,error}=await client.rpc("media_public_article_categories",{p_site_slug:mediaSlug,p_article_slug:articleSlug,p_revision_hash:article.revisionHash});
+  if(error||!Array.isArray(data)||data.length>100||!data.every(c=>typeof c==="string"&&c.length<=60))return null;
+  return {...article,categories:data as string[]};
+}
+
+export async function loadPublicMediaPage(mediaSlug:string,filters:import("./public-page").PublicMediaPageFilters){
+ if(process.env.NODE_ENV==="development"&&mediaSlug==="mikkeos-media-preview"){
+  const articles=await developmentReader.articles(mediaSlug)??[];
+  const filtered=articles.filter(a=>(!filters.query||a.title.includes(filters.query))&&(!filters.category||a.categoryName===filters.category)&&(!filters.month||a.publishedAt.startsWith(filters.month)));
+  return {total:filtered.length,items:filtered.slice((filters.page-1)*12,filters.page*12).map(article=>({article,categories:[article.categoryName].filter(Boolean),pinned:false,publicationOrder:0,displayDate:article.publishedAt}))};
+ }
+ if(!mediaCanonicalPath(mediaSlug)||process.env.MEDIA_PUBLIC_DATABASE_ENABLED!=="true")return null;
+ const url=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;if(!url||!key)return null;
+ const client=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{fetch:(input,init)=>fetch(input,{...init,cache:"no-store"})}});
+ const {data,error}=await client.rpc("media_public_article_page",{p_site_slug:mediaSlug,p_page:filters.page,p_query:filters.query,p_category:filters.category,p_month:filters.month,p_collection:filters.collection||null});
+ if(error)return null;const {parsePublicMediaPage}=await import("./public-page");return parsePublicMediaPage(data);
 }

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { MediaBlock } from "./types";
+import type { MediaBlock, MediaSite } from "./types";
 import type {
   MediaCreateInput,
   MediaDirectOwnerSite,
@@ -7,7 +7,7 @@ import type {
   MediaSession
 } from "./integration";
 
-export type MediaSiteDatabaseRow = MediaDirectOwnerSite;
+export type MediaSiteDatabaseRow = MediaDirectOwnerSite & {presentation?:Partial<MediaSite>};
 
 export type CreateMediaSiteInput = {
   name: string;
@@ -31,6 +31,7 @@ export type MediaArticleDraftInput = {
   locale?: string;
   blocks: MediaBlock[];
   categoryId?: string | null;
+  categoryNames?: string[];
   coverImageUrl?: string;
   coverImageAssetId?: string | null;
 };
@@ -72,7 +73,7 @@ export function createMediaDatabaseOperations(client: SupabaseClient) {
   async function listMyMediaSitesFromDatabase() {
     const { data, error } = await client
       .from("media_sites")
-      .select("id,name,slug,description,author_name,default_locale,publishing_policy,is_published,created_at,updated_at")
+      .select("id,name,slug,description,author_name,default_locale,publishing_policy,is_published,created_at,updated_at,presentation")
       .eq("publishing_policy", "direct_owner")
       .order("created_at", { ascending: true })
       .returns<MediaSiteDatabaseRow[]>();
@@ -127,6 +128,7 @@ export function createMediaDatabaseOperations(client: SupabaseClient) {
       excerpt: input.excerpt ?? "",
       locale: input.locale ?? "ja-JP",
       draft_blocks: input.blocks,
+      ...(input.categoryNames !== undefined ? { category_names: input.categoryNames } : {}),
       ...(input.categoryId !== undefined ? { category_id: input.categoryId } : {}),
       ...(input.coverImageUrl !== undefined ? { cover_image_url: input.coverImageUrl } : {}),
       ...(input.coverImageAssetId !== undefined ? { cover_image_asset_id: input.coverImageAssetId } : {})

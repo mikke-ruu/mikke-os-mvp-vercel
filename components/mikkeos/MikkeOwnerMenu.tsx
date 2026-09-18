@@ -21,6 +21,7 @@ type OwnerMenuIcon = ComponentType<{ size?: number; strokeWidth?: number; color?
 
 export type MikkeOwnerMenuItem = {
   title: string;
+  target?: "_blank";
   /** @deprecated 軽量ドロワーでは説明文を表示しない。型のみ後方互換で残す。 */
   helper?: string;
   href: string;
@@ -170,6 +171,8 @@ export function MikkeOwnerMenu({
               <Link
                 key={`${item.title}-${item.href}`}
                 href={item.href}
+                target={item.target}
+                rel={item.target ? "noopener noreferrer" : undefined}
                 className="flex items-center gap-3 rounded-lg px-1 py-2.5 text-sm font-bold hover:bg-[var(--mikke-surface-soft)]"
               >
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={{ background: themeStyle.background }}>

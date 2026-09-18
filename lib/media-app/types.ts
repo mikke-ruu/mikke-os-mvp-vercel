@@ -1,25 +1,12 @@
-export type MediaBlockType = "paragraph" | "heading" | "image" | "quote" | "list" | "divider" | "link";
-
-export type MediaBlock = {
-  id: string;
-  type: MediaBlockType;
-  text?: string;
-  level?: 2 | 3;
-  imageUrl?: string;
-  imageAssetId?: string;
-  alt?: string;
-  caption?: string;
-  attribution?: string;
-  items?: string[];
-  title?: string;
-  url?: string;
-};
+export type { MikkeContentBlock as MediaBlock, MikkeContentBlockType as MediaBlockType } from "@/lib/mikkeos/content/types";
+import type { MikkeContentBlock as MediaBlock } from "@/lib/mikkeos/content/types";
 
 export type MediaArticleSnapshot = {
   title: string;
   slug: string;
   excerpt: string;
   category: string;
+  categories?: string[];
   coverImageUrl: string;
   blocks: MediaBlock[];
   publishedAt: string;
@@ -27,12 +14,16 @@ export type MediaArticleSnapshot = {
 };
 
 export type MediaArticle = {
+  pinned?: boolean;
+  publicationOrder?: number;
+  displayDate?: string;
   id: string;
   mediaId: string;
   title: string;
   slug: string;
   excerpt: string;
   category: string;
+  categories?: string[];
   coverImageUrl: string;
   coverImageAssetId?: string;
   blocks: MediaBlock[];
@@ -43,6 +34,12 @@ export type MediaArticle = {
 };
 
 export type MediaSite = {
+  bannerImageUrl?: string;
+  bannerPosition?: number;
+  logoImageUrl?: string;
+  authorAvatarUrl?: string;
+  storyReference?: string;
+  storyLinkRequested?: boolean;
   id: string;
   ownerProfileId: string;
   name: string;

@@ -1,6 +1,7 @@
 "use client";
-import { MediaInlineEditor } from "./MediaInlineEditor";
-import { MediaCloudBlockFields } from "./MediaCloudBlockFields";
+import { MikkeContentEditor as MediaInlineEditor } from "@/components/mikkeos/content/MikkeContentEditor";
+import { MikkeBlockFields, type ContentImagePickerProps } from "@/components/mikkeos/content/MikkeBlockFields";
+import { MediaLinkFields } from "./MediaLinkFields";
 import { useMediaRepository } from "./MediaRepository";
 
 import { MediaLink as Link } from "./MediaNavigation";
@@ -22,6 +23,8 @@ function WritingArea({ value, onChange, label, placeholder, title = false }: { v
   useEffect(() => { if (ref.current) { ref.current.style.height = "0px"; ref.current.style.height = ref.current.scrollHeight + "px"; } }, [value]);
   return <textarea ref={ref} style={{ fontSize: title ? "clamp(1.5rem, 3vw, 2rem)" : "1.0625rem", fontWeight: title ? 700 : 400, lineHeight: title ? 1.6 : 2 }} aria-label={label} value={value} placeholder={placeholder} rows={1} onChange={(event) => onChange(event.target.value)} className={title ? "w-full resize-none overflow-hidden border-0 bg-transparent py-3 text-3xl font-bold leading-relaxed outline-none placeholder:text-[var(--mikke-muted)] sm:text-4xl" : "min-h-32 w-full resize-none overflow-hidden border-0 bg-transparent py-3 text-base leading-9 outline-none placeholder:text-[var(--mikke-muted)] sm:text-lg"} />;
 }
+
+function ContentImagePicker(props:ContentImagePickerProps){return <MikkeMediaPicker {...props} sourceApp="media-article" compact/>;}
 
 export function MediaEditor() {
   const { profile } = useAuth();
@@ -48,6 +51,7 @@ export function MediaEditor() {
   const [slug, setSlug] = useState("");
   const [excerpt, setExcerpt] = useState("");
   const [category, setCategory] = useState("");
+  const [categories,setCategories]=useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [addingCategory, setAddingCategory] = useState(false);
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -59,7 +63,7 @@ export function MediaEditor() {
   const [previewWidth, setPreviewWidth] = useState<"wide" | "phone">("wide");
   const articleId = useRef<string | null>(null);
   const savedPayload = useRef("");
-  const payload = useMemo(() => ({ title: title.trim() || "無題の記事", slug, excerpt, category, coverImageUrl, coverImageAssetId, blocks }), [title, slug, excerpt, category, coverImageUrl, coverImageAssetId, blocks]);
+  const payload = useMemo(() => ({ title: title.trim() || "無題の記事", slug, excerpt, category, categories, coverImageUrl, coverImageAssetId, blocks }), [title, slug, excerpt, category, categories, coverImageUrl, coverImageAssetId, blocks]);
   const serialized = JSON.stringify(payload);
   const latestPayload=useRef(serialized);
   latestPayload.current=serialized;
@@ -77,10 +81,10 @@ export function MediaEditor() {
       if(requestedId && (!found || !owned || found.mediaId!==owned.id))throw Error("この記事を開く権限がないか、記事が見つかりません。");
       const current=found;
       setSite(owned); articleId.current=current?.id??null;setArticle(current);
-      setTitle(current?.title??"");setSlug(current?.slug??"");setExcerpt(current?.excerpt??"");setCategory(current?.category??"");
+      setTitle(current?.title??"");setSlug(current?.slug??"");setExcerpt(current?.excerpt??"");setCategory(current?.category??"");setCategories(current?.categories??[current?.category??""].filter(Boolean));
       setCoverImageUrl(current?.coverImageUrl??"");setCoverImageAssetId(current?.coverImageAssetId);
       setBlocks(current?.blocks.length?current.blocks:[createMediaBlock("paragraph")]);
-      savedPayload.current=current?JSON.stringify({title:current.title.trim()||"無題の記事",slug:current.slug,excerpt:current.excerpt,category:current.category,coverImageUrl:current.coverImageUrl,coverImageAssetId:current.coverImageAssetId,blocks:current.blocks}):"";setPreview(false);setError("");setLoadedOwner(ownerKey);
+      savedPayload.current=current?JSON.stringify({title:current.title.trim()||"無題の記事",slug:current.slug,excerpt:current.excerpt,category:current.category,categories:current.categories??[current.category].filter(Boolean),coverImageUrl:current.coverImageUrl,coverImageAssetId:current.coverImageAssetId,blocks:current.blocks}):"";setPreview(false);setError("");setLoadedOwner(ownerKey);
       setMessage(current?(cloud?"アカウントに保存済み":"保存済み"):"タイトルか本文を書くと自動保存します");
     } catch(cause){if(alive){setError(cause instanceof Error?cause.message:"原稿を読み込めませんでした。");setLoadedOwner(ownerKey);}}
     finally{if(alive)setLoaded(true);}})();
@@ -128,7 +132,7 @@ export function MediaEditor() {
     finally{publicationBusy.current=false;if(mounted.current)setPublishing(false);}
   }
   async function cancelPublication(){if(!article)return;const version=epoch.current;try{const next=await unpublishMediaArticle(article.id);if(version!==epoch.current)return;setArticle(next);setMessage("公開をキャンセルしました。下書きは残っています。");}catch{setError("公開をキャンセルできませんでした。接続を確認してください。");}}
-  async function addCategory(){if(!site)return;const version=epoch.current;const name=newCategory.trim();try{const updated=await addMediaCategory(site.id,name);if(version!==epoch.current)return;setSite(updated);setCategory(name);setNewCategory("");setAddingCategory(false);}catch(cause){setError(cause instanceof Error?cause.message:"カテゴリーを追加できませんでした。");}}
+  async function addCategory(){if(!site)return;const version=epoch.current;const name=newCategory.trim();try{const updated=await addMediaCategory(site.id,name);if(version!==epoch.current)return;setSite(updated);setCategories(values=>[...new Set([...values,name])]);if(!category)setCategory(name);setNewCategory("");setAddingCategory(false);}catch(cause){setError(cause instanceof Error?cause.message:"カテゴリーを追加できませんでした。");}}
   const count = blocks.reduce((total, block) => total + Array.from(block.text ?? block.items?.join("") ?? "").length, 0);
   if (!loaded || loadedOwner!==ownerKey) return <p className="py-16 text-center">原稿を開いています…</p>;
   if (!site) return error ? <p role="alert">{error}</p> : <Link href="/apps/media/new">先にMediaを作成してください</Link>;
@@ -148,9 +152,9 @@ export function MediaEditor() {
       <div className="mx-auto max-w-3xl pt-5 sm:pt-8">
         <details className="mb-7"><summary className="inline-flex cursor-pointer items-center gap-2 text-sm text-[var(--mikke-muted)]"><ImageIcon size={17} />{coverImageUrl ? "カバー画像を変更" : "カバー画像を添える（任意）"}</summary><div className="mt-4"><MikkeMediaPicker currentUrl={coverImageUrl} sourceApp="media-cover" onSelect={(asset) => { setCoverImageUrl(asset.publicUrl); setCoverImageAssetId(asset.id); }} /></div></details>
         <WritingArea label="記事タイトル" title value={title} onChange={(value) => setTitle(value.slice(0, 160))} placeholder="タイトルをつけよう" />
-        <div className="my-5 flex flex-wrap items-center gap-3 border-b border-[var(--mikke-line)] pb-6"><select aria-label="カテゴリー" value={category} onChange={(event) => setCategory(event.target.value)} className="max-w-full rounded-full border border-[var(--mikke-line)] bg-white px-3 py-2 text-sm"><option value="">カテゴリーなし</option>{site.categories.map((item) => <option key={item}>{item}</option>)}</select><button type="button" aria-expanded={addingCategory} onClick={() => setAddingCategory(!addingCategory)} className="inline-flex items-center gap-1 text-sm text-[var(--mikke-primary)]"><Plus size={15} />カテゴリーを追加</button></div>
+        <div className="my-5 flex flex-wrap items-center gap-3 border-b border-[var(--mikke-line)] pb-6"><details className="text-sm"><summary className="cursor-pointer">{categories.length?categories.join("・"):"カテゴリーなし"}</summary><div className="mt-2 flex flex-wrap gap-3">{site.categories.map(item=><label key={item} className="flex items-center gap-1"><input type="checkbox" checked={categories.includes(item)} onChange={e=>{const next=e.target.checked?[...categories,item]:categories.filter(c=>c!==item);setCategories(next);setCategory(next[0]??"");}}/>{item}</label>)}</div></details><button type="button" aria-expanded={addingCategory} onClick={() => setAddingCategory(!addingCategory)} className="inline-flex items-center gap-1 text-sm text-[var(--mikke-primary)]"><Plus size={15} />カテゴリーを追加</button></div>
         {addingCategory ? <form onSubmit={(event) => { event.preventDefault(); addCategory(); }} className="mb-6 flex flex-wrap gap-2"><input autoFocus aria-label="新しいカテゴリー名" value={newCategory} maxLength={60} onChange={(event) => setNewCategory(event.target.value)} placeholder="例：日々のこと" className="min-w-0 flex-1 rounded-xl border border-[var(--mikke-line)] px-3 py-2" /><button type="submit" className={buttonClass}>追加</button><button type="button" className={buttonClass} onClick={() => setAddingCategory(false)}>やめる</button></form> : null}
-        <MediaInlineEditor blocks={blocks} onChange={setBlocks} renderBlock={(block,onChange,onSplit)=><MediaCloudBlockFields block={block} onChange={onChange} onSplit={onSplit}/>} />
+        <MediaInlineEditor blocks={blocks} onChange={setBlocks} renderBlock={(block,onChange,onSplit)=><MikkeBlockFields block={block} onChange={onChange} onSplit={onSplit} ImagePicker={ContentImagePicker} LinkEditor={MediaLinkFields}/>} />
         <p className="mt-5 text-right text-xs text-[var(--mikke-muted)]">{count.toLocaleString()}文字 · 読む目安 約{Math.max(1,Math.ceil(count/500))}分</p>
         <details className="mt-12 border-t border-[var(--mikke-line)] py-5"><summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold"><Settings2 size={16} />記事の設定（入力しなくても大丈夫）</summary><div className="mt-5 space-y-6">
           <label className="block text-sm font-semibold">記事URL名（任意）<input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="空欄なら自動で作成" className={inputClass} /><span className="mt-2 block break-all text-xs font-normal leading-6 text-[var(--mikke-muted)]">空欄のまま保存できます。一度作ったURLは空欄に戻しても変わりません。{article ? ` 現在：/media/${site.slug}/${article.slug}` : ""}</span></label>

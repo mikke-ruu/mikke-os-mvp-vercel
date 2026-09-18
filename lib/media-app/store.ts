@@ -1,4 +1,5 @@
 "use client";
+import { createMikkeContentBlock } from "@/lib/mikkeos/content/blocks.js";
 
 import type { MediaArticle, MediaBlock, MediaBlockType, MediaSite, MediaStoreState } from "./types";
 export { isSafeMediaUrl, normalizeMediaSlug } from "./validation.js";
@@ -18,14 +19,7 @@ function createId(prefix: string) {
 }
 
 export function createMediaBlock(type: MediaBlockType): MediaBlock {
-  const id = createId("media_block");
-  if (type === "heading") return { id, type, level: 2, text: "" };
-  if (type === "image") return { id, type, imageUrl: "", alt: "", caption: "" };
-  if (type === "quote") return { id, type, text: "", attribution: "" };
-  if (type === "list") return { id, type, items: [""] };
-  if (type === "divider") return { id, type };
-  if (type === "link") return { id, type, title: "", url: "" };
-  return { id, type: "paragraph", text: "" };
+  return createMikkeContentBlock(type);
 }
 
 export function loadMediaStore(): MediaStoreState {
@@ -75,7 +69,7 @@ export function createMediaSite(input: Pick<MediaSite, "ownerProfileId" | "name"
   return site;
 }
 
-export function updateMediaSite(id: string, input: Pick<MediaSite, "name" | "slug" | "description" | "authorName" | "categories">) {
+export function updateMediaSite(id: string, input: Pick<MediaSite, "name" | "slug" | "description" | "authorName" | "categories"> & Partial<Pick<MediaSite,"bannerImageUrl"|"bannerPosition"|"logoImageUrl"|"authorAvatarUrl"|"authorBio"|"storyReference"|"storyLinkRequested">>) {
   const state = loadMediaStore();
   const site = state.sites.find((item) => item.id === id);
   if (!site) throw new Error("Mediaが見つかりませんでした。");
@@ -136,7 +130,7 @@ export function getPublishedMediaArticle(mediaId: string, slug: string) {
   return loadMediaStore().articles.find((article) => article.mediaId === mediaId && article.publishedSnapshot?.slug === normalizeMediaSlug(slug)) ?? null;
 }
 
-export type SaveMediaArticleInput = Pick<MediaArticle, "title" | "slug" | "excerpt" | "category" | "coverImageUrl" | "coverImageAssetId" | "blocks">;
+export type SaveMediaArticleInput = Pick<MediaArticle, "title" | "slug" | "excerpt" | "category" | "categories" | "coverImageUrl" | "coverImageAssetId" | "blocks">;
 
 export function saveMediaArticle(mediaId: string, articleId: string | null, input: SaveMediaArticleInput) {
   const state = loadMediaStore();
@@ -161,7 +155,7 @@ export function saveMediaArticle(mediaId: string, articleId: string | null, inpu
   }
   if (conflicts(slug)) throw new Error("このURL名の記事はすでにあります。");
   const draft = {
-    title, slug, excerpt: input.excerpt.trim(), category: input.category,
+    title, slug, excerpt: input.excerpt.trim(), category: input.category, categories:input.categories??[input.category].filter(Boolean),
     coverImageUrl: input.coverImageUrl, coverImageAssetId: input.coverImageAssetId,
     blocks: clone(input.blocks)
   };
@@ -179,7 +173,7 @@ export function publishMediaArticle(articleId: string) {
   const now = new Date().toISOString();
   const article: MediaArticle = {
     ...current, status: "published", updatedAt: now,
-    publishedSnapshot: { title: current.title, slug: current.slug, excerpt: current.excerpt.trim() || getMediaExcerpt(current.blocks), category: current.category, coverImageUrl: current.coverImageUrl, blocks: clone(current.blocks), publishedAt: current.publishedSnapshot?.publishedAt ?? now, updatedAt: now }
+    publishedSnapshot: { title: current.title, slug: current.slug, excerpt: current.excerpt.trim() || getMediaExcerpt(current.blocks), category: current.category, categories:current.categories??[current.category].filter(Boolean), coverImageUrl: current.coverImageUrl, blocks: clone(current.blocks), publishedAt: current.publishedSnapshot?.publishedAt ?? now, updatedAt: now }
   };
   saveMediaStore({ ...state, articles: state.articles.map((item) => item.id === articleId ? article : item) });
   return article;
@@ -192,4 +186,30 @@ export function unpublishMediaArticle(articleId: string) {
   const article: MediaArticle = { ...current, status: "unpublished", publishedSnapshot: null, updatedAt: new Date().toISOString() };
   saveMediaStore({ ...state, articles: state.articles.map((item) => item.id === articleId ? article : item) });
   return article;
+}
+
+export function sortPublishedMediaArticles(articles: MediaArticle[]) {
+  return [...articles].sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || (a.publicationOrder ?? Number.MAX_SAFE_INTEGER) - (b.publicationOrder ?? Number.MAX_SAFE_INTEGER)
+    || (b.displayDate??b.publishedSnapshot?.publishedAt ?? "").localeCompare(a.displayDate??a.publishedSnapshot?.publishedAt ?? ""));
+}
+
+// Local review only. Production scheduling and ordering need a separate DB contract.
+export function updateLocalPublication(articleId: string, ownerProfileId: string, input: { date?: string; direction?: -1 | 1; pinned?: boolean }) {
+  const state = loadMediaStore();
+  const article = state.articles.find(item => item.id === articleId);
+  if (!article?.publishedSnapshot || !state.sites.some(site => site.id === article.mediaId && site.ownerProfileId === ownerProfileId)) throw Error("この記事の表示設定を変更できませんでした。");
+  if (input.pinned !== undefined) article.pinned = input.pinned;
+  if (input.date !== undefined) {
+    const date = new Date(input.date);
+    if (!Number.isFinite(date.getTime())) throw Error("日時を入力してください。");
+    article.publishedSnapshot = { ...article.publishedSnapshot, publishedAt: date.toISOString() };
+  }
+  if (input.direction) {
+    const items = sortPublishedMediaArticles(state.articles.filter(item => item.mediaId === article.mediaId && item.publishedSnapshot && Boolean(item.pinned) === Boolean(article.pinned)));
+    const index = items.findIndex(item => item.id === articleId), target = index + input.direction;
+    if (target >= 0 && target < items.length) [items[index], items[target]] = [items[target], items[index]];
+    items.forEach((item, index) => { item.publicationOrder = index; });
+  }
+  saveMediaStore(state);
+  return listMediaArticles(article.mediaId);
 }

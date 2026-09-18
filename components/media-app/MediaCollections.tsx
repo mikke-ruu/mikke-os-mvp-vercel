@@ -1,0 +1,16 @@
+"use client";
+import {useAuth} from "@/components/AuthGate";
+import {useMediaRepository} from "./MediaRepository";
+import {listCloudCollections,saveCloudCollection} from "@/lib/media-app/cloud-library";
+import {useEffect,useState} from "react";
+import type {MediaArticle} from "@/lib/media-app/types";
+import {listLibrary,putLibrary,type LibraryRecord} from "@/lib/mikkeos/content/local-library";
+export type MediaCollection={articleIds:string[]};
+export function MediaCollections({scope,articles,siteId}:{scope:string;articles:MediaArticle[];siteId:string}) {
+  const {cloud}=useMediaRepository();const {profile}=useAuth();
+  const load=()=>cloud?listCloudCollections(siteId,profile.user_id):listLibrary<MediaCollection>(scope,"collection");
+  const [items,setItems]=useState<LibraryRecord<MediaCollection>[]>([]),[name,setName]=useState(""),[ids,setIds]=useState<string[]>([]),[editing,setEditing]=useState<string|undefined>(),[message,setMessage]=useState("");
+  useEffect(()=>{let active=true;void load().then(value=>{if(active)setItems(value);}).catch(()=>setMessage("特集を読み込めませんでした。"));return()=>{active=false;};},[scope,siteId,profile.user_id,cloud]);
+  async function save(){try{if(cloud)await saveCloudCollection(siteId,profile.user_id,name.trim(),ids,editing);else await putLibrary(scope,"collection",name.trim(),{articleIds:ids},editing);setItems(await load());setMessage("特集を保存しました。");setEditing(undefined);setIds([]);setName("");}catch{setMessage("特集を保存できませんでした。");}}
+  return <details className="my-3 text-xs"><summary className="cursor-pointer text-xs font-semibold">特集・シリーズを作る</summary><div className="mt-4 space-y-4"><p className="text-sm">記事を選び、読んでほしい順に並べます。</p>{items.map(item=><button key={item.id} type="button" onClick={()=>{setEditing(item.id);setName(item.name);setIds(item.value.articleIds);}} className="mr-2 rounded-full border px-3 py-2 text-sm">{item.name}を編集</button>)}<label className="block text-sm">特集名<input aria-label="特集名" value={name} onChange={e=>setName(e.target.value)} placeholder="例：初めての方へ" className="mt-2 w-full rounded-lg border p-3"/></label><div className="max-h-72 space-y-2 overflow-y-auto">{articles.filter(a=>a.publishedSnapshot).map(a=><label key={a.id} className="flex gap-2 text-sm"><input type="checkbox" checked={ids.includes(a.id)} onChange={e=>setIds(value=>e.target.checked?[...value,a.id]:value.filter(id=>id!==a.id))}/>{a.publishedSnapshot!.title}</label>)}</div><ol className="space-y-2">{ids.map((id,index)=><li key={id} className="flex flex-wrap items-center gap-3 text-sm"><span>{index+1}. {articles.find(a=>a.id===id)?.title??"表示できない記事"}</span><button type="button" disabled={index===0} className="disabled:opacity-30" onClick={()=>{const next=[...ids];[next[index-1],next[index]]=[next[index],next[index-1]];setIds(next);}}>前へ</button><button type="button" onClick={()=>setIds(value=>value.filter(item=>item!==id))}>外す</button></li>)}</ol><button type="button" disabled={!name.trim()} onClick={()=>void save()} className="rounded-lg bg-[var(--mikke-primary)] px-4 py-2 text-sm text-white disabled:opacity-30">特集を保存</button>{editing?<button type="button" className="ml-4 text-sm" onClick={()=>{setEditing(undefined);setName("");setIds([]);}}>新しく作る</button>:null}{message?<p role="status" className="text-sm text-[var(--mikke-orange)]">{message}</p>:null}</div></details>;
+}
