@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { AcademyGettingStarted } from "./AcademyGettingStarted";
 import { AcademyHelp } from "./AcademyHelp";
+import { AcademyOfferingSummary } from "./AcademyOfferingSummary";
 import { academyMonth, matchesApplication, matchesOrder } from "@/lib/academy/dashboard-summary";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import type { AcademyApplication, AcademyClass, AcademyCourse, AcademyInstructor, AcademyKitOrder } from "@/types/database";
@@ -28,7 +29,7 @@ export function AcademyOperationsDashboard({ scope, data, classesError = false }
   const recorded = apps.filter(a => a.intake_source !== "koushi" && a.payment_status === "paid" && a.status !== "cancelled").reduce((n,a) => n + a.honbu_revenue, 0) + kits.filter(k => k.payment_status === "paid" && k.status !== "cancelled").reduce((n,k) => n + k.amount, 0);
   const metrics = [
     ["登録講座", courses.length, `公開 ${courses.filter(c=>c.is_published).length}・下書き ${courses.filter(c=>!c.is_published).length}`, link("/academy/courses")],
-    ["今月の受講申込", apps.filter(a=>matchesApplication(a,"month",month)).length, `${month.replace("-", "年")}月・本部で閲覧できる分`, intake("month")],
+    ["従来ページの今月の申込", apps.filter(a=>matchesApplication(a,"month",month)).length, `${month.replace("-", "年")}月・本部で閲覧できる分`, intake("month")],
     ["対応中の教材注文", activeKits.length, "未完了の注文・全期間", intake("active","koushi")],
     ["講師登録", instructors.length, `講座別の登録件数・活動中 ${instructors.filter(i=>i.is_active).length}`, link("/academy/instructors")]
   ] as const;
@@ -37,10 +38,11 @@ export function AcademyOperationsDashboard({ scope, data, classesError = false }
       <div><h2 className="text-sm font-bold tracking-wider">DASHBOARD</h2></div>
       <Link href={link("/academy/courses/new")} className="inline-flex min-h-11 items-center bg-[var(--mikke-accent)] px-4 text-sm font-bold text-white">＋ 講座をつくる</Link>
     </header>
+    <AcademyOfferingSummary />
     <section aria-label="教室の状況" className="grid grid-cols-2 gap-2 lg:grid-cols-4">{metrics.map(([label, count, detail, href], index)=><Link key={label} href={href} className={`${panel} border-t-2 transition hover:border-[var(--mikke-primary)] focus-visible:outline-2 focus-visible:outline-offset-2`} style={{borderTopColor:["var(--mikke-primary)","#ffd370","var(--mikke-accent)","#8bc7ad"][index]}}><h3 className="text-sm font-bold">{label}</h3><p className="my-1 text-2xl font-bold">{count}<span className="ml-1 text-sm font-normal">件</span></p><p className="text-xs leading-5 text-[var(--mikke-text)]">{detail}</p></Link>)}</section>
     <AcademyGettingStarted empty={courses.length === 0} scope={scope} />
     <div className="grid items-start gap-3 lg:grid-cols-2">
-      <section className={`${panel} border-l-[3px] border-l-[var(--mikke-pink)]`}><h2 className="text-base font-bold">対応が必要なこと</h2>
+      <section className={`${panel} border-l-[3px] border-l-[var(--mikke-pink)]`}><h2 className="text-base font-bold">従来の申込・教材注文で対応が必要なこと</h2>
         <div className="mt-1 divide-y divide-[var(--mikke-line)]">{[
           ["講座 新規申込", newApps.length, intake("new")],
           ["講座 入金確認", unpaid.length, intake("unpaid")],
@@ -65,6 +67,6 @@ export function AcademyOperationsDashboard({ scope, data, classesError = false }
       <section className={panel}><h2 className="text-lg font-bold">最近の受講申込</h2>{apps.length===0?<p className="mt-3 text-sm">まだ受講申込はありません。</p>:[...apps].sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,4).map(a=><Link key={a.id} href={link(`/academy/applications/${a.id}`)} className="block border-b border-[var(--mikke-line)] py-3"><p className="font-bold">{a.applicant_name}</p><p className="text-sm">{courseName(a.course_id)}</p><p className="text-xs text-[var(--mikke-text)]">{dateLabel(a.created_at)} · 内容を確認 →</p></Link>)}</section>
       <section className={panel}><h2 className="text-lg font-bold">対応中の教材注文</h2>{activeKits.length===0?<p className="mt-3 text-sm">対応中の教材注文はありません。</p>:activeKits.slice(0,4).map(k=><Link key={k.id} href={link(`/academy/applications?tab=koushi&order=${k.id}`)} className="block border-b border-[var(--mikke-line)] py-3"><p className="font-bold">{k.title}</p><p className="text-sm">{k.amount.toLocaleString()}円 · 注文を確認 →</p></Link>)}</section>
     </div>
-    <section className={panel}><h2 className="text-base font-bold">入金済みとして記録した金額〈累計〉</h2><p className="mt-2 text-2xl font-bold">{recorded.toLocaleString()}円</p><p className="mt-2 text-xs leading-5 text-[var(--mikke-text)]">本部受付の受講申込と教材注文のうち、入金済み・取消以外の記録を集計。今月の入金額や決済会社の残高ではありません。</p><AcademyHelp title="数字の見方">今月の受講申込は日本時間の受付月で集計し、キャンセルも受付履歴として含みます。講師登録は講座ごとの登録件数で、同じ人が複数講座に登録される場合があります。金額は現在の入金記録であり、決済会社との照合や返金履歴の集計ではありません。</AcademyHelp></section>
+    <section className={panel}><h2 className="text-base font-bold">従来の申込・教材注文の入金記録〈累計〉</h2><p className="mt-2 text-2xl font-bold">{recorded.toLocaleString()}円</p><p className="mt-2 text-xs leading-5 text-[var(--mikke-text)]">従来の本部受付の受講申込と教材注文のうち、入金済み・取消以外の記録を集計。新しい募集ページの申込は含みません。今月の入金額や決済会社の残高ではありません。</p><AcademyHelp title="数字の見方">今月の受講申込は日本時間の受付月で集計し、キャンセルも受付履歴として含みます。講師登録は講座ごとの登録件数で、同じ人が複数講座に登録される場合があります。金額は現在の入金記録であり、決済会社との照合や返金履歴の集計ではありません。</AcademyHelp></section>
   </div>;
 }

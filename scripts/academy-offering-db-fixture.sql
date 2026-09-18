@@ -1,0 +1,35 @@
+-- DISPOSABLE DATABASE ONLY. Reduced dependency fixture, never a production seed.
+create role anon nologin;
+create role authenticated nologin;
+create role service_role nologin bypassrls;
+create schema auth;
+create schema private;
+create schema test;
+create function test.uid(n int) returns uuid language sql immutable as $$select lpad(n::text,32,'0')::uuid$$;
+create table auth.users(id uuid primary key);
+insert into auth.users select test.uid(n) from generate_series(1,5)n;
+create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+create function auth.jwt() returns jsonb language sql stable as $$select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;
+grant usage on schema auth,private,test to authenticated,anon,service_role;
+create table public.profiles(id uuid primary key,user_id uuid);
+create table public.academy_headquarters(id uuid primary key,owner_user_id uuid,name text,handle text,is_active boolean default true,created_at timestamptz default now(),mode text default 'paid');
+create table public.academy_headquarters_members(headquarters_id uuid,member_profile_id uuid,role text,status text);
+create table public.academy_instructors(headquarters_id uuid,user_id uuid,registration_status text,is_certified boolean,is_active boolean,status text);
+create table public.academy_applications(headquarters_id uuid,user_id uuid,status text);
+create table public.academy_courses(id uuid primary key,headquarters_id uuid references public.academy_headquarters(id),name text,subtitle text,main_image_url text,description text,can_do_after text,duration_text text,kit_contents text,requires_kit boolean,price numeric,is_published boolean default true,learner_access_mode text default 'unlimited',learner_access_days integer,learner_access_fixed_end_at timestamptz);
+create table public.academy_course_access_grants(id uuid primary key default gen_random_uuid(),headquarters_id uuid,course_id uuid,application_id uuid,learner_user_id uuid,source text,status text,starts_at timestamptz,ends_at timestamptz,created_by_user_id uuid);
+create function private.academy_can_manage_headquarters(h uuid) returns boolean language sql stable security definer set search_path='' as $$select exists(select 1 from public.academy_headquarters where id=h and owner_user_id=auth.uid())$$;
+alter table public.academy_courses add column feature_settings jsonb;
+create function private.academy_headquarters_access_mode(h uuid) returns text language sql stable security definer set search_path='' as $$select mode from public.academy_headquarters where id=h$$;
+create function public.academy_is_publicly_available(h uuid) returns boolean language sql stable security definer set search_path='' as $$select exists(select 1 from public.academy_headquarters where id=h and mode='paid' and is_active)$$;
+alter table public.academy_courses enable row level security;
+grant select on public.academy_courses to authenticated;
+create policy owner_courses on public.academy_courses for select to authenticated using(private.academy_can_manage_headquarters(headquarters_id));
+insert into public.profiles values(test.uid(11),test.uid(1)),(test.uid(12),test.uid(2)),(test.uid(13),test.uid(3));
+insert into public.academy_headquarters(id,owner_user_id,name,handle) values(test.uid(100),test.uid(1),'HQ A','a'),(test.uid(200),test.uid(2),'HQ B','b');
+insert into public.academy_courses(id,headquarters_id,name,price,learner_access_mode,learner_access_days) values(test.uid(101),test.uid(100),'Course A',1200,'unlimited',null),(test.uid(102),test.uid(100),'Course B',1500,'days_after_enrollment',30),(test.uid(201),test.uid(200),'Other HQ',800,'unlimited',null);
+create function test.ok(value boolean,label text) returns void language plpgsql as $$begin if value is not true then raise exception 'ASSERTION: %',label; end if;end$$;
+create function test.denied(statement text) returns void language plpgsql security invoker as $$begin
+  begin execute statement; exception when others then return; end;
+  raise exception 'EXPECTED DENIAL: %',statement;
+end$$;

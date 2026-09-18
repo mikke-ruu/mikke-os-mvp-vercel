@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ExternalLink, FileText, Link2, Video } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
+import { supabase } from "@/lib/supabase/client";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { getCoursesByIds, getMyInstructorRecords, listMaterialsForInstructor } from "@/lib/academy/instructor-portal";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
@@ -40,6 +41,8 @@ function StudyContent() {
   const selectedCourseId = searchParams.get("course");
   const [records, setRecords] = useState<AcademyInstructor[]>([]);
   const [learnerApps, setLearnerApps] = useState<AcademyApplication[]>([]);
+  const [offeringCourseIds, setOfferingCourseIds] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState("");
   const [courseMap, setCourseMap] = useState<Record<string, AcademyCourse>>({});
   const [materials, setMaterials] = useState<AcademyMaterial[]>([]);
   const [pageMap, setPageMap] = useState<Record<string, AcademyInstructorPage>>({});
@@ -51,10 +54,17 @@ function StudyContent() {
   useEffect(() => {
     const requestedView = searchParams.get("view") ?? searchParams.get("sample");
     setLoading(true);
+    setLoadError("");
     let cancelled = false;
     if (requestedView) setView(requestedView === "instructor" ? "instructor" : "learner");
     async function load() {
+      try {
       const academyId = getAcademyRouteContext()?.academyId;
+      let offeringQuery = supabase.from("academy_offering_applications").select("course_ids").eq("learner_user_id", profile.user_id).eq("status", "paid");
+      if (academyId) offeringQuery = offeringQuery.eq("headquarters_id", academyId);
+      const { data: offeringApps, error: offeringError } = await offeringQuery;
+      if (offeringError) throw offeringError;
+      const newCourseIds = [...new Set((offeringApps ?? []).flatMap(row => Array.isArray(row.course_ids) ? row.course_ids.filter((id: unknown): id is string => typeof id === "string") : []))] as string[];
       const [myRecords, myLearnerApps] = await Promise.all([
         getMyInstructorRecords(profile.user_id, academyId),
         listMyLearnerApplications(profile.user_id, academyId)
@@ -62,9 +72,10 @@ function StudyContent() {
       if (cancelled) return;
       setRecords(myRecords);
       setLearnerApps(myLearnerApps);
-      if (!requestedView) setView(myLearnerApps.length > 0 ? "learner" : "instructor");
+      setOfferingCourseIds(newCourseIds);
+      if (!requestedView) setView(myLearnerApps.length > 0 || newCourseIds.length > 0 ? "learner" : "instructor");
       const instructorCourseIds = myRecords.map((record) => record.course_id);
-      const learnerCourseIds = [...new Set(myLearnerApps.map((application) => application.course_id))];
+      const learnerCourseIds = [...new Set([...myLearnerApps.map((application) => application.course_id), ...newCourseIds])];
       const courseIds = [...new Set([...instructorCourseIds, ...learnerCourseIds])];
       const [courses, mats, pages, learnerPages, grants] = await Promise.all([
         getCoursesByIds(courseIds),
@@ -80,14 +91,16 @@ function StudyContent() {
       setLearnerPageMap(Object.fromEntries(learnerPages.filter((page): page is AcademyLearnerPage => !!page).map((page) => [page.course_id, page])));
       setAccessGrants(grants);
       setLoading(false);
+      } catch { if (!cancelled) { setLoadError("教材を読み込めませんでした。画面を再読み込みしてください。"); setLoading(false); } }
     }
     load();
     return () => { cancelled = true; };
   }, [profile.user_id, searchParams]);
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (loadError) return <p role="alert" className="py-8 text-sm text-[var(--mikke-danger)]">{loadError}</p>;
   if (view === "learner") {
-    const learnerCourseIds = [...new Set(learnerApps.map((application) => application.course_id))];
+    const learnerCourseIds = [...new Set([...learnerApps.map((application) => application.course_id), ...offeringCourseIds])];
     if (learnerCourseIds.length === 0) {
       return <div className="rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-sm leading-7"><h2 className="font-bold">講座復習ページを表示できる受講履歴がありません</h2><p>講座復習ページは、受講の登録と教材の閲覧権限がある講座に表示されます。講師として登録されているだけでは表示されません。</p><p>受講済みなのに表示されない場合は、本部に受講登録のアカウントをご確認ください。本部で作成中のページは編集画面の「プレビュー」から確認できます。</p><Link className="mt-3 inline-block text-[var(--mikke-primary)]" href="?view=instructor">講師マニュアルページを確認する →</Link></div>;
     }
@@ -192,7 +205,7 @@ function StudyContent() {
   );
 }
 
-export default function StudyPage() {
+function StudyPageContent() {
   const requestedView = useSearchParams().get("view");
   const returnHref = `/academy/portal${requestedView === "instructor" || requestedView === "learner" ? `?view=${requestedView}` : ""}`;
   return (
@@ -205,4 +218,8 @@ export default function StudyPage() {
       <StudyContent />
     </KoushiShell>
   );
+}
+
+export default function StudyPage() {
+  return <Suspense fallback={<p className="p-6">教材を読み込んでいます…</p>}><StudyPageContent /></Suspense>;
 }

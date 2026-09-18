@@ -18,7 +18,7 @@ import { getAcademyCourseSaveErrorMessage } from "@/lib/academy/course-save-erro
 
 const FIELD_TYPES: AcademyFormField["type"][] = ["text", "textarea", "email", "tel", "select", "checkbox"];
 
-const COURSE_FEATURES: Array<{ key: keyof Omit<AcademyCourseFeatureSettings, "portal">; label: string; description: string; location: string }> = [
+const COURSE_FEATURES: Array<{ key: keyof Omit<AcademyCourseFeatureSettings, "portal" | "marketing">; label: string; description: string; location: string }> = [
   { key: "stepLearning", label: "オンラインのステップ教材（準備中）", description: "限定pilotでは利用できません。受講者への共有は復習ページを使います。", location: "準備中" },
   { key: "materialLicenses", label: "認定講師へ資料を共有", description: "講座の進め方、PDF、動画、外部URLなどを講師のマイポータルに表示します。", location: "講師用資料ページ・講師用ファイル" },
   { key: "materialAssignments", label: "受講者に復習教材を割り当てる", description: "誰がどの復習教材を見られるかを管理します。", location: "復習ページ" },
@@ -123,7 +123,7 @@ export function CourseForm({
   const submitting = useRef(false);
   const advancedRef = useRef<HTMLDetailsElement>(null);
   const [phonePreview, setPhonePreview] = useState(false);
-  const [imageSide, setImageSide] = useState<"left" | "right">("left");
+  const imageSide = form.featureSettings.marketing?.imageSide ?? "left";
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState(false);
@@ -164,7 +164,7 @@ export function CourseForm({
     }));
   }
 
-  function toggleCourseFeature(key: keyof Omit<AcademyCourseFeatureSettings, "portal">) {
+  function toggleCourseFeature(key: keyof Omit<AcademyCourseFeatureSettings, "portal" | "marketing">) {
     setSaved(false);
     setForm((prev) => {
       const enabled = !prev.featureSettings[key];
@@ -603,12 +603,12 @@ export function CourseForm({
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <button type="button" aria-pressed={!phonePreview} onClick={() => setPhonePreview(false)} className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3 aria-pressed:bg-[var(--mikke-accent-soft)]">PC</button>
           <button type="button" aria-pressed={phonePreview} onClick={() => setPhonePreview(true)} className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3 aria-pressed:bg-[var(--mikke-accent-soft)]">スマホ</button>
-          <label className="flex items-center gap-2">PCの画像位置<select className="min-h-11 rounded-lg border border-[var(--mikke-line)] bg-white px-2 text-base" value={imageSide} onChange={event => setImageSide(event.target.value as "left" | "right")}><option value="left">左</option><option value="right">右</option></select></label>
+          <label className="flex items-center gap-2">PCの画像位置<select className="min-h-11 rounded-lg border border-[var(--mikke-line)] bg-white px-2 text-base" value={imageSide} onChange={event => set("featureSettings", { ...form.featureSettings, marketing: { ...form.featureSettings.marketing, imageSide: event.target.value as "left" | "right" } })}><option value="left">左</option><option value="right">右</option></select></label>
         </div>
         <div className={phonePreview ? "mx-auto max-w-[390px]" : "w-full"}>
-          <AcademyCourseCard course={{ name: form.name || "講座名", price: form.price, subtitle: form.subtitle, main_image_url: form.mainImageUrl, description: form.description, can_do_after: form.canDoAfter, duration_text: form.durationText, kit_contents: form.kitContents, material_contents: form.materialContents }} imageSide={imageSide} priceLabel="基本価格（税込）" />
+          <AcademyCourseCard course={{ feature_settings: form.featureSettings, name: form.name || "講座名", price: form.price, subtitle: form.subtitle, main_image_url: form.mainImageUrl, description: form.description, can_do_after: form.canDoAfter, duration_text: form.durationText, kit_contents: form.kitContents, material_contents: form.materialContents }} imageSide={imageSide} priceLabel="基本価格（税込）" />
         </div>
-        <p className="text-xs leading-5 text-[var(--mikke-muted)]">画像位置はプレビュー用です。募集ページでの配置はLPエディターで変更します。</p>
+        <p className="text-xs leading-5 text-[var(--mikke-muted)]">画像位置は講座と一緒に保存します。募集ページではLPエディターの設定を優先します。</p>
       </section>
       </fieldset>
       {saved ? <p role="status" className="text-sm">変更を保存しました</p> : null}

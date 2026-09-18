@@ -252,7 +252,15 @@ export type AcademyCoursePortalFeatureSettings = {
   subscription: boolean;
 };
 
+export type AcademyCourseMarketing = {
+  category?: string;
+  images?: string[];
+  curriculum?: string[];
+  imageSide?: "left" | "right";
+};
+
 export type AcademyCourseFeatureSettings = {
+  marketing?: AcademyCourseMarketing;
   stepLearning: boolean;
   materialLicenses: boolean;
   materialAssignments: boolean;

@@ -1,22 +1,28 @@
 # Academy renewal: production integration gate
 
-Status: incomplete. Do not merge this preparation slice as the completed renewal.
+Status: implemented and undergoing final release checks. Production publication is not yet verified.
 
 The user approved the local design and full production rollout on 2026-09-18. That approval does not make the localStorage prototype a production persistence implementation.
 
-## Implemented in this preparation slice
+## Implemented
 
 - Simple course inputs retaining the complete existing CourseInput, with save-before-lesson navigation.
 - Course-card preview using existing persisted course fields.
 - Instructor portal links to the existing course-scoped manual and Community hub.
 - Existing Media-backed instructor editor retained; load failures and overlapping saves handled.
-- No changes to existing platform billing, Community invitations, SQL permissions, or production data.
+- Separate HQ offerings, independent price, multiple courses, shared LP editor and public application form.
+- Server price/course/access snapshots, expected-price comparison, idempotent applications and HQ bank/onsite receipt confirmation.
+- Staged purchase with snapshot prices, completion gates and grants only for purchased courses.
+- Qualified instructor pages referencing HQ content with editable profiles/additions; immutable instructor attribution across stages.
+- HQ/learner/instructor application views and existing content-access integration.
+- Course category, ordered images, curriculum and card layout stored without replacing existing feature settings.
+- No changes to existing platform billing or Community invitation/consent contracts. New customer Stripe remains unavailable.
 
-## Release-blocking model gap
+## Model gap resolved
 
-The production database has academy_courses, academy_classes, academy_applications and academy_instructor_pages. A read-only information_schema check found no academy offering table. Existing application RPCs take one course_id and calculate the application amount from academy_courses.price. The approved local model has Offering.courses[], an independent offering price and staged purchases. Mapping it to a course LP alone would display a price or purchased course set that the application backend does not enforce.
+The original database lacked a separate offering entity. Three additive migrations now implement offerings, immutable application snapshots, course grants, certified instructor pages and staged purchases. Existing course/application APIs and IDs are preserved. Deletion is restricted; archiving retains history.
 
-Before full rollout, implement and verify:
+Implemented boundaries to verify at release:
 
 1. Headquarters-owned offering records and ordered course associations, preserving all existing course IDs and old application URLs.
 2. Immutable application offering/price/course snapshots and atomic application creation. Never trust browser-supplied amounts.
@@ -36,4 +42,14 @@ Before full rollout, implement and verify:
 - Desktop/mobile navigation, duplicate content/price display, reload, back, unsaved form and error states.
 - Build, type checks, targeted tests, authenticated E2E, GitHub checks and production deployment verification are separate gates.
 
-The course-only preparation does not include category/multi-image storage or an independent curriculum field. Do not describe it as feature parity with the local design.
+## Evidence collected before publication
+
+- CourseInput payload/save-failure/double-submit tests passed.
+- Actual PublicOffering TSX SSR/submit and purchase helper tests passed, including snapshot pricing, null snapshots, mode changes and retry tokens.
+- Context rewrite and scoped application UI tests passed.
+- Disposable PostgreSQL all/staged/instructor suites passed, including cross-HQ/wrong-role denial and immutable attribution.
+- Actual remote schema BEGIN/ROLLBACK integration passed, including real content-access helpers and completion-based access periods. All fixtures and new schema objects were confirmed absent after rollback.
+- Three additive migrations were applied successfully to the production-connected project nttqpprkqbynxyldbnjs: 20260918050803, 20260918050806, 20260918050808. Local filenames match remote history without SQL-content changes.
+- Post-apply transaction/rollback contract tests passed. All five new public tables have RLS enabled, no anonymous table SELECT and no authenticated hard DELETE. No real customer applications or payments were created by verification.
+- Initial builds found an outer Suspense boundary missing on the study page and an overly broad feature-checkbox key type; both corrected. Final current-tree build, Git and deployment remain separate gates.
+- New monthly customer billing remains unavailable. Existing platform subscriptions and old payment links are unchanged.

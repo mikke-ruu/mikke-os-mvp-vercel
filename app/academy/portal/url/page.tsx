@@ -276,6 +276,7 @@ function UrlContent() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
+      <Link href="/academy/portal/offerings" className="block rounded-lg border border-[var(--mikke-line)] p-3 text-sm font-bold">本部の募集を使って自分の募集ページをつくる</Link>
       {records.map((rec) => {
         const course = courseMap[rec.course_id];
         const salesUrl = `${origin}/academy/i/${rec.id}`;

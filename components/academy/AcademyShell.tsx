@@ -43,9 +43,11 @@ import type { AcademyAccessContext, AcademyHeadquartersAccess } from "@/types/da
 const honbuNav: MikkeShellNavItem[] = [
   { href: "/academy", label: "ホーム", icon: LayoutDashboard, section: "はじめる" },
   { href: "/academy/courses", label: "講座をつくる・編集する", icon: BookOpen, section: "講座づくり" },
+  { href: "/academy/offerings", label: "募集をつくる・編集する", icon: Store, section: "講座づくり" },
+  { href: "/academy/offering-applications", label: "新しい募集の申込・入金確認", icon: ClipboardList, section: "運営" },
   { href: "/academy/classes", label: "開催日程・担当講師", icon: CalendarCheck, section: "講座" },
   { href: "/academy/instructors", label: "講師管理", icon: Users, section: "講座" },
-  { href: "/academy/applications", label: "申込・受注管理", icon: ClipboardList, section: "運営" },
+  { href: "/academy/applications", label: "従来の申込・教材注文", icon: ClipboardList, section: "運営" },
   { href: "/academy/front", label: "ホームページ編集", icon: Store, section: "公開" },
   { href: "/academy/settings", label: "本部設定", icon: Settings, section: "設定" }
 ];
@@ -54,27 +56,34 @@ const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard, section: "マイポータル" },
   { href: "/academy/portal/class-requests", label: "担当する開催日", icon: CalendarCheck, section: "マイポータル" },
   { href: "/academy/portal/study", label: "講座復習ページ・講師マニュアルページ", icon: GraduationCap, section: "マイポータル" },
+  { href: "/academy/offering-applications/mine", label: "申し込んだ募集", icon: ClipboardList, section: "マイポータル" },
+  { href: "/academy/portal/offerings", label: "自分の募集ページ", icon: Store, section: "募集" },
   { href: "/academy/portal/url", label: "募集ページ・共有リンク", icon: Link2, section: "募集" },
   { href: "/academy/portal/applications", label: "申込管理", icon: ClipboardList, section: "募集" },
+  { href: "/academy/portal/offering-applications", label: "募集ページからの申込", icon: ClipboardList, section: "募集" },
   { href: "/academy/portal/kits", label: "教材の注文・履歴", icon: Package, section: "発注" }
 ];
 
 const honbuBottomNav: MikkeShellBottomNavItem[] = [
   { href: "/academy", label: "ホーム", icon: LayoutDashboard },
   { href: "/academy/courses", label: "講座", icon: BookOpen },
-  { href: "/academy/instructors", label: "講師", icon: Users },
-  { href: "/academy/applications", label: "申込・受注", icon: ClipboardList }
+  { href: "/academy/offerings", label: "募集", icon: Store },
+  { href: "/academy/offering-applications", label: "申込", icon: ClipboardList }
 ];
 
 const koushiBottomNav: MikkeShellBottomNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard },
   { href: "/academy/portal/study", label: "復習・資料", icon: GraduationCap },
-  { href: "/academy/portal/applications", label: "申込", icon: ClipboardList },
-  { href: "/academy/portal/kits", label: "教材注文", icon: Package }
+  { href: "/academy/offering-applications/mine", label: "自分の申込", icon: ClipboardList },
+  { href: "/academy/portal/offerings", label: "募集", icon: Store },
+  { href: "/academy/portal/offering-applications", label: "募集の申込", icon: ClipboardList }
 ];
 
 function canShowManageHref(context: AcademyAccessContext | null, href: string) {
   if (!context) return true;
+  if (href.startsWith("/academy/offerings") || href.startsWith("/academy/offering-applications")) {
+    return context.capabilities.includes("academy:headquarters:manage");
+  }
   if (href === "/academy") return context.capabilities.includes("academy:headquarters:view");
   if (href.startsWith("/academy/classes")) {
     return context.capabilities.includes("academy:headquarters:manage");
@@ -93,6 +102,8 @@ function canShowManageHref(context: AcademyAccessContext | null, href: string) {
 
 function canShowPersonalHref(context: AcademyAccessContext | null, href: string, personalView: "learner" | "instructor") {
   if (!context) return true;
+  if (href === "/academy/offering-applications/mine") return context.capabilities.includes("academy:learner_portal:view");
+  if (href === "/academy/portal/offering-applications") return personalView === "instructor" && context.capabilities.includes("academy:instructor_portal:view");
   if (href === "/academy/portal" || href.startsWith("/academy/portal/study")) {
     return context.capabilities.includes("academy:learner_portal:view") ||
       context.capabilities.includes("academy:instructor_portal:view");

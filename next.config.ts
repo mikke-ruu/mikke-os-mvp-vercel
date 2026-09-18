@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       { source: "/academy/h/:academyId/manage", destination: "/academy" },
       { source: "/academy/h/:academyId/manage/:path*", destination: "/academy/:path*" },
       { source: "/academy/h/:academyId/teach", destination: "/academy/portal" },
+      { source: "/academy/h/:academyId/teach/offering-applications/mine", destination: "/academy/offering-applications/mine" },
       { source: "/academy/h/:academyId/teach/:path*", destination: "/academy/portal/:path*" }
     ];
   },

@@ -7,6 +7,8 @@ export type AcademyRoutePortal = "manage" | "teach";
 const PUBLIC_ACADEMY_PREFIXES = [
   "/academy/site",
   "/academy/c/",
+  "/academy/o/",
+  "/academy/oi/",
   "/academy/i/",
   "/academy/apply/",
   "/academy/graduate/",
@@ -36,6 +38,9 @@ export function toAcademyContextHref(
   if (PUBLIC_ACADEMY_PREFIXES.some((prefix) => href === prefix || href.startsWith(prefix))) return href;
 
   const [pathname, suffix = ""] = href.split(/(?=[?#])/u, 2);
+  if (pathname === "/academy/offering-applications/mine") {
+    return `/academy/h/${academyId}/teach/offering-applications/mine${suffix}`;
+  }
   if (pathname === "/academy/portal" || pathname.startsWith("/academy/portal/")) {
     const rest = pathname.slice("/academy/portal".length);
     return `/academy/h/${academyId}/teach${rest}${suffix}`;

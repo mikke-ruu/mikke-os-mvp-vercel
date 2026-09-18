@@ -97,6 +97,7 @@ function PortalDashboard() {
       <div className="mx-auto max-w-md rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-center">
         <p className="text-sm font-bold text-[var(--mikke-text)]">表示できる講座がありません</p>
         <p className="mt-1 text-xs text-[var(--mikke-muted)]">受講が確定した講座や、認定講師として登録された講座がここに表示されます。</p>
+        <Link href={toCurrentAcademyContextHref("/academy/offering-applications/mine")} className="mt-3 inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]">申し込んだ募集を確認する →</Link>
       </div>
     );
   }
@@ -144,6 +145,7 @@ function PortalDashboard() {
       </div>
       <h2 className="text-base font-bold text-[var(--mikke-text)]">{currentView === "learner" ? "受講中・修了した講座" : "講師として登録された講座"}</h2>
       <div className="grid gap-3 md:grid-cols-2">
+        <QuickCard href="/academy/offering-applications/mine" icon={ClipboardList} title="申し込んだ募集" desc="募集ページからの申込内容と入金状況を確認" />
         {currentView === "learner" ? learnerCourseIds.map((courseId) => {
           const course = courseMap[courseId];
           const application = learnerApps.find((item) => item.course_id === courseId);
@@ -182,6 +184,7 @@ function PortalDashboard() {
         <QuickCard href={currentView === "learner" ? "/academy/portal/study?view=learner" : "/academy/portal/study?view=instructor"} icon={GraduationCap} title={currentView === "learner" ? "講座復習ページ" : "講師マニュアルページ"} desc={currentView === "learner" ? "受講した講座の復習内容を確認" : "講座運営に必要なマニュアル、PDF、動画、リンクを確認"} />
         {currentView === "instructor" ? <QuickCard href="/academy/portal/study?view=learner" icon={GraduationCap} title="講座復習ページ" desc="自分が受講した講座の教材を確認。講師マニュアルページとは別のページです" /> : null}
         {currentView === "instructor" ? <QuickCard href="/community" icon={Users} title="Communityを開く" desc="参加しているCommunityを確認。Academyの講師登録とは別に招待・参加が必要です" /> : null}
+        {currentView === "instructor" ? <QuickCard href="/academy/portal/offering-applications" icon={ClipboardList} title="自分の募集ページからの申込" desc="担当する募集の申込内容と入金状況を確認" /> : null}
         {currentView === "instructor" && canOperate ? (
           <>
             <QuickCard href="/academy/portal/class-requests" icon={CalendarCheck} title="開催日・担当依頼" desc="自分が担当する日程と、本部からの依頼を確認" />
