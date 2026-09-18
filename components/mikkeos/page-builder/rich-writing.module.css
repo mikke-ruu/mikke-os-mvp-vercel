@@ -1,0 +1,6 @@
+.compact.compact[role=toolbar]{position:relative;background:var(--mikke-surface,#fff);border:1px solid var(--mikke-line);border-radius:8px;padding:3px;width:fit-content;max-width:100%;z-index:3}
+.compact .row{display:flex;flex-wrap:nowrap;gap:2px}
+.compact .row>button{display:inline-flex;align-items:center;justify-content:center;padding:0;width:36px;min-width:36px;height:36px;min-height:36px;border:0;border-radius:5px;color:var(--mikke-text);background:transparent}
+.compact .row>button:hover,.compact .row>button[aria-expanded=true]{background:var(--mikke-accent-soft)}
+.compact .menu{position:absolute;bottom:calc(100% + 4px);left:0;min-width:150px;background:var(--mikke-surface,#fff);padding:5px;border:1px solid var(--mikke-line);border-radius:8px;box-shadow:0 6px 20px #0002;display:grid;z-index:5}
+.compact .menu>button{text-align:left;justify-content:flex-start;min-height:40px;padding:8px 12px;white-space:nowrap}

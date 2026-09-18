@@ -1,7 +1,7 @@
 import type {ComponentType} from "react";
 import type {MikkeContentBlock as MediaBlock} from "@/lib/mikkeos/content/types";
 type ImageProps={src:string;alt:string;className?:string};
-function safeHref(value:string){if(/[\s\\]/.test(value))return false;if(/^\/(?!\/)/.test(value))return true;try{return ["https:","http:"].includes(new URL(value).protocol);}catch{return false;}}
+function safeHref(value:string){if(/[\s\\]/.test(value))return false;if(value.startsWith("#")||/^\/(?!\/)/.test(value))return true;try{return ["https:","http:"].includes(new URL(value).protocol);}catch{return false;}}
 function LinkedImage({href,Image,...props}:ImageProps & {href?:string;Image:ComponentType<ImageProps>}) {const image=<Image {...props}/>;return href&&safeHref(href)?<a href={href} target="_blank" rel="noopener noreferrer" className={"block "+(props.className?.includes("sm:order-2")?"sm:order-2":"")}>{image}</a>:image;}
 function RichText({block}:{block:MediaBlock}) { return <>{(block.richText ?? [{text:block.text??""}]).map((run,index)=>{const text=<span style={{fontWeight:run.bold?700:undefined,textDecoration:run.strike?"line-through":undefined}}>{run.text}</span>;return run.href&&safeHref(run.href)?<a key={index} href={run.href} target="_blank" rel="noopener noreferrer" className="text-[var(--mikke-primary)] underline underline-offset-4">{text}</a>:<span key={index}>{text}</span>;})}</>; }
 

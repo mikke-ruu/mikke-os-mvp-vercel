@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, LayoutTemplate } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
-import { LpBlocksEditor } from "@/components/academy/LpBlocksEditor";
+import { AcademyLpEditor } from "@/components/academy/AcademyLpEditor";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters, AcademyLpBlock } from "@/types/database";
@@ -22,6 +22,8 @@ function FrontContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const revision = useRef(0);
 
   const [form, setForm] = useState({
     name: "",
@@ -50,22 +52,29 @@ function FrontContent() {
       }
       setLoading(false);
     }
-    load();
+    void load().catch(() => {
+      setSaveError("ホームページを読み込めませんでした。ページを再読み込みしてください。");
+      setLoading(false);
+    });
   }, [profile.user_id]);
 
   function set(key: keyof typeof form, value: string) {
+    revision.current += 1;
     setForm((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
   }
 
   function handleBlocksChange(next: AcademyLpBlock[]) {
+    revision.current += 1;
     setBlocks(next);
     setSaved(false);
   }
 
   async function save() {
     if (!hq) return;
+    const savingRevision = revision.current;
     setSaving(true);
+    setSaveError("");
     try {
       await updateHeadquarters(hq.id, {
         name: form.name.trim() || hq.name,
@@ -75,17 +84,20 @@ function FrontContent() {
         contact_email: form.contact_email || null,
         front_blocks: blocks
       });
-      setSaved(true);
+      setSaved(revision.current === savingRevision);
+    } catch {
+      setSaveError("保存できませんでした。入力内容は残っています。時間をおいてもう一度保存してください。");
     } finally {
       setSaving(false);
     }
   }
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
-  if (!hq) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">先に本部を作成してください。</p>;
+  if (!hq) return <p role={saveError ? "alert" : undefined} className="py-16 text-center text-sm text-[var(--mikke-muted)]">{saveError || "先に本部を作成してください。"}</p>;
 
   return (
-    <div className="mx-auto min-w-0 max-w-2xl space-y-4 overflow-x-hidden">
+    <div className="mx-auto min-w-0 max-w-7xl space-y-4">
+      {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="min-w-0 text-sm font-bold leading-6 text-[var(--mikke-text)]">本部全体を紹介するホームページを編集します。各講座の講座ページとは別のページです。</p>
         <Link
@@ -143,7 +155,7 @@ function FrontContent() {
           メイン画像と講座一覧の間に表示されます。「＋」から文章・画像・動画などを挿入し、自由に組み立てられます。
         </p>
 
-        <LpBlocksEditor blocks={blocks} onChange={handleBlocksChange} />
+        <AcademyLpEditor blocks={blocks} onChange={handleBlocksChange} title={form.name} />
 
         <div className="flex items-center gap-3">
           <button onClick={save} disabled={saving} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">

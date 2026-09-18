@@ -6,12 +6,14 @@ const React = require('react');
 const { renderToStaticMarkup } = require('react-dom/server');
 const root = path.resolve(__dirname, '..');
 function load(relative) {
-  const filename = path.join(root, relative);
+  if (relative.endsWith('.css')) return new Proxy({}, { get: (_, key) => key });
+  let filename = path.join(root, relative);
+  if (!fs.existsSync(filename)) filename = ['.tsx', '.ts', '.js'].map(ext => filename + ext).find(fs.existsSync);
   const source = fs.readFileSync(filename, 'utf8');
   const result = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true }, reportDiagnostics: true });
   assert.equal((result.diagnostics || []).filter(d => d.category === ts.DiagnosticCategory.Error).length, 0, relative);
   const module = { exports: {} };
-  const localRequire = name => name.startsWith('@/') ? load(name.slice(2) + '.tsx') : name.startsWith('.') ? load(path.relative(root, path.resolve(path.dirname(filename), name + '.tsx'))) : require(name);
+  const localRequire = name => name.startsWith('@/') ? load(name.slice(2)) : name.startsWith('.') ? load(path.relative(root, path.resolve(path.dirname(filename), name))) : require(name);
   new Function('require', 'module', 'exports', result.outputText)(localRequire, module, module.exports);
   return module.exports;
 }

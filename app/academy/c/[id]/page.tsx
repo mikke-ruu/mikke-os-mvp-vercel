@@ -28,7 +28,7 @@ function ApplyButton({ href, label = "この講座に申し込む" }: { href: st
   return (
     <Link
       href={href}
-      className="mx-auto block w-full max-w-xs rounded-full bg-[var(--mikke-accent)] py-3.5 text-center text-sm font-bold tracking-wider text-white transition hover:opacity-90"
+      className="mx-auto flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-center text-base font-bold leading-6 text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mikke-primary)] md:max-w-sm"
     >
       {label}
     </Link>
@@ -87,7 +87,7 @@ function PublicLpInner({ courseId }: { courseId: string }) {
         )}
 
         {/* ファーストビュー */}
-        <div className="px-5 py-8 text-center md:px-12 md:py-12">
+        <div className="px-4 py-5 text-center md:px-12 md:py-12">
           <p className="text-xs font-bold uppercase tracking-[0.35em] text-[var(--mikke-accent-strong)]">{course.code}</p>
           <h1 className="mt-3 text-2xl font-bold leading-9 tracking-wide text-[var(--mikke-text)] md:text-4xl md:leading-[3.2rem]">
             {course.name}
@@ -96,7 +96,7 @@ function PublicLpInner({ courseId }: { courseId: string }) {
             <p className="mt-2 text-sm tracking-wider text-[var(--mikke-muted)] md:text-base">{course.subtitle}</p>
           ) : null}
 
-          <div className="mx-auto mt-7 flex max-w-xl flex-col divide-y divide-[var(--mikke-line)] rounded-2xl bg-[var(--mikke-surface-soft)] text-sm text-[var(--mikke-text)] md:flex-row md:divide-x md:divide-y-0">
+          <div className="mx-auto mt-4 flex max-w-xl flex-col divide-y divide-[var(--mikke-line)] rounded-2xl bg-[var(--mikke-surface-soft)] text-sm text-[var(--mikke-text)] md:mt-7 md:flex-row md:divide-x md:divide-y-0">
             <div className="flex-1 px-4 py-3 md:py-4">
               <p className="text-[11px] tracking-widest text-[var(--mikke-accent-strong)]">受講料</p>
               <p className="mt-1 font-bold">{course.price.toLocaleString()}円</p>
@@ -131,7 +131,7 @@ function PublicLpInner({ courseId }: { courseId: string }) {
             </div>
           ) : null}
 
-          <div className="mt-8">
+          <div className="mt-5 md:mt-8">
             <ApplyButton
               href={classes.length ? "#academy-schedules" : applyHref}
               label={classes.length ? "開催日程を見る" : undefined}
@@ -169,7 +169,7 @@ function PublicLpInner({ courseId }: { courseId: string }) {
                       </p>
                       <Link
                         href={buildApplyHref(academyClass.id)}
-                        className="mt-4 inline-flex rounded-full bg-[var(--mikke-accent)] px-5 py-2.5 text-sm font-bold text-white"
+                        className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-center text-base font-bold leading-6 text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mikke-primary)] md:mt-4 md:w-auto md:text-sm"
                       >
                         この日程で申し込む
                       </Link>
@@ -211,7 +211,7 @@ function PublicLpInner({ courseId }: { courseId: string }) {
           </section>
         ) : null}
 
-        <div className="border-t border-[var(--mikke-line)] px-5 py-10 md:px-12">
+        <div className="border-t border-[var(--mikke-line)] px-4 py-5 md:px-12 md:py-10">
           <ApplyButton
             href={classes.length ? "#academy-schedules" : applyHref}
             label={classes.length ? "開催日程を選ぶ" : undefined}

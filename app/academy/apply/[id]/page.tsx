@@ -326,7 +326,7 @@ function ApplyInner({ courseId }: { courseId: string }) {
 
         {error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">{error}</p> : null}
 
-        <button type="submit" disabled={saving} className="w-full rounded-2xl bg-[var(--mikke-accent)] py-3 text-sm font-bold text-white disabled:opacity-60">
+        <button type="submit" disabled={saving} className="min-h-12 w-full rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-base! font-bold! leading-6! text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mikke-primary)]">
           {saving ? "送信中…" : "申し込む"}
         </button>
         <p className="text-[11px] text-[var(--mikke-muted)]">送信後、担当より折り返しご連絡します。お支払いは案内に従ってお手続きください。</p>
