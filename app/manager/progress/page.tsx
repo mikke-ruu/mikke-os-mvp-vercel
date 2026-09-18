@@ -1,11 +1,6 @@
-import { AuthGate } from "@/components/AuthGate";
-import { ManagerProgressBoard } from "@/components/manager/ManagerProgressBoard";
+import { redirect } from "next/navigation";
 
 export default function ManagerProgressPage() {
-  return (
-    <AuthGate>
-      <ManagerProgressBoard />
-    </AuthGate>
-  );
+  redirect("/manager/notifications");
 }
 

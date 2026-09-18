@@ -10,7 +10,7 @@ export function ManagerProgressBoard() {
   const snapshot = useManagerSnapshot(profile.id, profile.user_id);
 
   return (
-    <ManagerShell title="進行" subtitle="イベントやFundなど、動いているものの進み具合を見ます。">
+    <ManagerShell title="進行" subtitle="各アプリで動いているものの進み具合を見ます。">
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
         <ManagerProgressList progress={snapshot.progress} />
       </section>

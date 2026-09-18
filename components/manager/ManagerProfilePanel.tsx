@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Check, Copy, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Copy, Eye, EyeOff, KeyRound, LogOut, Mail, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useAuth } from "@/components/AuthGate";
@@ -33,6 +33,36 @@ function StatusNotice({ notice }: { notice: Notice }) {
   );
 }
 
+function AccountDisclosure({
+  icon: Icon,
+  title,
+  summary,
+  children,
+}: {
+  icon: typeof UserRound;
+  title: string;
+  summary: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="group border-b border-[var(--mikke-line)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 [&::-webkit-details-marker]:hidden sm:px-6 sm:py-4">
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-[var(--mikke-line)] text-[var(--mikke-blue)]">
+            <Icon size={16} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-[var(--mikke-text)] sm:text-base">{title}</span>
+            <span className="block truncate text-xs font-semibold text-[var(--mikke-muted)]">{summary}</span>
+          </span>
+        </span>
+        <ChevronDown size={18} className="shrink-0 text-[var(--mikke-muted)] transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="px-4 pb-4 sm:px-6 sm:pb-6">{children}</div>
+    </details>
+  );
+}
+
 function authErrorMessage(message: string) {
   const normalized = message.toLowerCase();
   if (normalized.includes("same password")) return "現在と異なるパスワードを入力してください。";
@@ -43,7 +73,27 @@ function authErrorMessage(message: string) {
   return getJapaneseAuthError(message);
 }
 
-export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEnabled: boolean }) {
+function mikkeIdErrorMessage(error: { code?: string; message: string }) {
+  const normalized = error.message.toLowerCase();
+  if (error.code === "23505" || normalized.includes("使用されています") || normalized.includes("duplicate")) {
+    return "このmikke IDは使用されています。別のIDを選んでください。";
+  }
+  if (error.code === "22023") {
+    return error.message.includes("mikke ID") ? error.message : "入力したmikke IDは使用できません。形式をご確認ください。";
+  }
+  if (error.code === "42501" || normalized.includes("authentication required")) {
+    return "ログイン状態を確認できませんでした。ログインし直してからお試しください。";
+  }
+  if (error.code === "P0002" || normalized.includes("profile not found")) {
+    return "基本情報を確認できませんでした。画面を再読み込みしてからお試しください。";
+  }
+  if (normalized.includes("failed to fetch") || normalized.includes("network") || normalized.includes("load failed")) {
+    return "通信できませんでした。接続を確認してもう一度お試しください。";
+  }
+  return "mikke IDを変更できませんでした。時間をおいてもう一度お試しください。";
+}
+
+export function ManagerProfilePanel() {
   const router = useRouter();
   const { user, profile, refreshProfile } = useAuth();
   const [displayName, setDisplayName] = useState(profile.display_name ?? "");
@@ -61,6 +111,7 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPasswords, setShowPasswords] = useState(false);
   const [passwordNotice, setPasswordNotice] = useState<Notice>(null);
   const [savingPassword, setSavingPassword] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -76,12 +127,14 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
     }
 
     setSavingDisplayName(true);
-    const { error } = await supabase
+    const { data: updatedProfile, error } = await supabase
       .from("profiles")
       .update({ display_name: nextDisplayName })
       .eq("id", profile.id)
-      .eq("user_id", user.id);
-    if (error) {
+      .eq("user_id", user.id)
+      .select("id")
+      .maybeSingle();
+    if (error || !updatedProfile) {
       setDisplayNameNotice({ type: "error", text: "表示名を保存できませんでした。時間をおいてもう一度お試しください。" });
     } else {
       await refreshProfile();
@@ -105,24 +158,22 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
   async function saveMikkeId(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMikkeIdNotice(null);
-    if (!mikkeIdChangeEnabled) {
-      setMikkeIdNotice({ type: "error", text: "mikke IDの変更は、専用RPCの本番適用後に利用できます。" });
-      return;
-    }
     if (!mikkeIdConfirmed) {
       setMikkeIdNotice({ type: "error", text: "公開URLが変わることを確認してください。" });
       return;
     }
 
     setSavingMikkeId(true);
-    const { error } = await supabase.rpc("mikke_update_my_mikke_id", { p_handle: mikkeId.trim() });
+    const { data, error } = await supabase.rpc("mikke_update_my_mikke_id", { p_handle: mikkeId.trim() });
     if (error) {
-      setMikkeIdNotice({ type: "error", text: error.message || "mikke IDを変更できませんでした。" });
+      setMikkeIdNotice({ type: "error", text: mikkeIdErrorMessage(error) });
     } else {
       await refreshProfile();
+      const normalizedMikkeId = typeof data === "string" ? data : mikkeId.trim().replace(/^@/, "").toLowerCase();
+      setMikkeId(normalizedMikkeId);
       setMikkeIdConfirmed(false);
       setMikkeIdConfirmationOpen(false);
-      setMikkeIdNotice({ type: "success", text: "mikke IDを変更しました。新しい公開URLをご確認ください。" });
+      setMikkeIdNotice({ type: "success", text: `mikke IDを@${normalizedMikkeId}へ変更しました。新しい公開URLをご確認ください。` });
     }
     setSavingMikkeId(false);
   }
@@ -213,8 +264,8 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
 
   return (
     <ManagerShell title="基本情報" subtitle="表示名、mikke ID、ログイン情報を管理します。">
-      <div className="overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white shadow-sm">
-        <header className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
+      <div className="overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-white shadow-sm sm:rounded-2xl">
+        <header className="border-b-[3px] border-b-[var(--mikke-yellow)] p-4 sm:p-6">
           <div className="flex items-center gap-3">
             <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--mikke-surface-soft)] text-[var(--mikke-primary)]">
               <UserRound size={22} />
@@ -228,10 +279,9 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
           </div>
         </header>
 
-        <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
-          <h2 className="text-base font-bold text-[var(--mikke-text)]">表示名</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">mikkeOS内であなたの名前として表示されます。</p>
-          <form onSubmit={saveDisplayName} className="mt-4 max-w-xl">
+        <AccountDisclosure icon={UserRound} title="表示名" summary={profile.display_name || "名前未設定"}>
+          <p className="text-sm text-[var(--mikke-muted)]">mikkeOS内であなたの名前として表示されます。</p>
+          <form onSubmit={saveDisplayName} className="mt-3 max-w-xl">
             <label className="grid gap-2">
               <span className="text-sm font-bold">表示名</span>
               <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} maxLength={80} autoComplete="name" className={inputClassName} />
@@ -241,12 +291,14 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
             </button>
             <StatusNotice notice={displayNameNotice} />
           </form>
-        </section>
+        </AccountDisclosure>
 
-        <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
+        <section className="border-b border-[var(--mikke-line)] border-l-[3px] border-l-[var(--mikke-orange)] p-4 sm:p-6">
           <h2 className="text-base font-bold text-[var(--mikke-text)]">mikke ID</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">StoryやFundの公開ページで使われる、あなた専用のIDです。</p>
-          <div className="mt-4 flex max-w-xl items-center gap-2">
+          <p className="mt-1 text-sm leading-5 text-[var(--mikke-muted)]">
+            mikkeの各アプリで共通して使う、あなた専用のIDです。公開ページのURLなど、mikke内のさまざまな場所につながります。
+          </p>
+          <div className="mt-3 flex max-w-xl items-center gap-2">
             <code className="min-w-0 flex-1 truncate rounded-xl bg-[var(--mikke-surface-soft)] px-3 py-2.5 text-sm font-bold text-[var(--mikke-text)]">
               {profile.handle ? `@${profile.handle}` : "未設定"}
             </code>
@@ -256,11 +308,7 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
             </button>
           </div>
 
-          {!mikkeIdChangeEnabled ? (
-            <p className="mt-4 max-w-xl rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm font-semibold text-[var(--mikke-muted)]">
-              mikke IDの変更は準備中です。現在は表示とコピーのみ利用できます。
-            </p>
-          ) : mikkeIdConfirmationOpen ? (
+          {mikkeIdConfirmationOpen ? (
             <form onSubmit={saveMikkeId} className="mt-5 max-w-xl">
               <div className="rounded-xl border border-[var(--mikke-primary-border)] bg-[var(--mikke-primary-soft)] p-4">
                 <p className="flex items-center gap-2 text-sm font-bold text-[var(--mikke-primary)]"><AlertTriangle size={17} />変更前にご確認ください</p>
@@ -295,16 +343,16 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
                 <span className="text-sm font-bold">新しいmikke ID</span>
                 <input value={mikkeId} onChange={(event) => setMikkeId(event.target.value)} autoCapitalize="none" autoComplete="off" spellCheck={false} className={inputClassName} />
               </label>
+              <p className="mt-2 text-xs font-semibold leading-5 text-[var(--mikke-muted)]">半角英数字・_・- の3〜30文字で入力してください。</p>
               <button type="submit" className={`${primaryButtonClassName} mt-4`}>変更内容を確認</button>
             </form>
           )}
           <StatusNotice notice={mikkeIdNotice} />
         </section>
 
-        <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
-          <h2 className="flex items-center gap-2 text-base font-bold text-[var(--mikke-text)]"><Mail size={18} />メールアドレス</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">ログインや大切なお知らせに使います。変更時は確認メールが届きます。</p>
-          <form onSubmit={saveEmail} className="mt-4 max-w-xl">
+        <AccountDisclosure icon={Mail} title="メールアドレス" summary={user.email ?? "メールアドレス未設定"}>
+          <p className="text-sm text-[var(--mikke-muted)]">ログインや大切なお知らせに使います。変更時は確認メールが届きます。</p>
+          <form onSubmit={saveEmail} className="mt-3 max-w-xl">
             <label className="grid gap-2">
               <span className="text-sm font-bold">新しいメールアドレス</span>
               <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" className={inputClassName} />
@@ -314,40 +362,48 @@ export function ManagerProfilePanel({ mikkeIdChangeEnabled }: { mikkeIdChangeEna
             </button>
             <StatusNotice notice={emailNotice} />
           </form>
-        </section>
+        </AccountDisclosure>
 
-        <section className="border-b border-[var(--mikke-line)] p-5 sm:p-6">
-          <h2 className="flex items-center gap-2 text-base font-bold text-[var(--mikke-text)]"><KeyRound size={18} />パスワード</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">ログイン中の本人が、現在のパスワードを使って変更します。</p>
-          <form onSubmit={savePassword} className="mt-4 grid max-w-xl gap-3">
+        <AccountDisclosure icon={KeyRound} title="パスワード" summary="必要なときだけ変更できます">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm text-[var(--mikke-muted)]">現在のパスワードを使って変更します。</p>
+            <button
+              type="button"
+              onClick={() => setShowPasswords((value) => !value)}
+              className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-bold text-[var(--mikke-muted)]"
+              aria-pressed={showPasswords}
+            >
+              {showPasswords ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showPasswords ? "隠す" : "表示する"}
+            </button>
+          </div>
+          <form onSubmit={savePassword} className="mt-3 grid max-w-xl gap-3">
             <label className="grid gap-2">
               <span className="text-sm font-bold">現在のパスワード</span>
-              <input type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" className={inputClassName} />
+              <input type={showPasswords ? "text" : "password"} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} autoComplete="current-password" className={inputClassName} />
             </label>
             <label className="grid gap-2">
               <span className="text-sm font-bold">新しいパスワード（8文字以上）</span>
-              <input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
+              <input type={showPasswords ? "text" : "password"} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
             </label>
             <label className="grid gap-2">
               <span className="text-sm font-bold">新しいパスワード（確認）</span>
-              <input type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
+              <input type={showPasswords ? "text" : "password"} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} autoComplete="new-password" className={inputClassName} />
             </label>
             <button type="submit" disabled={savingPassword} className={`${primaryButtonClassName} mt-1 w-fit`}>
               {savingPassword ? "変更中…" : "パスワードを変更"}
             </button>
             <StatusNotice notice={passwordNotice} />
           </form>
-        </section>
+        </AccountDisclosure>
 
-        <section className="p-5 sm:p-6">
-          <h2 className="text-base font-bold text-[var(--mikke-text)]">ログアウト</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">この端末のmikkeOSからログアウトします。</p>
-          <button type="button" onClick={signOut} disabled={signingOut} className={`${secondaryButtonClassName} mt-4`}>
+        <AccountDisclosure icon={LogOut} title="ログアウト" summary="この端末からログアウトします">
+          <button type="button" onClick={signOut} disabled={signingOut} className={secondaryButtonClassName}>
             <LogOut size={17} />
             {signingOut ? "ログアウト中…" : "ログアウト"}
           </button>
           <StatusNotice notice={signOutNotice} />
-        </section>
+        </AccountDisclosure>
       </div>
     </ManagerShell>
   );
