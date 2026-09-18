@@ -1,0 +1,83 @@
+{
+  "capturedAt": "2026-08-29T16:20:00+09:00",
+  "reverifiedAt": "2026-08-30T21:32:00+09:00",
+  "source": {
+    "projectRef": "nttqpprkqbynxyldbnjs",
+    "mode": "read-only-catalog-fingerprint",
+    "containsData": false,
+    "containsSecrets": false
+  },
+  "schemas": [
+    "public",
+    "private",
+    "community_private"
+  ],
+  "catalog": {
+    "relations": {
+      "count": 178,
+      "md5": "97cba19df50322cc0404fef60b640784"
+    },
+    "columns": {
+      "count": 2072,
+      "md5": "61eeac671c3abc32ed68756ea3f041fc"
+    },
+    "constraints": {
+      "count": 1176,
+      "md5": "108fa5ae174df05d2c324429189eb44f"
+    },
+    "indexes": {
+      "count": 660,
+      "md5": "4390609f8228bab1e58f7765cd9af525"
+    },
+    "functions": {
+      "count": 243,
+      "md5": "2d28e5ead6aa4129c2a124d3e68342c3"
+    },
+    "policies": {
+      "count": 444,
+      "md5": "8b8be520012006904456680440de2468"
+    },
+    "triggers": {
+      "count": 107,
+      "md5": "d900574bd02e0300afc1152c7996ea5a"
+    }
+  },
+  "migrationHistory": {
+    "count": 149,
+    "firstVersion": "20260714070637",
+    "lastVersion": "20260827140922",
+    "md5": "2022e24e158219750aba1ef3505d6c61"
+  },
+  "baselineArtifact": {
+    "file": "20260829000000_mikkeos_schema_baseline.sql",
+    "sha256": "521bf5a61eb8fe572011526faa469a679328f581e3bc291191aef18379c97299",
+    "bytes": 1060178,
+    "productionOwnerStatementsRemoved": 424,
+    "containsTableRows": false,
+    "containsSecrets": false,
+    "localReplay": {
+      "postgresVersion": "17.6",
+      "catalogCountsMatch": true,
+      "baselineRollbackZeroResidue": true,
+      "frozenPackageRollbackZeroResidue": true,
+      "limitedPilotDeltaRollbackZeroResidue": true,
+      "paidActivationTwoConnectionContention": true,
+      "temporaryLocalVolumeRemoved": true
+    }
+  },
+  "gitHistoryComparison": {
+    "localMigrationFiles": 151,
+    "productionHistoryRows": 149,
+    "localNamesAbsentFromProductionHistory": 34,
+    "productionNamesAbsentFromGit": 32,
+    "sameNameDifferentVersion": 69,
+    "exactNameAndVersionMatches": 48,
+    "meaning": "The difference is structural drift, not a two-file offset. Reconciliation must use the cutover baseline and immutable manifests, never guessed filename repairs."
+  },
+  "notes": [
+    "Counts and hashes are derived from pg_catalog and supabase_migrations using SELECT only.",
+    "The production history starts after the missing foundation schema.",
+    "The user-provided estimate of 104 migrations is stale; current origin/master contains 151 SQL migration files.",
+    "Storage bucket configuration and Storage policies require a separately reviewed configuration migration."
+  ]
+}

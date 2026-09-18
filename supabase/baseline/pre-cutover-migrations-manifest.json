@@ -1,0 +1,918 @@
+{
+  "generatedAt": "2026-08-30T07:00:28.169Z",
+  "state": "prepared-not-archived",
+  "sourceDirectory": "supabase/migrations",
+  "futureArchiveDirectory": "supabase/migrations_archive/pre_baseline/2026-08-29",
+  "migrationCount": 151,
+  "firstVersion": "20260714070637",
+  "lastVersion": "20260827140922",
+  "duplicateVersions": [],
+  "migrations": [
+    {
+      "version": "20260714070637",
+      "file": "20260714070637_fund_f4_b1_ownership_foundation.sql",
+      "bytes": 11061,
+      "sha256": "ca76594881aff9a1ad234477d699dc76c20a09442c44ce88207e067c57e2393d"
+    },
+    {
+      "version": "20260714222029",
+      "file": "20260714222029_fund_f4_b2_claims_and_participations.sql",
+      "bytes": 19286,
+      "sha256": "a3338beadbafe3a0609a6485e0c8eebedce00822459994cbbe5ed7fd9a525a0c"
+    },
+    {
+      "version": "20260715124228",
+      "file": "20260715124228_fund_f4_c_participation_activity.sql",
+      "bytes": 4379,
+      "sha256": "832cd69d4a713945deaa20adabbda8a7a88ef0bea3ec509fcf09790d947cd331"
+    },
+    {
+      "version": "20260715132817",
+      "file": "20260715132817_fund_f4_d_story_projection.sql",
+      "bytes": 3683,
+      "sha256": "97e35485f50a16dbcf2f68a23ec83b52e99a548bfe9c92c4d3aaa6814721b020"
+    },
+    {
+      "version": "20260715135018",
+      "file": "20260715135018_fund_f4_d_profile_handle_paths.sql",
+      "bytes": 2166,
+      "sha256": "14da1aac270155acefbf82b7a442a4732c48de2ac25f65f4b12ca67fa807d9ca"
+    },
+    {
+      "version": "20260715162110",
+      "file": "20260715162110_fund_f5_a_public_project_content.sql",
+      "bytes": 26556,
+      "sha256": "6de72a0b7450650be0e3fec94b50a75389e3da795e3c18672bb0c647dbb873e2"
+    },
+    {
+      "version": "20260715165421",
+      "file": "20260715165421_fund_f5_b_owner_source_ids.sql",
+      "bytes": 996,
+      "sha256": "39c0cdb681849e1a4a655299cbd28a816b000a6304e2f521d283837017fb5183"
+    },
+    {
+      "version": "20260716105132",
+      "file": "20260716105132_fund_f5_c_activity_updates.sql",
+      "bytes": 12201,
+      "sha256": "2af281dad19fe9554dd9851582b730c96706b845a62a6a04fa67f6f7f9b7fefb"
+    },
+    {
+      "version": "20260716113100",
+      "file": "20260716113100_fund_f5_d_support_management.sql",
+      "bytes": 9209,
+      "sha256": "4767a9b2d6161e12cfed85d7b0fefe1e31d06664e715bf516a16d591a8d7f383"
+    },
+    {
+      "version": "20260716120919",
+      "file": "20260716120919_fund_f5_e_completion_records.sql",
+      "bytes": 19816,
+      "sha256": "b8a851ca294df8dcbacbf22ad0f75b40eebb76575f1db9a3b61fa2740ca5e86c"
+    },
+    {
+      "version": "20260716131053",
+      "file": "20260716131053_fund_f5_f_retention_guard.sql",
+      "bytes": 1417,
+      "sha256": "a48a8b75ac8c73b9a3273c990ed31dd0e8037085c3c66e6c8f0b2fa85dea694b"
+    },
+    {
+      "version": "20260717155456",
+      "file": "20260717155456_team_works_p8a_foundation.sql",
+      "bytes": 20941,
+      "sha256": "69afadb4a870477a1eacd6fa5137d27624d382f1d89e6683df15b7534074c6d6"
+    },
+    {
+      "version": "20260717155738",
+      "file": "20260717155738_team_works_p8a_foreign_key_indexes.sql",
+      "bytes": 1157,
+      "sha256": "334abc68b2030272fe8005f77cd66a58941fcfbe28bd3cc809734a1834d6eaa4"
+    },
+    {
+      "version": "20260717223358",
+      "file": "20260717223358_team_works_p8c_collaboration.sql",
+      "bytes": 18771,
+      "sha256": "b1de49bba2ce1ae3efab04ab88d64198b6ab3d5c0880745daeecb9973483b28c"
+    },
+    {
+      "version": "20260717224356",
+      "file": "20260717224356_team_works_p8c_advisor_fixes.sql",
+      "bytes": 2268,
+      "sha256": "59b6d2fea6653bce2ec74feb8bd966731a47aa464d48f89fd794ad29bed8ccc1"
+    },
+    {
+      "version": "20260717234401",
+      "file": "20260717234401_team_works_p8f_review_deliverable_portals.sql",
+      "bytes": 4013,
+      "sha256": "c93378814d34cc6f54db6cc9e2c1dc7a873bdde2d549fdba900fb5ad04dc4081"
+    },
+    {
+      "version": "20260718001256",
+      "file": "20260718001256_team_works_p8g_deliverable_storage.sql",
+      "bytes": 5606,
+      "sha256": "6378b5ecc1efac1440f1ca212b4274189ee0cd4cf40862db4cd7e5bddfb46d9b"
+    },
+    {
+      "version": "20260718003633",
+      "file": "20260718003633_team_works_p8h_form_attachment_storage.sql",
+      "bytes": 5998,
+      "sha256": "a971eafb046346d53cf85c2dbf5e6def565e9e53f94c2fe66c2289d7b5e00ab0"
+    },
+    {
+      "version": "20260719044459",
+      "file": "20260719044459_page_builder_assets.sql",
+      "bytes": 1754,
+      "sha256": "79a8e35e66db185746780f96714ab280d4a89fb93125429870a46238e587a707"
+    },
+    {
+      "version": "20260719053654",
+      "file": "20260719053654_mikke_media_foundation.sql",
+      "bytes": 11699,
+      "sha256": "a8692935d1469216160f662efeea4795b8ffbefe149551b3d63294e72439c717"
+    },
+    {
+      "version": "20260719054957",
+      "file": "20260719054957_mikke_media_lifecycle.sql",
+      "bytes": 6022,
+      "sha256": "6302c8140841ce47bbde711f0fd0e561520c1428ed5404bff731461811878c21"
+    },
+    {
+      "version": "20260724060000",
+      "file": "20260724060000_team_works_r1_operations_foundation.sql",
+      "bytes": 19617,
+      "sha256": "5fbbac78678e89bd4c316c1da76c75378b68e134ff5a1218bad9f55d108692e0"
+    },
+    {
+      "version": "20260724063000",
+      "file": "20260724063000_team_works_r1_foreign_key_indexes.sql",
+      "bytes": 1013,
+      "sha256": "bdc1f57d0aa401b8802d58a4a6709b38a02c6c06b67f51813cf47d5bd67576f5"
+    },
+    {
+      "version": "20260724112532",
+      "file": "20260724112532_team_works_r4_portal_requests.sql",
+      "bytes": 5831,
+      "sha256": "b957f9d759582ace95bc8efd3ceae3986a1eda05b7a1537831139f591315da00"
+    },
+    {
+      "version": "20260724112628",
+      "file": "20260724112628_team_works_r4_portal_request_indexes.sql",
+      "bytes": 348,
+      "sha256": "32ac71afbbf431bc1cea39a90f4bd8b75f14666e2eaf19e224d2114a98a13799"
+    },
+    {
+      "version": "20260724134437",
+      "file": "20260724134437_team_works_r5_partner_directory.sql",
+      "bytes": 4915,
+      "sha256": "1ebbe0a4927ff9597b717191add1181c64538657b374907e562ad6e8c0df4a6a"
+    },
+    {
+      "version": "20260725014812",
+      "file": "20260725014812_team_works_holidays_delete_policy.sql",
+      "bytes": 343,
+      "sha256": "00563a8671261c198b2efbd05e8b265de1ed7c23dac60ff7f8ede783c8d2e40f"
+    },
+    {
+      "version": "20260725032524",
+      "file": "20260725032524_team_works_direct_messages.sql",
+      "bytes": 1838,
+      "sha256": "23a7303ddd8e2269efecc3b9b1ada1e9e175f2380160c5f1a85f1b609f2fd04d"
+    },
+    {
+      "version": "20260725035145",
+      "file": "20260725035145_team_works_project_partner_settings.sql",
+      "bytes": 2321,
+      "sha256": "33f5c1c925cefa9b8aa2f46a90ac9e1569ad96cf355971eafa0bd50408daeef5"
+    },
+    {
+      "version": "20260725144511",
+      "file": "20260725144511_team_works_partner_project_offers.sql",
+      "bytes": 2966,
+      "sha256": "9640e311ab7507d53a7895ab3ce67d3939f586337b4671988fb16d4b08ae5918"
+    },
+    {
+      "version": "20260726103000",
+      "file": "20260726103000_team_works_client_portal_roster_and_messages.sql",
+      "bytes": 2160,
+      "sha256": "99dae393179a0bc1c4bb445a48ca772e82737baf7caf6a6a024af4a398d6461c"
+    },
+    {
+      "version": "20260726120000",
+      "file": "20260726120000_team_works_r6_client_directory.sql",
+      "bytes": 5333,
+      "sha256": "7cee43efe1c7d2b1dbba205aba312aadc1e396f51fea9381a502c54517782571"
+    },
+    {
+      "version": "20260726130000",
+      "file": "20260726130000_team_works_r6_member_reactivation.sql",
+      "bytes": 1419,
+      "sha256": "38f35f5ba57e49335664cb4fc04c8d0348ceb5bc9d77dea96bf4f2ea043a3f0d"
+    },
+    {
+      "version": "20260726140000",
+      "file": "20260726140000_team_works_r6_session_roster_delete_grant.sql",
+      "bytes": 668,
+      "sha256": "4e63dca0d3818c184796c1fe83ef1ca987d9e7d9ac07f3ff1bcd073b8f723ca8"
+    },
+    {
+      "version": "20260726150000",
+      "file": "20260726150000_team_works_r6_multi_role_membership.sql",
+      "bytes": 1489,
+      "sha256": "76ced30c083455f05f87e63ba289d1503afd7574abf9d025606397ea25daba16"
+    },
+    {
+      "version": "20260726160000",
+      "file": "20260726160000_team_works_r6_directory_self_activation.sql",
+      "bytes": 3213,
+      "sha256": "7c243c96b2f94ec6beef3d882478f6410cde726fb5d7431429b09397d41f86d2"
+    },
+    {
+      "version": "20260726170000",
+      "file": "20260726170000_team_works_r6_client_project_approval.sql",
+      "bytes": 3880,
+      "sha256": "db4537b981e81ad72e7ebf6078dc1ba16b768826022bfdd8480ef5c2e0ce0e82"
+    },
+    {
+      "version": "20260726180000",
+      "file": "20260726180000_team_works_r6_activation_hotfix.sql",
+      "bytes": 2556,
+      "sha256": "f67f777fef8461cce6b1da1eef193fcda01cbe96c1c943d0cb92d55128c37d0c"
+    },
+    {
+      "version": "20260726190000",
+      "file": "20260726190000_team_works_r6_multi_role_rls.sql",
+      "bytes": 16657,
+      "sha256": "1c355c5351993257cb54ef22277e50f21e34f4e82f5df69665df4e1db2eb3140"
+    },
+    {
+      "version": "20260727005537",
+      "file": "20260727005537_team_works_directory_profiles_manual_scope.sql",
+      "bytes": 6820,
+      "sha256": "cedd9bce3fbbf6e2528bad7468daae58f56c7a95c7f912068bd38ed54f745f26"
+    },
+    {
+      "version": "20260727022357",
+      "file": "20260727022357_team_works_partner_lesson_console.sql",
+      "bytes": 5974,
+      "sha256": "1831b0e5ecf875c41e18cd426cf579261df3bf1670caa17a7a7a9f88fb3a7a50"
+    },
+    {
+      "version": "20260727031109",
+      "file": "20260727031109_team_works_partner_handoff_rpc_fix.sql",
+      "bytes": 3344,
+      "sha256": "a7c9bad33f1a276530193630fc4c68c21b90812f3a75866c0b6b6c3a789ba181"
+    },
+    {
+      "version": "20260727100000",
+      "file": "20260727100000_team_works_client_partner_contact_visibility.sql",
+      "bytes": 854,
+      "sha256": "842e836d83c48c03506268f21a918bf6765e9b00dc0d51d38687cf25283cfecb"
+    },
+    {
+      "version": "20260727110000",
+      "file": "20260727110000_team_works_project_and_session_zoom.sql",
+      "bytes": 5772,
+      "sha256": "70b9648e3f9f10b06b62cf4a99bfd6c23fcb8f1109ea6d07015634032d9a20e0"
+    },
+    {
+      "version": "20260727120000",
+      "file": "20260727120000_team_works_client_roster_groups.sql",
+      "bytes": 1157,
+      "sha256": "25a2ea1ad87cebfe5e79b9655d8170b6f917b42da7b8d92c70ef44858ce4d55d"
+    },
+    {
+      "version": "20260727130000",
+      "file": "20260727130000_team_works_manual_body.sql",
+      "bytes": 322,
+      "sha256": "9a44da8ae581c87a37c6aeaba292eb9c7464764175810c5f83c99bd994119e17"
+    },
+    {
+      "version": "20260727225109",
+      "file": "20260727225109_team_works_partner_shift_availability.sql",
+      "bytes": 4075,
+      "sha256": "ac66cd9d4aa40fc588b7103351a2a2a0c29c332031ce04d50d341789506d05e5"
+    },
+    {
+      "version": "20260728070657",
+      "file": "20260728070657_team_works_organization_deadlines.sql",
+      "bytes": 1555,
+      "sha256": "7cfd1d103398bec4890c07448397e1a0d7206fa1726dae56b26ec09a8a2fbb01"
+    },
+    {
+      "version": "20260728072555",
+      "file": "20260728072555_team_works_invite_state_repair.sql",
+      "bytes": 2560,
+      "sha256": "2691ead1030dacca0a7c572cee77ca7ae12231443b1054510da47f79c0452dd7"
+    },
+    {
+      "version": "20260728085644",
+      "file": "20260728085644_backfill_team_works_organization_manuals.sql",
+      "bytes": 5640,
+      "sha256": "3e7a4d19d1b718c324d3b9bca62ef3a826e469275005e7ec2d475b9e356e3818"
+    },
+    {
+      "version": "20260728102235",
+      "file": "20260728102235_team_works_partner_presence_rewind.sql",
+      "bytes": 2089,
+      "sha256": "21cff53fd481a22269375f149f96d13ef777cfcdd06f6b902e24d1779527efd8"
+    },
+    {
+      "version": "20260729120000",
+      "file": "20260729120000_team_works_organization_labels.sql",
+      "bytes": 835,
+      "sha256": "e414ba30588e86752c4134b844bba32b49d1a38b769d0d8f871307a7c67ff3e7"
+    },
+    {
+      "version": "20260729130000",
+      "file": "20260729130000_team_works_delivery_task_due_date.sql",
+      "bytes": 590,
+      "sha256": "26fa592d92a40059424388b07c589b94b1982838f87ae4e5eddca0aa8594d524"
+    },
+    {
+      "version": "20260729140000",
+      "file": "20260729140000_team_works_delivery_generator.sql",
+      "bytes": 1881,
+      "sha256": "9e59b160642a11903e9f19bada36420e7cab31406fd2d58df7b853c73126cfe9"
+    },
+    {
+      "version": "20260729150000",
+      "file": "20260729150000_team_works_delivery_task_structure.sql",
+      "bytes": 2034,
+      "sha256": "3e330a3d1fd625b630dea99f833389df36c89ed832f094cfd7b03f01197c6850"
+    },
+    {
+      "version": "20260729160000",
+      "file": "20260729160000_team_works_delivery_schedule.sql",
+      "bytes": 984,
+      "sha256": "c85735cc3dabc3f1572cbe88ca51a4b052bfc8df33bde04aa329360988e3cf1c"
+    },
+    {
+      "version": "20260730090000",
+      "file": "20260730090000_team_works_delivery_task_detail.sql",
+      "bytes": 2361,
+      "sha256": "c7d9d78c1f3b7bd88d3db3a5ef46159ad4694ec1f7ad88bca0e6b24f2a199cec"
+    },
+    {
+      "version": "20260730120000",
+      "file": "20260730120000_team_works_operation_settings.sql",
+      "bytes": 1556,
+      "sha256": "8e8f35689af516b3eeab4868490993477d23eeddd728557842231774c512d685"
+    },
+    {
+      "version": "20260731072248",
+      "file": "20260731072248_library_private_store.sql",
+      "bytes": 1375,
+      "sha256": "d3197adec203733c84a0c544a00f01f7b6a7eff06d9dd8f46db183266fa8ad7e"
+    },
+    {
+      "version": "20260731130000",
+      "file": "20260731130000_team_works_feature_settings.sql",
+      "bytes": 1378,
+      "sha256": "f54765fd4c9c00a89fe075a2881cb28067f0cfcc0743ed85af2403d4ca8f99e4"
+    },
+    {
+      "version": "20260731230000",
+      "file": "20260731230000_team_works_session_work_description.sql",
+      "bytes": 1328,
+      "sha256": "dd087c921223464971a9cb479cf3a750e48ad32e3589279c664a8b600cb28952"
+    },
+    {
+      "version": "20260802022323",
+      "file": "20260802022323_library_private_store_grants.sql",
+      "bytes": 168,
+      "sha256": "efe7fa8d806571cf5d9e2cd11ad36ecb6fe276cca711c6261622751dd95b3584"
+    },
+    {
+      "version": "20260802145308",
+      "file": "20260802145308_community_standalone_mvp.sql",
+      "bytes": 23383,
+      "sha256": "52b86786b7f8b30b3f229d8c8c1e952daefdab49134952a254b7f17edc191e55"
+    },
+    {
+      "version": "20260803065515",
+      "file": "20260803065515_community_generic_room_access.sql",
+      "bytes": 14511,
+      "sha256": "24bb17932d43cd6d476f4372460721aba8927e694f271f2565b38a790c91af82"
+    },
+    {
+      "version": "20260803070831",
+      "file": "20260803070831_community_room_access_policy_cleanup.sql",
+      "bytes": 5120,
+      "sha256": "8495b6c9b2d66c63d97f988aa0de89caed99b9a030b507f560d786a54bb047aa"
+    },
+    {
+      "version": "20260803072446",
+      "file": "20260803072446_community_foreign_key_indexes.sql",
+      "bytes": 1048,
+      "sha256": "4f64288892053193b816af0cdfe6897f05a8aa7196e316c512f55d1ad1e14a00"
+    },
+    {
+      "version": "20260803072728",
+      "file": "20260803072728_community_creation_flow.sql",
+      "bytes": 3362,
+      "sha256": "970a35f8b74c81856c9db112c26e540b7e4c68072a92e0b71ede6e4bcd6139d1"
+    },
+    {
+      "version": "20260803124639",
+      "file": "20260803124639_community_staff_hidden_post_read.sql",
+      "bytes": 356,
+      "sha256": "3aebeefda200d6b3b147859780783ddd3a002763c034a8bd0e7876977b1d9131"
+    },
+    {
+      "version": "20260803134209",
+      "file": "20260803134209_community_staff_archived_room_read.sql",
+      "bytes": 360,
+      "sha256": "9f27981a99ba9f3dc370b6fcee18ed929ba5a5db3416d152673d5f8882f5a808"
+    },
+    {
+      "version": "20260804012321",
+      "file": "20260804012321_story_profiles_public_profile.sql",
+      "bytes": 8438,
+      "sha256": "a660ccaad85c02f1d1618c11002d7bfffc62e627c691a70a85e4122dfcc6f23f"
+    },
+    {
+      "version": "20260804054246",
+      "file": "20260804054246_mikke_reserved_names_guard.sql",
+      "bytes": 3737,
+      "sha256": "cad442f79daae7c2ef45099928c48a5c4902e026436a03837596f7bf37dcead5"
+    },
+    {
+      "version": "20260806033309",
+      "file": "20260806033309_community_public_participant_entry.sql",
+      "bytes": 379,
+      "sha256": "125b7b5efb354d488af7db563e2a50f70c7d209acc5d5f6c8acb245a05a9aefc"
+    },
+    {
+      "version": "20260806034322",
+      "file": "20260806034322_community_public_participant_entry_acl.sql",
+      "bytes": 192,
+      "sha256": "79ee933f14441b850adab9df2a1543038ee47c684f035b6ae5300b523e74b106"
+    },
+    {
+      "version": "20260806035325",
+      "file": "20260806035325_official_academy_initial_owner.sql",
+      "bytes": 904,
+      "sha256": "66aa04cfa605bfa6912cddceffb81029b487b2974b48425a6d738f2feb177abe"
+    },
+    {
+      "version": "20260806143015",
+      "file": "20260806143015_story_profile_save_rpc.sql",
+      "bytes": 4063,
+      "sha256": "7e08685937b1251b88b8ab2e2202eb7b43602ad8ce47a0a5c4509be6f5e0a1ec"
+    },
+    {
+      "version": "20260806153718",
+      "file": "20260806153718_community_engagement_phase1.sql",
+      "bytes": 2309,
+      "sha256": "95a2ae2de5d6b4a46fd838458615970da68be9c2a4964a7beffadbeca7cba602"
+    },
+    {
+      "version": "20260806161500",
+      "file": "20260806161500_story_profile_media_and_theme.sql",
+      "bytes": 8099,
+      "sha256": "b8f072bcd987fca21ad7f876f5f4c150ffd427ab05cecd057b413fa4420d2795"
+    },
+    {
+      "version": "20260806164012",
+      "file": "20260806164012_story_profile_media_path_guard.sql",
+      "bytes": 1236,
+      "sha256": "3c18ec947c50c56662b1c1c99ac05b04eaa9ab2b5c115158cb2de000b15858fb"
+    },
+    {
+      "version": "20260806171609",
+      "file": "20260806171609_community_visual_media_phase2a.sql",
+      "bytes": 1615,
+      "sha256": "81512e2ddd5df6cd5d8ccb7e46d872f47d913b6c935050fc8987c59c49f94514"
+    },
+    {
+      "version": "20260806171749",
+      "file": "20260806171749_community_deleted_by_fk_indexes.sql",
+      "bytes": 399,
+      "sha256": "58085771a9babe3f2c73778df555b88a30e63d6c18d2f78b7da4f0af1944ec58"
+    },
+    {
+      "version": "20260806173316",
+      "file": "20260806173316_community_public_brand_acl.sql",
+      "bytes": 251,
+      "sha256": "2dfd38d7b6461cfc5c5ca22be17164ec697dae435cf051c9c410a624f7c4db06"
+    },
+    {
+      "version": "20260806182048",
+      "file": "20260806182048_story_profile_mikke_id_sync.sql",
+      "bytes": 8468,
+      "sha256": "e8abcd1c60988841f4ce0645926994bb047ad9338a0ea932a8a85b90f0b66cb6"
+    },
+    {
+      "version": "20260806183722",
+      "file": "20260806183722_community_files_and_stamps_phase2b.sql",
+      "bytes": 9327,
+      "sha256": "306664daccf63e1afc82a68df50e91fc1ac901545878d627e7d43eb1b34d3520"
+    },
+    {
+      "version": "20260806184931",
+      "file": "20260806184931_community_stamp_history_visibility.sql",
+      "bytes": 431,
+      "sha256": "221df8b6bd126a1226c07e1f22300ae7dc3fb1b9884d0fe7072848bfa29dbb49"
+    },
+    {
+      "version": "20260807002334",
+      "file": "20260807002334_community_realtime_chat_phase3a.sql",
+      "bytes": 7708,
+      "sha256": "a22762612a345117ef0d30d62e79936f82660e0743907096ae576c79cd50a1a3"
+    },
+    {
+      "version": "20260807002844",
+      "file": "20260807002844_community_chat_soft_delete_policy.sql",
+      "bytes": 1057,
+      "sha256": "9d7c653820d6e9216c35c0641602a1e3ddf82696355ef88e3fe8816c1ad43ad7"
+    },
+    {
+      "version": "20260807003102",
+      "file": "20260807003102_community_chat_foreign_key_indexes.sql",
+      "bytes": 494,
+      "sha256": "7633bf133ea68bfffac25c0aa92b1a12dca812bbefd606bab5122257aacda523"
+    },
+    {
+      "version": "20260807003506",
+      "file": "20260807003506_community_thread_post_mode_guard.sql",
+      "bytes": 684,
+      "sha256": "52485d9e377e1b029d90df2b023e96eb12b5a30282ec6a641367e3ae771bf309"
+    },
+    {
+      "version": "20260807003937",
+      "file": "20260807003937_story_collection_and_card_refresh.sql",
+      "bytes": 17509,
+      "sha256": "39da7d0557799144b3c428a49285d2c4b71892058b7a9b2d3b89321976f4b12a"
+    },
+    {
+      "version": "20260807005719",
+      "file": "20260807005719_story_theme_default_blue.sql",
+      "bytes": 115,
+      "sha256": "6891c714c138b50c96bfec1972db04be9db742f061e0e58bbc413a2bbe0797e7"
+    },
+    {
+      "version": "20260807014410",
+      "file": "20260807014410_community_reactions_and_unread_phase3b.sql",
+      "bytes": 4951,
+      "sha256": "18f06514fdfad10f34cccd11edfd5a5bde9b2cbb471428d578b2421834f9f1bd"
+    },
+    {
+      "version": "20260807014714",
+      "file": "20260807014714_community_phase3b_fk_indexes.sql",
+      "bytes": 361,
+      "sha256": "147341e72833a42a60c54d93fd8f85a9b15115924e0571d87eb8b514003ae9ba"
+    },
+    {
+      "version": "20260807152126",
+      "file": "20260807152126_marketnote_reflection_photos.sql",
+      "bytes": 3306,
+      "sha256": "ca689c41f60afe24d1cdb601917a2f87d92c5399ff67053c82779904aa05ffab"
+    },
+    {
+      "version": "20260807154039",
+      "file": "20260807154039_marketnote_photo_import.sql",
+      "bytes": 398,
+      "sha256": "b97497819b3907e694210931b29277d04cd29ea24f6f3012706b9b01a0934550"
+    },
+    {
+      "version": "20260807154535",
+      "file": "20260807154535_marketnote_photo_policy_performance.sql",
+      "bytes": 2713,
+      "sha256": "ef0d3affd8c3ce5382550432d9ddb8b30bae1cf0a7b4f88056ce2ffef1e5eab7"
+    },
+    {
+      "version": "20260807161958",
+      "file": "20260807161958_community_thread_reactions_and_activity.sql",
+      "bytes": 6487,
+      "sha256": "ff133ee2af01774fa399f1cc635d4db0e7fd32c26d28597480c05dd3c970e272"
+    },
+    {
+      "version": "20260807163744",
+      "file": "20260807163744_community_thread_reaction_fk_indexes.sql",
+      "bytes": 752,
+      "sha256": "8d34823e21b20ab59c8b6aa22bbd917b93e2e74131cbded6ff301fbc5076be08"
+    },
+    {
+      "version": "20260808014005",
+      "file": "20260808014005_community_profile_avatar_color.sql",
+      "bytes": 266,
+      "sha256": "c716f600a753878e0553c4eca8f9b2d337219d4c88b2efa08433143388d2c35d"
+    },
+    {
+      "version": "20260808072833",
+      "file": "20260808072833_story_collection_favorites.sql",
+      "bytes": 3182,
+      "sha256": "cbbc0df40dfaadec739960c2db1a5410d8b61dee1a2f9fdfec1e9135a73f0f5c"
+    },
+    {
+      "version": "20260808155414",
+      "file": "20260808155414_community_home_metrics_and_post_bookmarks.sql",
+      "bytes": 3487,
+      "sha256": "06c5cf69db0fd1efc1dd83b8a072d8a08dd24994ad3a29bf22e8dff5063ac9e6"
+    },
+    {
+      "version": "20260809034428",
+      "file": "20260809034428_story_collection_for_all_mikke_ids.sql",
+      "bytes": 3613,
+      "sha256": "a0020de133e60da3ddcbc60c70a2e7aace941451722f12e89bfd13fa5848e3d4"
+    },
+    {
+      "version": "20260809083534",
+      "file": "20260809083534_story_optional_profile_details.sql",
+      "bytes": 472,
+      "sha256": "dcb7257a5b6fcf9c00184a597c1d2e33d152bd117a032fd13ed850e0d63a8375"
+    },
+    {
+      "version": "20260810053039",
+      "file": "20260810053039_marketnote_multiwork_schedule_finance.sql",
+      "bytes": 1373,
+      "sha256": "1ed64c531ceb29a23c6f619fdffc80742b063dc4b2196f20b422f093a47e9faa"
+    },
+    {
+      "version": "20260811220921",
+      "file": "20260811220921_mikkeos_hq_dashboard_phase1.sql",
+      "bytes": 15290,
+      "sha256": "12f860fb97224a3f592e1eca4e860f4075091b1d8bf7e4d26e72cf7eb9e46464"
+    },
+    {
+      "version": "20260811223449",
+      "file": "20260811223449_mikkeos_hq_revoke_internal_anon.sql",
+      "bytes": 621,
+      "sha256": "310fc190b4d6c175045e1c401f1e703cb5de79c9cf24cf0fcfb7bd9d3572a272"
+    },
+    {
+      "version": "20260811223650",
+      "file": "20260811223650_mikkeos_hq_advisor_hardening.sql",
+      "bytes": 2290,
+      "sha256": "9eebfb80e033ae33e5a91be75497e72042520f7a5ba7f58c714328d990d8aeda"
+    },
+    {
+      "version": "20260812000110",
+      "file": "20260812000110_mikkeos_hq_dashboard_charts.sql",
+      "bytes": 1729,
+      "sha256": "4379a2922815ef5644bd2ab0b2b4dbb7d4059e1cf840250a4fa0270297b8b5bb"
+    },
+    {
+      "version": "20260812063044",
+      "file": "20260812063044_mikkeos_email_preferences_and_campaigns.sql",
+      "bytes": 7287,
+      "sha256": "0eeb4a4fd4395e0e914b61ee0968ce99d6d11ec76a1a4ee18c5d6ca7cd95dc4b"
+    },
+    {
+      "version": "20260812072416",
+      "file": "20260812072416_community_safety_and_moderation.sql",
+      "bytes": 24239,
+      "sha256": "b06a0af2f33f879c7c557cb9da0ad07977970c974bb58bb1ebddf396d951a7a7"
+    },
+    {
+      "version": "20260812080113",
+      "file": "20260812080113_community_join_application_enforcement.sql",
+      "bytes": 656,
+      "sha256": "b960aa09158136ed27c8fc9b26d457c09fec9d72ee2d9056c38448a0d985e469"
+    },
+    {
+      "version": "20260812083000",
+      "file": "20260812083000_community_owner_moderator_governance.sql",
+      "bytes": 1818,
+      "sha256": "f493dc69197eed6733f653ecd7aede2e87021044aac29ee3016eeffc1f7e28be"
+    },
+    {
+      "version": "20260812084000",
+      "file": "20260812084000_normalize_community_owner_roles.sql",
+      "bytes": 432,
+      "sha256": "97ff70781c520987b6c087b97fa75978ba5e4a990af8ea68057aff2d6804ecc7"
+    },
+    {
+      "version": "20260812104958",
+      "file": "20260812104958_community_safety_foreign_key_indexes.sql",
+      "bytes": 753,
+      "sha256": "bd2050b0412e5d3b5832545ec7554cb34dca19e938bc9413c174d68966ec8a73"
+    },
+    {
+      "version": "20260812110224",
+      "file": "20260812110224_replace_email_campaign_audit_rules.sql",
+      "bytes": 1658,
+      "sha256": "2b95af47c09f9a4f146e957a169f93c147387b3501fcdcbdc5177f952b1bfd8c"
+    },
+    {
+      "version": "20260812225415",
+      "file": "20260812225415_add_safe_email_campaign_delivery.sql",
+      "bytes": 2442,
+      "sha256": "80e0a1af140ae4707c1defa72bc7e92857e336964c89c10ae2b1b37ccbc2d765"
+    },
+    {
+      "version": "20260812230829",
+      "file": "20260812230829_index_email_delivery_recipient.sql",
+      "bytes": 116,
+      "sha256": "4a69d8dcb33c611f43e61625eec26a231f0b5f03659f7ff1cdcfe3aad184ca8e"
+    },
+    {
+      "version": "20260812230915",
+      "file": "20260812230915_require_test_proof_before_campaign_send.sql",
+      "bytes": 785,
+      "sha256": "572e26f84cb6bfdddaf8dc42e9cf43ecd5e17edc2fe10e14c7762053a3fe0ab9"
+    },
+    {
+      "version": "20260812231714",
+      "file": "20260812231714_index_email_campaign_staff_references.sql",
+      "bytes": 280,
+      "sha256": "ad7f6486edd2a1cd78c9907dceea213f980a8cfd126d053633c09b5d6a701a08"
+    },
+    {
+      "version": "20260813110738",
+      "file": "20260813110738_mark_marketnote_owned_from_login.sql",
+      "bytes": 1184,
+      "sha256": "a0ad9e95b9ef57ddcd539bb8fbe5b9445db1deadf1074ad748b680060a704af5"
+    },
+    {
+      "version": "20260813154439",
+      "file": "20260813154439_marketnote_event_types_phase0.sql",
+      "bytes": 5229,
+      "sha256": "35566377513645d069d98c68299143fead276cfae5d3b9c83b4a916ebdc60749"
+    },
+    {
+      "version": "20260814035716",
+      "file": "20260814035716_marketnote_activity_log_phase1_columns.sql",
+      "bytes": 303,
+      "sha256": "db09bcf4229754fa200afc06eb486a1ad4a33ac06385e7c4349843836e2c22a9"
+    },
+    {
+      "version": "20260814093000",
+      "file": "20260814093000_mikke_id_shared_validation.sql",
+      "bytes": 4896,
+      "sha256": "ba53de6ac6ffe5e4446cb3d486a4f1a8af036ade5d53374e7e1cb4aeccdfab52"
+    },
+    {
+      "version": "20260814094000",
+      "file": "20260814094000_manager_update_my_mikke_id.sql",
+      "bytes": 2181,
+      "sha256": "99798529df54d0b22f48a04c9297f0b7fec4b64705c2945007665b6fad4d6bab"
+    },
+    {
+      "version": "20260814100000",
+      "file": "20260814100000_story_shared_mikke_id_validation.sql",
+      "bytes": 5267,
+      "sha256": "cd46c57b2c5e02b694849d259539f50a08d011cde7334a6fa1866deb3e7c1f65"
+    },
+    {
+      "version": "20260814120000",
+      "file": "20260814120000_profiles_handle_guard.sql",
+      "bytes": 9875,
+      "sha256": "4ebdcaad9c3f6d4a909458712eb81311fe46600b2b9dd63547095fd5b13f1407"
+    },
+    {
+      "version": "20260814143000",
+      "file": "20260814143000_community_commercial_foundation.sql",
+      "bytes": 24365,
+      "sha256": "51f04b6b8e439ce87d9961c369ba6294da12f710e650ce5ad611415e4ba4f8b3"
+    },
+    {
+      "version": "20260815035552",
+      "file": "20260815035552_marketnote_event_type_auto_summary.sql",
+      "bytes": 497,
+      "sha256": "5883dec9035035f0aa3bde80261cd8e80641c982c9a9749b19d2412f7f217c9f"
+    },
+    {
+      "version": "20260815044544",
+      "file": "20260815044544_academy_class_scheduling_and_instructor_requests.sql",
+      "bytes": 10706,
+      "sha256": "156d1a5e28a6759a5649f0a34750ba9bc4615da97118442349e2a3c2128da235"
+    },
+    {
+      "version": "20260815060551",
+      "file": "20260815060551_mikkeos_implementation_center.sql",
+      "bytes": 12137,
+      "sha256": "842e4feeeba1735c1a928d6e4401d65a77feac0a1c9e3b76263c54eadc053180"
+    },
+    {
+      "version": "20260815063303",
+      "file": "20260815063303_index_mikkeos_implementation_staff_refs.sql",
+      "bytes": 655,
+      "sha256": "8bf06f53e669b21cd3f02282adb4084a4554912cc6ae4617a45796df84943534"
+    },
+    {
+      "version": "20260815073352",
+      "file": "20260815073352_mikkeos_consultation_dispatcher.sql",
+      "bytes": 5266,
+      "sha256": "ef242edc19564d8be6b75f14a74dd4b2ec466af7fd880a952327dd8cd7fcc5e5"
+    },
+    {
+      "version": "20260815163949",
+      "file": "20260815163949_mikkeos_implementation_conversations.sql",
+      "bytes": 18082,
+      "sha256": "5d2a690847bc5f956a52ea0fb7055d5e69f9bb575f60948243021c02b91aab66"
+    },
+    {
+      "version": "20260815165328",
+      "file": "20260815165328_secure_mikkeos_implementation_conversations.sql",
+      "bytes": 2612,
+      "sha256": "d5df0d312c0ff14c6a3e8cb90e5984db2b7e70de9a577ced2e865a496a526e0c"
+    },
+    {
+      "version": "20260815235256",
+      "file": "20260815235256_implementation_portfolio_v2.sql",
+      "bytes": 27915,
+      "sha256": "c1e49758fb537d251379a94d0abd751d98a83c2a31e273f02b63aa2f60fe6a5d"
+    },
+    {
+      "version": "20260816002934",
+      "file": "20260816002934_implementation_portfolio_v2_indexes.sql",
+      "bytes": 1280,
+      "sha256": "faeed15b24949d7eaebc3f4d001e3dd31ab27338737e44efa6bcf3ddf531dff9"
+    },
+    {
+      "version": "20260816005852",
+      "file": "20260816005852_grant_implementation_conversation_progress_columns.sql",
+      "bytes": 293,
+      "sha256": "5675ff078f823f3d24749dff9b1e33836dcf4c8531ebac13ff52a63ecd49acce"
+    },
+    {
+      "version": "20260816011946",
+      "file": "20260816011946_implementation_response_details_and_local_previews.sql",
+      "bytes": 14919,
+      "sha256": "d7b59b4229036160c8b219f6ee74cb9248a10c4c01e79cedcdd0fee46431060a"
+    },
+    {
+      "version": "20260816032826",
+      "file": "20260816032826_mikkeos_hq_journal_phase1.sql",
+      "bytes": 12075,
+      "sha256": "f1313a323612906dbc40fe25dcee75526805354b5179d8ddfaec8a6df21b4800"
+    },
+    {
+      "version": "20260816034813",
+      "file": "20260816034813_implementation_conversation_parallel_claims.sql",
+      "bytes": 5613,
+      "sha256": "d136b59e086e829d846025f150a584de2e18ecd843840c864b702b4ea21e7267"
+    },
+    {
+      "version": "20260816061030",
+      "file": "20260816061030_academy_serialize_class_instructor_responses.sql",
+      "bytes": 6025,
+      "sha256": "fb80136938a94dda45a50c721db115fc0b7bac324fc4afe361a9cf2c8fd44a25"
+    },
+    {
+      "version": "20260816132334",
+      "file": "20260816132334_academy_headquarters_collaboration.sql",
+      "bytes": 27058,
+      "sha256": "9031906a969ed2286432a5133cb5475fe434b349d20fc9ae18e469c180b3e699"
+    },
+    {
+      "version": "20260816155000",
+      "file": "20260816155000_academy_course_feature_settings.sql",
+      "bytes": 374,
+      "sha256": "202101a82084d52952383b27b789ad3bcdd05ed631104abd907393a4cc26d7ce"
+    },
+    {
+      "version": "20260816160000",
+      "file": "20260816160000_academy_course_program_workspace.sql",
+      "bytes": 5205,
+      "sha256": "792484c3aec26180d8940f2268b02ec6450f8d4fc5084f59938754c1e5101346"
+    },
+    {
+      "version": "20260817020655",
+      "file": "20260817020655_academy_application_notifications.sql",
+      "bytes": 1953,
+      "sha256": "ab9238a51caadd4f0e8b522facc7edd635d084f4f9841f47b3477851e8d6e460"
+    },
+    {
+      "version": "20260817090000",
+      "file": "20260817090000_academy_payment_provider_and_certified_instructor.sql",
+      "bytes": 16070,
+      "sha256": "b0be40a737358f9a4e6321657f3f32f3a738ee5d1c64e86e21959aa46e4a06e4"
+    },
+    {
+      "version": "20260821061915",
+      "file": "20260821061915_fix_hq_journal_audit_rules.sql",
+      "bytes": 2761,
+      "sha256": "5b51b3b95f6c727eafc57c653fb56def168ec0a396ac4467a8103dd1aa10bb32"
+    },
+    {
+      "version": "20260825042454",
+      "file": "20260825042454_manager_app_menu_preferences.sql",
+      "bytes": 8025,
+      "sha256": "2046b45fd45dfd1e660b06ccdee7486e7b830b6334f67818d37cca6284ddd40c"
+    },
+    {
+      "version": "20260825230706",
+      "file": "20260825230706_marketnote_schedule_projection_foundation.sql",
+      "bytes": 9471,
+      "sha256": "2f528d81d23530e2fe9bf0fe5c7d322a09e4ebd26e2a7bd374db16359004e104"
+    },
+    {
+      "version": "20260826011933",
+      "file": "20260826011933_marketnote_manual_google_import_rpc.sql",
+      "bytes": 7116,
+      "sha256": "51508e53f63ed614b215cc90ee4c8174a736f7cec1c32840fbe4bfc9f1325caf"
+    },
+    {
+      "version": "20260826144726",
+      "file": "20260826144726_marketnote_schedule_source_display_color.sql",
+      "bytes": 503,
+      "sha256": "4e6adee1234c49f8d8e23a3e7c3b98ade3ac80516d368d5eb6cc5e8cb3ec2964"
+    },
+    {
+      "version": "20260827140922",
+      "file": "20260827140922_ai_tech_lab_mvp.sql",
+      "bytes": 16998,
+      "sha256": "b95ac248e2497bb2d588c5a69a06c98988dd6b90b279cf4891b0755ba4f669b5"
+    }
+  ]
+}
