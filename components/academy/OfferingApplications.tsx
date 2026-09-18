@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
-import { getAcademyRouteContext, toAcademyContextHref } from "@/lib/academy/access-context";
+import { getAcademyRouteContext, toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { supabase } from "@/lib/supabase/client";
 
@@ -97,6 +97,7 @@ function Applications({ userId, academyId, audience }: { userId: string; academy
   }
 
   return <div className="mx-auto max-w-3xl space-y-4">
+    {audience === "hq" && <header className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[11px] tracking-[.14em]">MY ACADEMY</p><h1 className="mt-1 text-2xl font-bold">申込</h1></div><Link href={toCurrentAcademyContextHref("/academy/applications")} className="inline-flex min-h-11 items-center text-xs underline">これまでの申込・教材注文</Link></header>}
     <p className="text-sm text-[var(--mikke-muted)]">{audience === "hq" ? "募集ページから届いた申込です。振込・現地払いの受領を確認してから教材を利用可能にします。カード決済の確認には使えません。" : audience === "instructor" ? "自分の募集ページから届いた申込です。入金確認と本部による修了確認は本部で行います。" : "募集ページから申し込んだ内容を確認できます。入金確認後に教材の利用が始まります。"}</p>
     <button type="button" disabled={loading || saving} onClick={() => setRefresh(value => value + 1)} className="min-h-11 text-sm font-bold text-[var(--mikke-primary)] disabled:opacity-50">再読み込み</button>
     {error ? <p role="alert" className="text-sm text-[var(--mikke-danger)]">{error}</p> : null}

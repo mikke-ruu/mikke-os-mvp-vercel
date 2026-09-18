@@ -1,0 +1,8 @@
+.page{background:var(--mikke-surface-soft,#f7f8fa);color:var(--mikke-text);min-width:0;max-width:960px;margin:0 auto;padding:0 0 24px;font-size:14px;line-height:1.55;overflow-wrap:anywhere}
+.page *{box-sizing:border-box}
+.page input:not([type=checkbox]):not([type=radio]):not([type=file]),.page textarea,.page select{max-width:100%;min-width:0;font-size:16px;line-height:1.5}
+.page input[type=checkbox],.page input[type=radio]{flex-shrink:0;width:18px;height:18px;accent-color:var(--mikke-primary)}
+.content{min-width:0;font-weight:400}
+.utility{font-size:12px;margin:0 0 20px;color:var(--mikke-muted)}
+.utility>summary{cursor:pointer;padding:5px 0}
+@media(max-width:600px){.page{padding-bottom:16px}.utility{margin-bottom:14px}}

@@ -1,0 +1,15 @@
+.flow{min-width:0;scroll-margin-top:72px;color:var(--mikke-text)}
+.flow:focus{outline:none}.toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.tools{display:flex;justify-content:flex-end;margin-bottom:14px}
+.steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;border-bottom:1px solid var(--mikke-line);margin-bottom:24px}
+.steps button{min-height:52px;padding:10px 8px;border-radius:0;font-weight:600;font-size:13px;border:0;background:transparent}
+.steps button[aria-current=step]{color:var(--mikke-primary);background:var(--mikke-surface-soft);box-shadow:inset 0 -3px var(--mikke-primary)}
+.setup{max-width:900px;margin:0 auto;display:grid;gap:24px}.group{min-width:0;background:white;border:1px solid var(--mikke-line);border-radius:12px;padding:20px;display:grid;gap:14px}
+.group>h2{display:flex;align-items:center;gap:10px;margin:0;font-size:19px;font-weight:700}.group>h2 span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;color:var(--mikke-primary);background:var(--mikke-surface-soft);font-size:13px}
+.field{display:block;margin-top:6px;min-height:44px;width:100%;min-width:0;border:1px solid var(--mikke-line);border-radius:9px;background:white;padding:10px 12px;font-size:16px;line-height:1.5}
+.action{min-height:44px;border-radius:9px;border:1px solid var(--mikke-line);padding:9px 12px;font-size:14px;font-weight:600;background:white}.action:disabled{opacity:.4;cursor:not-allowed}
+.flowActions{display:flex;justify-content:flex-end;gap:10px;margin:22px 0}.flowActions button:last-child{border-color:var(--mikke-primary);color:var(--mikke-primary);padding:12px 18px}
+.saveBar{position:sticky;bottom:0;z-index:20;display:flex;justify-content:flex-end;background:white;border:1px solid var(--mikke-line);border-radius:12px;padding:12px;box-shadow:0 4px 16px #17224b08}
+.saveBar button{min-width:120px;background:var(--mikke-accent);color:white;border-color:var(--mikke-accent)}
+.flow button:focus-visible,.flow a:focus-visible,.field:focus-visible{outline:2px solid var(--mikke-primary);outline-offset:3px}
+@media(max-width:600px){.steps{gap:0;margin-bottom:18px}.steps button{font-size:12px;padding:10px 5px}.setup{gap:18px}.group{padding:16px}.group>h2{font-size:17px}.saveBar{bottom:72px}.tools{justify-content:flex-start}.toolbar{gap:8px}}
+@media(max-width:600px){.flow .saveBar{position:static}}

@@ -1,111 +1,23 @@
 "use client";
-
 import Link from "next/link";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { X } from "lucide-react";
 import type { AcademyCourse } from "@/types/database";
-import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
-
-const courseTabs = [
-  { id: "settings", label: "講座内容編集", href: (courseId: string) => `/academy/courses/${courseId}` },
-  { id: "program", label: "ステップ教材", href: (courseId: string) => `/academy/courses/${courseId}/program` },
-  { id: "page", label: "講座ページ編集", href: (courseId: string) => `/academy/courses/${courseId}/lp` },
-  {
-    id: "learner",
-    label: "講座復習ページ",
-    href: (courseId: string) => `/academy/courses/${courseId}/instructor-page?audience=learner`
-  },
-  {
-    id: "instructor",
-    label: "講師マニュアルページ",
-    href: (courseId: string) => `/academy/courses/${courseId}/instructor-page`
-  },
-  { id: "materials", label: "講師用ファイル", href: (courseId: string) => `/academy/materials?course=${courseId}` }
-] as const;
-
-export type AcademyCourseWorkspaceTab = (typeof courseTabs)[number]["id"];
-
-export function AcademyCourseWorkspace({
-  course,
-  activeTab,
-  children
-}: {
-  course: AcademyCourse;
-  activeTab: AcademyCourseWorkspaceTab;
-  children: React.ReactNode;
-}) {
-  const features = resolveAcademyCourseFeaturesForCourse(course);
-  const visibleTabs = courseTabs.filter((tab) => {
-    if (tab.id === "program" || tab.id === "materials") return false;
-    if (tab.id === "page") return features.publicCoursePage;
-    return true;
-  });
-
-  return (
-    <div className="space-y-3">
-      <header className="border-b border-[var(--mikke-line)] pb-2">
-        <Link
-          href="/academy/courses"
-          className="inline-flex items-center gap-1 text-xs font-bold text-[var(--mikke-primary)]"
-        >
-          <ArrowLeft size={14} />
-          講座一覧へ戻る
-        </Link>
-        <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--mikke-muted)]">
-              講座の編集
-            </p>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold text-[var(--mikke-primary)]">{course.name}</h2>
-              <span
-                className={`rounded px-2 py-1 text-[11px] font-bold ${
-                  course.is_published
-                    ? "bg-[var(--mikke-green)] text-[var(--mikke-text)]"
-                    : "bg-[var(--mikke-surface-soft)] text-[var(--mikke-muted)]"
-                }`}
-              >
-                {course.is_published ? "公開中" : "下書き保存済み"}
-              </span>
-            </div>
-          </div>
-          <Link
-            href={`/academy/c/${course.id}`}
-            target="_blank"
-            className="inline-flex items-center gap-1 self-start rounded-[10px] border border-[var(--mikke-line)] bg-white px-3 py-2 text-xs font-bold text-[var(--mikke-text-soft)] lg:self-auto"
-          >
-            <ExternalLink size={14} />
-            講座ページを見る
-          </Link>
-        </div>
-        {activeTab !== "settings" ? <p className="mt-2 text-sm leading-5">{activeTab === "page" ? "受講を考えている人へ、講座の魅力を伝えるページをつくります。" : activeTab === "learner" ? "受講者が講座の後も見返せる、教材や復習内容をまとめます。" : "教える人が使う進め方や資料をまとめます。"}</p> : null}
-      </header>
-
-      <nav aria-label="講座内メニュー" className="grid grid-cols-2 gap-1 border-b border-[var(--mikke-accent)] sm:flex">
-        {visibleTabs.filter(tab => tab.id === "settings" || tab.id === "page").map((tab) => {
-          const active = tab.id === activeTab;
-          return (
-            <Link
-              key={tab.id}
-              href={tab.href(course.id)}
-              aria-current={active ? "page" : undefined}
-              className={`relative -mb-px flex min-h-10 items-center justify-center rounded-t-lg border px-3 py-2 text-sm font-bold ${
-                active
-                  ? "border-[var(--mikke-accent)] border-b-white bg-white text-[var(--mikke-text)]"
-                  : "border-[var(--mikke-line)] bg-white text-[var(--mikke-text-soft)]"
-              }`}
-            >
-              {tab.label}
-            </Link>
-          );
-        })}
-      </nav>
-      <div className="mx-auto w-full max-w-5xl">{children}</div>
-      <section className="border-t border-[var(--mikke-line)] bg-white py-4">
-        <h2 className="text-sm font-bold">教材・講師向けのページを整える</h2>
-        <nav aria-label="教材・講師用メニュー" className="mt-3 grid gap-2 sm:grid-cols-2">{visibleTabs.filter(tab => tab.id !== "settings" && tab.id !== "page").map(tab => <Link key={tab.id} href={tab.href(course.id)} aria-current={activeTab === tab.id ? "page" : undefined} className={`flex min-h-11 items-center justify-center rounded-lg border p-3 text-sm font-bold ${activeTab === tab.id ? "bg-[#3f4eb5] text-white" : "bg-white"}`}>{tab.label}</Link>)}</nav>
-      </section>
-
-
-    </div>
-  );
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
+import styles from "./academy-course-workspace.module.css";
+export type AcademyCourseWorkspaceTab = "settings" | "program" | "page" | "learner" | "instructor" | "materials";
+export function AcademyCourseWorkspace({ course, activeTab, children }: { course: AcademyCourse; activeTab: AcademyCourseWorkspaceTab; children: React.ReactNode }) {
+  const href = (suffix = "") => toCurrentAcademyContextHref(`/academy/courses/${course.id}${suffix}`);
+  return <div className={styles.workspace}>
+    <Link className={styles.back} href={toCurrentAcademyContextHref("/academy/courses")}><X size={16} />閉じる（講座一覧へ）</Link>
+    <header className={styles.heading}><div><span>MY ACADEMY</span><h1>{activeTab === "settings" ? "講座を編集" : activeTab === "learner" ? "レッスン教材" : activeTab === "instructor" ? "講師マニュアル" : "講座を編集"}</h1></div><small>{course.is_published ? "公開中" : "下書き"}</small></header>
+    {activeTab !== "settings" && <nav className={styles.steps} aria-label="講座作成の手順"><Link href={href()}>1 講座情報</Link><Link href={href("/instructor-page?audience=learner")} aria-current={activeTab === "learner" ? "step" : undefined}>2 レッスン教材</Link></nav>}
+    {children}
+    <details className={styles.other}><summary>講師用の資料・これまでの講座ページ</summary><nav>
+      <Link href={href("/instructor-page")}>講師マニュアル</Link>
+      <Link href={toCurrentAcademyContextHref(`/academy/materials?course=${course.id}`)}>講師用ファイル</Link>
+      <Link href={href("/portal-preview")}>受講者・講師の表示を確認</Link>
+      <Link href={href("/lp")}>これまでの講座ページを編集</Link>
+      <Link href={`/academy/c/${course.id}`} target="_blank" rel="noopener noreferrer">これまでの公開ページを見る</Link>
+    </nav></details>
+  </div>;
 }

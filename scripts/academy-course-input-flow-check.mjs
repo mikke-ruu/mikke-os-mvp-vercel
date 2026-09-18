@@ -36,6 +36,7 @@ const { CourseForm } = load('app/academy/courses/CourseForm.tsx', {
   '@/components/academy/AcademyImageUploader': { AcademyImageUploader: basic },
   '@/components/academy/AcademyCourseInput': { AcademyCourseInput: basic },
   '@/components/academy/AcademyCourseCard': { AcademyCourseCard: basic },
+  '@/components/academy/academy-course-input.module.css': { default: {} },
   '@/components/academy/AcademyRolePreview': { AcademyRolePreview: basic },
   '@/lib/academy/course-feature-settings': { DEFAULT_ACADEMY_COURSE_FEATURE_SETTINGS: {} },
   '@/lib/academy/course-save-errors': { getAcademyCourseSaveErrorMessage: error => error.message }

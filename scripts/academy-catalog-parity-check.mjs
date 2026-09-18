@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+import React from 'react';
+import * as jsx from 'react/jsx-runtime';
+import {renderToStaticMarkup} from 'react-dom/server';
+const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
+function load(path,deps={}) {const box={exports:{},crypto,structuredClone,require:name=>{if(!(name in deps))throw new Error(name);return deps[name];}};vm.runInNewContext(ts.transpileModule(read(path),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022}}).outputText,box);return box.exports;}
+const resolver=load('lib/academy/course-feature-settings.ts');
+const {duplicateCourseInput}=load('lib/academy/course-draft-copy.ts',{'./course-feature-settings':resolver});
+const source={id:'existing',code:'OLD',name:'講座',price:1000,formats:['online'],faq:[{q:'Q',a:'A'}],application_form_fields:[{id:'a'}],feature_settings:{marketing:{category:'カラー',curriculum:['色を知る']},unknown:{keep:true}},learner_access_mode:'days_after_enrollment',learner_access_days:90};
+const copy=duplicateCourseInput(source);
+assert.notEqual(copy.code,source.code);assert.equal(copy.name,'講座（コピー）');assert.equal(copy.learnerAccessDays,90);assert.equal(copy.featureSettings.unknown.keep,true);assert.equal(copy.faq[0].a,'A');
+copy.featureSettings.marketing.curriculum.push('追加');assert.equal(source.feature_settings.marketing.curriculum.length,1);
+const Link=({href,children,...props})=>React.createElement('a',{href,...props},children);
+const Icon=()=>null;
+const {AcademyCatalogList}=load('components/academy/AcademyCatalogList.tsx',{react:React,'react/jsx-runtime':jsx,'next/link':{default:Link},'lucide-react':{BookOpen:Icon,Copy:Icon,Plus:Icon,Search:Icon},'./academy-catalog-list.module.css':{default:new Proxy({},{get:(_,key)=>String(key)})}});
+const html=renderToStaticMarkup(React.createElement(AcademyCatalogList,{kind:'course',createHref:'/new',items:[{id:'a',title:'色の講座',category:'カラー',summary:'60分 · ¥1,000 · 1レッスン',image:'/a.png',editHref:'/edit',duplicateHref:'/new?duplicate=a',offeringHref:'/offerings/new?courseId=a'}]}));
+for(const text of ['色の講座','カラー','複製','募集をつくる','編集する','1件','aria-pressed="true"','/offerings/new?courseId=a'])assert(html.includes(text),text);
+const css=read('components/academy/academy-catalog-list.module.css');
+for(const text of ['max-width:960px','width:78px;height:78px','grid-template-columns:minmax(0,1fr)','border-left:4px solid var(--mikke-green','margin-right:auto'])assert(css.includes(text),text);
+const newCourse=read('app/academy/courses/new/page.tsx');assert(newCourse.includes('getCourse(found.id, duplicateId)'));assert(newCourse.includes('getMyAcademyCourseCreationAccess'));assert(newCourse.indexOf('createCourse(profile')>newCourse.indexOf('onSubmit='));
+const newOffering=read('app/academy/offerings/new/page.tsx');for(const text of ['getOffering(hq.id, duplicateId)','status: "draft"','initialInput={initialInput}','found.find(item => item.id === courseId)','createdId.current'])assert(newOffering.includes(text),text);
+assert(newOffering.indexOf('await createOffering')>newOffering.indexOf('onSave='));
+console.log('PASS: catalog SSR/layout contract, full input draft copy, HQ-scoped duplicate/preselection, save-only creation');

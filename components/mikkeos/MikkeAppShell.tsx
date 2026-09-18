@@ -70,6 +70,8 @@ type MikkeAppShellProps = {
   showSharedUtilities?: boolean;
   /** 初見でも意味が分かるよう、モバイル下部メニューに短いラベルを表示する。 */
   showBottomNavLabels?: boolean;
+  /** Academy's approved compact navigation; other apps keep the existing owner menu. */
+  simpleMenu?: boolean;
   sidebarFooterAction?: {
     label: string;
     helper?: string;
@@ -122,6 +124,7 @@ export function MikkeAppShell({
   primaryActionTone,
   showSharedUtilities = true,
   showBottomNavLabels = false,
+  simpleMenu = false,
   sidebarFooterAction,
   children
 }: MikkeAppShellProps) {
@@ -176,7 +179,11 @@ export function MikkeAppShell({
               drawerEntered ? "translate-x-0" : "-translate-x-full"
             }`}
           >
-            <MikkeOwnerMenu
+            {simpleMenu ? <>
+              <div className="mb-5 flex items-center justify-between"><strong className="text-[13px] tracking-[.26em] text-[var(--mikke-primary)]">{appName.toUpperCase()}</strong><button type="button" aria-label="メニューを閉じる" onClick={closeMenu} className="min-h-11 min-w-11 text-xl">×</button></div>
+              <nav aria-label={`${appName} メニュー`} className="grid gap-1">{navItems?.map(item => { const Icon = item.icon; const active = item.href === activeNavHref; return <Link key={item.href} href={item.href} onClick={closeMenu} aria-current={active ? "page" : undefined} className="flex min-h-11 items-center gap-3 rounded-[10px] px-3 py-2 text-sm font-semibold" style={active ? { background: toneStyle.background, color: toneStyle.foreground } : { color: "var(--mikke-muted)" }}><Icon size={18} strokeWidth={1.8} />{item.label}</Link>; })}</nav>
+              {(mikkeId || onSignOut) && <div className="mt-8 border-t border-[var(--mikke-line)] pt-4"><MikkeAccountMenu mikkeId={mikkeId} isGuest={isGuest} onSignOut={onSignOut} /></div>}
+            </> : <MikkeOwnerMenu
               appName={appName}
               theme={theme}
               editItems={menuEditItems ?? navItems?.map((item) => ({ title: item.label, href: item.href, icon: item.icon }))}
@@ -188,7 +195,7 @@ export function MikkeAppShell({
               isGuest={isGuest}
               onSignOut={onSignOut}
               onClose={closeMenu}
-            />
+            />}
             {sidebarFooterAction ? (
               <button
                 type="button"

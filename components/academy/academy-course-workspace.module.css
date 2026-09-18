@@ -1,0 +1,6 @@
+.workspace{min-width:0;width:100%;margin:auto;font-size:14px;line-height:1.55}
+.back{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin-bottom:12px;font-weight:600}
+.heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
+.heading span{font-size:11px;letter-spacing:.14em}.heading h1{font-size:24px;font-weight:700;margin:3px 0 0}.heading small{font-size:12px;border:1px solid var(--mikke-line);border-radius:6px;background:white;padding:3px 7px}
+.steps{display:flex;border-bottom:1px solid var(--mikke-line);margin:0 0 20px}.steps a{flex:1;text-align:center;padding:12px;font-weight:600;min-height:48px}.steps a[aria-current=step]{color:var(--mikke-primary);box-shadow:inset 0 -3px var(--mikke-primary)}
+.other{margin-top:24px;font-size:13px;border-top:1px solid var(--mikke-line);padding-top:8px;color:var(--mikke-muted)}.other summary{cursor:pointer;padding:12px 0}.other nav{display:grid;gap:4px}.other a{display:inline-flex;align-items:center;min-height:44px;text-decoration:underline}

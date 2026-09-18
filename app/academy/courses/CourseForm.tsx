@@ -6,6 +6,7 @@ import { AcademyHelp } from "@/components/academy/AcademyHelp";
 import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
 import { AcademyCourseInput } from "@/components/academy/AcademyCourseInput";
 import { AcademyCourseCard } from "@/components/academy/AcademyCourseCard";
+import courseStyles from "@/components/academy/academy-course-input.module.css";
 import { AcademyRolePreview } from "@/components/academy/AcademyRolePreview";
 import type {
   AcademyCourseFeatureSettings,
@@ -270,11 +271,12 @@ export function CourseForm({
         setStep(Number(panel.dataset.courseStep));
         requestAnimationFrame(() => { target.focus(); target.reportValidity(); });
       }
-    }} className="min-w-0 space-y-4 [&_input]:text-base! [&_textarea]:text-base! [&_select]:text-base!">
+    }} className={courseStyles.root}>
       {error ? <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 p-3 text-sm outline-none">{error}<p className="mt-1">入力内容は残っています。</p></div> : null}
-      <fieldset disabled={saving} className="min-w-0 space-y-5 disabled:opacity-70">
+      <fieldset disabled={saving} className="min-w-0 disabled:opacity-70">
+        <nav className={courseStyles.steps} aria-label="講座作成の手順"><button type="button" aria-current="step">1 講座情報</button>{onNext && <button type="submit" data-next="true">2 レッスン教材</button>}</nav>
         <AcademyCourseInput value={form} onChange={set} />
-      <details ref={advancedRef} className="border-y border-[var(--mikke-line)] py-3">
+      <details ref={advancedRef} className={courseStyles.advanced}>
         <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">開催方法・申込・教材の詳細設定</summary>
         <p className="mb-3 text-xs leading-5 text-[var(--mikke-muted)]">既存の支払い方法、申込項目、教材の閲覧期限などはここで確認できます。変更しない設定はそのまま保存します。</p>
       <div ref={guideRef} className="scroll-mt-20 bg-white">
@@ -600,25 +602,23 @@ export function CourseForm({
       </div>
       {step === 2 ? <button type="button" className="min-h-11 text-sm text-[var(--mikke-primary)]" onClick={() => goToStep(4)}>教材・講師の追加設定は変更せず、内容確認へ →</button> : null}
       </details>
-      <section aria-label="講座カードプレビュー" className="space-y-3 border-t border-[var(--mikke-line)] pt-4">
-        <h2 className="text-base font-bold">講座カードプレビュー</h2>
-        <div className="flex flex-wrap items-center gap-2 text-sm">
+      <details aria-label="講座カードプレビュー" className={courseStyles.preview}>
+        <summary className="cursor-pointer text-base font-bold">講座カードプレビュー</summary>
+        <div className={courseStyles.previewTools}>
           <button type="button" aria-pressed={!phonePreview} onClick={() => setPhonePreview(false)} className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3 aria-pressed:bg-[var(--mikke-accent-soft)]">PC</button>
           <button type="button" aria-pressed={phonePreview} onClick={() => setPhonePreview(true)} className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3 aria-pressed:bg-[var(--mikke-accent-soft)]">スマホ</button>
           <label className="flex items-center gap-2">PCの画像位置<select className="min-h-11 rounded-lg border border-[var(--mikke-line)] bg-white px-2 text-base" value={imageSide} onChange={event => set("featureSettings", { ...form.featureSettings, marketing: { ...form.featureSettings.marketing, imageSide: event.target.value as "left" | "right" } })}><option value="left">左</option><option value="right">右</option></select></label>
         </div>
-        <div className={phonePreview ? "mx-auto max-w-[390px]" : "w-full"}>
+        <div className={courseStyles.previewCard} data-phone={phonePreview}>
           <AcademyCourseCard course={{ feature_settings: form.featureSettings, name: form.name || "講座名", price: form.price, subtitle: form.subtitle, main_image_url: form.mainImageUrl, description: form.description, can_do_after: form.canDoAfter, duration_text: form.durationText, kit_contents: form.kitContents, material_contents: form.materialContents }} imageSide={imageSide} priceLabel="基本価格（税込）" />
         </div>
-        <p className="text-xs leading-5 text-[var(--mikke-muted)]">画像位置は講座と一緒に保存します。募集ページではLPエディターの設定を優先します。</p>
-      </section>
+        <p className={courseStyles.note}>募集ページでは、募集で設定した価格を表示します。</p>
+      </details>
       </fieldset>
       {saved ? <p role="status" className="text-sm">変更を保存しました</p> : null}
       <p className="text-xs leading-5 text-[var(--mikke-muted)]">新しい講座は下書きで保存します。公開状態は別に設定します。</p>
-      <div className="flex flex-wrap justify-end gap-3 border-t border-[var(--mikke-line)] bg-white py-3">
-        <button type="submit" disabled={saving} className="min-h-12 rounded-lg border border-[var(--mikke-line)] px-5 py-3 text-sm font-bold disabled:opacity-60">{saving ? "保存中…" : submitLabel}</button>
-        {onNext ? <button type="submit" data-next="true" disabled={saving} className="min-h-12 rounded-lg bg-[var(--mikke-accent)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60">保存して次へ：レッスン教材</button> : null}
-      </div>
+      {onNext ? <div className={courseStyles.next}><button type="submit" data-next="true" disabled={saving}>次へ：レッスン教材</button></div> : null}
+      <div className={courseStyles.savebar}><button type="submit" title={submitLabel} disabled={saving}>{saving ? "保存中…" : "保存する"}</button></div>
     </form>
   );
 }

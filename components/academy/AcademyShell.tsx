@@ -19,6 +19,8 @@ import {
   Store,
   Users
 } from "lucide-react";
+import { CalendarDays, Globe, Megaphone } from "lucide-react";
+import surface from "./academy-surface.module.css";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import {
   MikkeAppShell,
@@ -41,15 +43,15 @@ import { supabase } from "@/lib/supabase/client";
 import type { AcademyAccessContext, AcademyHeadquartersAccess } from "@/types/database";
 
 const honbuNav: MikkeShellNavItem[] = [
-  { href: "/academy", label: "ホーム", icon: LayoutDashboard, section: "はじめる" },
-  { href: "/academy/courses", label: "講座をつくる・編集する", icon: BookOpen, section: "講座づくり" },
-  { href: "/academy/offerings", label: "募集をつくる・編集する", icon: Store, section: "講座づくり" },
-  { href: "/academy/offering-applications", label: "新しい募集の申込・入金確認", icon: ClipboardList, section: "運営" },
-  { href: "/academy/classes", label: "開催日程・担当講師", icon: CalendarCheck, section: "講座" },
-  { href: "/academy/instructors", label: "講師管理", icon: Users, section: "講座" },
-  { href: "/academy/applications", label: "従来の申込・教材注文", icon: ClipboardList, section: "運営" },
-  { href: "/academy/front", label: "ホームページ編集", icon: Store, section: "公開" },
-  { href: "/academy/settings", label: "本部設定", icon: Settings, section: "設定" }
+  { href: "/academy", label: "ダッシュボード", icon: LayoutDashboard },
+  { href: "/academy/courses", label: "講座", icon: BookOpen },
+  { href: "/academy/offerings", label: "募集", icon: Megaphone },
+  { href: "/academy/classes", label: "開催日時", icon: CalendarDays },
+  { href: "/academy/offering-applications", label: "申込", icon: ClipboardList },
+  { href: "/academy/portal", label: "マイページ", icon: GraduationCap },
+  { href: "/academy/front", label: "ホームページ編集", icon: Globe },
+  { href: "/academy/instructors", label: "講師管理", icon: Users },
+  { href: "/academy/settings", label: "本部設定", icon: Settings }
 ];
 
 const koushiNav: MikkeShellNavItem[] = [
@@ -65,9 +67,9 @@ const koushiNav: MikkeShellNavItem[] = [
 ];
 
 const honbuBottomNav: MikkeShellBottomNavItem[] = [
-  { href: "/academy", label: "ホーム", icon: LayoutDashboard },
   { href: "/academy/courses", label: "講座", icon: BookOpen },
-  { href: "/academy/offerings", label: "募集", icon: Store },
+  { href: "/academy/offerings", label: "募集", icon: Megaphone },
+  { href: "/academy/classes", label: "開催日時", icon: CalendarDays },
   { href: "/academy/offering-applications", label: "申込", icon: ClipboardList }
 ];
 
@@ -81,6 +83,7 @@ const koushiBottomNav: MikkeShellBottomNavItem[] = [
 
 function canShowManageHref(context: AcademyAccessContext | null, href: string) {
   if (!context) return true;
+  if (href === "/academy/portal") return context.capabilities.includes("academy:learner_portal:view") || context.capabilities.includes("academy:instructor_portal:view");
   if (href.startsWith("/academy/offerings") || href.startsWith("/academy/offering-applications")) {
     return context.capabilities.includes("academy:headquarters:manage");
   }
@@ -477,7 +480,7 @@ function ShellInner({
   return (
     <MikkeAppShell
       appName="Academy"
-      title={title}
+      title="Academy"
       subtitle={variant === "honbu" ? "本部｜教室全体の運営" : "マイポータル｜自分の受講・講師活動"}
       theme="blue"
       currentApp={{
@@ -487,7 +490,7 @@ function ShellInner({
       }}
       menuDescription={variant === "honbu" ? "講座をつくり、教室全体の申込・日程・講師を管理します。" : "自分の受講内容や、講師として担当する講座を確認します。"}
       menuEditItems={navItems.map((item) => ({ title: item.label, href: item.href, icon: item.icon }))}
-      ownedApps={ownedApps}
+      ownedApps={variant === "honbu" ? [] : ownedApps}
       otherApps={[]}
       suggestedApps={suggestedApps}
       mikkeId={profile.handle}
@@ -495,12 +498,13 @@ function ShellInner({
       navItems={navItems}
       bottomNavItems={bottomNavItems}
       showBottomNavLabels
+      simpleMenu={variant === "honbu"}
       showSharedUtilities={variant === "koushi"}
       footerLabel="Academy by mikke"
     >
       <div
         onClickCapture={captureAcademyLink}
-        className="min-w-0 overflow-x-hidden [&_input]:max-w-full [&_input]:text-base [&_select]:max-w-full [&_select]:text-base [&_textarea]:max-w-full [&_textarea]:text-base sm:[&_input]:text-sm sm:[&_select]:text-sm sm:[&_textarea]:text-sm"
+        className={surface.page}
       >
       {previewMode === "dashboard" || previewMode === "walkthrough" ? (
         <div className="mb-2 border-l-2 border-[var(--mikke-accent)] px-2 py-1 text-xs leading-5 text-[var(--mikke-text)]">
@@ -561,7 +565,7 @@ function ShellInner({
           ローカル読み取り確認中です。画面移動はできますが、フォームの保存は停止しています。
         </div>
       ) : null}
-      <div className={`mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--mikke-line)] bg-white pb-2 ${workingOnCourse ? "hidden" : ""}`}>
+      <details className={surface.utility}><summary>教室・アカウントの案内</summary><div className="mb-3 flex flex-wrap items-center justify-between gap-2 py-3">
         <div className="min-w-0"><p className="break-words text-xs font-bold text-[var(--mikke-muted)]">
           {selectedContext ? `${selectedContext.academy_name} / ` : ""}
           {variant === "honbu" ? "本部" : "マイポータル"}
@@ -598,9 +602,8 @@ function ShellInner({
             </div>
           ) : null}
         </div>
-      </div>
-      {variant === "honbu" ? <AcademyPageHelp pathname={pathname} /> : null}
-      <div onSubmitCapture={blockReadonlySubmit} className="font-medium text-[var(--mikke-text)] [--mikke-muted:var(--mikke-text)] [--mikke-text-soft:var(--mikke-text)] max-sm:[&_section]:rounded-lg max-sm:[&_input]:rounded-lg max-sm:[&_select]:rounded-lg max-sm:[&_textarea]:rounded-lg max-sm:[&_button]:rounded-lg max-sm:[&_.p-6]:p-3 max-sm:[&_.p-5]:p-3 max-sm:[&_.space-y-6]:space-y-3 max-sm:[&_.space-y-5]:space-y-3">{children}</div>
+      </div>{variant === "honbu" ? <AcademyPageHelp pathname={pathname} /> : null}</details>
+      <div onSubmitCapture={blockReadonlySubmit} className={surface.content}>{children}</div>
       </div>
     </MikkeAppShell>
   );

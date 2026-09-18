@@ -19,6 +19,7 @@ const { OfferingEditor } = load('components/academy/OfferingEditor.tsx', {
   '@/lib/academy/access-context': { toCurrentAcademyContextHref: value => value }, '@/lib/academy/offerings': api,
   './AcademyCourseCard': { AcademyCourseCard: empty }, './AcademyContentRenderer': { AcademyContentRenderer: empty }, './AcademyImageUploader': { AcademyImageUploader: empty },
   './AcademyRolePreview': { AcademyRolePreview: empty },
+  './offering-editor.module.css': { default: {} },
   '@/components/mikkeos/page-builder/LpCanvas': { LpCanvas: empty }, '@/components/mikkeos/page-builder/LpDesign': { LpDesignFields: empty },
   '@/components/mikkeos/page-builder/LpGalleryFields': { LpGalleryFields: empty }, '@/components/mikkeos/page-builder/LpRichWriting': { LpRichWriting: empty }, '@/components/mikkeos/content/MikkeBlockFields': { MikkeBlockFields: empty }
 });
@@ -38,4 +39,18 @@ async function check(isPublished, expectedSaves) {
 }
 await check(true, 1);
 await check(false, 0);
+states = []; cursor = 0;
+const seed = { ...api.blankOfferingInput(), title: 'プリセットの募集', course_ids: ['c1'], price: 500, lp_blocks: [{ id: 'seed-card', type: 'paragraph', lp: { reference: { kind: 'academy-course', id: 'c1' } } }] };
+let seededSave;
+const seededTree = OfferingEditor({ initialInput: seed, courses: [{ id: 'c1', name: '講座', is_published: true }], onSave: async value => { seededSave = value; return { id: 'created', ...value }; } });
+seed.title = '外からの変更'; seed.course_ids.push('external');
+await find(seededTree, node => node.type === 'button' && node.props.children === '保存する').props.onClick();
+assert.equal(seededSave.title, 'プリセットの募集');
+assert.deepEqual(seededSave.course_ids, ['c1']);
+assert.equal(seededSave.lp_blocks[0].id, 'seed-card');
+assert.equal(seededSave.price, 500);
+states = []; cursor = 0;
+const precedenceTree = OfferingEditor({ initial, initialInput: seed, courses: [{ id: 'c1', name: '講座', is_published: true }], onSave: async value => value });
+assert(find(precedenceTree, node => node.type === 'input' && node.props.value === initial.title));
+console.log('PASS: initialInput is isolated, keeps seeded course card/price, and existing records take precedence');
 console.log('Offering editor allows published completion-days courses and blocks unpublished courses');

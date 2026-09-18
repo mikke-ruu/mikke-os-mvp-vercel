@@ -1,40 +1,27 @@
 "use client";
-
 import Link from "next/link";
-import { AcademyHelp } from "./AcademyHelp";
+import { ArrowRight, BookOpen, Plus } from "lucide-react";
 import { AcademyOfferingSummary } from "./AcademyOfferingSummary";
 import { AcademyGettingStarted } from "./AcademyGettingStarted";
-import { ArrowRight, Plus } from "lucide-react";
+import { toCurrentAcademyContextHref as href } from "@/lib/academy/access-context";
 import type { AcademyCourse } from "@/types/database";
+import styles from "./academy-studio-home.module.css";
 
 export function AcademyStudioHome({ name, courses, pendingCount, guideScope = "local-review" }: { name: string; courses: AcademyCourse[]; pendingCount: number; guideScope?: string }) {
-  const draft = courses.find(course => !course.is_published);
   const activities = [
-    { title: "募集をつくる・編集する", detail: "講座を組み合わせて募集ページをつくります。", href: "/academy/offerings" },
-    { title: "募集ページの申込・入金確認", detail: "新しい募集ページから届いた申込を確認します。", href: "/academy/offering-applications" },
-    { title: "従来の申込・教材注文", detail: "従来ページからの申込と教材注文の入金・発送を確認します。", href: "/academy/applications" },
-    { title: "講師管理", detail: "講師管理｜一緒に教える人の情報や認定状況を管理します。一人で教える場合は後で構いません。", href: "/academy/instructors" },
-    { title: "講座一覧・編集", detail: "登録した講座の内容や紹介ページを整える。", href: "/academy/courses" },
-    { title: "開催日程・担当講師", detail: "開催日時、担当する講師、参加者を確認。", href: "/academy/classes" }
+    ["募集をつくる・編集する", "講座を組み合わせて募集ページへ", "/academy/offerings"],
+    ["申込・入金を確認する", "新しい募集ページからの申込", "/academy/offering-applications"],
+    ["講師管理", "認定・登録状況を確認", "/academy/instructors"],
+    ["開催日程・担当講師", "日時と担当者を確認", "/academy/classes"],
   ];
-  return <div className="space-y-8 bg-white">
-    <header className="border-b border-[var(--mikke-line)] pb-5">
-      <p className="text-sm text-[var(--mikke-muted)]">{name}</p>
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold">運営ホーム</h2>
-        <Link href="/academy/courses/new" className="inline-flex min-h-11 items-center gap-2 rounded-sm bg-[var(--mikke-accent)] px-4 py-2 text-sm font-bold text-white"><Plus size={18} />講座をつくる</Link>
-      </div>
-    </header>
+  return <div className={styles.overview}>
+    <header className={styles.welcome}><div><span className={styles.kicker}>MY ACADEMY</span><h2>{name || "運営ホーム"}</h2><p>講座を整えて、募集をはじめましょう。</p><Link className={styles.primary} href={href("/academy/courses/new")}><Plus size={17} />講座をつくる</Link></div><div className={styles.summary}><span>登録している講座</span><strong>{courses.length}<small>講座</small></strong><span>公開 {courses.filter(course => course.is_published).length} ／ 下書き {courses.filter(course => !course.is_published).length}</span></div></header>
     <AcademyOfferingSummary />
-    <AcademyGettingStarted key={guideScope} empty={courses.length === 0} scope={guideScope} />
-    <nav aria-label="運営のメニュー" className="grid gap-x-8 sm:grid-cols-2">
-      {activities.map(({ title, detail, href }) => <div key={href} className="border-b border-[var(--mikke-line)] py-3"><Link href={href} className="flex min-h-11 items-center justify-between gap-4 font-bold hover:text-[var(--mikke-primary)]"><span>{title}</span><ArrowRight size={18} className="shrink-0" /></Link><AcademyHelp title={title}>{detail}</AcademyHelp></div>)}
-    </nav>
-    {pendingCount > 0 ? <Link href="/academy/applications" className="flex min-h-11 items-center justify-between gap-3 border-l-2 border-[var(--mikke-accent)] pl-4 text-sm font-bold"><span>従来ページの確認待ちの申込が {pendingCount} 件あります</span><ArrowRight size={18} /></Link> : null}
-    {draft ? <section className="border-b border-[var(--mikke-line)] pb-5">
-      <h2 className="text-sm text-[var(--mikke-muted)]">作成途中の講座</h2>
-      <Link href={`/academy/courses/${draft.id}`} className="mt-2 flex min-h-11 flex-wrap items-center justify-between gap-3"><span className="min-w-0 break-words font-bold">{draft.name}</span><span className="text-sm text-[var(--mikke-primary)]">編集を続ける →</span></Link>
-    </section> : null}
-    <AcademyHelp title="Academyでできること">ここは教室・講座を運営する人の画面です。講座をつくり、紹介と申込のページを公開し、申込・入金・開催を管理できます。受講者には講座の紹介ページを案内します。「ホームページ編集」は教室全体、「講座の紹介ページ」は一つの講座の募集に使います。</AcademyHelp>
+    <div className={styles.workspace}>
+      <section><div className={styles.sectionHead}><h2>運営のメニュー</h2></div><nav className={styles.menu} aria-label="運営のメニュー">{activities.map(([title, detail, path]) => <Link key={path} href={href(path)}><span><strong>{title}</strong><small>{detail}</small></span><ArrowRight size={16} /></Link>)}</nav></section>
+      <aside><details className={styles.setup} open={courses.length === 0}><summary>はじめの設定</summary><AcademyGettingStarted key={guideScope} empty={courses.length === 0} scope={guideScope} /></details>{pendingCount > 0 ? <Link href={href("/academy/applications")} className={styles.legacyNotice}><strong>従来ページの確認待ち {pendingCount}件</strong><span>申込・教材注文を確認 →</span></Link> : null}</aside>
+    </div>
+    <section><div className={styles.sectionHead}><h2>講座の編集を続ける</h2><Link href={href("/academy/courses")}>講座一覧 →</Link></div><div className={styles.courses}>{courses.length ? [...courses].sort((a,b) => Number(a.is_published)-Number(b.is_published)).slice(0,3).map(course => <Link key={course.id} className={styles.course} href={href("/academy/courses/" + course.id)}><span className={styles.cover}>{course.main_image_url ? <img src={course.main_image_url} alt="" /> : <BookOpen size={23} />}</span><span><small>{course.is_published ? "公開中" : "下書き"}</small><strong>{course.name}</strong></span><ArrowRight size={15} /></Link>) : <p className={styles.empty}>講座をつくると、ここから編集を続けられます。</p>}</div></section>
+    <nav className={styles.reviewLinks} aria-label="その他の運営メニュー"><Link href={href("/academy/front")}>ホームページ編集</Link><Link href={href("/academy/applications")}>従来の申込・教材注文</Link><Link href={href("/academy/settings")}>本部設定</Link></nav>
   </div>;
 }
