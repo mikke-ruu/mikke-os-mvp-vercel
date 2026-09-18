@@ -1,0 +1,8 @@
+.content{--mikke-muted:var(--mikke-text);font-weight:500;color:var(--mikke-text)}
+.content p{line-height:1.65}.content input,.content textarea,.content select{font-weight:500;color:var(--mikke-text)}
+.settings{padding-bottom:16px}.settings h1{font-size:24px}.settings h2{font-size:16px}.settings h3{font-size:14px}.settings p{font-size:11px;line-height:1.6}.settings button:disabled{opacity:.5}.settings [aria-label="発信者プロフィール"]{border-top:3px solid var(--mikke-pink)}
+.saveBar{position:sticky;top:64px;z-index:25;display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;border-bottom:1px solid var(--mikke-line);background:white;padding:7px 0;margin-bottom:12px}
+.saveBar button{border:0;border-radius:8px;background:var(--mikke-orange);color:white;font-size:13px;font-weight:700;padding:9px 24px;line-height:1.4;min-height:38px}.saveBar p{flex-basis:100%;margin:0;border-radius:6px;padding:5px 9px;font-size:12px;line-height:1.5}.saveBar [role=status]{background:var(--mikke-primary-soft)}.saveBar [role=alert]{border:1px solid var(--mikke-orange)}
+.content [data-home-next]{border-top:4px solid var(--mikke-yellow)}.content [data-home-reader]{background:white;border-left:4px solid var(--mikke-blue)}
+.settings :global(#media-settings-form){border-top:3px solid var(--mikke-green)}.settings>section{border-top:3px solid var(--mikke-yellow)}
+@media(max-width:767px){.content{font-size:14px}.settings form{scroll-margin-top:112px}.saveBar button{width:100%}.settings :global(.leading-7){line-height:1.65}.settings :global(.leading-6){line-height:1.6}}
