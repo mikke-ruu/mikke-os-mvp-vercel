@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
-import { AcademyOperationsDashboard } from "@/components/academy/AcademyOperationsDashboard";
 import { AcademyStudioHome } from "@/components/academy/AcademyStudioHome";
 import { listAcademyClasses } from "@/lib/academy/classes";
 import type { AcademyClass } from "@/types/database";
@@ -199,7 +198,7 @@ function DashboardContent() {
     );
   }
 
-  return <><AcademyStudioHome name={hq.name} courses={courses} pendingCount={apps.filter(a => a.status === "received").length} guideScope={`${profile.user_id}:${hq.id}`} /><details className="mt-6 border-t border-[var(--mikke-line)] pt-3"><summary className="cursor-pointer py-2 text-sm">従来の申込・教材注文・開催状況を詳しく見る</summary><AcademyOperationsDashboard name={hq.name} scope={`${profile.user_id}:${hq.id}`} data={{ courses, apps, kits, instructors, classes }} classesError={classesError} /></details></>;
+  return <><AcademyStudioHome name={hq.name} courses={courses} pendingCount={apps.filter(a => a.status === "received").length} guideScope={`${profile.user_id}:${hq.id}`} /></>;
 }
 
 export default function AcademyDashboardPage() {

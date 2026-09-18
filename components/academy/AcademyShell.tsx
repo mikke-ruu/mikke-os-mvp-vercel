@@ -63,7 +63,6 @@ const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal/class-requests", label: "担当依頼", icon: CalendarCheck },
   { href: "/academy/portal/url", label: "プロフィール・QR", icon: Link2 },
   { href: "/academy/portal/kits", label: "教材注文", icon: Package },
-  { href: "/academy/portal/applications", label: "従来の申込", icon: ClipboardList }
 ];
 
 const honbuBottomNav: MikkeShellBottomNavItem[] = [

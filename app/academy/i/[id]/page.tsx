@@ -91,22 +91,7 @@ function InstructorPublicInner({ instructorId }: { instructorId: string }) {
               {course.duration_text ? <span className="ml-2 text-xs font-normal text-[var(--mikke-muted)]">{course.duration_text}</span> : null}
             </p>
             <div className="mt-5 space-y-2">
-              {canApply ? (
-                <Link
-                  href={`/academy/apply/${course.id}?k=${instructor.id}`}
-                  className="mx-auto block w-full max-w-xs rounded-full bg-[var(--mikke-accent)] py-3 text-center text-sm font-bold text-white transition hover:opacity-90"
-                >
-                  この講師に申し込む
-                </Link>
-              ) : (
-                <p className="text-xs text-[var(--mikke-muted)]">現在、この講師の申込受付は停止中です。</p>
-              )}
-              <Link
-                href={`/academy/c/${course.id}?k=${instructor.id}`}
-                className="mx-auto flex w-fit items-center gap-1 text-xs font-bold text-[var(--mikke-accent-strong)]"
-              >
-                講座の詳細を見る <ArrowRight size={13} />
-              </Link>
+              <p className="text-sm">お申込みは、この講師から案内された募集ページをご利用ください。</p>
             </div>
           </div>
         </section>

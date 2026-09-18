@@ -24,7 +24,7 @@ assert(visible(teacher, '/academy/portal/offering-applications', 'instructor'));
 assert(visible(teacher, '/academy/portal/offerings', 'instructor'));
 assert(!visible({capabilities: []}, '/academy/offering-applications/mine', 'learner'));
 assert(koushiBottomNav.some(item => item.href === '/academy/offering-applications/mine'));
-assert(koushiNav.some(item => item.href === '/academy/portal/applications'));
+assert(!koushiNav.some(item => item.href === '/academy/portal/applications'), 'legacy intake is not a primary portal menu');
 assert(honbuBottomNav.some(item => item.href === '/academy/offering-applications'));
 const summary = read('components/academy/AcademyOfferingSummary.tsx');
 for (const expected of ['getOwnedHeadquarters(userId, academyId)', 'context.academy_id === hq.id', 'context.capabilities.includes("academy:headquarters:manage")', '.eq("headquarters_id", hq.id)', '.range(offset, offset + 499)', 'if (readError) throw readError', 'setSummary(null)', '件数・金額は未確認', '従来の申込・教材注文とは別集計']) assert(summary.includes(expected), expected);

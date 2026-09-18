@@ -95,9 +95,6 @@ function HonbuTab({ hq, source }: { hq: AcademyHeadquarters; source: "all" | "ho
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-xs text-[var(--mikke-muted)]">{source === "koushi" ? "講師の紹介ページなどで受け付けた受講申込です。教材の注文がない申込も含みます。" : source === "honbu" ? "本部で直接受け付けた受講申込です。" : "本部で閲覧できる受講申込を受付元にかかわらず表示しています。"}</p>
-        <Link href={toCurrentAcademyContextHref("/academy/applications/new")} className="flex items-center gap-1 rounded-lg bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
-          <Plus size={16} /> 申込を追加
-        </Link>
       </div>
 
       {statusError ? <p className="text-sm font-bold text-[var(--mikke-danger)]">{statusError}</p> : null}
@@ -107,9 +104,6 @@ function HonbuTab({ hq, source }: { hq: AcademyHeadquarters; source: "all" | "ho
         <div className="rounded-lg border border-dashed border-[var(--mikke-line)] bg-white p-8 text-center">
           <ClipboardList size={28} className="mx-auto text-[var(--mikke-accent)]" />
           <p className="mt-2 text-sm text-[var(--mikke-text-soft)]">{filter ? "この条件に合う申込はありません。「すべて」で全件を確認できます。" : "まだ申込がありません。"}</p>
-          <Link href={toCurrentAcademyContextHref("/academy/applications/new")} className="mt-3 inline-block text-xs font-bold text-[var(--mikke-accent-strong)]">
-            申込を手入力で追加
-          </Link>
         </div>
       ) : (
         <ul className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">

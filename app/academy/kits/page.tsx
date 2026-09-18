@@ -5,5 +5,5 @@ import { redirect } from "next/navigation";
 // 中身（academy_kit_orders一覧・ステータス/入金のインライン変更）は
 // app/academy/applications/page.tsx の「講師受付」タブへ移植済み。
 export default function KitsPage() {
-  redirect("/academy/applications");
+  redirect("/academy/applications?tab=koushi");
 }

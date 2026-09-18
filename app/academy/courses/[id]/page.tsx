@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
-import { AcademyCoursePublication } from "@/components/academy/AcademyCoursePublication";
-import { isAcademyLocalReview } from "@/lib/academy/preview";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
-import { getCourse, setCoursePublished, updateCourse, type CourseInput } from "@/lib/academy/courses";
+import { getCourse, updateCourse, type CourseInput } from "@/lib/academy/courses";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 import { CourseForm } from "../CourseForm";
@@ -87,13 +85,6 @@ function EditCourseContent({ courseId }: { courseId: string }) {
           router.push(toCurrentAcademyContextHref(`/academy/courses/${course.id}/instructor-page?audience=learner`));
         }}
       />
-      <details className="mt-5 border-t border-[var(--mikke-line)] pt-3"><summary className="cursor-pointer py-2 text-sm font-semibold">講座の公開状態・利用料金</summary><AcademyCoursePublication key={`${profile.user_id}:${hq.id}:${course.id}`} headquartersId={hq.id} userId={profile.user_id} ownerUserId={hq.owner_user_id} course={course} sample={isAcademyLocalReview()} onReloadCourse={async()=>{ const refreshed=await getCourse(hq.id,course.id); if(!refreshed)throw new Error("course_unavailable"); setCourse(refreshed); }} onLegacyChange={async (published) => {
-        if (isAcademyLocalReview()) {
-          setCourse({ ...course, is_published: published });
-          return;
-        }
-        setCourse(await setCoursePublished(profile, hq.id, course, published));
-      }} /></details>
     </AcademyCourseWorkspace>
   );
 }

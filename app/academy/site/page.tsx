@@ -128,12 +128,7 @@ function SitePage() {
                         {c.price.toLocaleString()}円
                         {c.duration_text ? <span className="ml-2 text-[11px] font-normal text-[var(--mikke-muted)]">{c.duration_text}</span> : null}
                       </p>
-                      <Link
-                        href={`/academy/c/${c.id}`}
-                        className="rounded-full border border-[var(--mikke-accent)] px-3 py-1.5 text-xs font-bold text-[var(--mikke-accent)] transition hover:bg-[var(--mikke-accent-soft)]"
-                      >
-                        詳細を見る
-                      </Link>
+                      <span className="text-xs">お申込みは教室からの募集案内をご確認ください。</span>
                     </div>
                   </div>
                 </li>

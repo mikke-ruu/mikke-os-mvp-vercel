@@ -167,7 +167,7 @@ function FrontContent() {
 
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
         <p className="text-sm font-bold text-[var(--mikke-text)]">講座ページ</p>
-        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">ホームページには、公開中の講座が一覧で並びます。講座ごとの紹介と申込受付は、それぞれの講座ページで編集します。</p>
+        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">講座情報を編集できます。お客様向けの紹介と申込受付は「募集」で作成・公開します。</p>
         <ul className="mt-3 space-y-2">
           {courses.map((c) => (
             <li key={c.id} className="flex min-w-0 flex-col items-stretch gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -175,13 +175,12 @@ function FrontContent() {
                 <p className="truncate text-sm font-bold text-[var(--mikke-text)]">
                   {c.code} {c.name}
                 </p>
-                <p className="text-[11px] text-[var(--mikke-muted)]">{c.is_published ? "公開中" : "非公開（フロントに出ません）"}</p>
               </div>
               <Link
-                href={`/academy/courses/${c.id}/lp`}
+                href={`/academy/courses/${c.id}`}
                 className="flex shrink-0 items-center justify-center gap-1 rounded-full bg-[var(--mikke-accent-soft)] px-3 py-2 text-xs font-bold text-[var(--mikke-accent-strong)]"
               >
-                <LayoutTemplate size={13} /> 講座ページを編集
+                <LayoutTemplate size={13} /> 講座情報を編集
               </Link>
             </li>
           ))}
