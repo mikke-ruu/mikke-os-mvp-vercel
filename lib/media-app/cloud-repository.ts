@@ -18,20 +18,25 @@ export function createMediaCloudRepository(client: SupabaseClient, expectedSubje
 
   async function run<T>(action: (scope: Scope) => Promise<T>): Promise<T> {
     let changed = false;
-    const { data: subscription } = client.auth.onAuthStateChange((event) => {
-      if (event !== "INITIAL_SESSION" && event !== "TOKEN_REFRESHED") changed = true;
+    const { data: subscription } = client.auth.onAuthStateChange((event, session) => {
+      // SIGNED_IN also fires when an already signed-in tab regains focus.
+      // Never treat that as a new owner, but retain sticky A -> B -> A rejection.
+      if (!["INITIAL_SESSION", "TOKEN_REFRESHED", "SIGNED_IN"].includes(event)
+        || !session?.user || session.user.is_anonymous || session.user.id !== expectedSubject) changed = true;
     });
     try {
       const { data, error } = await client.auth.getUser();
-      if (error || !data.user || data.user.is_anonymous) throw new Error("ログインし直してください。");
+      if (error) throw error;
+      if (!data.user || data.user.is_anonymous) throw Object.assign(new Error("ログインし直してください。"), {code:"MEDIA_LOGIN_REQUIRED"});
       // UI identity is only a stale-screen precondition. RLS/getUser remain the
       // authority; a caller cannot select another owner by supplying this value.
-      if (!expectedSubject || data.user.id !== expectedSubject) throw new Error("ログイン状態が変わりました。画面を開き直してください。");
+      if (!expectedSubject || data.user.id !== expectedSubject) throw Object.assign(new Error("ログイン状態が変わりました。画面を開き直してください。"), {code:"MEDIA_SESSION_CHANGED"});
       const subject = data.user.id;
       const check = async () => {
         const latest = await client.auth.getUser();
-        if (changed || latest.error || !latest.data.user || latest.data.user.is_anonymous || latest.data.user.id !== subject) {
-          throw new Error("ログイン状態が変わりました。画面を開き直してください。");
+        if (latest.error) throw latest.error;
+        if (changed || !latest.data.user || latest.data.user.is_anonymous || latest.data.user.id !== subject) {
+          throw Object.assign(new Error("ログイン状態が変わりました。画面を開き直してください。"), {code:"MEDIA_SESSION_CHANGED"});
         }
       };
       const scope: Scope = { subject, check, step: async (operation) => { await check(); const value = await operation(); await check(); return value; } };
