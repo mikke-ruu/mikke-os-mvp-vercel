@@ -1,6 +1,6 @@
 # Academy renewal: production integration gate
 
-Status: implemented and undergoing final release checks. Production publication is not yet verified.
+Status: main integration published at d30f093. Final completion-authority hardening and role-preview additions are undergoing release checks.
 
 The user approved the local design and full production rollout on 2026-09-18. That approval does not make the localStorage prototype a production persistence implementation.
 
@@ -53,3 +53,11 @@ Implemented boundaries to verify at release:
 - Post-apply transaction/rollback contract tests passed. All five new public tables have RLS enabled, no anonymous table SELECT and no authenticated hard DELETE. No real customer applications or payments were created by verification.
 - Initial builds found an outer Suspense boundary missing on the study page and an overly broad feature-checkbox key type; both corrected. Final current-tree build, Git and deployment remain separate gates.
 - New monthly customer billing remains unavailable. Existing platform subscriptions and old payment links are unchanged.
+
+## Production evidence
+
+- Full Next build (session48910) completed with exit 0, including TypeScript and all 177 prerendered pages. The follow-up editor-publication regression passed; d30f093 Vercel production deployment 5MPoWaKUCFpaef18aKnCnkfU3bpB reported success.
+- Production /academy redirects anonymous visitors to login. The new /academy/o/:id route shows the expected unavailable-offering state for a rolled-back fixture, without returning a 404 or exposing test data.
+- An additional applied migration 20260918052843 freezes completion authority for all-at-once purchases, with unknown legacy snapshots restricted to HQ completion. Full post-apply remote transaction tests passed and rolled back.
+- Final UI adds read-only learner/instructor portal examples inside the editors. They render input data only and never impersonate users or read their records.
+- Authenticated owner/instructor/learner browser save/readback using real accounts is not verified in this session. Database role tests are separate evidence, not a claim of completed browser E2E. Existing platform billing was not changed or charged.

@@ -7,6 +7,9 @@
 | 20260918043218 | 20260918050803 | academy_offerings_and_manual_entitlements |
 | 20260918044306 | 20260918050806 | academy_instructor_offering_pages |
 | 20260918044449 | 20260918050808 | academy_offering_staged_purchases |
+| 20260918052444 | 20260918052843 | academy_offering_all_completion_snapshot |
+
+4本目は一括申込の修了権限を申込時に固定する限定修正。旧null snapshotは本部のみ修了可能とし、後から変更された募集設定から権限を推測しない。本番schemaの隔離fixtureでROLLBACK検証後、統制担当が適用した。
 
 事前検証では上記3本を順番にBEGIN内で実行し、隔離したテスト用Authユーザー・本部・講座だけを作成した。申込・入金確認・段階支払・修了後の期限付き教材権限・RLSを検証してROLLBACKし、新tableとfixtureの残留がないことを確認した。既存顧客行は変更していない。
 

@@ -26,6 +26,7 @@ assert(!summary.includes('localStorage'));
 for (const file of ['AcademyOperationsDashboard', 'AcademyStudioHome']) assert(read(`components/academy/${file}.tsx`).includes('<AcademyOfferingSummary />'));
 const ui = read('components/academy/OfferingApplications.tsx');
 assert(ui.includes('course.learner_access_mode === "days_after_completion"'));
-assert(ui.includes('(row.purchase_snapshot?.completion_mode ?? "learner")'));
+assert(ui.includes('(row.purchase_snapshot?.completion_mode ?? "hq")'));
+assert(!ui.includes('(row.purchase_snapshot?.completion_mode ?? "learner")'), 'Unknown legacy completion authority must not enable learner completion');
 assert(ui.includes('audience === "learner" && row.stage_index > 0 && row.completed_at'));
 console.log('PASS: learner/instructor nav gates, new intake primary links, separate HQ summary/error/pagination, completion access mode');

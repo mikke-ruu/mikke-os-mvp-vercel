@@ -18,6 +18,7 @@ const { OfferingEditor } = load('components/academy/OfferingEditor.tsx', {
   react: hooks, 'react/jsx-runtime': jsx, 'next/link': { default: ({ children, ...props }) => jsx.jsx('a', { ...props, children }) },
   '@/lib/academy/access-context': { toCurrentAcademyContextHref: value => value }, '@/lib/academy/offerings': api,
   './AcademyCourseCard': { AcademyCourseCard: empty }, './AcademyContentRenderer': { AcademyContentRenderer: empty }, './AcademyImageUploader': { AcademyImageUploader: empty },
+  './AcademyRolePreview': { AcademyRolePreview: empty },
   '@/components/mikkeos/page-builder/LpCanvas': { LpCanvas: empty }, '@/components/mikkeos/page-builder/LpDesign': { LpDesignFields: empty },
   '@/components/mikkeos/page-builder/LpGalleryFields': { LpGalleryFields: empty }, '@/components/mikkeos/page-builder/LpRichWriting': { LpRichWriting: empty }, '@/components/mikkeos/content/MikkeBlockFields': { MikkeBlockFields: empty }
 });

@@ -6,6 +6,7 @@ import { AcademyHelp } from "@/components/academy/AcademyHelp";
 import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
 import { AcademyCourseInput } from "@/components/academy/AcademyCourseInput";
 import { AcademyCourseCard } from "@/components/academy/AcademyCourseCard";
+import { AcademyRolePreview } from "@/components/academy/AcademyRolePreview";
 import type {
   AcademyCourseFeatureSettings,
   AcademyCoursePortalFeatureSettings,
@@ -368,6 +369,7 @@ export function CourseForm({
         </div>
         {form.featureSettings.certification ? <div>
           <label className={labelClass}>認定の条件</label>
+          <div className="my-3"><AcademyRolePreview role="instructor" title={form.name} courseNames={[form.name]} /></div>
           <AcademyHelp title="認定の条件">修了者を認定講師として登録する場合に、必要な条件を説明します。認定制度を使わない講座には不要です。記入だけで誰かが自動認定されることはありません。</AcademyHelp>
           <textarea className={`${inputClass} min-h-16`} value={form.certificationConditions} onChange={(e) => set("certificationConditions", e.target.value)} />
           <p className="mt-1 text-[11px] leading-5">例えば認定講師になる条件として、課題の提出やCommunity参加、年会費の支払いなどがある場合に記載します。ただし、これらを自動で判定するシステムではありません。</p>

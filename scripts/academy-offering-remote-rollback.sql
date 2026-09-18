@@ -81,3 +81,27 @@ select public.academy_complete_offering_course((select id from public.academy_of
 select academy_offering_test.ok((select count(*)=1 from public.academy_offering_application_grants g join public.academy_offering_applications a on a.id=g.application_id where a.offering_id=academy_offering_test.uid(701)),'completion access grant idempotent');
 reset role;
 select academy_offering_test.ok((select g.ends_at=a.completed_at+interval '7 days' from public.academy_course_access_grants g join public.academy_offering_application_grants b on b.access_grant_id=g.id join public.academy_offering_applications a on a.id=b.application_id where a.offering_id=academy_offering_test.uid(701)),'completion duration snapshot');
+-- Runs with the existing disposable fixture, migrations and base regression suites.
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub',academy_offering_test.uid(1)::text,true);
+insert into public.academy_offerings(id,headquarters_id,title,course_ids,price,status,completion_mode)
+values(academy_offering_test.uid(801),academy_offering_test.uid(100),'HQ completion',array[academy_offering_test.uid(101)],100,'published','hq'),
+      (academy_offering_test.uid(802),academy_offering_test.uid(100),'Learner completion',array[academy_offering_test.uid(101)],100,'published','learner');
+select set_config('request.jwt.claim.sub',academy_offering_test.uid(4)::text,true);
+select public.academy_submit_offering_application(academy_offering_test.uid(801),academy_offering_test.uid(811),'Learner','l@example.invalid','bank',100);
+select public.academy_submit_offering_application(academy_offering_test.uid(802),academy_offering_test.uid(812),'Learner','l@example.invalid','bank',100);
+select academy_offering_test.ok((select purchase_snapshot->>'completion_mode'='hq' from public.academy_offering_applications where offering_id=academy_offering_test.uid(801)),'all HQ completion snapshotted');
+select academy_offering_test.ok((select purchase_snapshot->>'completion_mode'='learner' from public.academy_offering_applications where offering_id=academy_offering_test.uid(802)),'all learner completion snapshotted');
+select set_config('request.jwt.claim.sub',academy_offering_test.uid(1)::text,true);
+update public.academy_offerings set completion_mode='learner' where id=academy_offering_test.uid(801);
+update public.academy_offerings set completion_mode='hq' where id=academy_offering_test.uid(802);
+select public.academy_confirm_offering_payment((select id from public.academy_offering_applications where offering_id=academy_offering_test.uid(801)));
+select public.academy_confirm_offering_payment((select id from public.academy_offering_applications where offering_id=academy_offering_test.uid(802)));
+select set_config('request.jwt.claim.sub',academy_offering_test.uid(4)::text,true);
+select academy_offering_test.denied($q$select public.academy_complete_offering_course((select id from public.academy_offering_applications where offering_id=academy_offering_test.uid(801)))$q$);
+select public.academy_complete_offering_course((select id from public.academy_offering_applications where offering_id=academy_offering_test.uid(802)));
+select set_config('request.jwt.claim.sub',academy_offering_test.uid(1)::text,true);
+select public.academy_complete_offering_course((select id from public.academy_offering_applications where offering_id=academy_offering_test.uid(801)));
+select academy_offering_test.ok((select bool_and(completed_at is not null) from public.academy_offering_applications where offering_id in(academy_offering_test.uid(801),academy_offering_test.uid(802))),'both approved completion paths');
+reset role;

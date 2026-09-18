@@ -6,6 +6,7 @@ import type { AcademyCourse } from "@/types/database";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { blankOfferingInput, offeringError, offeringInput, offeringKinds, offeringProblem, type AcademyOffering, type OfferingInput } from "@/lib/academy/offerings";
 import { AcademyCourseCard } from "./AcademyCourseCard";
+import { AcademyRolePreview } from "./AcademyRolePreview";
 import { AcademyContentRenderer } from "./AcademyContentRenderer";
 import { AcademyImageUploader } from "./AcademyImageUploader";
 import { LpCanvas } from "@/components/mikkeos/page-builder/LpCanvas";
@@ -78,6 +79,7 @@ export function OfferingEditor({ initial, courses, onSave, onArchive }: {
   }
   const price = <section className="space-y-2 border-t border-[var(--mikke-line)] p-5"><small>{form.purchase_mode === "staged" ? "初回のお支払い（税込）" : "募集価格（税込）"}</small><p className="text-xl font-bold">{Number.isFinite(form.purchase_mode === "staged" ? form.stage_prices[form.course_ids[0]] : form.price) ? `¥${(form.purchase_mode === "staged" ? form.stage_prices[form.course_ids[0]] : form.price).toLocaleString("ja-JP")}` : "価格未入力"}</p><p className="text-sm">{form.payment_methods.map(method => method === "bank" ? "振込" : "現地決済").join(" ／ ")}</p><button type="button" disabled className="min-h-12 w-full rounded-lg bg-[var(--mikke-accent)] p-3 font-bold text-white">申し込む</button><p className="text-xs text-[var(--mikke-muted)]">編集画面では送信されません。公開後の募集ページから申し込めます。</p></section>;
   return <div ref={top} className="min-w-0 space-y-4">
+    <AcademyRolePreview role="learner" title={form.title} courseNames={selected.map(course => course.name)} price={form.purchase_mode === "staged" ? form.course_ids.reduce((sum, id) => sum + (form.stage_prices[id] ?? 0), 0) : form.price} />
     <div className="flex flex-wrap items-center justify-between gap-3"><Link className={action} href={toCurrentAcademyContextHref("/academy/offerings")} onClick={event => { if (dirty && !window.confirm("保存していない変更があります。一覧に戻りますか？")) event.preventDefault(); }}>募集一覧へ</Link><span className="text-xs">{dirty ? "未保存" : initial ? "保存済み" : "新しい募集"}</span></div>
     {error && <p role="alert" className="border-l-4 border-red-500 bg-red-50 p-3 text-sm">{error} 入力内容は残っています。</p>}{notice && <p role="status" className="text-sm">{notice}</p>}
     <nav aria-label="募集作成の手順" className="grid grid-cols-3 border-b border-[var(--mikke-line)]">{["1–3 募集・販売設定", "4 ページを編集", "5 公開設定"].map((label, index) => <button key={label} type="button" disabled={saving} aria-current={step === index ? "step" : undefined} onClick={() => go(index)} className={`min-h-12 border-b-2 px-2 py-2 text-xs font-bold sm:text-sm ${step === index ? "border-[var(--mikke-primary)] text-[var(--mikke-primary)]" : "border-transparent"}`}>{label}</button>)}</nav>

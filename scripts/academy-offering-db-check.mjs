@@ -16,6 +16,14 @@ try{
   await db.exec(fs.readFileSync('supabase/migrations/20260918050808_academy_offering_staged_purchases.sql','utf8'));
   await db.exec(fs.readFileSync('scripts/academy-offering-db-rollback.sql','utf8'));
   await db.exec(fs.readFileSync('scripts/academy-offering-staged-db-rollback.sql','utf8'));
+  await db.exec(fs.readFileSync('supabase/migrations/20260918052843_academy_offering_all_completion_snapshot.sql','utf8'));
+  await db.exec(`set local role authenticated;
+    select set_config('request.jwt.claim.sub',test.uid(3)::text,true);
+    select test.denied($q$select public.academy_complete_offering_course((select id from public.academy_offering_applications where offering_id=test.uid(301)))$q$);
+    select set_config('request.jwt.claim.sub',test.uid(1)::text,true);
+    select public.academy_complete_offering_course((select id from public.academy_offering_applications where offering_id=test.uid(301)));
+    reset role;`);
+  await db.exec(fs.readFileSync('scripts/academy-offering-completion-db-rollback.sql','utf8'));
   await db.exec('ROLLBACK');
   const result=await db.query("select to_regclass('public.academy_offerings') value");
   if(result.rows[0].value!==null)throw new Error('rollback failed');
