@@ -209,7 +209,7 @@ export type AcademyLpBlock = AcademyContentExtension & (
 // Wave C (AC-C3): materials-list（設定項目なし。この講座のacademy_materialsを自動表示）を追加。
 // 既存のheading/text/image/video/linksは変更しない（旧データがそのまま読み込める）。
 export type AcademyPageLink = { label: string; url: string };
-export type AcademyPageBlock = AcademyContentExtension & (
+export type AcademyPageBlock = AcademyContentExtension & { lessonId?: string } & (
   | { type: "heading"; text: string }
   | { type: "text"; text: string }
   | { type: "image"; url: string; caption?: string; linkUrl?: string }

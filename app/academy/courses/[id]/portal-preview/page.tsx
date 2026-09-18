@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { PageBlocks } from "@/components/academy/PageBlocks";
+import { AcademyLessonContent } from "@/components/academy/AcademyLessonContent";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import { getLearnerPage } from "@/lib/academy/learner-page";
@@ -43,7 +44,7 @@ function Preview({id}:{id:string}) {
       <p className="text-xs">個人情報・申込履歴・期限判定は見本に含みません。ポータル全体の完全な再現ではありません。</p>
       <h4 className="border-l-2 border-[var(--mikke-pink)] pl-2 font-bold">{title}</h4>
       {view==="learner"&&!data.published?<p className="text-sm font-bold">下書きの確認中です。受講生にはまだ表示されません。</p>:null}
-      {blocks.length?<PageBlocks blocks={blocks}/>:<p className="text-sm">このページの内容はまだありません。</p>}
+      {blocks.length ? view === "learner" ? <AcademyLessonContent blocks={blocks}/> : <PageBlocks blocks={blocks}/> : <p className="text-sm">このページの内容はまだありません。</p>}
     </section>
     <p className="text-xs leading-5">実際の表示は本人の受講・講師登録と閲覧期限によって変わります。限定PDFの取得と教材一覧は、実際の権限付き画面で確認します。</p>
     <Link href={toCurrentAcademyContextHref(`/academy/courses/${id}/instructor-page${view==="learner"?"?audience=learner":""}`)} className="inline-flex min-h-11 items-center rounded-lg border border-[var(--mikke-line)] px-3 text-sm font-bold">{title}を編集する →</Link>

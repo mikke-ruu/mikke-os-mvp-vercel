@@ -14,6 +14,7 @@ import { listMyLearnerApplications } from "@/lib/academy/learner-portal";
 import { listMyCourseAccessGrants, resolveCourseAccessGrant } from "@/lib/academy/course-access";
 import { getAcademyRouteContext, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { PageBlocks } from "@/components/academy/PageBlocks";
+import { AcademyLessonContent } from "@/components/academy/AcademyLessonContent";
 import { PrivateMaterialFiles } from "@/components/academy/PrivateMaterialFiles";
 import { isAcademyLocalReview, academyPreviewCourses } from "@/lib/academy/preview";
 import type { AcademyApplication, AcademyCourse, AcademyCourseAccessGrant, AcademyInstructor, AcademyInstructorPage, AcademyLearnerPage, AcademyMaterial } from "@/types/database";
@@ -121,7 +122,7 @@ function StudyContent() {
                 {access.grant.ends_at ? `閲覧期限：${formatAccessDate(access.grant.ends_at)}` : "閲覧期限：期限なし"}
               </p>
               <div className="mt-3 rounded-xl bg-[var(--mikke-surface-soft)] p-4 md:p-5">
-                {page?.blocks.length ? <PageBlocks blocks={page.blocks} /> : <p className="text-sm text-[var(--mikke-muted)]">本部が講座復習ページを準備中です。</p>}
+                {page?.blocks.length ? <AcademyLessonContent blocks={page.blocks} /> : <p className="text-sm text-[var(--mikke-muted)]">本部がレッスン教材を準備中です。</p>}
                 {page ? <PrivateMaterialFiles parent={{ audience: "learner", parentId: page.id }} /> : null}
               </div>
             </>

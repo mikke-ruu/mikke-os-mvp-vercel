@@ -2,6 +2,10 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { AcademyLessonEditor } from "@/components/academy/AcademyLessonEditor";
+import { readLessons, writeLessons } from "@/lib/academy/lesson-content";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
@@ -49,7 +53,8 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
           const page = await getLearnerPage(foundHq.id, courseId);
           if (cancelled) return;
           setLearnerPageId(page?.id ?? null);
-          setBlocks(page?.blocks ?? []);
+          const existingBlocks = page?.blocks ?? [];
+          setBlocks(existingBlocks.length ? existingBlocks : writeLessons(readLessons([], loadedCourse?.feature_settings?.marketing?.curriculum ?? [])));
           setIsPublished(page?.is_published ?? false);
         } else {
           const page = await getInstructorPage(foundHq.id, courseId);
@@ -95,41 +100,28 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
   return (
     <AcademyCourseWorkspace course={course} activeTab={audience}>
       <div className="space-y-4">
+      {audience === "learner" ? <>
+        <AcademyLessonEditor blocks={blocks} curriculum={[]} onChange={next => { revision.current += 1; setBlocks(next); setSaved(false); }} />
+        <div className="flex justify-end"><Link className="inline-flex min-h-11 items-center rounded-lg border border-[var(--mikke-line)] bg-white px-4 text-sm font-bold" href={toCurrentAcademyContextHref(`/academy/courses/${course.id}`)}>講座情報に戻る</Link></div>
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={isPublished} onChange={event => { revision.current += 1; setIsPublished(event.target.checked); setSaved(false); }} />受講者のマイページに表示する</label>
+        {privateMaterialUiEnabled && <details className="border-t border-[var(--mikke-line)] py-4"><summary className="min-h-11 cursor-pointer text-sm font-bold">受講生向けPDF資料</summary>{learnerPageId ? <PrivateMaterialFiles parent={{ audience: "learner", parentId: learnerPageId }} editable /> : <p className="mt-2 text-sm">教材を保存すると、PDFを追加できます。</p>}</details>}
+      </> : <>
       <div>
         <p className="truncate text-xs text-[var(--mikke-muted)]">{course.code} {course.name}</p>
-        <h2 className="text-base font-bold text-[var(--mikke-text)]">{audience === "learner" ? "講座復習ページ" : "講師マニュアルページ"}</h2>
+        <h2 className="text-base font-bold text-[var(--mikke-text)]">講師マニュアル</h2>
       </div>
       <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
-        {audience === "learner"
-          ? "受講した人が、講座の振り返りや配布資料、本部からのお知らせを確認するページです。認定講師用の資料とは別です。"
-          : "講座の進め方、材料の購入先、営業方法などを、この講座の認定講師に共有するページです。受講者の講座復習ページとは別です。"}
+        講座の進め方や材料の購入先を、認定講師に共有します。受講者用のレッスン教材とは別です。
       </p>
-
-      {audience === "learner" ? (
-        <fieldset className="rounded-xl border border-[var(--mikke-line)] bg-white p-4">
-          <legend className="px-1 text-xs font-bold text-[var(--mikke-text)]">受講者への表示</legend>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {([
-              [false, "下書き（まだ受講者に表示しない）"],
-              [true, "受講者のマイポータルに表示"]
-            ] as const).map(([value, label]) => (
-              <label key={String(value)} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm font-bold ${isPublished === value ? "border-[var(--mikke-primary)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-primary)]" : "border-[var(--mikke-line)] text-[var(--mikke-text-soft)]"}`}>
-                <input type="radio" name="learner-page-publication" checked={isPublished === value} onChange={() => { revision.current += 1; setIsPublished(value); setSaved(false); }} />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      ) : null}
 
       <EditorPreview preview={<PageBlocks blocks={[...blocks.filter((block) => block.type !== "materials-list"), ...(audience === "instructor" && previewMaterials.some((material) => material.is_published) ? [{ type: "materials-list" } as const] : [])]} materials={previewMaterials.filter((material) => material.is_published)} />}>
       <AcademyContentEditor blocks={blocks} onChange={next => { revision.current += 1; setBlocks(next); setSaved(false); }} />
       {audience === "instructor" ? <section id="resources" className="border-t border-[var(--mikke-line)] pt-6"><ManualResources courseId={course.id} onChange={setPreviewMaterials} /></section> : null}
-      {audience === "learner" && privateMaterialUiEnabled ? <section className="border-t border-[var(--mikke-line)] py-4"><h3 className="font-bold">受講生向けPDF資料</h3>{learnerPageId ? <PrivateMaterialFiles parent={{ audience: "learner", parentId: learnerPageId }} editable /> : <p className="mt-2 text-sm">最初に講座復習ページを保存すると、PDFを追加できます。</p>}</section> : null}
       </EditorPreview>
-      <div className="flex items-center gap-3">
+      </>}
+      <div className="flex items-center justify-end gap-3 rounded-xl border border-[var(--mikke-line)] bg-white p-4">
         <button onClick={save} disabled={saving} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
-          {saving ? "保存中…" : audience === "learner" ? "講座復習ページを保存" : "講師マニュアルページを保存"}
+          {saving ? "保存中…" : "保存する"}
         </button>
         {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
       </div>
@@ -144,7 +136,7 @@ export default function InstructorPageBuilder({ params }: { params: Promise<{ id
   const searchParams = useSearchParams();
   const audience = searchParams.get("audience") === "learner" ? "learner" : "instructor";
   return (
-    <HonbuShell title={audience === "learner" ? "講座復習ページ" : "講師マニュアルページ"}>
+    <HonbuShell title={audience === "learner" ? "レッスン教材" : "講師マニュアル"}>
       <BuilderContent key={`${id}:${audience}`} courseId={id} audience={audience} />
     </HonbuShell>
   );
