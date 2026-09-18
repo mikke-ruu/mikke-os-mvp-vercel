@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { AcademyHelp } from "@/components/academy/AcademyHelp";
 import { AcademyImageUploader } from "@/components/academy/AcademyImageUploader";
+import { AcademyCourseInput } from "@/components/academy/AcademyCourseInput";
+import { AcademyCourseCard } from "@/components/academy/AcademyCourseCard";
 import type {
   AcademyCourseFeatureSettings,
   AcademyCoursePortalFeatureSettings,
@@ -108,14 +110,20 @@ function emptyInput(): CourseInput {
 export function CourseForm({
   initial,
   submitLabel,
-  onSubmit
+  onSubmit,
+  onNext
 }: {
   initial?: Partial<CourseInput>;
   submitLabel: string;
   onSubmit: (input: CourseInput) => Promise<void>;
+  onNext?: (input: CourseInput) => Promise<void>;
 }) {
   const [form, setForm] = useState<CourseInput>({ ...emptyInput(), ...initial });
   const [saving, setSaving] = useState(false);
+  const submitting = useRef(false);
+  const advancedRef = useRef<HTMLDetailsElement>(null);
+  const [phonePreview, setPhonePreview] = useState(false);
+  const [imageSide, setImageSide] = useState<"left" | "right">("left");
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
   const [saved, setSaved] = useState(false);
@@ -210,32 +218,43 @@ export function CourseForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting.current) return;
+    const next = (e.nativeEvent as SubmitEvent).submitter?.getAttribute("data-next") === "true";
     setError(null);
+    setSaved(false);
     if (!form.name.trim()) {
       setStep(0);
       showError("講座名は必須です。");
       return;
     }
+    if (!Number.isSafeInteger(form.price) || form.price < 0) {
+      showError("基本価格は0円以上の整数で入力してください。");
+      return;
+    }
     if (form.learnerAccessMode.startsWith("days_after_") && (!form.learnerAccessDays || form.learnerAccessDays < 1 || form.learnerAccessDays > 3650)) {
       setStep(3);
+      if (advancedRef.current) advancedRef.current.open = true;
       showError("教材を見られる日数は、1日から3650日の間で入力してください。");
       return;
     }
     if (form.learnerAccessMode === "fixed_end" && (!form.learnerAccessFixedEndAt || Number.isNaN(new Date(form.learnerAccessFixedEndAt).getTime()))) {
       setStep(3);
+      if (advancedRef.current) advancedRef.current.open = true;
       showError("教材の閲覧終了日時を入力してください。");
       return;
     }
+    submitting.current = true;
     setSaving(true);
     try {
-      await onSubmit({
+      await (next && onNext ? onNext : onSubmit)({
         ...form,
         code: form.code.trim() || `COURSE-${Date.now().toString().slice(-8)}`
       });
       setSaved(true);
-      setSaving(false);
     } catch (err) {
       showError(getAcademyCourseSaveErrorMessage(err));
+    } finally {
+      submitting.current = false;
       setSaving(false);
     }
   }
@@ -244,24 +263,25 @@ export function CourseForm({
     <form onSubmit={handleSubmit} onInvalidCapture={(event) => {
       const target = event.target as HTMLInputElement;
       const panel = target.closest<HTMLElement>("[data-course-step]");
-      if (panel && Number(panel.dataset.courseStep) !== step) {
+      if (panel && (Number(panel.dataset.courseStep) !== step || !advancedRef.current?.open)) {
         event.preventDefault();
+        if (advancedRef.current) advancedRef.current.open = true;
         setStep(Number(panel.dataset.courseStep));
         requestAnimationFrame(() => { target.focus(); target.reportValidity(); });
       }
-    }} className="min-w-0 space-y-4">
+    }} className="min-w-0 space-y-4 [&_input]:text-base! [&_textarea]:text-base! [&_select]:text-base!">
+      {error ? <div ref={errorRef} tabIndex={-1} role="alert" className="rounded-lg border border-[var(--mikke-danger)] bg-red-50 p-3 text-sm outline-none">{error}<p className="mt-1">入力内容は残っています。</p></div> : null}
+      <fieldset disabled={saving} className="min-w-0 space-y-5 disabled:opacity-70">
+        <AcademyCourseInput value={form} onChange={set} />
+      <details ref={advancedRef} className="border-y border-[var(--mikke-line)] py-3">
+        <summary className="min-h-11 cursor-pointer py-2 text-sm font-bold">開催方法・申込・教材の詳細設定</summary>
+        <p className="mb-3 text-xs leading-5 text-[var(--mikke-muted)]">既存の支払い方法、申込項目、教材の閲覧期限などはここで確認できます。変更しない設定はそのまま保存します。</p>
       <div ref={guideRef} className="scroll-mt-20 bg-white">
         <p className="text-xs">講座づくりの道順 · {step + 1} / {steps.length}</p>
         <nav aria-label="講座づくりの手順" className="my-1 grid grid-cols-2 gap-x-2 gap-y-0 sm:grid-cols-5">
           {steps.map(([title], index) => <button key={title} type="button" onClick={() => goToStep(index)} aria-current={step === index ? "step" : undefined} className={`min-h-9 border-b-[3px] px-1 py-1 text-left text-xs! leading-4! ${step === index ? "border-[var(--mikke-pink)] font-bold!" : "border-transparent"}`}>{index + 1}. {title}</button>)}
         </nav>
       </div>
-      {error ? (
-        <div ref={errorRef} tabIndex={-1} role="alert" aria-live="assertive" className="rounded-sm border border-[var(--mikke-danger)] bg-red-50 px-4 py-3 outline-none">
-          <p className="text-sm font-bold text-[var(--mikke-danger)]">講座を保存できませんでした</p>
-          <p className="mt-1 text-sm leading-6 text-[var(--mikke-text)]">原因: {error}</p>
-        </div>
-      ) : null}
       <div className="space-y-4 rounded-lg border border-[var(--mikke-line)] bg-white p-4 sm:p-6 [&>section]:border-0! [&>section]:p-0! [&_button[aria-expanded]]:text-xs! [&_button[aria-expanded]]:min-h-8! [&_button[aria-expanded]_span[aria-hidden]]:size-4! [&_[role=note]]:text-xs! [&_[role=note]]:leading-5!">
         <header className="space-y-2">
           <h2 className="text-lg font-bold">{step + 1} {steps[step][0]}</h2>
@@ -294,7 +314,7 @@ export function CourseForm({
         <div>
           <label className={labelClass}>受講料（税込・円）</label>
           <AcademyHelp title="受講料（税込・円）">受講者がこの講座に払う金額です。Academyの利用料金とは別です。無料なら0円。ここで金額を変更して保存しても、決済は実行されません。</AcademyHelp>
-          <input type="number" min={0} className={inputClass} value={form.price} onChange={(e) => set("price", Number(e.target.value) || 0)} />
+          <input type="number" min={0} className={inputClass} value={Number.isFinite(form.price) ? form.price : ""} onChange={(e) => set("price", e.target.value === "" ? Number.NaN : Number(e.target.value))} />
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           <div>
@@ -571,16 +591,32 @@ export function CourseForm({
         </dl>
         <p className="text-sm leading-7">保存後は「紹介ページを整える」で見せ方を整え、「公開状態」で公開するかを選びます。日程の登録はホームの「開催日程・担当講師」から進めます。</p>
       </section> : null}
-        {saved ? <p role="status" className="text-sm">変更を保存しました</p> : null}
-        <button type="submit" disabled={saving} className="w-full rounded-lg bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">{saving ? "保存中…" : submitLabel}</button>
       </div>
       <div className="flex items-center justify-between gap-3 border-t border-[var(--mikke-line)] pt-4">
         <button type="button" disabled={step === 0} onClick={() => goToStep(step - 1)} className="min-h-11 px-3 text-sm disabled:opacity-30">← 前へ</button>
         {step < steps.length - 1 ? <button type="button" onClick={() => goToStep(step + 1)} className="min-h-11 border border-[var(--mikke-primary)] px-4 text-sm font-bold text-[var(--mikke-primary)]">次へ：{steps[step + 1][0]} →</button> : null}
       </div>
       {step === 2 ? <button type="button" className="min-h-11 text-sm text-[var(--mikke-primary)]" onClick={() => goToStep(4)}>教材・講師の追加設定は変更せず、内容確認へ →</button> : null}
-      {error ? <p className="text-sm font-bold text-[var(--mikke-danger)]">保存できなかった原因は、この画面の上部にも表示しています。</p> : null}
-
+      </details>
+      <section aria-label="講座カードプレビュー" className="space-y-3 border-t border-[var(--mikke-line)] pt-4">
+        <h2 className="text-base font-bold">講座カードプレビュー</h2>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button type="button" aria-pressed={!phonePreview} onClick={() => setPhonePreview(false)} className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3 aria-pressed:bg-[var(--mikke-accent-soft)]">PC</button>
+          <button type="button" aria-pressed={phonePreview} onClick={() => setPhonePreview(true)} className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3 aria-pressed:bg-[var(--mikke-accent-soft)]">スマホ</button>
+          <label className="flex items-center gap-2">PCの画像位置<select className="min-h-11 rounded-lg border border-[var(--mikke-line)] bg-white px-2 text-base" value={imageSide} onChange={event => setImageSide(event.target.value as "left" | "right")}><option value="left">左</option><option value="right">右</option></select></label>
+        </div>
+        <div className={phonePreview ? "mx-auto max-w-[390px]" : "w-full"}>
+          <AcademyCourseCard course={{ name: form.name || "講座名", price: form.price, subtitle: form.subtitle, main_image_url: form.mainImageUrl, description: form.description, can_do_after: form.canDoAfter, duration_text: form.durationText, kit_contents: form.kitContents, material_contents: form.materialContents }} imageSide={imageSide} priceLabel="基本価格（税込）" />
+        </div>
+        <p className="text-xs leading-5 text-[var(--mikke-muted)]">画像位置はプレビュー用です。募集ページでの配置はLPエディターで変更します。</p>
+      </section>
+      </fieldset>
+      {saved ? <p role="status" className="text-sm">変更を保存しました</p> : null}
+      <p className="text-xs leading-5 text-[var(--mikke-muted)]">新しい講座は下書きで保存します。公開状態は別に設定します。</p>
+      <div className="flex flex-wrap justify-end gap-3 border-t border-[var(--mikke-line)] bg-white py-3">
+        <button type="submit" disabled={saving} className="min-h-12 rounded-lg border border-[var(--mikke-line)] px-5 py-3 text-sm font-bold disabled:opacity-60">{saving ? "保存中…" : submitLabel}</button>
+        {onNext ? <button type="submit" data-next="true" disabled={saving} className="min-h-12 rounded-lg bg-[var(--mikke-accent)] px-5 py-3 text-sm font-bold text-white disabled:opacity-60">保存して次へ：レッスン教材</button> : null}
+      </div>
     </form>
   );
 }

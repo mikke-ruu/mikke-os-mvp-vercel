@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, CalendarCheck, ClipboardList, GraduationCap, Link2, Package } from "lucide-react";
+import { ArrowRight, CalendarCheck, ClipboardList, GraduationCap, Link2, Package, Users } from "lucide-react";
 import { AcademyHelp } from "@/components/academy/AcademyHelp";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
@@ -12,7 +12,7 @@ import { getCoursesByIds, getMyInstructorRecords, listMyApplications } from "@/l
 import { listMyKitOrders } from "@/lib/academy/kits";
 import { APPLICATION_STATUS_LABELS } from "@/lib/academy/applications";
 import { isAcademyLocalReview } from "@/lib/academy/preview";
-import { getAcademyRouteContext } from "@/lib/academy/access-context";
+import { getAcademyRouteContext, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { listMyLearnerApplications } from "@/lib/academy/learner-portal";
 import type { AcademyApplication, AcademyCourse, AcademyInstructor, AcademyKitOrder } from "@/types/database";
 
@@ -28,7 +28,7 @@ function QuickCard({
   desc: string;
 }) {
   return (
-    <Link href={href} className="flex items-center gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 transition hover:border-[var(--mikke-accent)]/40">
+    <Link href={toCurrentAcademyContextHref(href)} className="flex items-center gap-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4 transition hover:border-[var(--mikke-accent)]/40">
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#ffd370] text-[var(--mikke-text)]">
         <Icon size={18} />
       </span>
@@ -171,6 +171,7 @@ function PortalDashboard() {
                 {rec.is_certified ? "認定済み" : "未認定"} ・ {activityLabel}
                 {rec.instructor_number ? ` ・ No.${rec.instructor_number}` : ""}
               </p>
+              <Link href={toCurrentAcademyContextHref(`/academy/portal/study?view=instructor&course=${encodeURIComponent(rec.course_id)}`)} className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]">この講座のマニュアルを見る →</Link>
             </div>
           );
         })}
@@ -180,10 +181,11 @@ function PortalDashboard() {
       <div className="grid gap-3 md:grid-cols-2">
         <QuickCard href={currentView === "learner" ? "/academy/portal/study?view=learner" : "/academy/portal/study?view=instructor"} icon={GraduationCap} title={currentView === "learner" ? "講座復習ページ" : "講師マニュアルページ"} desc={currentView === "learner" ? "受講した講座の復習内容を確認" : "講座運営に必要なマニュアル、PDF、動画、リンクを確認"} />
         {currentView === "instructor" ? <QuickCard href="/academy/portal/study?view=learner" icon={GraduationCap} title="講座復習ページ" desc="自分が受講した講座の教材を確認。講師マニュアルページとは別のページです" /> : null}
+        {currentView === "instructor" ? <QuickCard href="/community" icon={Users} title="Communityを開く" desc="参加しているCommunityを確認。Academyの講師登録とは別に招待・参加が必要です" /> : null}
         {currentView === "instructor" && canOperate ? (
           <>
             <QuickCard href="/academy/portal/class-requests" icon={CalendarCheck} title="開催日・担当依頼" desc="自分が担当する日程と、本部からの依頼を確認" />
-            <QuickCard href="/academy/portal/url" icon={Link2} title="募集ページを案内する" desc="自分専用の紹介リンクをコピーして、受講希望者へ案内" />
+            <QuickCard href="/academy/portal/url" icon={Link2} title="営業プロフィール・紹介URL・QR" desc="プロフィールを編集し、紹介リンクやQRコードで講座を案内" />
             <QuickCard href="/academy/portal/applications" icon={ClipboardList} title="申込管理" desc={`担当申込 ${apps.length}件${pendingApps.length ? `（未対応 ${pendingApps.length}件）` : ""}`} />
             <QuickCard href="/academy/portal/kits" icon={Package} title="教材を注文する" desc={`講座に使う教材の注文・履歴を確認（${kits.length}件）`} />
           </>

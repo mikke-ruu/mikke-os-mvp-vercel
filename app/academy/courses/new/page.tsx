@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
-import { AcademyQuickCourseForm } from "@/components/academy/AcademyQuickCourseForm";
+import { CourseForm } from "../CourseForm";
+import { createAcademyDraftInput } from "@/lib/academy/draft-input";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getMyAcademyCourseCreationAccess, type AcademyCourseCreationAccess } from "@/lib/academy/course-creation-access";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
@@ -17,6 +18,7 @@ function NewCourseContent() {
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [loading, setLoading] = useState(true);
   const [createAccess, setCreateAccess] = useState<AcademyCourseCreationAccess | null>(null);
+  const [initial] = useState(() => ({ ...createAcademyDraftInput("新しい講座", "0"), name: "", price: Number.NaN }));
 
   useEffect(() => {
     let active = true;
@@ -62,10 +64,16 @@ function NewCourseContent() {
   }
 
   return (
-      <AcademyQuickCourseForm
+      <CourseForm
+        initial={initial}
+        submitLabel="下書きを保存"
         onSubmit={async (input) => {
           const course = await createCourse(profile, hq.id, input);
           router.push(toCurrentAcademyContextHref(`/academy/courses/${course.id}?created=1`));
+        }}
+        onNext={async (input) => {
+          const course = await createCourse(profile, hq.id, input);
+          router.push(toCurrentAcademyContextHref(`/academy/courses/${course.id}/instructor-page?audience=learner`));
         }}
       />
   );
@@ -74,7 +82,7 @@ function NewCourseContent() {
 export default function NewCoursePage() {
   return (
     <HonbuShell title="講座を作成">
-      <div className="mx-auto min-w-0 max-w-2xl">
+      <div className="mx-auto min-w-0 max-w-5xl">
         <NewCourseContent />
       </div>
     </HonbuShell>

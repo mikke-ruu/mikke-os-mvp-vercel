@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
@@ -30,31 +30,46 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [isPublished, setIsPublished] = useState(false);
+  const revision = useRef(0);
+  const savePending = useRef(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
+      try {
       const foundHq = await getOwnedHeadquarters(profile.user_id);
+      if (cancelled) return;
       setHq(foundHq);
       if (foundHq) {
-        setCourse(await getCourse(foundHq.id, courseId));
+        const loadedCourse = await getCourse(foundHq.id, courseId);
+        if (cancelled) return;
+        setCourse(loadedCourse);
         if (audience === "learner") {
           const page = await getLearnerPage(foundHq.id, courseId);
+          if (cancelled) return;
           setLearnerPageId(page?.id ?? null);
           setBlocks(page?.blocks ?? []);
           setIsPublished(page?.is_published ?? false);
         } else {
           const page = await getInstructorPage(foundHq.id, courseId);
+          if (cancelled) return;
           setBlocks(page?.blocks ?? []);
           setIsPublished(true);
         }
       }
-      setLoading(false);
+      } catch {
+        if (!cancelled) setLoadError("教材を読み込めませんでした。画面を再読み込みしてください。");
+      } finally { if (!cancelled) setLoading(false); }
     }
     load();
+    return () => { cancelled = true; };
   }, [audience, profile.user_id, courseId]);
 
   async function save() {
-    if (!hq || !course) return;
+    if (!hq || !course || savePending.current) return;
+    savePending.current = true;
+    const savingRevision = revision.current;
     setSaving(true);
     setSaveError("");
     try {
@@ -64,15 +79,17 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
       } else {
         await saveInstructorPageBlocks(profile, hq.id, course.id, blocks);
       }
-      setSaved(true);
+      setSaved(revision.current === savingRevision);
     } catch {
       setSaveError("保存できませんでした。入力内容はこの画面に残っています。通信状態を確認して、もう一度保存してください。");
     } finally {
+      savePending.current = false;
       setSaving(false);
     }
   }
 
   if (loading) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (loadError) return <p role="alert" className="py-10 text-center text-sm text-[var(--mikke-danger)]">{loadError}</p>;
   if (!hq || !course) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">講座が見つかりません。</p>;
 
   return (
@@ -97,7 +114,7 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
               [true, "受講者のマイポータルに表示"]
             ] as const).map(([value, label]) => (
               <label key={String(value)} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-sm font-bold ${isPublished === value ? "border-[var(--mikke-primary)] bg-[var(--mikke-accent-soft)] text-[var(--mikke-primary)]" : "border-[var(--mikke-line)] text-[var(--mikke-text-soft)]"}`}>
-                <input type="radio" name="learner-page-publication" checked={isPublished === value} onChange={() => { setIsPublished(value); setSaved(false); }} />
+                <input type="radio" name="learner-page-publication" checked={isPublished === value} onChange={() => { revision.current += 1; setIsPublished(value); setSaved(false); }} />
                 {label}
               </label>
             ))}
@@ -106,7 +123,7 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
       ) : null}
 
       <EditorPreview preview={<PageBlocks blocks={[...blocks.filter((block) => block.type !== "materials-list"), ...(audience === "instructor" && previewMaterials.some((material) => material.is_published) ? [{ type: "materials-list" } as const] : [])]} materials={previewMaterials.filter((material) => material.is_published)} />}>
-      <AcademyContentEditor blocks={blocks} onChange={next => { setBlocks(next); setSaved(false); }} />
+      <AcademyContentEditor blocks={blocks} onChange={next => { revision.current += 1; setBlocks(next); setSaved(false); }} />
       {audience === "instructor" ? <section id="resources" className="border-t border-[var(--mikke-line)] pt-6"><ManualResources courseId={course.id} onChange={setPreviewMaterials} /></section> : null}
       {audience === "learner" && privateMaterialUiEnabled ? <section className="border-t border-[var(--mikke-line)] py-4"><h3 className="font-bold">受講生向けPDF資料</h3>{learnerPageId ? <PrivateMaterialFiles parent={{ audience: "learner", parentId: learnerPageId }} editable /> : <p className="mt-2 text-sm">最初に講座復習ページを保存すると、PDFを追加できます。</p>}</section> : null}
       </EditorPreview>

@@ -11,7 +11,7 @@ import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
 import { getLearnerPageForViewer } from "@/lib/academy/learner-page";
 import { listMyLearnerApplications } from "@/lib/academy/learner-portal";
 import { listMyCourseAccessGrants, resolveCourseAccessGrant } from "@/lib/academy/course-access";
-import { getAcademyRouteContext } from "@/lib/academy/access-context";
+import { getAcademyRouteContext, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { PageBlocks } from "@/components/academy/PageBlocks";
 import { PrivateMaterialFiles } from "@/components/academy/PrivateMaterialFiles";
 import { isAcademyLocalReview, academyPreviewCourses } from "@/lib/academy/preview";
@@ -37,6 +37,7 @@ function kindIcon(kind: AcademyMaterial["kind"]) {
 function StudyContent() {
   const { profile } = useAuth();
   const searchParams = useSearchParams();
+  const selectedCourseId = searchParams.get("course");
   const [records, setRecords] = useState<AcademyInstructor[]>([]);
   const [learnerApps, setLearnerApps] = useState<AcademyApplication[]>([]);
   const [courseMap, setCourseMap] = useState<Record<string, AcademyCourse>>({});
@@ -129,10 +130,11 @@ function StudyContent() {
     );
   }
   if (records.length === 0) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">まだ講師登録されていません。</p>;
+  if (selectedCourseId && !records.some(rec => rec.course_id === selectedCourseId)) return <p className="py-8 text-sm text-[var(--mikke-muted)]">この講座の講師マニュアルは表示できません。登録されている講座を選んでください。</p>;
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      {records.map((rec) => {
+      {records.filter(rec => !selectedCourseId || rec.course_id === selectedCourseId).map((rec) => {
         const course = courseMap[rec.course_id];
         const courseMaterials = materials.filter((m) => m.course_id === rec.course_id);
         const page = pageMap[rec.course_id];
@@ -191,9 +193,12 @@ function StudyContent() {
 }
 
 export default function StudyPage() {
+  const requestedView = useSearchParams().get("view");
+  const returnHref = `/academy/portal${requestedView === "instructor" || requestedView === "learner" ? `?view=${requestedView}` : ""}`;
   return (
     <KoushiShell title="講座復習ページ・講師マニュアルページ">
       <nav aria-label="教材ページの切り替え" className="mx-auto mb-4 flex max-w-3xl flex-wrap gap-2">
+        <Link className="inline-flex min-h-11 items-center px-2 text-sm font-bold text-[var(--mikke-primary)]" href={toCurrentAcademyContextHref(returnHref)}>マイページへ戻る</Link>
         <Link className="rounded-lg border border-[var(--mikke-line)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]" href="?view=learner">講座復習ページ</Link>
         <Link className="rounded-lg border border-[var(--mikke-line)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]" href="?view=instructor">講師マニュアルページ</Link>
       </nav>

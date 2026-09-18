@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyCourseWorkspace } from "@/components/academy/AcademyCourseWorkspace";
@@ -11,6 +12,7 @@ import { getCourse, setCoursePublished, updateCourse, type CourseInput } from "@
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
 import { CourseForm } from "../CourseForm";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 
 function toLocalDateTimeValue(value: string) {
   const date = new Date(value);
@@ -52,6 +54,7 @@ function toInput(course: AcademyCourse): CourseInput {
 
 function EditCourseContent({ courseId }: { courseId: string }) {
   const { profile } = useAuth();
+  const router = useRouter();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [course, setCourse] = useState<AcademyCourse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -77,6 +80,11 @@ function EditCourseContent({ courseId }: { courseId: string }) {
         onSubmit={async (input) => {
           const updated = await updateCourse(profile, hq.id, course.id, input);
           setCourse(updated);
+        }}
+        onNext={async (input) => {
+          const updated = await updateCourse(profile, hq.id, course.id, input);
+          setCourse(updated);
+          router.push(toCurrentAcademyContextHref(`/academy/courses/${course.id}/instructor-page?audience=learner`));
         }}
       />
       <AcademyCoursePublication key={`${profile.user_id}:${hq.id}:${course.id}`} headquartersId={hq.id} userId={profile.user_id} ownerUserId={hq.owner_user_id} course={course} sample={isAcademyLocalReview()} onReloadCourse={async()=>{ const refreshed=await getCourse(hq.id,course.id); if(!refreshed)throw new Error("course_unavailable"); setCourse(refreshed); }} onLegacyChange={async (published) => {
