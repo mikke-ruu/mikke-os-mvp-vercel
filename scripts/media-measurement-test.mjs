@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+import crypto from 'node:crypto';
+import net from 'node:net';
+function compile(path,require,extra={}){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require,URL,Headers,Request,Response,Buffer,TextDecoder,Date,process:{env:{NODE_ENV:'production',NETLIFY:'true',NEXT_PUBLIC_SUPABASE_URL:'https://example.invalid',SUPABASE_SECRET_KEY:'test-only-key'}},...extra});return exports;}
+const identity=compile('lib/media-app/measurement-server.ts',name=>name==='node:crypto'?crypto:net).mediaMeasurementIdentity;
+const headers=new Headers({'x-nf-client-connection-ip':'192.0.2.1','user-agent':'test browser','x-forwarded-for':'203.0.113.1'});
+const a=identity(headers,'test-secret','netlify','2026-09-18');assert.match(a.visitor,/^[a-f0-9-]{36}$/);assert.equal(a.rateKey.length,64);assert.ok(!JSON.stringify(a).includes('192.0.2.1'));
+headers.set('x-forwarded-for','203.0.113.22');assert.equal(a.rateKey,identity(headers,'test-secret','netlify','2026-09-18').rateKey);
+assert.notEqual(a.rateKey,identity(headers,'test-secret','netlify','2026-09-19').rateKey);
+assert.equal(identity(new Headers({'x-forwarded-for':'192.0.2.1'}),'secret','netlify','2026-09-18'),null);
+let writes=0;const {POST}=compile('app/api/media/measure/route.ts',name=>name==='@supabase/supabase-js'?{createClient:()=>({rpc:async()=>{writes++;return {data:true,error:null};}})}:{mediaMeasurementIdentity:identity});
+const request=(body,extra={})=>new Request('https://example.test/api/media/measure',{method:'POST',headers:{host:'example.test',origin:'https://example.test','content-type':'application/json','x-nf-client-connection-ip':'192.0.2.1',...extra},body:JSON.stringify(body)});
+assert.equal((await POST(request({site:'site',article:'article',kind:'read'},{origin:'https://evil.test'}))).status,403);
+assert.equal((await POST(request({site:'site',article:'article',kind:'read',visitor:crypto.randomUUID()}))).status,400);
+assert.equal((await POST(request({site:'site',article:'article',kind:'read'}))).status,204);
+for(let i=0;i<29;i++)await POST(request({site:'site',article:'article',kind:'read'}));
+assert.equal((await POST(request({site:'site',article:'article',kind:'read'}))).status,429);assert.ok(writes<=30);
+console.log('PASS measurement identity rotation, raw-IP exclusion, trusted header selection, cross-origin/client-ID rejection and rate limit');

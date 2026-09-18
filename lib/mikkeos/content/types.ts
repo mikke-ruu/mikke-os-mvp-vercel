@@ -17,7 +17,7 @@ export type MikkeContentBlock = {
   title?: string;
   url?: string;
   links?: {label:string;url:string}[];
-  images?: {url:string;alt:string;caption?:string;href?:string}[];
+  images?: {url:string;alt:string;caption?:string;href?:string;assetId?:string}[];
   imageSide?: "left" | "right";
   columns?: 2 | 3;
   buttonLabel?: string;

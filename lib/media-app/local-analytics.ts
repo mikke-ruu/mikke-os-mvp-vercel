@@ -1,0 +1,5 @@
+export type LocalReaction={views:number;saved:boolean;favorite:boolean;shares:number};
+export const EMPTY_REACTION:LocalReaction={views:0,saved:false,favorite:false,shares:0};
+const key=(scope:string)=>`mikke.media.reactions.v1:${scope}`;
+export function readReactions(scope:string):Record<string,LocalReaction>{const raw=localStorage.getItem(key(scope));if(!raw)return {};const parsed=JSON.parse(raw);if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw Error("反応の記録を読み込めませんでした。");return parsed;}
+export function updateReaction(scope:string,id:string,action:"view"|"saved"|"favorite"|"share"){const all=readReactions(scope);const prev={...EMPTY_REACTION,...all[id]};const next={...prev};if(action==="view")next.views++;if(action==="share")next.shares++;if(action==="saved")next.saved=!prev.saved;if(action==="favorite")next.favorite=!prev.favorite;localStorage.setItem(key(scope),JSON.stringify({...all,[id]:next}));window.dispatchEvent(new Event("media-reactions-changed"));return next;}

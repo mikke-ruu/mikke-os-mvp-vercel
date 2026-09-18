@@ -4,12 +4,12 @@ import type { MediaArticle, MediaArticleSnapshot, MediaSite } from "./types";
 import type { SaveMediaArticleInput } from "./store";
 
 type Category = { id: string; name: string; sort_order: number };
-type ArticleRow = MediaArticleDraftDatabaseRow & { status: MediaArticle["status"]; current_published_version_id: string | null };
-type Version = { title: string; slug: string; excerpt: string; category_name: string; cover_image_url: string; blocks: MediaArticleSnapshot["blocks"]; published_at: string };
+type ArticleRow = MediaArticleDraftDatabaseRow & { category_names:string[];pinned:boolean;publication_order:number;display_date:string|null; status: MediaArticle["status"]; current_published_version_id: string | null };
+type Version = { categories:string[]; title: string; slug: string; excerpt: string; category_name: string; cover_image_url: string; blocks: MediaArticleSnapshot["blocks"]; published_at: string };
 type Scope = { subject: string; check: () => Promise<void>; step: <T>(action: () => PromiseLike<T>) => Promise<T> };
 export type MediaActiveTerms={termsVersion:string;documentSha256:string;documentUrl:string;accepted:boolean};
 export type MediaPublicationReview={expectedRevision:string;snapshot:{title:string;slug:string;excerpt:string;category:string;coverImageUrl:string;blocks:MediaArticleSnapshot["blocks"];site:{name:string;slug:string;description:string;authorName:string;locale:string}}};
-const articleColumns = "id,site_id,title,slug,excerpt,locale,draft_blocks,category_id,cover_image_url,cover_image_asset_id,created_at,updated_at,status,current_published_version_id";
+const articleColumns = "id,site_id,title,slug,excerpt,locale,draft_blocks,category_id,cover_image_url,cover_image_asset_id,created_at,updated_at,status,current_published_version_id,category_names,pinned,publication_order,display_date";
 const randomSlug = () => crypto.randomUUID().replace(/-/g, "").slice(0, 20);
 
 /** Authenticated UI repository. Never imports browser drafts or uses profile IDs as authority. */
@@ -56,7 +56,7 @@ export function createMediaCloudRepository(client: SupabaseClient, expectedSubje
     const sites = await scope.step(() => db.listMyMediaSitesFromDatabase());
     const row = id ? sites.find((value) => value.id === id) : sites[0];
     if (!row) return null;
-    return { id: row.id, ownerProfileId: scope.subject, name: row.name, slug: row.slug, description: row.description,
+    return { ...(row.presentation??{}), id: row.id, ownerProfileId: scope.subject, name: row.name, slug: row.slug, description: row.description,
       authorName: row.author_name, categories: (await categories(scope, row.id)).map((category) => category.name),
       createdAt: row.created_at, updatedAt: row.updated_at };
   }
@@ -74,15 +74,15 @@ export function createMediaCloudRepository(client: SupabaseClient, expectedSubje
     let publishedSnapshot: MediaArticleSnapshot | null = null;
     if (row.status === "published" && row.current_published_version_id) {
       const result = await scope.step(() => client.from("media_article_versions")
-        .select("title,slug,excerpt,category_name,cover_image_url,blocks,published_at")
+        .select("title,slug,excerpt,category_name,cover_image_url,blocks,published_at,categories")
         .eq("id", row.current_published_version_id).eq("article_id", id).eq("site_id", row.site_id).maybeSingle<Version>());
       if (result.error) throw result.error;
       if (!result.data) throw new Error("公開版を読み込めませんでした。");
       const version = result.data;
-      publishedSnapshot = { title: version.title, slug: version.slug, excerpt: version.excerpt, category: version.category_name,
+      publishedSnapshot = { categories: version.categories?.length?version.categories:[version.category_name].filter(Boolean), title: version.title, slug: version.slug, excerpt: version.excerpt, category: version.category_name,
         coverImageUrl: version.cover_image_url, blocks: version.blocks, publishedAt: version.published_at, updatedAt: version.published_at };
     }
-    return { id: row.id, mediaId: row.site_id, title: row.title, slug: row.slug, excerpt: row.excerpt,
+    return { categories:row.category_names?.length?row.category_names:[names.find(value=>value.id===row.category_id)?.name??""].filter(Boolean), pinned:row.pinned, publicationOrder:row.publication_order, displayDate:row.display_date??undefined, id: row.id, mediaId: row.site_id, title: row.title, slug: row.slug, excerpt: row.excerpt,
       category: names.find((value) => value.id === row.category_id)?.name ?? "", coverImageUrl: row.cover_image_url ?? "",
       coverImageAssetId: row.cover_image_asset_id ?? undefined, blocks: row.draft_blocks, status: row.status,
       publishedSnapshot, createdAt: row.created_at, updatedAt: row.updated_at };
@@ -139,19 +139,11 @@ export function createMediaCloudRepository(client: SupabaseClient, expectedSubje
       const id = await scope.step(() => db.createMediaSiteInDatabase({ name: input.name.trim(), slug: input.slug.trim().toLowerCase(), description: input.description.trim(), authorName: input.authorName.trim() || input.name.trim() }));
       return requireSite(scope, id);
     }),
-    updateMediaSite: (id: string, input: Pick<MediaSite, "name" | "slug" | "description" | "authorName" | "categories">) => run(async (scope) => {
-      rejectProfileFields(input);
-      if(input.slug.trim().toLowerCase()==="images")throw Error("この公開URL名は使用できません。別の名前を選択してください。");
-      const current = await requireSite(scope, id);
-      const wanted = [...new Set(input.categories.map((name) => name.trim()).filter(Boolean))];
-      if (current.categories.some((name) => !wanted.includes(name))) throw new Error("カテゴリーの削除と名前変更は準備中です。追加のみ利用できます。");
-      if (wanted.length > 100 || wanted.some((name) => Array.from(name).length > 60)) throw new Error("カテゴリーは100件まで、名前は60文字以内で入力してください。");
-      // Refuse multi-table updates rather than report a partially saved settings form.
-      if (wanted.some((name) => !current.categories.includes(name))) throw new Error("カテゴリーは記事編集画面の追加ボタンから追加してください。");
-      const { data, error } = await scope.step(() => client.from("media_sites").update({ name: input.name.trim(), slug: input.slug.trim().toLowerCase(), description: input.description.trim(), author_name: input.authorName.trim() || input.name.trim() }).eq("id", id).select("id").single());
-      if (error) throw error;
-      if (!data) throw new Error("設定を保存できませんでした。");
-      return requireSite(scope, id);
+    updateMediaSite: (id: string, input: Parameters<typeof import("./store").updateMediaSite>[1]) => run(async scope=>{
+      await requireSite(scope,id);
+      const {error}=await scope.step(()=>client.rpc("media_update_settings",{p_site_id:id,p_settings:input}));
+      if(error)throw new Error(error.message.includes("STORY")?"ご自身の公開STORYのIDを確認してください。":"設定を保存できませんでした。入力内容と画像を確認してください。");
+      return requireSite(scope,id);
     }),
     updateMediaAuthorProfile: async (_id: string, _input: { authorBio: string; storyUrl: string; showStory: boolean }): Promise<MediaSite> => {
       throw new Error("自己紹介とSTORY連携のクラウド保存は準備中です。");
@@ -167,7 +159,7 @@ export function createMediaCloudRepository(client: SupabaseClient, expectedSubje
       const slug = input.slug.trim().toLowerCase() || current?.slug || randomSlug();
       if (slug.length > 80 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) throw new Error("記事URL名は80文字以内の半角英数字とハイフンで入力してください。");
       const values = { title: input.title.trim(), slug, excerpt: input.excerpt.trim(), blocks: input.blocks,
-        categoryId: category?.id ?? null, coverImageUrl: input.coverImageUrl, coverImageAssetId: input.coverImageAssetId || null };
+        categoryNames: [...new Set(input.categories??[input.category])].filter(Boolean), categoryId: category?.id ?? null, coverImageUrl: input.coverImageUrl, coverImageAssetId: input.coverImageAssetId || null };
       const saved = await scope.step(() => id ? db.updateMediaArticleDraftInDatabase(id, values) : db.createMediaArticleDraftInDatabase(siteId, values));
       return requireArticle(scope, saved.id);
     }),
