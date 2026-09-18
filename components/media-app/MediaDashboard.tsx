@@ -1,5 +1,6 @@
 "use client";
 import { useMediaRepository } from "./MediaRepository";
+import { mediaLoadError } from "@/lib/media-app/load-error";
 
 import { MediaLink as Link, useMediaReviewNavigation } from "./MediaNavigation";
 import { useEffect, useState } from "react";
@@ -12,15 +13,16 @@ export function MediaDashboard() {
   const { profile } = useAuth();
   const repository = useMediaRepository();
   const { getOwnedMedia, listMediaArticles } = repository;
-  const [loadError,setLoadError] = useState("");
+  const [loadError,setLoadError] = useState<ReturnType<typeof mediaLoadError>|null>(null);
+  const [loadAttempt,setLoadAttempt] = useState(0);
   const [loading,setLoading]=useState(true);
   const { reviewing } = useMediaReviewNavigation();
   const [site, setSite] = useState<MediaSite | null>(null);
   const [articles, setArticles] = useState<MediaArticle[]>([]);
-  useEffect(() => { let alive=true; setLoading(true); setSite(null); setArticles([]); setLoadError(""); void (async()=>{try {const next=await getOwnedMedia(profile.id); const items=next?await listMediaArticles(next.id):[]; if(alive){setSite(next);setArticles(items);}} catch {if(alive)setLoadError("記事を読み込めませんでした。ログインと接続を確認してください。");}finally{if(alive)setLoading(false);}})(); return()=>{alive=false;}; },[profile.id,repository,getOwnedMedia,listMediaArticles]);
+  useEffect(() => { let alive=true; setLoading(true); setSite(null); setArticles([]); setLoadError(null); void (async()=>{try {const next=await getOwnedMedia(profile.id); const items=next?await listMediaArticles(next.id):[]; if(alive){setSite(next);setArticles(items);}} catch(cause) {if(alive)setLoadError(mediaLoadError(cause));}finally{if(alive)setLoading(false);}})(); return()=>{alive=false;}; },[profile.id,repository,getOwnedMedia,listMediaArticles,loadAttempt]);
   if(site && site.ownerProfileId !== (repository.cloud?profile.user_id:profile.id)) return <p>記事を読み込んでいます…</p>;
   if(loading) return <p>記事を読み込んでいます…</p>;
-  if(loadError) return <p role="alert">{loadError}</p>;
+  if(loadError) return <section role="alert" className="rounded-xl border border-[var(--mikke-line)] bg-white p-4"><p>{loadError.message}</p><p className="mt-2 text-xs text-[var(--mikke-muted)]">確認コード：MEDIA-{loadError.code}</p><button type="button" onClick={()=>setLoadAttempt(value=>value+1)} className="mt-4 rounded-xl bg-[var(--mikke-primary)] px-4 py-3 font-semibold text-white">もう一度読み込む</button></section>;
   if (!site) return <section className="mx-auto grid min-h-[62vh] max-w-2xl place-items-center text-center"><div><span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-[var(--mikke-primary-soft)] text-[var(--mikke-primary)]"><BookOpen size={30} /></span><p className="mt-6 text-xs font-black tracking-[0.14em] text-[var(--mikke-primary)]">MEDIA FREE</p><h1 className="mt-2 text-3xl font-black">発信を、ここから残していく。</h1><p className="mx-auto mt-4 max-w-lg text-sm leading-7 text-[var(--mikke-muted)]">難しい設定なしで、記事を書き、確認して、自分のMediaに公開できます。</p><Link href="/apps/media/new" className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[var(--mikke-primary)] px-5 py-3 text-sm font-bold text-white"><Plus size={17} />Mediaを作る</Link></div></section>;
   const drafts = articles.filter((article) => article.status !== "published" || (article.publishedSnapshot && article.updatedAt > article.publishedSnapshot.updatedAt));
   const published = articles.filter((article) => article.publishedSnapshot);

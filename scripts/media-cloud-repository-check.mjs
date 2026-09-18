@@ -31,7 +31,28 @@ function fixture() {
     },
     async rpc(name, values) { calls.push({ name, values }); return { data: "site-a", error: null }; }
   };
-  return { repo: createMediaCloudRepository(client, "user-a"), calls, listeners, switchTo(next) { user = next; for (const listener of listeners) listener("SIGNED_IN"); }, beforeResult(action) { beforeResult = action; } };
+  return { repo: createMediaCloudRepository(client, "user-a"), calls, listeners,
+    emit(event,next=user){for(const listener of listeners)listener(event,next?{user:next}:null);},
+    switchTo(next) { user = next; for (const listener of listeners) listener("SIGNED_IN",next?{user:next}:null); }, beforeResult(action) { beforeResult = action; } };
+}
+for(const event of ["INITIAL_SESSION","SIGNED_IN","TOKEN_REFRESHED"]){
+  const f=fixture();f.beforeResult(()=>f.emit(event));
+  assert.equal((await f.repo.getOwnedMedia()).ownerProfileId,"user-a",`Same-owner ${event} must not cancel loading`);
+  assert.equal(f.listeners.size,0);
+}
+for(const event of ["SIGNED_IN","TOKEN_REFRESHED","INITIAL_SESSION"]){
+  const f=fixture();f.beforeResult(()=>{f.emit(event,{id:"user-b",is_anonymous:false});f.emit(event);});
+  await assert.rejects(()=>f.repo.getOwnedMedia(),error=>error.code==="MEDIA_SESSION_CHANGED");
+}
+{
+  const f=fixture();f.beforeResult(()=>{f.emit("SIGNED_OUT",null);f.emit("SIGNED_IN");});
+  await assert.rejects(()=>f.repo.getOwnedMedia(),error=>error.code==="MEDIA_SESSION_CHANGED");
+}
+{
+  const {mediaLoadError}=load("load-error");
+  for(const [input,code] of [[{code:"MEDIA_SESSION_CHANGED"},"SESSION"],[{status:429},"BUSY"],[{code:"42703"},"DATA"],[{code:"42501"},"ACCESS"],[{name:"AuthRetryableFetchError"},"NETWORK"],[{message:"private database details"},"LOAD"]]){
+    const result=mediaLoadError(input);assert.equal(result.code,code);assert.ok(!result.message.includes("private database details"));
+  }
 }
 {
   const f = fixture();
