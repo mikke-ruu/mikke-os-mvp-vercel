@@ -122,7 +122,7 @@ set local role anon;
 select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001', gen_random_uuid(),
-    'evt_test_Anon', repeat('a',64), 'cs_test_Anon', statement_timestamp()
+    'evt_testAnon', repeat('a',64), 'cs_test_Anon', statement_timestamp()
   )$q$, '42501'
 );
 select pg_temp.verified_denied(
@@ -134,7 +134,7 @@ set local role authenticated;
 select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001', gen_random_uuid(),
-    'evt_test_Authenticated', repeat('a',64), 'cs_test_Authenticated', statement_timestamp()
+    'evt_testAuthenticated', repeat('a',64), 'cs_test_Authenticated', statement_timestamp()
   )$q$, '42501'
 );
 reset role;
@@ -146,7 +146,7 @@ select pg_temp.verified_denied(
     actor_user_id, product_key, plan_key, quote_id, quote_revision, paid_at,
     entitlement_expires_at
   ) values (
-    'evt_test_Direct', repeat('d',64), 'cs_test_Direct', gen_random_uuid(),
+    'evt_testDirect', repeat('d',64), 'cs_test_Direct', gen_random_uuid(),
     'aa030000-0000-4000-8000-000000000001', 'academy_platform', 'fixture_plan',
     'direct', 1, statement_timestamp(), statement_timestamp() + interval '1 month'
   )$q$, '42501'
@@ -154,7 +154,7 @@ select pg_temp.verified_denied(
 select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000003', gen_random_uuid(),
-    'evt_test_AnonymousUser', repeat('a',64), 'cs_test_AnonymousUser', statement_timestamp()
+    'evt_testAnonymousUser', repeat('a',64), 'cs_test_AnonymousUser', statement_timestamp()
   )$q$, '42501', 'PLATFORM_BILLING_FORBIDDEN'
 );
 
@@ -177,7 +177,7 @@ select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Unready', repeat('1',64), 'cs_test_Main', statement_timestamp()
+    'evt_testUnready', repeat('1',64), 'cs_test_Main', statement_timestamp()
   )$q$, '42501', 'PLATFORM_BILLING_VERIFIED_EVENT_SCOPE_MISMATCH'
 );
 
@@ -201,7 +201,7 @@ select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000002',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Main', repeat('1',64), 'cs_test_Main',
+    'evt_testMain', repeat('1',64), 'cs_test_Main',
     current_setting('test.verified_paid_at')::timestamptz
   )$q$, 'P0002', 'PLATFORM_BILLING_NOT_FOUND'
 );
@@ -209,21 +209,21 @@ select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Main', repeat('1',64), 'cs_test_Wrong', statement_timestamp()
+    'evt_testMain', repeat('1',64), 'cs_test_Wrong', statement_timestamp()
   )$q$, '42501', 'PLATFORM_BILLING_VERIFIED_EVENT_SCOPE_MISMATCH'
 );
 select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Main', repeat('1',64), 'cs_test_Main', statement_timestamp() + interval '6 minutes'
+    'evt_testMain', repeat('1',64), 'cs_test_Main', statement_timestamp() + interval '6 minutes'
   )$q$, '22023', 'PLATFORM_BILLING_INVALID_PAID_AT'
 );
 select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Main', repeat('1',64), 'cs_test_Main',
+    'evt_testMain', repeat('1',64), 'cs_test_Main',
     statement_timestamp() - interval '6 minutes'
   )$q$, '22023', 'PLATFORM_BILLING_INVALID_PAID_AT'
 );
@@ -233,7 +233,7 @@ select set_config(
   public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Main', repeat('1',64), 'cs_test_Main',
+    'evt_testMain', repeat('1',64), 'cs_test_Main',
     current_setting('test.verified_paid_at')::timestamptz
   )::text, true
 );
@@ -258,7 +258,7 @@ select pg_temp.verified_assert(
   public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Main', repeat('1',64), 'cs_test_Main',
+    'evt_testMain', repeat('1',64), 'cs_test_Main',
     current_setting('test.verified_paid_at')::timestamptz
   )->'created' = 'false'::jsonb,
   'same event and hash is idempotent'
@@ -267,7 +267,7 @@ select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Main', repeat('2',64), 'cs_test_Main',
+    'evt_testMain', repeat('2',64), 'cs_test_Main',
     current_setting('test.verified_paid_at')::timestamptz
   )$q$, '23505', 'PLATFORM_BILLING_VERIFIED_EVENT_CONFLICT'
 );
@@ -290,20 +290,20 @@ select set_config(
 select public.platform_billing_attempt_mark_ready(
   'aa030000-0000-4000-8000-000000000004',
   current_setting('test.other_attempt')::uuid,
-  'cs_test_Other', repeat('b',64)
+  'cs_live_Other', repeat('b',64)
 );
 select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000004',
     current_setting('test.other_attempt')::uuid,
-    'evt_test_Main', repeat('5',64), 'cs_test_Other', statement_timestamp()
+    'evt_testMain', repeat('5',64), 'cs_live_Other', statement_timestamp()
   )$q$, '23505', 'PLATFORM_BILLING_VERIFIED_EVENT_CONFLICT'
 );
 select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000001',
     current_setting('test.verified_attempt')::uuid,
-    'evt_test_Different', repeat('1',64), 'cs_test_Main',
+    'evt_testDifferent', repeat('1',64), 'cs_test_Main',
     current_setting('test.verified_paid_at')::timestamptz
   )$q$, '23505', 'PLATFORM_BILLING_VERIFIED_EVENT_CONFLICT'
 );
@@ -331,7 +331,7 @@ select pg_temp.verified_denied(
   $q$select public.platform_billing_verified_payment_grant(
     'aa030000-0000-4000-8000-000000000002',
     current_setting('test.uncertain_attempt')::uuid,
-    'evt_test_Uncertain', repeat('3',64), 'cs_test_Uncertain', statement_timestamp()
+    'evt_testUncertain', repeat('3',64), 'cs_test_Uncertain', statement_timestamp()
   )$q$, '42501', 'PLATFORM_BILLING_VERIFIED_EVENT_SCOPE_MISMATCH'
 );
 

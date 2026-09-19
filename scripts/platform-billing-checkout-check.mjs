@@ -28,6 +28,7 @@ function setup(overrides = {}) {
   let row = null;
   const calls = { create: 0, retrieve: 0, reserve: 0, uncertain: 0, ready: 0, authorization: 0 };
   const dependencies = {
+    providerMode: 'test',
     now: () => now,
     selectAuthorizedContext: async () => { calls.authorization++; return structuredClone(context); },
     loadQuote: async () => structuredClone(quote),
