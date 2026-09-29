@@ -6,25 +6,41 @@ import { GraduationCap, Store } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { listMyAcademyContexts, toAcademyContextHref } from "@/lib/academy/access-context";
 import type { AcademyAccessContext } from "@/types/database";
+import { listAcademy2Headquarters } from "@/lib/academy2/context";
+import { type Academy2Role } from "@/lib/academy2/permissions.mjs";
+
+type SelectionContext = Omit<AcademyAccessContext, 'roles'> & { roles: (AcademyAccessContext['roles'][number] | Academy2Role)[]; academy2?: boolean; manageStart?: string };
+const ACADEMY2_ROLE_LABELS = { owner: '本部責任者', administrator: '本部運営担当', learning_operator: '受講運営担当', course_editor: '講座編集担当' };
 
 const ROLE_LABELS = {
   owner: "オーナー",
   administrator: "本部スタッフ",
   course_editor: "講座編集",
+  learning_operator: "受講運営担当",
   instructor: "認定講師",
   learner: "受講者"
 } as const;
 
 function AcademySelector() {
-  const [contexts, setContexts] = useState<AcademyAccessContext[]>([]);
+  const [contexts, setContexts] = useState<SelectionContext[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
-    listMyAcademyContexts()
-      .then(setContexts)
+    let current = true;
+    Promise.all([listMyAcademyContexts(), listAcademy2Headquarters()])
+      .then(([legacy, headquarters]) => {
+        if (!current) return;
+        const newIds = new Set(headquarters.map(row => row.id));
+        setContexts([...legacy.filter(row => !newIds.has(row.academy_id)), ...headquarters.map(row => ({
+          academy_id: row.id, academy_name: row.name, academy_handle: row.handle, roles: [row.role],
+          portals: ['manage'] as ['manage'], capabilities: [], academy2: true,
+          manageStart: '/academy',
+        }))]);
+      })
       .catch(() => setLoadError(true))
-      .finally(() => setLoading(false));
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
   }, []);
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">Academyを確認中…</p>;
@@ -68,12 +84,12 @@ function AcademySelector() {
                 <div>
                   <h2 className="font-bold text-[var(--mikke-text)]">{context.academy_name}</h2>
                   <p className="mt-1 text-xs text-[var(--mikke-muted)]">
-                    {context.roles.map((role) => ROLE_LABELS[role]).join("・")}
+                    {context.roles.map((role) => context.academy2 ? ACADEMY2_ROLE_LABELS[role as Academy2Role] : ROLE_LABELS[role]).join("・")}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {context.portals.includes("manage") ? (
-                    <Link href={toAcademyContextHref("/academy", context.academy_id, "manage")} className="inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
+                    <Link href={toAcademyContextHref(context.manageStart ?? "/academy", context.academy_id, "manage")} className="inline-flex items-center gap-1 rounded-xl bg-[var(--mikke-accent)] px-3 py-2 text-xs font-bold text-white">
                       <Store size={18} /> 講座をつくる・運営する
                     </Link>
                   ) : null}

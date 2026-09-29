@@ -50,13 +50,13 @@ function SummaryContent({ userId, academyId }: { userId: string; academyId?: str
     return () => { cancelled = true; };
   }, [userId, academyId, retry]);
   if (!loading && !allowed && !error) return null;
-  return <section className="border-y border-[var(--mikke-line)] bg-white py-4" aria-label="募集ページの申込状況">
-    <h2 className="text-base font-bold">募集ページの申込状況</h2>
+  return <section className="border-y border-[var(--mikke-line)] bg-white py-4" aria-label="サービスページの申込状況">
+    <h2 className="text-base font-bold">サービスページの申込状況</h2>
     {loading ? <p role="status" className="mt-2 text-sm">集計中…</p> : error ? <div role="alert" className="mt-2 text-sm"><p>申込状況を取得できませんでした。件数・金額は未確認です。</p><button type="button" className="min-h-11 font-bold text-[var(--mikke-primary)]" onClick={() => setRetry(value => value + 1)}>再読み込み</button></div> : summary ? <>
-      <div className="mt-3 grid grid-cols-3 gap-3 text-sm"><p>申込件数<strong className="mt-1 block text-xl">{summary.total}件</strong></p><p>入金確認待ち<strong className="mt-1 block text-xl">{summary.pending}件</strong></p><p>入金確認済み<strong className="mt-1 block text-xl">{summary.paid}件</strong></p></div>
-      <p className="mt-3 text-sm">入金済みの記録額 <strong>{summary.amount.toLocaleString("ja-JP")}円</strong></p>
-      <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">新しい募集ページの全期間の記録です。講師の募集ページも含み、段階購入は講座ごとに1件と数えます。従来の申込・教材注文とは別集計で、決済会社の残高ではありません。</p>
-      <div className="mt-2 flex flex-wrap gap-x-6"><Link className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]" href={toAcademyContextHref("/academy/offerings", summary.headquartersId, "manage")}>募集をつくる・編集する →</Link><Link className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]" href={toAcademyContextHref("/academy/offering-applications", summary.headquartersId, "manage")}>申込・入金を確認する →</Link></div>
+      <div className="mt-3 grid grid-cols-3 gap-3 text-sm"><Link href={toAcademyContextHref("/academy/offering-applications", summary.headquartersId, "manage")}>申込件数<strong className="mt-1 block text-xl">{summary.total}件</strong></Link><Link href={toAcademyContextHref("/academy/offering-applications?status=pending", summary.headquartersId, "manage")}>入金確認待ち<strong className="mt-1 block text-xl">{summary.pending}件</strong></Link><Link href={toAcademyContextHref("/academy/offering-applications?status=paid", summary.headquartersId, "manage")}>入金確認済み<strong className="mt-1 block text-xl">{summary.paid}件</strong></Link></div>
+      <p className="mt-3 text-sm">入金済みの記録額 <Link className="font-bold underline" href={toAcademyContextHref("/academy/offering-applications?status=paid", summary.headquartersId, "manage")}>{summary.amount.toLocaleString("ja-JP")}円</Link></p>
+      <p className="mt-2 text-xs leading-5 text-[var(--mikke-muted)]">新しいサービスページの全期間の記録です。講師のサービスページも含み、段階購入は講座ごとに1件と数えます。従来の申込・教材注文とは別集計で、決済会社の残高ではありません。</p>
+      <div className="mt-2 flex flex-wrap gap-x-6"><Link className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]" href={toAcademyContextHref("/academy/offerings", summary.headquartersId, "manage")}>サービスをつくる・編集する →</Link><Link className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]" href={toAcademyContextHref("/academy/offering-applications", summary.headquartersId, "manage")}>申込・入金を確認する →</Link></div>
     </> : null}
   </section>;
 }

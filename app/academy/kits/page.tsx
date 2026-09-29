@@ -1,9 +1,16 @@
-import { redirect } from "next/navigation";
+"use client";
 
-// AC-F1: 本部の申込管理を「本部受付」「講師受付」の2タブに統合したため、
-// 独立していたキット発送ページはリダイレクトに置き換える。
-// 中身（academy_kit_orders一覧・ステータス/入金のインライン変更）は
-// app/academy/applications/page.tsx の「講師受付」タブへ移植済み。
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
+
+// Preserve the visible HQ context after the /academy/h/... rewrite.
+// The destination retains its existing owner checks and order authorization.
 export default function KitsPage() {
-  redirect("/academy/applications?tab=koushi");
+  const router = useRouter();
+  const pathname = usePathname();
+  useEffect(() => {
+    router.replace(toCurrentAcademyContextHref("/academy/applications?tab=koushi"));
+  }, [pathname, router]);
+  return <p className="p-6 text-sm">キットの申込管理へ移動しています…</p>;
 }

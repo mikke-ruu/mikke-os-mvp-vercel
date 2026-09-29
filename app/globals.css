@@ -1,4 +1,11 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+/* Only shipped UI is a class source. Local SQL, tests and build evidence must
+   not reload the app while a user is entering or saving a form. */
+@source "./";
+@source "../components";
+@source "../lib";
+@source "../legal-content";
+@source "../public";
 
 :root {
   --background: #ffffff;

@@ -9,8 +9,12 @@ import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse, updateCourse, type CourseInput } from "@/lib/academy/courses";
 import { resolveAcademyCourseFeaturesForCourse } from "@/lib/academy/course-feature-settings";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
+import { AcademySavedCoursePublication } from "@/components/academy/AcademySavedCoursePublication";
 import { CourseForm } from "../CourseForm";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { CourseEditorConnected } from "@/components/academy2/CourseEditorConnected";
+
 
 function toLocalDateTimeValue(value: string) {
   const date = new Date(value);
@@ -55,6 +59,8 @@ function EditCourseContent({ courseId }: { courseId: string }) {
   const router = useRouter();
   const [hq, setHq] = useState<AcademyHeadquarters | null>(null);
   const [course, setCourse] = useState<AcademyCourse | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,6 +80,8 @@ function EditCourseContent({ courseId }: { courseId: string }) {
     <AcademyCourseWorkspace course={course} activeTab="settings">
       <CourseForm
         initial={toInput(course)}
+        onDirtyChange={setDirty}
+        disabled={publishing}
         submitLabel="変更を保存する"
         onSubmit={async (input) => {
           const updated = await updateCourse(profile, hq.id, course.id, input);
@@ -85,6 +93,7 @@ function EditCourseContent({ courseId }: { courseId: string }) {
           router.push(toCurrentAcademyContextHref(`/academy/courses/${course.id}/instructor-page?audience=learner`));
         }}
       />
+      <AcademySavedCoursePublication key={course.id} profile={profile} course={course} dirty={dirty} onChanged={setCourse} onBusy={setPublishing} />
     </AcademyCourseWorkspace>
   );
 }
@@ -100,5 +109,11 @@ export default function EditCoursePage({ params }: { params: Promise<{ id: strin
 
 function EditCourseIdentity({ courseId }: { courseId: string }) {
   const { user } = useAuth();
+  const academy2 = useAcademy2Headquarters();
+  if (academy2) return <EditAcademy2Course key={`${user.id}:${academy2.id}:${courseId}`} headquartersId={academy2.id} courseId={courseId} />;
   return <EditCourseContent key={`${user.id}:${courseId}`} courseId={courseId} />;
+}
+
+function EditAcademy2Course({ headquartersId, courseId }: { headquartersId: string; courseId: string }) {
+  return <CourseEditorConnected headquartersId={headquartersId} courseId={courseId} />;
 }

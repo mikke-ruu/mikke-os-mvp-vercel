@@ -1,8 +1,12 @@
 "use client";
+import { academyCourseCode } from "@/lib/academy/course-display";
+
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthGate";
+import { HeadquartersInstructorReadOnly } from "@/components/academy2/HeadquartersInstructorReadOnly";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { RotateCw, UserMinus } from "lucide-react";
@@ -116,7 +120,7 @@ function DetailContent({ instructorId }: { instructorId: string }) {
       <section className="flex flex-col gap-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            {course ? <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course.code}</span> : null}
+            {course ? academyCourseCode(course.code) && <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{academyCourseCode(course.code)}</span> : null}
             <h2 className="text-base font-bold text-[var(--mikke-text)]">{ins.business_name || "（屋号未設定）"}</h2>
           </div>
           <p className="mt-1 text-xs text-[var(--mikke-muted)]">
@@ -266,12 +270,13 @@ function DetailContent({ instructorId }: { instructorId: string }) {
   );
 }
 
+function InstructorDetailReadBoundary({instructorId}:{instructorId:string}) { const hq=useAcademy2Headquarters(); return hq ? <HeadquartersInstructorReadOnly instructorId={instructorId}/> : <DetailContent instructorId={instructorId}/>; }
 export default function InstructorDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return (
     <HonbuShell title="講師詳細">
       <div className="mx-auto max-w-2xl">
-        <DetailContent instructorId={id} />
+        <InstructorDetailReadBoundary instructorId={id} />
       </div>
     </HonbuShell>
   );

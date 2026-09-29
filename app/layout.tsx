@@ -26,7 +26,10 @@ export const metadata: Metadata = {
 
 // mikkeOS共通フォント（英数=Poppins／日本語=Noto Sans JP）をアプリ全体で読み込む。
 // lib/page/fonts.ts の既存カタログ・ヘルパーを流用。
-const appFontsCssUrl = buildPageFontsCssUrl(["noto-sans"], ["poppins"]);
+// The isolated Academy runtime works without remote stylesheets. A failed
+// stylesheet can leave React's initial commit waiting during offline review.
+const appFontsCssUrl = process.env.NEXT_PUBLIC_SUPABASE_URL === "http://127.0.0.1:57680"
+  ? "" : buildPageFontsCssUrl(["noto-sans"], ["poppins"]);
 
 export default function RootLayout({
   children

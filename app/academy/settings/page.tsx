@@ -5,9 +5,13 @@ import { usePathname } from "next/navigation";
 import { Building2, Check, Link2, ReceiptJapaneseYen, ShieldCheck, UserPlus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { Academy2HeadquartersSettings } from "@/components/academy2/Academy2HeadquartersSettings";
 import { AcademyPlatformBillingLoader } from "@/app/academy/billing/AcademyPlatformBillingLoader";
 import { AcademyCommunityOverview } from "@/components/academy/AcademyCommunityOverview";
 import { AcademySettingsBilling } from "@/components/academy/AcademySettingsBilling";
+import { AcademyNotificationSettings } from "@/components/academy/AcademyNotificationSettings";
+import { AcademyNotificationLogs } from "@/components/academy/AcademyNotificationLogs";
 import { isAcademyLocalReview } from "@/lib/academy/preview";
 import { academyCheckoutPlanForCatalogPrice } from "@/lib/academy/platform-billing-view";
 import { supabase } from "@/lib/supabase/client";
@@ -439,6 +443,9 @@ function SettingsContent() {
             )}
           </section>
 
+          {canManageRole ? <AcademyNotificationSettings key={`mail:${user.id}:${headquarters.id}`} headquartersId={headquarters.id} canEdit={canManage} sampleOnly={isAcademyLocalReview()} /> : null}
+          {canManageRole ? <AcademyNotificationLogs key={`mail-log:${user.id}:${headquarters.id}`} headquartersId={headquarters.id} sampleOnly={isAcademyLocalReview()} /> : null}
+
           {role === "owner" ? (
             <AcademySettingsBilling key={`${user.id}:${headquarters.id}`} userId={user.id} headquartersId={headquarters.id} isGuest={isGuest} sample={isAcademyLocalReview()} legacy={
             <section className={cardClass}>
@@ -701,5 +708,7 @@ export default function AcademySettingsPage() {
 function SettingsIdentityBoundary() {
   const { user } = useAuth();
   const pathname = usePathname();
+  const academy2Headquarters = useAcademy2Headquarters();
+  if (academy2Headquarters) return <Academy2HeadquartersSettings key={`${user.id}:${academy2Headquarters.id}`} headquarters={academy2Headquarters} />;
   return <SettingsContent key={`${user.id}:${pathname}`} />;
 }

@@ -1,0 +1,9 @@
+"use client";
+import {use,useEffect,useState} from 'react';
+import {AuthGate} from '@/components/AuthGate';
+import {rosterAction} from '@/lib/academy/roster-local';
+import styles from '@/components/academy/academy-roster.module.css';
+type Invitation={name:string;number:string;headquartersName:string;confirmed:boolean;registered:boolean};
+function Confirm({id}:{id:string}){const [item,setItem]=useState<Invitation|null>(null),[error,setError]=useState(''),[checked,setChecked]=useState(false),[busy,setBusy]=useState(false);async function load(){setError('');try{setItem(await rosterAction<Invitation>('view_link',{p_id:id}));}catch(e){setError((e as Error).message);}}useEffect(()=>{void load();},[id]);async function accept(){setBusy(true);try{setItem(await rosterAction<Invitation>('confirm_link',{p_id:id,p_data:{confirmed:checked}}));}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+return <main className={styles.root} style={{padding:24}}><h1>講師名簿の本人確認</h1>{error?<><p role="alert">{error}</p><button onClick={()=>void load()}>再読み込み</button></>:!item?<p>確認依頼を読み込み中…</p>:<section className={styles.card}><h2>{item.headquartersName}</h2><p>氏名：{item.name}</p><p>講師番号：{item.number||'未設定'}</p>{item.confirmed?<p role="status">{item.registered?'本人確認が完了しました。マイページで登録状況を確認できます。':'本人確認が完了しました。本部の正式登録をお待ちください。'}</p>:<><p>この名簿をご自身のmikkeアカウントと連携します。心当たりがない場合は承諾せず、教室へ確認してください。</p><label style={{display:'flex',alignItems:'center'}}><input style={{width:20}} type="checkbox" checked={checked} onChange={e=>setChecked(e.target.checked)}/>自分の氏名・講師番号であることを確認しました</label><button className={styles.primary} disabled={!checked||busy} onClick={()=>void accept()}>確認して連携する</button><p className={styles.note}>連携後の講師登録状況はマイページで確認できます。</p></>}</section>}</main>;}
+export default function Page({params}:{params:Promise<{id:string}>}){const {id}=use(params);return <AuthGate><Confirm key={id} id={id}/></AuthGate>;}

@@ -1,4 +1,6 @@
 "use client";
+import { LpGalleryFields } from "@/components/mikkeos/page-builder/LpGalleryFields";
+import { AcademyImageFields } from "./AcademyImageFields";
 import { MikkeContentEditor } from "@/components/mikkeos/content/MikkeContentEditor";
 import { MikkeBlockFields, type ContentImagePickerProps } from "@/components/mikkeos/content/MikkeBlockFields";
 import type { MikkeContentBlock } from "@/lib/mikkeos/content/types";
@@ -13,5 +15,5 @@ function LinkEditor({block,onChange}:{block:MikkeContentBlock;onChange:(block:Mi
   return <div className="space-y-3"><label className="block text-sm">{block.type === "video" ? "動画のURL" : "リンク先のURL"}<input type="url" value={block.url ?? ""} placeholder="https://" onChange={e=>onChange({...block,url:e.target.value})} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] p-3"/></label><label className="block text-sm">表示する名前<input value={block.title ?? ""} onChange={e=>onChange({...block,title:e.target.value})} className="mt-2 w-full rounded-lg border border-[var(--mikke-line)] p-3"/></label></div>;
 }
 export function AcademyContentEditor({blocks,onChange}:{blocks:AcademyPageBlock[];onChange:(blocks:AcademyPageBlock[])=>void}) {
-  return <MikkeContentEditor blocks={academyContent(blocks)} onChange={next=>onChange(replaceAcademyContent(blocks,next))} renderBlock={(block,change,split)=><MikkeBlockFields block={block} onChange={change} onSplit={split} ImagePicker={ImagePicker} LinkEditor={LinkEditor}/>}/>;
+  return <MikkeContentEditor blocks={academyContent(blocks)} onChange={next=>onChange(replaceAcademyContent(blocks,next))} renderBlock={(block,change,split)=>block.type === "gallery" ? <LpGalleryFields key={block.id} block={block} onChange={change} ImagePicker={ImagePicker}/> : block.type === "image" ? <AcademyImageFields block={block} onChange={change} ImagePicker={ImagePicker}/> : <MikkeBlockFields block={block} onChange={change} onSplit={split} ImagePicker={ImagePicker} LinkEditor={LinkEditor}/>}/>;
 }

@@ -1,4 +1,6 @@
 "use client";
+import { academyCourseLabel } from "@/lib/academy/course-display";
+
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -172,7 +174,7 @@ function NewInstructorContent() {
             <option value="">選択してください</option>
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.code} {c.name}
+                {academyCourseLabel(c)}
               </option>
             ))}
           </select>

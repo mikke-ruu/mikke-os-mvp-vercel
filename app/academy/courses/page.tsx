@@ -2,14 +2,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
+import { CourseCatalog } from "@/components/academy2/CourseCatalog";
 import { AcademyCatalogList } from "@/components/academy/AcademyCatalogList";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getMyAcademyCourseCreationAccess } from "@/lib/academy/course-creation-access";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters } from "@/types/database";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { listAcademy2Courses, type Academy2Course } from "@/lib/academy2/courses";
 
-function CoursesContent() {
+function LegacyCoursesContent() {
  const { profile } = useAuth();
  const [hq,setHq]=useState<AcademyHeadquarters|null>(null);
  const [courses,setCourses]=useState<AcademyCourse[]>([]);
@@ -36,5 +39,26 @@ function CoursesContent() {
   offeringHref:toCurrentAcademyContextHref(`/academy/offerings/new?courseId=${course.id}`),
   editHref:toCurrentAcademyContextHref(`/academy/courses/${course.id}`)
  }))}/>;
+}
+function Academy2CoursesContent({ headquartersId }: { headquartersId: string }) {
+ const [courses, setCourses] = useState<Academy2Course[]>([]);
+ const [loading, setLoading] = useState(true);
+ const [error, setError] = useState("");
+ const [retry, setRetry] = useState(0);
+ useEffect(() => {
+  let current = true;
+  setCourses([]); setLoading(true); setError("");
+  listAcademy2Courses(headquartersId).then(rows => { if (current) setCourses(rows); })
+   .catch(cause => { if (current) setError(cause instanceof Error ? cause.message : "講座を読み込めませんでした。"); })
+   .finally(() => { if (current) setLoading(false); });
+  return () => { current = false; };
+ }, [headquartersId, retry]);
+ if (loading) return <p role="status" className="py-10 text-center text-sm">読み込み中…</p>;
+ if (error) return <div role="alert"><p>{error}</p><button type="button" onClick={() => setRetry(value => value + 1)}>再読み込み</button></div>;
+ return <CourseCatalog courses={courses} />;
+}
+function CoursesContent() {
+ const context = useAcademy2Headquarters();
+ return context ? <Academy2CoursesContent key={context.id} headquartersId={context.id} /> : <LegacyCoursesContent />;
 }
 export default function CoursesPage(){return <HonbuShell title="講座一覧"><CoursesContent/></HonbuShell>;}

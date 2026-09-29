@@ -9,15 +9,15 @@ import styles from "./academy-studio-home.module.css";
 
 export function AcademyStudioHome({ name, courses, pendingCount, guideScope = "local-review" }: { name: string; courses: AcademyCourse[]; pendingCount: number; guideScope?: string }) {
   const activities = [
-    ["募集をつくる・編集する", "講座を組み合わせて募集ページへ", "/academy/offerings"],
-    ["申込・入金を確認する", "新しい募集ページからの申込", "/academy/offering-applications"],
+    ["サービスをつくる・編集する", "講座を組み合わせてサービスページへ", "/academy/offerings"],
+    ["申込・入金を確認する", "新しいサービスページからの申込", "/academy/offering-applications"],
     ["講師管理", "認定・登録状況を確認", "/academy/instructors"],
     ["開催日程・担当講師", "日時と担当者を確認", "/academy/classes"],
     ["教材注文", "講師からの注文と発送を確認", "/academy/kits"],
   ];
   return <div className={styles.overview}>
-    <header className={styles.welcome}><div><span className={styles.kicker}>MY ACADEMY</span><h2>{name || "運営ホーム"}</h2><p>講座を整えて、募集をはじめましょう。</p><Link className={styles.primary} href={href("/academy/courses/new")}><Plus size={17} />講座をつくる</Link></div><div className={styles.summary}><span>登録している講座</span><strong>{courses.length}<small>講座</small></strong></div></header>
-    <AcademyOfferingSummary />
+    <header className={styles.welcome}><div><span className={styles.kicker}>MY ACADEMY</span><h2>{name || "運営ホーム"}</h2><p>{courses.length ? "今日はどの講座を編集しますか？下の講座から続きを開けます。" : "どんな講座を開きますか？まずは講座名と内容を登録しましょう。"}</p><Link className={styles.primary} href={href("/academy/courses/new")}><Plus size={17} />講座をつくる</Link></div><Link href={href("/academy/courses")} className={styles.summary}><span>登録している講座</span><strong>{courses.length}<small>講座</small></strong></Link></header>
+    <div className={styles.applications}><AcademyOfferingSummary /></div>
     <div className={styles.workspace}>
       <section><div className={styles.sectionHead}><h2>運営のメニュー</h2></div><nav className={styles.menu} aria-label="運営のメニュー">{activities.map(([title, detail, path]) => <Link key={path} href={href(path)}><span><strong>{title}</strong><small>{detail}</small></span><ArrowRight size={16} /></Link>)}</nav></section>
       <aside><details className={styles.setup} open={courses.length === 0}><summary>はじめの設定</summary><AcademyGettingStarted key={guideScope} empty={courses.length === 0} scope={guideScope} /></details></aside>

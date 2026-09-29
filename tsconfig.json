@@ -33,7 +33,17 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    ".next-academy2-dev/types/**/*.ts",
+    ".next-academy2-dev/dev/types/**/*.ts",
+    ".next-academy2-build/types/**/*.ts",
+    ".next-academy2-build/dev/types/**/*.ts",
+    ".next-academy2-dev-recovery/types/**/*.ts",
+    ".next-academy2-dev-recovery/dev/types/**/*.ts",
+    ".next-academy2-predeploy/types/**/*.ts",
+    ".next-academy2-predeploy/dev/types/**/*.ts",
+    ".next-academy2-dev-full-20260928/types/**/*.ts",
+    ".next-academy2-dev-full-20260928/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -1,4 +1,6 @@
 "use client";
+import { academyCourseLabel } from "@/lib/academy/course-display";
+
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -10,6 +12,9 @@ import { AcademyLpEditor } from "@/components/academy/AcademyLpEditor";
 import { getOwnedHeadquarters, updateHeadquarters } from "@/lib/academy/headquarters";
 import { listCourses } from "@/lib/academy/courses";
 import type { AcademyCourse, AcademyHeadquarters, AcademyLpBlock } from "@/types/database";
+
+import { frontMaxWidth, defaultFrontDesign, readFrontDocument, writeFrontDocument, type AcademyFrontDesign } from "@/lib/academy/front-design";
+import { AcademyFrontDesignEditor } from "@/components/academy/AcademyFrontDesignEditor";
 
 const inputClass =
   "min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm";
@@ -33,6 +38,7 @@ function FrontContent() {
     contact_email: ""
   });
   // Wave F (AC-F3): 既存hqデータはfront_blocks列が無いため undefined→[] フォールバック必須。
+  const [design, setDesign] = useState<AcademyFrontDesign>(defaultFrontDesign);
   const [blocks, setBlocks] = useState<AcademyLpBlock[]>([]);
 
   useEffect(() => {
@@ -47,7 +53,9 @@ function FrontContent() {
           hero_image_url: foundHq.hero_image_url ?? "",
           contact_email: foundHq.contact_email ?? ""
         });
-        setBlocks(foundHq.front_blocks ?? []);
+        const document = readFrontDocument(foundHq.front_blocks ?? []);
+        setBlocks(document.blocks);
+        setDesign(document.design);
         setCourses(await listCourses(foundHq.id));
       }
       setLoading(false);
@@ -82,7 +90,7 @@ function FrontContent() {
         front_message: form.front_message || null,
         hero_image_url: form.hero_image_url || null,
         contact_email: form.contact_email || null,
-        front_blocks: blocks
+        front_blocks: writeFrontDocument(blocks, design)
       });
       setSaved(revision.current === savingRevision);
     } catch {
@@ -96,7 +104,7 @@ function FrontContent() {
   if (!hq) return <p role={saveError ? "alert" : undefined} className="py-16 text-center text-sm text-[var(--mikke-muted)]">{saveError || "先に本部を作成してください。"}</p>;
 
   return (
-    <div className="mx-auto min-w-0 max-w-7xl space-y-4">
+    <div className="min-w-0 w-full space-y-4">
       {saveError && <p role="alert" className="text-sm text-red-700">{saveError}</p>}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="min-w-0 text-sm font-bold leading-6 text-[var(--mikke-text)]">本部全体を紹介するホームページを編集します。各講座の講座ページとは別のページです。</p>
@@ -109,6 +117,7 @@ function FrontContent() {
         </Link>
       </div>
 
+      <AcademyFrontDesignEditor design={design} onChange={next => { revision.current += 1; setDesign(next); setSaved(false); }} title={form.tagline} message={form.front_message} imageUrl={form.hero_image_url} />
       <section className="space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
         <p className="text-xs font-bold text-[var(--mikke-accent)]">ヒーローエリア</p>
         <div>
@@ -155,7 +164,7 @@ function FrontContent() {
           メイン画像と講座一覧の間に表示されます。「＋」から文章・画像・動画などを挿入し、自由に組み立てられます。
         </p>
 
-        <AcademyLpEditor blocks={blocks} onChange={handleBlocksChange} title={form.name} />
+        <AcademyLpEditor previewMaxWidth={frontMaxWidth(design, 768)} blocks={blocks} onChange={handleBlocksChange} title={form.name} />
 
         <div className="flex items-center gap-3">
           <button onClick={save} disabled={saving} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">
@@ -167,13 +176,13 @@ function FrontContent() {
 
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-5">
         <p className="text-sm font-bold text-[var(--mikke-text)]">講座ページ</p>
-        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">講座情報を編集できます。お客様向けの紹介と申込受付は「募集」で作成・公開します。</p>
+        <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">講座情報を編集できます。お客様向けの紹介と申込受付は「サービス」で作成・公開します。</p>
         <ul className="mt-3 space-y-2">
           {courses.map((c) => (
             <li key={c.id} className="flex min-w-0 flex-col items-stretch gap-2 rounded-xl border border-[var(--mikke-line)] px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="truncate text-sm font-bold text-[var(--mikke-text)]">
-                  {c.code} {c.name}
+                  {academyCourseLabel(c)}
                 </p>
               </div>
               <Link

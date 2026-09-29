@@ -5,3 +5,16 @@
 .courses{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}.course{display:flex;align-items:flex-start;gap:10px;min-height:64px}.course>span:nth-child(2){flex:1}.course strong{display:block;font-size:13px;line-height:1.5;margin:3px 0;overflow-wrap:anywhere}.course small{font-size:11px}.course>svg{flex-shrink:0;margin-top:5px}.cover{display:grid;place-items:center;flex:0 0 56px;height:64px;border-radius:8px;background:var(--mikke-surface-soft);color:var(--mikke-primary);overflow:hidden}.cover img{width:100%;height:100%;object-fit:cover}.reviewLinks{display:flex;align-items:center;flex-wrap:wrap;gap:8px 20px;font-size:12px}.reviewLinks>a{display:inline-flex;align-items:center;min-height:44px}.empty{font-size:13px;color:var(--mikke-text-soft)}.overview a:focus-visible,.overview summary:focus-visible{outline:2px solid var(--mikke-primary);outline-offset:3px}
 @media(max-width:800px){.workspace{grid-template-columns:1fr}.courses{grid-template-columns:1fr}.welcome{padding:24px}.summary{padding-left:20px}.summary>strong{font-size:38px}}
 @media(max-width:520px){.overview{gap:20px}.welcome{padding:20px;gap:16px;align-items:flex-start}.welcome h2{font-size:22px}.summary{padding-left:12px}.summary>span:last-child{display:none}.summary>strong{font-size:32px}.menu{grid-template-columns:1fr}.reviewLinks{gap:4px 14px}}
+
+/* Keep the dashboard accents local; other Academy pages retain their styles. */
+.welcome{background:linear-gradient(115deg,var(--mikke-accent-soft),var(--mikke-surface));border-top:5px solid var(--mikke-accent)}
+.primary{background:var(--mikke-accent);color:var(--mikke-text);font-weight:700;border-radius:12px;box-shadow:var(--mikke-shadow-soft)}
+.primary:hover{box-shadow:var(--mikke-shadow-panel)}
+.primary:focus-visible{outline:3px solid var(--mikke-primary);outline-offset:3px}
+.summary{border-left-color:var(--mikke-accent)}
+.sectionHead h2{display:flex;align-items:center;gap:8px}
+.sectionHead h2::before{content:"";width:5px;height:18px;border-radius:3px;background:var(--mikke-accent);flex-shrink:0}
+.applications>section{padding:18px;border:1px solid var(--mikke-line);border-radius:14px;background:var(--mikke-accent-soft)}
+.applications a:has(>strong){display:block;padding:12px;background:var(--mikke-surface);border:1px solid var(--mikke-line-soft);border-radius:10px;color:var(--mikke-text)}
+.applications a:has(>strong):hover{border-color:var(--mikke-accent)}
+@media(max-width:520px){.applications>section{padding:14px}.applications a:has(>strong){padding:8px}}

@@ -159,7 +159,12 @@ export async function createInstructor(profile: Profile, headquartersId: string,
     .select("*")
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.message === "roster_identity_link_required") {
+      throw new Error("この講師番号は名簿に登録されています。名簿から本人のmikke IDと連携してください。");
+    }
+    throw error;
+  }
   const instructor = data as AcademyInstructor;
 
   await logAcademyEvent({

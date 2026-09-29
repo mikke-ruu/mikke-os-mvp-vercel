@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { createFirstPublicationAccessRpc, type FirstPublicationAccess } from "@/lib/academy/first-publication/access-client";
-import { firstPublicationDate } from "@/lib/academy/first-publication-view";
+import { firstPublicationDate, describeFirstPublicationAccess } from "@/lib/academy/first-publication-view";
 
 export function AcademySchemeUsageStatus({ headquartersId, userId, href, legacy }: {
   headquartersId: string; userId: string; href: string; legacy: React.ReactNode;
@@ -50,6 +50,6 @@ function Scheme({ headquartersId, userId, href, legacy }: {
   return <section aria-label="Academyの利用状態" className="mb-2 border-b border-[var(--mikke-line)] pb-2 text-xs">
     <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1"><span className="rounded-md border border-[var(--mikke-green)] px-2 py-1 font-bold">{periodEnded && access.phase !== "expired" ? "利用期間後の状態を再確認" : labels[access.phase]}</span>{access.endsAt ? <span>{firstPublicationDate(access.endsAt)}まで</span> : null}<Link href={href} className="ml-auto inline-flex min-h-11 items-center text-[var(--mikke-primary)]">利用状態・料金を確認 →</Link></div>
     {periodEnded ? <button type="button" className="min-h-11 text-[var(--mikke-primary)]" onClick={() => setRevision(value => value + 1)}>最新の利用状態を確認</button> : null}
-    <details><summary className="w-fit cursor-pointer py-1 text-[var(--mikke-muted)]">利用期間について</summary><p className="mt-1 leading-5">{access.phase === "prepared" ? "無料期間は初めての講座公開が成功した時点から始まります。" : access.cancellationAcceptedAt ? "有料移行の取消を受け付けています。現在の利用は元の無料終了日時まで続き、新しいCommunity招待はできません。" : access.phase === "paid" ? "支払いが確認された有料期間です。解約と講座の非公開は別の手続きです。" : "初公開から168時間が無料期間です。期限後は確認済みの契約条件で有料利用へ移行します。下書きに戻しても契約は終了しません。"}</p></details>
+    <details><summary className="w-fit cursor-pointer py-1 text-[var(--mikke-muted)]">利用期間について</summary><p className="mt-1 leading-5">{describeFirstPublicationAccess(access, periodEnded)}</p></details>
   </section>;
 }

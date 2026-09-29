@@ -1,0 +1,2 @@
+/* UI05 v0.10 form-row: 10px padding/radius, 10px heading, 9px supporting copy. */
+.summary{font-size:10px;line-height:1.55}.summary h3{font-size:11px;margin:14px 0 6px}.summary dl{display:grid;gap:10px;margin:0}.row{padding:10px;border:1px solid #e8e8eb;border-radius:10px;background:#fff}.row dt{font-size:10px;font-weight:850}.row dd{margin:3px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}.row p{font-size:9px;color:#777982;margin:3px 0 0}.summary ul{padding-left:18px}.summary li{margin-top:3px}

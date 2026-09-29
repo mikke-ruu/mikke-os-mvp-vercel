@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { createFirstPublicationQuoteRpc, createFirstPublicationRpc, type FirstPublicationQuote, type FirstPublicationStatus } from "@/lib/academy/first-publication/rpc-client";
+import { createFirstPublicationQuoteRpc, createFirstPublicationRpc, parseFirstPublicationStatus, type FirstPublicationQuote, type FirstPublicationStatus } from "@/lib/academy/first-publication/rpc-client";
 import { approvedAcademySetupUrl, createAcademySetupClient } from "@/lib/academy/first-publication-setup-client";
 import { firstPublicationDate } from "@/lib/academy/first-publication-view";
 
 type Props = {
+  academy2?: boolean;
   userId: string;
   headquartersId: string;
   policyVersion: string;
@@ -67,6 +68,12 @@ export function AcademyFirstPublicationEnrollment(props: Props) {
 }
 
 function Enrollment(props: Props) {
+  async function enrollmentCommand(input:{action:'status'}|{action:'prepare';quoteId:string;termsRevision:string;amountYen:number;consent:boolean}) {
+    if(!props.academy2)return createFirstPublicationRpc(supabase)(props.headquartersId,input);
+    const {data,error}=await supabase.rpc(input.action==='status'?'academy2_first_publication_status':'academy2_first_publication_prepare',input.action==='status'?{p_headquarters_id:props.headquartersId}:{p_headquarters_id:props.headquartersId,p_quote_id:input.quoteId,p_terms_revision:input.termsRevision,p_amount_yen:input.amountYen,p_confirmed:input.consent});
+    if(error)throw new Error('契約準備の結果を確認できませんでした。契約状態を再確認してください。');
+    return data?.enrollment?parseFirstPublicationStatus(data.enrollment,props.headquartersId):null;
+  }
   const [quote, setQuote] = useState<FirstPublicationQuote | null>(null);
   const [returnAttempt, setReturnAttempt] = useState<ReturnAttempt | null>(null);
   const [verified, setVerified] = useState(false);
@@ -130,7 +137,7 @@ function Enrollment(props: Props) {
   function refreshStatus() {
     void run(async () => {
       await currentToken();
-      const state = await createFirstPublicationRpc(supabase)(props.headquartersId, { action: "status" });
+      const state = await enrollmentCommand({ action: "status" });
       await currentToken();
       const expectedQuoteId = quote?.id ?? returnAttempt?.quoteId ?? null;
       if (state && matchesAcademyEnrollmentResult(state, props, expectedQuoteId)) { await showPrepared(state); return; }
@@ -144,7 +151,7 @@ function Enrollment(props: Props) {
     void run(async () => {
       setQuote(null); setVerified(false); clearConsent();
       await currentToken();
-      const next = await createFirstPublicationQuoteRpc(supabase)(props.headquartersId, props.policyVersion);
+      const next = await createFirstPublicationQuoteRpc({rpc:(_name,args)=>supabase.rpc(props.academy2?'academy2_first_publication_quote':'academy_first_publication_quote',args)})(props.headquartersId, props.policyVersion);
       await currentToken();
       if (!usableAcademyEnrollmentQuote(next, props, Date.now()) || next.id === props.replacePreparedQuoteId) throw new Error("料金の有効期限または契約条件が変わりました。最新の条件で見積もりを取得してください。");
       setQuote(next); setVerified(false); setReturnAttempt(null); clearConsent(); setMessage("");
@@ -177,7 +184,7 @@ function Enrollment(props: Props) {
     void run(async () => {
       await currentToken();
       if (!usableAcademyEnrollmentQuote(quote, props, Date.now())) throw new Error("見積もりの有効期限が終了しました。料金を再確認してください。");
-      const state = await createFirstPublicationRpc(supabase)(props.headquartersId, { action: "prepare", quoteId: quote.id, termsRevision: quote.termsRevision, amountYen: quote.amountYen, consent: true });
+      const state = await enrollmentCommand({ action: "prepare", quoteId: quote.id, termsRevision: quote.termsRevision, amountYen: quote.amountYen, consent: true });
       await currentToken();
       if (!state || !matchesAcademyEnrollmentResult(state, props, quote.id)) throw new Error("今回の見積もりによる契約準備を確認できませんでした。再申し込みせず契約状態を確認してください。");
       await showPrepared(state);

@@ -1,4 +1,8 @@
 "use client";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { HeadquartersApplicationDetail } from "@/components/academy2/HeadquartersApplicationDetail";
+import { academyCourseCode } from "@/lib/academy/course-display";
+
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -161,7 +165,7 @@ function DetailContent({ appId }: { appId: string }) {
     <div className="space-y-4">
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4">
         <div className="flex items-center gap-2">
-          {course ? <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course.code}</span> : null}
+          {course ? academyCourseCode(course.code) && <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{academyCourseCode(course.code)}</span> : null}
           <h2 className="text-base font-bold text-[var(--mikke-text)]">{app.applicant_name}</h2>
         </div>
         <div className="mt-2 divide-y divide-[var(--mikke-line-soft)]">
@@ -351,12 +355,13 @@ function DetailContent({ appId }: { appId: string }) {
   );
 }
 
+function ConnectedDetail({ id }: { id: string }) { return useAcademy2Headquarters() ? <HeadquartersApplicationDetail applicationId={id} /> : <DetailContent appId={id} />; }
 export default function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return (
     <HonbuShell title="申込詳細">
       <div className="mx-auto max-w-2xl">
-        <DetailContent appId={id} />
+        <ConnectedDetail id={id} />
       </div>
     </HonbuShell>
   );

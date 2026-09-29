@@ -1,4 +1,6 @@
 "use client";
+import { academyCourseCode, academyCourseLabel } from "@/lib/academy/course-display";
+
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -107,7 +109,7 @@ function MaterialsContent() {
           <option value="">すべての講座</option>
           {courses.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.code} {c.name}
+              {academyCourseLabel(c)}
             </option>
           ))}
         </select>
@@ -130,7 +132,7 @@ function MaterialsContent() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      {course ? <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course.code}</span> : null}
+                      {course ? academyCourseCode(course.code) && <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{academyCourseCode(course.code)}</span> : null}
                       <span className="rounded-full border border-[var(--mikke-line)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-muted)]">
                         {MATERIAL_KIND_LABELS[m.kind]}
                       </span>

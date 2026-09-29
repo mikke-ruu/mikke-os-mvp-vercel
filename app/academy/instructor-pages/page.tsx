@@ -1,4 +1,6 @@
 "use client";
+import { academyCourseLabel } from "@/lib/academy/course-display";
+
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -38,7 +40,7 @@ function InstructorPagesContent() {
           <li key={c.id} className="flex items-center justify-between gap-2 rounded-2xl border border-[var(--mikke-line)] bg-white px-4 py-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-bold text-[var(--mikke-text)]">
-                {c.code} {c.name}
+                {academyCourseLabel(c)}
               </p>
               <p className="text-sm text-[var(--mikke-muted)]">認定講師のマイポータルに表示する資料ページを編集</p>
             </div>

@@ -9,6 +9,8 @@ import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { listOfferings, offeringError, type AcademyOffering } from "@/lib/academy/offerings";
 import { offeringUsage } from "@/lib/academy/instructor-offerings";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { SalesPlanDraftCatalog } from "@/components/academy2/SalesPlanDraftCatalog";
 
 function Content() {
   const { profile } = useAuth();
@@ -32,15 +34,20 @@ function Content() {
     })().catch(cause => { if (active) setError(offeringError(cause)); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [profile.user_id, retry]);
-  if (loading) return <p className="py-8 text-sm">募集を読み込み中…</p>;
+  if (loading) return <p className="py-8 text-sm">サービスを読み込み中…</p>;
   if (error) return <div role="alert" className="space-y-3"><p>{error}</p><button type="button" onClick={() => setRetry(value => value + 1)} className="min-h-11 rounded-lg border px-4">再読み込み</button></div>;
   if (!hasHeadquarters) return <p>管理する本部が見つかりません。</p>;
-  return <AcademyCatalogList kind="offering" createHref={toCurrentAcademyContextHref("/academy/offerings/new")} filters={[{value:"published",label:"公開中"},{value:"draft",label:"下書き"},{value:"archived",label:"募集終了"}]} items={offerings.map(offering=>({
+  return <AcademyCatalogList kind="offering" createHref={toCurrentAcademyContextHref("/academy/offerings/new")} filters={[{value:"published",label:"公開中"},{value:"draft",label:"下書き"},{value:"archived",label:"受付終了"}]} items={offerings.map(offering=>({
     id:offering.id,title:offering.title,category:offering.kind,filter:offering.status,
-    status:({draft:"下書き",published:"公開中",archived:"募集終了・保管中"} as const)[offering.status],
+    status:({draft:"下書き",published:"公開中",archived:"受付終了・保管中"} as const)[offering.status],
     summary:`${offering.purchase_mode==="staged"?"講座ごとにお支払い · ":""}¥${Number(offering.price).toLocaleString("ja-JP")} · ${offering.course_ids.map(id=>courses.find(course=>course.id===id)?.name??"講座情報を確認").join("・")}${usage[offering.id]?` · 講師${usage[offering.id]}名が利用中`:""}`,
     editHref:toCurrentAcademyContextHref(`/academy/offerings/${offering.id}`),
     duplicateHref:toCurrentAcademyContextHref(`/academy/offerings/new?duplicate=${offering.id}`)
   }))}/>;
 }
-export default function Page() { return <HonbuShell title="募集"><Content /></HonbuShell>; }
+function CatalogIdentity() {
+  const context = useAcademy2Headquarters();
+  const { user } = useAuth();
+  return context ? <SalesPlanDraftCatalog key={`${user.id}:${context.id}`} headquartersId={context.id} /> : <Content />;
+}
+export default function Page() { return <HonbuShell title="販売プラン"><CatalogIdentity /></HonbuShell>; }

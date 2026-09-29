@@ -32,13 +32,28 @@ function runtime(signal: AbortSignal) {
 export async function serveSetup(action:'setup'|'confirm',request:Request){
   try {
     const signal=AbortSignal.any([request.signal,AbortSignal.timeout(20000)]),r=runtime(signal);
+    // Per-request, service-validated scope. Never infer the mode from client input.
+    let scope:{owner:string;hq:string;scheme:'legacy'|'academy2'}|null=null;
+    function setupRpc(owner:string,hq:string,suffix:'reserve'|'complete'){
+      demand(scope&&scope.owner===owner&&scope.hq===hq,'SETUP_SCOPE_REQUIRED');
+      return `${scope.scheme==='academy2'?'academy2':'academy'}_first_publication_setup_${suffix}`;
+    }
     return handleSetupRequest(action,request,{
       allowedOrigins:['https://app.mikke-os.com','https://mikke-os.com'],
       async authenticate(token){const {data,error}=await r.user(token).auth.getUser(token);return error||!data.user?null:{id:data.user.id,anonymous:data.user.is_anonymous!==false};},
-      async owns(token,userId,hq){const {data,error}=await r.user(token).from('academy_headquarters').select('id,owner_user_id').eq('id',hq).eq('owner_user_id',userId).abortSignal(signal).maybeSingle();return !error&&data?.id===hq&&data?.owner_user_id===userId;},
-      async reserve(userId,hq,quote){const value=await r.rpc('academy_first_publication_setup_reserve',{p_owner_user_id:userId,p_headquarters_id:hq,p_quote_id:quote});demand(object(value),'INVALID_ATTEMPT');quoteFromDatabase(value.quote,value as SetupAttempt);return value as SetupAttempt;},
+      async owns(token,userId,hq){
+        const value=await r.rpc('academy2_first_publication_setup_scope',{p_owner_user_id:userId,p_headquarters_id:hq});
+        if(!object(value)||value.owner_user_id!==userId||value.headquarters_id!==hq||(value.scheme!=='legacy'&&value.scheme!=='academy2'))return false;
+        if(value.scheme==='legacy'){
+          // Preserve the original legacy owner RLS check as well as the service scope.
+          const {data,error}=await r.user(token).from('academy_headquarters').select('id,owner_user_id').eq('id',hq).eq('owner_user_id',userId).abortSignal(signal).maybeSingle();
+          if(error||data?.id!==hq||data?.owner_user_id!==userId)return false;
+        }
+        scope={owner:userId,hq,scheme:value.scheme};return true;
+      },
+      async reserve(userId,hq,quote){const value=await r.rpc(setupRpc(userId,hq,'reserve'),{p_owner_user_id:userId,p_headquarters_id:hq,p_quote_id:quote});demand(object(value),'INVALID_ATTEMPT');quoteFromDatabase(value.quote,value as SetupAttempt);return value as SetupAttempt;},
       async setup(a){return r.stripe.setup(a,async(customer,session,setup)=>{await r.rpc('academy_first_publication_setup_attach',{p_attempt_id:a.attempt_id,p_provider_customer_id:customer,p_checkout_session_id:session,p_setup_intent_id:setup??null});},signal);},
-      async confirm(a){const original=quoteFromDatabase(a.quote,a);const proof=await r.stripe.verifySetup(a,signal);const saved=await r.rpc('academy_first_publication_setup_complete',{p_attempt_id:a.attempt_id,p_provider_customer_id:proof.customerId,p_setup_intent_id:proof.setupIntentId,p_payment_method_id:proof.paymentMethodId});demand(object(saved)&&saved.attempt_id===a.attempt_id&&saved.status==='verified','PROOF_NOT_PERSISTED');return{paymentPreparationId:a.attempt_id,verified:true,quote:verifyConfirmedQuote(original,saved.quote,a)};},
+      async confirm(a){const completeRpc=setupRpc(a.owner_user_id,a.headquarters_id,'complete');const original=quoteFromDatabase(a.quote,a);const proof=await r.stripe.verifySetup(a,signal);const saved=await r.rpc(completeRpc,{p_attempt_id:a.attempt_id,p_provider_customer_id:proof.customerId,p_setup_intent_id:proof.setupIntentId,p_payment_method_id:proof.paymentMethodId});demand(object(saved)&&saved.attempt_id===a.attempt_id&&saved.status==='verified','PROOF_NOT_PERSISTED');return{paymentPreparationId:a.attempt_id,verified:true,quote:verifyConfirmedQuote(original,saved.quote,a)};},
     });
   }catch{return privateJson({error:'BILLING_NOT_CONFIGURED'},503);}
 }

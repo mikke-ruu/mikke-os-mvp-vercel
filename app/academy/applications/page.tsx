@@ -1,4 +1,6 @@
 "use client";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { HeadquartersApplications } from "@/components/academy2/HeadquartersApplications";
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
@@ -373,10 +375,11 @@ function ApplicationsContent() {
   );
 }
 
+function ConnectedApplicationsContent() { return useAcademy2Headquarters() ? <HeadquartersApplications /> : <ApplicationsContent />; }
 export default function ApplicationsPage() {
   return (
     <HonbuShell title="申込・受注管理">
-      <ApplicationsContent />
+      <ConnectedApplicationsContent />
     </HonbuShell>
   );
 }

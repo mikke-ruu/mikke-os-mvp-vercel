@@ -1,0 +1,357 @@
+{
+  "preparedAt": "2026-09-29T15:22:45.552Z",
+  "scope": "2026-09-30 courses/materials/six-step UI; manual payments; no payment launch",
+  "productionApplyAllowed": false,
+  "productionChanged": false,
+  "steps": [
+    {
+      "order": 1,
+      "path": "supabase/migrations/20260920104929_academy_class_current_material_mode.sql",
+      "sha256": "6bb716d569e50ad8afa04b4a23cc0a4d8333532bb6a1244ce924eab4c651aca9"
+    },
+    {
+      "order": 2,
+      "path": "supabase/migrations/20260920111505_academy_paid_class_bookings.sql",
+      "sha256": "5af29a5db18f317e010b623f020917e9d4af2ef0796ae38401744febd98d78d9"
+    },
+    {
+      "order": 3,
+      "path": "supabase/migrations/20260924135543_academy_trial_learner_draft_save.sql",
+      "sha256": "7e14c79b44c0637902df584e6bec89a229fb166338850ba9285767290fb87ee5"
+    },
+    {
+      "order": 4,
+      "path": "supabase/migrations/20260925181229_academy2_opt_in_permissions.sql",
+      "sha256": "42e400b9db60dbfe61af804b83c3be358fa3509084bdf9daf3cdafbb90cf4427"
+    },
+    {
+      "order": 5,
+      "path": "supabase/migrations/20260925181735_academy2_activity_requests.sql",
+      "sha256": "9bd78e71fa2d90e69b5592c65999a97933954476ffe8246682087a1a19387269"
+    },
+    {
+      "order": 6,
+      "path": "supabase/migrations/20260925184908_academy2_scoped_legacy_fence.sql",
+      "sha256": "bdc28bc733d61737ccfe211a9769b8fcac7a882268bcc6eca9e35a9efedad382"
+    },
+    {
+      "order": 7,
+      "path": "supabase/migrations/20260925185103_academy2_sales_plan_drafts.sql",
+      "sha256": "a393780d6016fe548f2e2df2c10dd9841cd620f9e24b15f8e48933107d333595"
+    },
+    {
+      "order": 8,
+      "path": "supabase/migrations/20260925190209_academy2_activity_shell_context.sql",
+      "sha256": "ebb51e5f10f49b8ec3dc90ff7928f5412a5ef0147f63c13cb88c386a03075758"
+    },
+    {
+      "order": 9,
+      "path": "supabase/migrations/20260925191148_academy2_course_reference_settings.sql",
+      "sha256": "b7cfd6c4dae6abebf9d88c7e0c50750c4cc206dc32b854678cf9c69f26d0e028"
+    },
+    {
+      "order": 10,
+      "path": "supabase/migrations/20260925193613_academy2_staff_invitation_adapter.sql",
+      "sha256": "497c0f37657fc6c9357c105b1eb76bad878f78483bd830cc111abe72923a453b"
+    },
+    {
+      "order": 11,
+      "path": "supabase/migrations/20260925202357_academy2_legacy_invitation_context_fence.sql",
+      "sha256": "bd6fe249429ccbd6b95bca39c7bc9dfe1f093fe872d3616fbf0c77e1f274a51b"
+    },
+    {
+      "order": 12,
+      "path": "supabase/migrations/20260925203910_academy2_legacy_publication_assignment_fence.sql",
+      "sha256": "593dc895494ac69d982c2b08dce050fa169f391bbe27126961e32fca6f52e3e0"
+    },
+    {
+      "order": 13,
+      "path": "supabase/migrations/20260925214000_academy2_course_basic_editor.sql",
+      "sha256": "0d6d97573cefea46d67139c947df5e27069223b2437cce98c915027a486251ac"
+    },
+    {
+      "order": 14,
+      "path": "supabase/migrations/20260925214500_academy2_course_basic_version.sql",
+      "sha256": "2ba4a15ccc4a04c50e6860fba67fce5d87d79469916b21ee2a666d4203350d38"
+    },
+    {
+      "order": 15,
+      "path": "supabase/migrations/20260925221000_academy2_course_draft_create.sql",
+      "sha256": "97bbd1fd04fdcb87c3ee61fa5083f3855c8bfad83a3bea10d3cabb948f35fe7a"
+    },
+    {
+      "order": 16,
+      "path": "supabase/migrations/20260926001459_academy2_operational_workflow.sql",
+      "sha256": "7b524ffb57f70554e6eec80871cb3708cfb731d5e2b4c08b26e638b4dfe86980"
+    },
+    {
+      "order": 17,
+      "path": "supabase/migrations/20260926002631_academy2_event_commands.sql",
+      "sha256": "9372c478be1b9ec90133eee920d08e6fc551ef0f45349ebf652a0a9219d84fbb"
+    },
+    {
+      "order": 18,
+      "path": "supabase/migrations/20260926004001_academy2_operation_course_access_boundary.sql",
+      "sha256": "5593f17c81058fb4ba74e67c436533a883901d495390604a7872812cdfe8761f"
+    },
+    {
+      "order": 19,
+      "path": "supabase/migrations/20260926005654_academy2_existing_source_event_registration.sql",
+      "sha256": "b8b9de79f27aa7ab05cf6d25ccf7759cebb1982cb1703977862262c4013db6dc"
+    },
+    {
+      "order": 20,
+      "path": "supabase/migrations/20260926012944_academy2_bound_source_submission_guard.sql",
+      "sha256": "6754a3a822a46922250c00a0c10cb04be2faa90ffb76fa9c3aa0a9b0ed7a4d4d"
+    },
+    {
+      "order": 21,
+      "path": "supabase/migrations/20260926015444_academy2_private_opening_license_ledger.sql",
+      "sha256": "37ea1e27b0f80d0dd64b0390a643f89afbe34d076e245ffd590012ad08250499"
+    },
+    {
+      "order": 22,
+      "path": "supabase/migrations/20260926021000_academy2_learner_operation_read.sql",
+      "sha256": "00b47628cb77a942050d7bdf8386708bd5f4dfa9dab2205cb4596f1e7b9bcc42"
+    },
+    {
+      "order": 23,
+      "path": "supabase/migrations/20260926023427_academy2_instructor_operations.sql",
+      "sha256": "ed664e5670a62cb19ea4874c8248bba40a381bb10abd4deba3d85b4391b1e5f0"
+    },
+    {
+      "order": 24,
+      "path": "supabase/migrations/20260926023509_academy2_payment_provider_boundary.sql",
+      "sha256": "48ebfc3a9ec88c6de806620ac7fe593f8cf5313750c74a8cd252b793c81eabe6"
+    },
+    {
+      "order": 25,
+      "path": "supabase/migrations/20260926030607_academy2_instructor_course_access_boundary.sql",
+      "sha256": "6dfef5e130e564b4842e7d0525d990ed414fa591eb78207d9b811662fb467559"
+    },
+    {
+      "order": 26,
+      "path": "supabase/migrations/20260926132051_academy2_release_mail_settings_source.sql",
+      "sha256": "d3ee7fbaf4e9e8440683101e8152a31e90618f1f501c8b19d0cb92ebdddfb9a6"
+    },
+    {
+      "order": 27,
+      "path": "supabase/migrations/20260926040703_academy2_receipt_mail_settings.sql",
+      "sha256": "d585f6561847a0ca7dc84dd7aad540816674bfe528f6c601abdd971cde833cd1"
+    },
+    {
+      "order": 28,
+      "path": "supabase/migrations/20260926083310_academy2_headquarters_operations.sql",
+      "sha256": "1770b6005db5a716516518a027e3c860b9fb7d73de334d99b86bdad0c2fde478"
+    },
+    {
+      "order": 29,
+      "path": "supabase/migrations/20260926083727_academy2_public_intake_connection.sql",
+      "sha256": "5e8b98e60bc546155817f10848c9c54cad4cf46e59972843fe57006928effd76"
+    },
+    {
+      "order": 30,
+      "path": "supabase/migrations/20260927091000_academy2_event_detail_read.sql",
+      "sha256": "aede4087d08f2133bf60c7b3e05013a438b0b5cf36081de5ad6416158e7f9b4a"
+    },
+    {
+      "order": 31,
+      "path": "supabase/migrations/20260927052802_academy2_hq_instructor_read.sql",
+      "sha256": "bad59a147770a54af3c07755462f3630b25c578a333ad81919c4e3b2bd869861"
+    },
+    {
+      "order": 32,
+      "path": "supabase/migrations/20260927053309_academy2_sales_plan_application_form.sql",
+      "sha256": "ded02e772c929b33e0750805af30512c287224331da0f2c3fdcc8da7be2a5e6f"
+    },
+    {
+      "order": 33,
+      "path": "supabase/migrations/20260927053355_academy2_course_material_drafts.sql",
+      "sha256": "7a4284a74416d126e5669ca75e69e7e60f1d2eb26f2981971ca78fb83724ffbd"
+    },
+    {
+      "order": 34,
+      "path": "supabase/migrations/20260927053448_academy2_event_assignees.sql",
+      "sha256": "16389a9410c0e32deae76e66ba394b15fb842c8f58801dcdf5c6587d4428d9ee"
+    },
+    {
+      "order": 35,
+      "path": "supabase/migrations/20260927053600_academy2_headquarters_settings.sql",
+      "sha256": "8f7b14a80ca79908d5afe1e8f0c348ae0e278461a9c39ee0c7ee1408244c307c"
+    },
+    {
+      "order": 36,
+      "path": "supabase/migrations/20260927015513_academy2_sales_page_drafts.sql",
+      "sha256": "b6e34237d7abe4caa9137f9fdccd55bd915a57f11bd1b17bae31b8197269ae6e"
+    },
+    {
+      "order": 37,
+      "path": "supabase/migrations/20260927021008_academy2_existing_headquarters_plan_publication.sql",
+      "sha256": "d29ba47abf6a8ec9e50c405a52a84b0ba044edfe106044544da9975d98d9bea8"
+    },
+    {
+      "order": 38,
+      "path": "supabase/migrations/20260927053654_academy2_public_intake_answers.sql",
+      "sha256": "93e142952e9257e2707d6ac3928c053c7a725af574234b4f73b5b298bf61d0a2"
+    },
+    {
+      "order": 39,
+      "path": "supabase/migrations/20260927053712_academy2_plan_public_projection.sql",
+      "sha256": "0533d7f966250bb91c6460e4757a6f85323d2298eb11d24a82a37ead494f3ec7"
+    },
+    {
+      "order": 40,
+      "path": "supabase/migrations/20260927053729_academy2_first_publication_bridge.sql",
+      "sha256": "dd403a26bfccdd08653fe040f244de2c47f1b15d163c11ddb6dcbc871d9d99bd"
+    },
+    {
+      "order": 41,
+      "path": "supabase/migrations/20260927053835_academy2_materials_only_delivery.sql",
+      "sha256": "9da523dba44f43a4b9752a7579d01f7c67d27b3b8f18a1acdc56673e2a8cdb8c"
+    },
+    {
+      "order": 42,
+      "path": "supabase/migrations/20260927053927_academy2_instructor_assignment_connection.sql",
+      "sha256": "faaabfc729428399e66dafdafdfe5f2609e3e38c15c1576a0defa687d3df29eb"
+    },
+    {
+      "order": 43,
+      "path": "supabase/migrations/20260927054021_academy2_first_publication_setup_scope.sql",
+      "sha256": "cedb580cea89d10df7702fec42a7bf5e877fb42d97692a8ddcbfcdc4dd762a59"
+    },
+    {
+      "order": 44,
+      "path": "supabase/migrations/20260927054047_academy2_unpublished_event_plan_refresh.sql",
+      "sha256": "f1a99227dacc6192a3e1f439ffb17da0708d83f4660760083f34905e32a3f81a"
+    },
+    {
+      "order": 45,
+      "path": "docs/academy2-sept30-candidate/45_course_editor.sql",
+      "sha256": "2263aa084fb0f5adc521366dc57f45915eecfa471c77762918db5512972de10c",
+      "source": "supabase/local/academy2_course_editor_bundle.sql"
+    },
+    {
+      "order": 46,
+      "path": "docs/academy2-sept30-candidate/46_course_introduction.sql",
+      "sha256": "254802c020b80a19b1edc4ad2609afd261e0e90a5d93beb4cc56a5b070fe6e58",
+      "source": "supabase/local/academy2_course_introduction_projection.sql"
+    },
+    {
+      "order": 47,
+      "path": "docs/academy2-sept30-candidate/47_headquarters_home.sql",
+      "sha256": "bbb20351f01efb0a3f0c73a0093bebb74e8748b86865be5886aedca9597f1f4f",
+      "source": "supabase/local/academy2_headquarters_home.sql"
+    },
+    {
+      "order": 48,
+      "path": "docs/academy2-sept30-candidate/48_sales_plan_catalog.sql",
+      "sha256": "2568526bdf12ccffdc0ce623a24365d77b683dd6a852967d5fb0cecc9949224a",
+      "source": "supabase/local/academy2_sales_plan_catalog.sql"
+    },
+    {
+      "order": 49,
+      "path": "docs/academy2-sept30-candidate/49_condition_documents.sql",
+      "sha256": "b5bdba8dbdfebc3c5e0ab9f9b0659f63d33e4150193f698892c75f2d8379dabf",
+      "source": "supabase/local/academy2_plan_condition_documents.sql"
+    },
+    {
+      "order": 50,
+      "path": "docs/academy2-sept30-candidate/50_conditional_intake.sql",
+      "sha256": "a1003687eb009b73ee4e79f978816135ecb2c20d4fee813db5d788b2c15dc27c",
+      "source": "supabase/local/academy2_conditional_intake.sql"
+    },
+    {
+      "order": 51,
+      "path": "docs/academy2-sept30-candidate/51_event_kit.sql",
+      "sha256": "a4b8efe0382606bcfeef0e3c490b525082e7bdbd667138a64fde5abad53be766",
+      "source": "supabase/local/academy2_event_kit.sql"
+    },
+    {
+      "order": 52,
+      "path": "docs/academy2-sept30-candidate/52_teacher_material_delivery.sql",
+      "sha256": "74e8a9e5fbe8a7ac64548ab7d0e735484e30470cd1ad62f365d21947fb219b50",
+      "source": "supabase/local/academy2_teacher_material_delivery.sql"
+    },
+    {
+      "order": 53,
+      "path": "docs/academy2-sept30-candidate/53_all_courses_publication.sql",
+      "sha256": "10178bf2b2ef193effbd84e7a2c761f8758de91c9bb0c25dcb1e0031766fbbe5",
+      "source": "supabase/local/academy2_all_courses_publication.sql"
+    },
+    {
+      "order": 54,
+      "path": "docs/academy2-sept30-candidate/54_manual_payment.sql",
+      "sha256": "5c9c89d416ceb32124497bb528a766e537f05ce36d1f12f1962720e1c4e7846e",
+      "source": "supabase/local/academy2_manual_payment_selection.sql"
+    },
+    {
+      "order": 55,
+      "path": "docs/academy2-sept30-candidate/55_monthly_policy.sql",
+      "sha256": "3fa2eaa58dd61886c87d1a53b309b8789cadbd6fe99383c2c8333b4abda24328",
+      "source": "supabase/local/academy2_monthly_policy_contract.sql"
+    },
+    {
+      "order": 56,
+      "path": "docs/academy2-sept30-candidate/56_monthly_policy_fix.sql",
+      "sha256": "d6239f4b2d68b5279d50ba241e99bd4c4473dac4059fe76572815b3f57ffd2f0",
+      "source": "supabase/local/academy2_monthly_policy_unicode.sql"
+    },
+    {
+      "order": 57,
+      "path": "docs/academy2-sept30-candidate/57_public_course_introductions.sql",
+      "sha256": "306aea01a582137c01bbe9d11c1e209c8e5db472511ad643e8fe9f836c319d8a",
+      "source": "supabase/local/academy2_public_course_introductions.sql"
+    },
+    {
+      "order": 58,
+      "path": "docs/academy2-sept30-candidate/58_after_course_settings.sql",
+      "sha256": "e92a556f9d8e317a0faeec8e7a96ab04606cde2364e69343f456331cb53d6c1c",
+      "source": "supabase/local/academy2_after_course_settings.sql"
+    },
+    {
+      "order": 59,
+      "path": "docs/academy2-sept30-candidate/59_course_shipping.sql",
+      "sha256": "9e00f6eb926e27ec5a4272bcfba11c4c05bcd0123818f16c3c0629eee2afa999",
+      "source": "supabase/local/academy2_six_step_review.sql (schema/field contract only)"
+    },
+    {
+      "order": 60,
+      "path": "docs/academy2-sept30-candidate/60_general_six_step.sql",
+      "sha256": "eb90efa9f264cfb0adb0002e09778204715c9d52b5ed1fe17ac692e9347cc2ef",
+      "source": [
+        "supabase/local/academy2_general_six_step.sql",
+        "supabase/local/academy2_general_six_step_fix.sql"
+      ]
+    },
+    {
+      "order": 61,
+      "path": "docs/academy2-sept30-candidate/61_event_operations.sql",
+      "sha256": "04e4e55885af9e13df3592847aafb373553ffe46d9597f7f2278011855553f22",
+      "source": "supabase/local/academy2_event_operations.sql"
+    },
+    {
+      "order": 62,
+      "path": "docs/academy2-sept30-candidate/62_event_destination.sql",
+      "sha256": "e724d194d67e6c92aa034c65635e0e11d928115d7307de7c60a7b637366269b0",
+      "source": "supabase/local/academy2_event_kit_destination.sql"
+    },
+    {
+      "order": 63,
+      "path": "docs/academy2-sept30-candidate/63_event_shipping.sql",
+      "sha256": "b5638559471356cb5372b6df702eceb9f57b93af01d3c57b07404ef96b11dcc2",
+      "source": "supabase/local/academy2_event_kit_shipping.sql"
+    },
+    {
+      "order": 64,
+      "path": "docs/academy2-sept30-candidate/64_event_enrollment.sql",
+      "sha256": "543a05210697ac909ceab37eaf9b8a890761fea0ad415dbab59369a8649e5585",
+      "source": "supabase/local/academy2_event_kit_enrollment.sql"
+    },
+    {
+      "order": 65,
+      "path": "docs/academy2-sept30-candidate/65_assignment_replacement.sql",
+      "sha256": "b390d9955d0bf9cc8ea637f25543b66c34eff1cc5216aa33a65d868fd4d421e6",
+      "source": "supabase/local/academy2_event_assignment_replacement.sql"
+    }
+  ]
+}

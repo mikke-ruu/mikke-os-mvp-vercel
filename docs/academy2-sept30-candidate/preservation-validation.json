@@ -1,0 +1,11 @@
+{
+  "checkedAt": "2026-09-29T14:57:27.720Z",
+  "target": "academy2_sept30_preservation_20260929",
+  "template": "academy2_release_validation_20260926_v2",
+  "additions": 60,
+  "orderedApply": true,
+  "rollbackFunctionsUnchanged": true,
+  "productionChanged": false,
+  "limitation": "Owned local modeled baseline, not a fresh full production snapshot",
+  "legacyFixturePreserved": true
+}

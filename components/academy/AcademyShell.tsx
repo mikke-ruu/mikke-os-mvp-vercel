@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { HeadquartersBoundary } from "@/components/academy2/HeadquartersBoundary";
 import { AcademyPageHelp } from "./AcademyPageHelp";
 import { AcademyUsageStatus } from "./AcademyUsageStatus";
 import { AcademySchemeUsageStatus } from "./AcademySchemeUsageStatus";
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 import { CalendarDays, Globe, Megaphone } from "lucide-react";
 import surface from "./academy-surface.module.css";
+import { isAcademyPageEditorPath } from "@/lib/academy/editor-layout";
 import { AuthGate, useAuth } from "@/components/AuthGate";
 import {
   MikkeAppShell,
@@ -45,7 +47,7 @@ import type { AcademyAccessContext, AcademyHeadquartersAccess } from "@/types/da
 const honbuNav: MikkeShellNavItem[] = [
   { href: "/academy", label: "ダッシュボード", icon: LayoutDashboard },
   { href: "/academy/courses", label: "講座", icon: BookOpen },
-  { href: "/academy/offerings", label: "募集", icon: Megaphone },
+  { href: "/academy/offerings", label: "サービス", icon: Megaphone },
   { href: "/academy/classes", label: "開催日時", icon: CalendarDays },
   { href: "/academy/offering-applications", label: "申込", icon: ClipboardList },
   { href: "/academy/portal", label: "マイページ", icon: GraduationCap },
@@ -58,8 +60,8 @@ const koushiNav: MikkeShellNavItem[] = [
   { href: "/academy/portal", label: "マイページ", icon: LayoutDashboard },
   { href: "/academy/portal/study", label: "レッスン・教材", icon: GraduationCap },
   { href: "/academy/offering-applications/mine", label: "自分の申込", icon: ClipboardList },
-  { href: "/academy/portal/offerings", label: "募集ページ", icon: Megaphone },
-  { href: "/academy/portal/offering-applications", label: "募集の申込", icon: ClipboardList },
+  { href: "/academy/portal/offerings", label: "サービスページ", icon: Megaphone },
+  { href: "/academy/portal/offering-applications", label: "サービスの申込", icon: ClipboardList },
   { href: "/academy/portal/class-requests", label: "担当依頼", icon: CalendarCheck },
   { href: "/academy/portal/url", label: "プロフィール・QR", icon: Link2 },
   { href: "/academy/portal/kits", label: "教材注文", icon: Package },
@@ -67,7 +69,7 @@ const koushiNav: MikkeShellNavItem[] = [
 
 const honbuBottomNav: MikkeShellBottomNavItem[] = [
   { href: "/academy/courses", label: "講座", icon: BookOpen },
-  { href: "/academy/offerings", label: "募集", icon: Megaphone },
+  { href: "/academy/offerings", label: "サービス", icon: Megaphone },
   { href: "/academy/classes", label: "開催日時", icon: CalendarDays },
   { href: "/academy/offering-applications", label: "申込", icon: ClipboardList }
 ];
@@ -76,8 +78,8 @@ const koushiBottomNav: MikkeShellBottomNavItem[] = [
   { href: "/academy/portal", label: "ホーム", icon: LayoutDashboard },
   { href: "/academy/portal/study", label: "復習・資料", icon: GraduationCap },
   { href: "/academy/offering-applications/mine", label: "自分の申込", icon: ClipboardList },
-  { href: "/academy/portal/offerings", label: "募集", icon: Store },
-  { href: "/academy/portal/offering-applications", label: "募集の申込", icon: ClipboardList }
+  { href: "/academy/portal/offerings", label: "サービス", icon: Store },
+  { href: "/academy/portal/offering-applications", label: "サービスの申込", icon: ClipboardList }
 ];
 
 function canShowManageHref(context: AcademyAccessContext | null, href: string) {
@@ -130,6 +132,7 @@ function ShellInner({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const pageEditor = isAcademyPageEditorPath(pathname);
   const searchParams = useSearchParams();
   const canonicalSearch = searchParams.toString();
   const routeContext = parseAcademyContextPath(pathname);
@@ -478,6 +481,7 @@ function ShellInner({
 
   return (
     <MikkeAppShell
+      contentWidth={pageEditor ? "full" : "standard"}
       appName="Academy"
       title="Academy"
       subtitle={variant === "honbu" ? "本部｜教室全体の運営" : "マイポータル｜自分の受講・講師活動"}
@@ -503,7 +507,7 @@ function ShellInner({
     >
       <div
         onClickCapture={captureAcademyLink}
-        className={surface.page}
+        className={`${surface.page} ${pageEditor ? surface.fullWidth : ""}`}
       >
       {previewMode === "dashboard" || previewMode === "walkthrough" ? (
         <div className="mb-2 border-l-2 border-[var(--mikke-accent)] px-2 py-1 text-xs leading-5 text-[var(--mikke-text)]">
@@ -611,9 +615,7 @@ function ShellInner({
 export function HonbuShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <AuthGate>
-      <ShellInner variant="honbu" title={title}>
-        {children}
-      </ShellInner>
+      <HeadquartersBoundary title={title} legacy={<ShellInner variant="honbu" title={title}>{children}</ShellInner>}>{children}</HeadquartersBoundary>
     </AuthGate>
   );
 }

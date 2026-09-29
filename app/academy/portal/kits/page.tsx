@@ -1,9 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { ExternalLink, Package } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
+import { AcademyContextBoundary } from "@/components/academy/AcademyContextBoundary";
 import { getCoursesByIds, getMyInstructorRecords } from "@/lib/academy/instructor-portal";
 import { KIT_STATUS_LABELS, createKitOrder, listMyKitOrders } from "@/lib/academy/kits";
 import { formatDate } from "@/lib/format";
@@ -104,9 +107,12 @@ function MyKitsContent() {
   const [courseMap, setCourseMap] = useState<Record<string, AcademyCourse>>({});
   const [orders, setOrders] = useState<AcademyKitOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
+    try {
     const myRecords = await getMyInstructorRecords(profile.user_id);
     setRecords(myRecords);
     const [courses, myOrders] = await Promise.all([
@@ -115,7 +121,9 @@ function MyKitsContent() {
     ]);
     setCourseMap(Object.fromEntries(courses.map((c) => [c.id, c])));
     setOrders(myOrders);
-    setLoading(false);
+    } catch {
+      setLoadError("注文履歴を読み込めませんでした。もう一度お試しください。");
+    } finally { setLoading(false); }
   }, [profile.user_id]);
 
   useEffect(() => {
@@ -123,14 +131,18 @@ function MyKitsContent() {
   }, [load]);
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (loadError) return <div className="space-y-3 py-8"><p role="alert" className="text-sm text-[var(--mikke-danger)]">{loadError}</p><button type="button" className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3" onClick={() => void load()}>再読み込み</button></div>;
   if (records.length === 0) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">まだ講師登録されていません。</p>;
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <p className="text-xs text-[var(--mikke-muted)]">
-        通常のキット仕入れは「申込管理」の各申込にある「受講日を確定してキットを仕入れる」から行ってください。
-        ここでは過去の注文履歴を確認できます。
+        注文履歴を確認できます。申込に紐づかない単発注文は、下の「単発注文を作成する」から受け付けています。
       </p>
+      <Link href={toCurrentAcademyContextHref("/academy/portal/applications")} className="inline-flex min-h-11 items-center text-sm font-bold text-[var(--mikke-primary)]">
+        旧申込からキットを仕入れる →
+      </Link>
+      <p className="text-xs text-[var(--mikke-muted)]">旧申込の一覧で、対象の申込にある「受講日を確定してキットを仕入れる」を選んでください。</p>
 
       {/* 注文履歴 */}
       <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
@@ -177,7 +189,7 @@ function MyKitsContent() {
       {/* 申込に紐付かない単発注文（例外対応用・目立たない導線） */}
       <details className="rounded-2xl border border-dashed border-[var(--mikke-line)] bg-white p-4 md:p-6">
         <summary className="cursor-pointer text-xs font-bold text-[var(--mikke-muted)]">
-          申込に紐づかない単発注文（例外対応・通常は使いません）
+          単発注文を作成する（申込に紐づかない注文）
         </summary>
         <OtherOrderForm
           records={records}
@@ -193,7 +205,7 @@ function MyKitsContent() {
 export default function MyKitsPage() {
   return (
     <KoushiShell title="キット発注">
-      <MyKitsContent />
+      <AcademyContextBoundary><MyKitsContent /></AcademyContextBoundary>
     </KoushiShell>
   );
 }

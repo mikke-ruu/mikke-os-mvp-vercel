@@ -1,6 +1,22 @@
 import type { FirstPublicationStatus } from "./first-publication/rpc-client";
 import type { FirstPublicationAccess } from "./first-publication/access-client";
 
+/** A local deadline only prompts a refresh; it never projects payment success. */
+export function describeFirstPublicationAccess(access: FirstPublicationAccess, periodEnded: boolean) {
+  if (access.phase === "expired") return access.cancellationAcceptedAt
+    ? "有料移行は取消済みで、無料期間は終了しました。利用状態をご確認ください。"
+    : "利用期間は終了しました。お支払いと利用状態をご確認ください。";
+  if (periodEnded) return "表示されている利用期限を過ぎています。最新の利用状態を確認してください。";
+  if (access.phase === "attention") return "お支払いと利用状態の確認が必要です。有料利用が始まったとは限りません。";
+  if (access.phase === "sync_pending") return "初公開後の契約情報を確認中です。同じ公開操作を繰り返さず、最新の利用状態を確認してください。";
+  if (access.phase === "prepared") return "無料期間は初めての講座公開が成功した時点から始まります。";
+  if (access.phase === "paid") return access.active
+    ? "支払いが確認された有料期間です。解約と講座の非公開は別の手続きです。"
+    : "有料契約の利用状態を確認してください。現在利用できる状態とは限りません。";
+  if (access.cancellationAcceptedAt) return "有料移行の取消を受け付けています。現在の利用は元の無料終了日時まで続き、新しいCommunity招待はできません。";
+  return "初公開から168時間が無料期間です。期限後は確認済みの契約条件で有料利用へ移行します。下書きに戻しても契約は終了しません。";
+}
+
 /** Display only. A local clock never grants access or authorizes payment. */
 export function describeFirstPublication(state: FirstPublicationStatus, now: number, access?: FirstPublicationAccess) {
   if (access?.phase === "paid") return {

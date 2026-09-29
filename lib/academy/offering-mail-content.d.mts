@@ -1,0 +1,14 @@
+export type OperationalMailKind = 'instructor_registered' | 'instructor_invitation' | 'instructor_linked' | 'instructor_order_headquarters' | 'instructor_order_received';
+export type MailKind = 'receipt' | 'headquarters' | 'materials' | OperationalMailKind;
+export type MailVariable = 'name' | 'title' | 'price' | 'materials_url' | 'applications_url' | 'manager_url' | 'instructor_url' | 'invitation_url' | 'order_url';
+export type MailPayload = { application_id?: string; source_id?: string; headquarters_id: string; name: string; title: string; price: number | string; payment_method?: string; invitation_token?: string; invitation_redacted?: boolean };
+export const OPERATIONAL_MAIL_KINDS: readonly OperationalMailKind[];
+export const MAIL_KINDS: readonly MailKind[];
+export const MAIL_VARIABLES: readonly MailVariable[];
+export const MAX_BODY_LENGTH: 4000;
+export const MAIL_SUBJECTS: Readonly<Record<MailKind,string>>;
+export function DEFAULT_BODIES(kind: MailKind,paymentMethod?: string): string;
+export function validateBody(body: string | null | undefined): string[];
+export function renderPlainBody(kind: MailKind,body: string | null | undefined,payload: MailPayload,appOrigin?: string): string;
+export function renderHtmlBody(kind: MailKind,body: string | null | undefined,payload: MailPayload,appOrigin?: string): string;
+export function renderSnapshotPlainBody(kind: MailKind,payload: MailPayload & {mail_content_version?: number | null; body_override?: string | null; template_version?: number},appOrigin?: string): string;

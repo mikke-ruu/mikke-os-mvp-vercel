@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ClipboardList, Mail, Package, Phone, X } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
+import { AcademyContextBoundary } from "@/components/academy/AcademyContextBoundary";
 import { APPLICATION_STATUS_LABELS } from "@/lib/academy/applications";
 import { getCoursesByIds, getMyInstructorRecords, listMyApplications } from "@/lib/academy/instructor-portal";
 import { KIT_STATUS_LABELS, createKitOrder, listMyKitOrders } from "@/lib/academy/kits";
@@ -336,7 +337,7 @@ function MyApplicationsContent() {
 export default function MyApplicationsPage() {
   return (
     <KoushiShell title="申込管理">
-      <MyApplicationsContent />
+      <AcademyContextBoundary><MyApplicationsContent /></AcademyContextBoundary>
     </KoushiShell>
   );
 }

@@ -1,5 +1,8 @@
 "use client";
 
+import { useAcademy2Headquarters } from '@/components/academy2/HeadquartersBoundary';
+import { HeadquartersHome } from '@/components/academy2/HeadquartersHome';
+
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -210,7 +213,9 @@ export default function AcademyDashboardPage() {
 }
 
 function DashboardIdentity() {
+  const hq = useAcademy2Headquarters();
   const { user } = useAuth();
   const pathname = usePathname();
+  if (hq) return <HeadquartersHome key={hq.id} />;
   return <DashboardContent key={`${user.id}:${pathname}`} />;
 }

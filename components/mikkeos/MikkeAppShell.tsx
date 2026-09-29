@@ -64,6 +64,8 @@ type MikkeAppShellProps = {
    * 未指定の既存アプリ（STORY等）は従来通り＝後方互換。
    */
   navItems?: MikkeShellNavItem[];
+  /** Shared detail pages can retain the section from which they were opened. */
+  activeNavigationHref?: string;
   /** モバイル下部メニュー（アイコンのみ5枠想定）。navItems指定時のみ意味を持つ。 */
   bottomNavItems?: MikkeShellBottomNavItem[];
   /** 中央の主要操作だけ別の固定色にする。未指定時はthemeと同じ。 */
@@ -80,6 +82,7 @@ type MikkeAppShellProps = {
     icon: LucideIcon;
     onClick: () => void;
   };
+  contentWidth?: "standard" | "full";
   children: React.ReactNode;
 };
 
@@ -122,12 +125,14 @@ export function MikkeAppShell({
   onSignOut,
   footerLabel,
   navItems,
+  activeNavigationHref,
   bottomNavItems,
   primaryActionTone,
   showSharedUtilities = true,
   showBottomNavLabels = false,
   simpleMenu = false,
   sidebarFooterAction,
+  contentWidth = "standard",
   children
 }: MikkeAppShellProps) {
   const pathname = usePathname() ?? "";
@@ -148,11 +153,13 @@ export function MikkeAppShell({
   const hasSidebar = Boolean(navItems && navItems.length > 0);
   const toneStyle = tileToneStyles[theme];
   const primaryToneStyle = tileToneStyles[primaryActionTone ?? theme];
-  const activeNavHref = navItems && navItems.length > 0 ? findActiveHref(pathname, navItems.map((item) => item.href)) : null;
+  const activeNavHref = navItems?.some(item => item.href === activeNavigationHref)
+    ? activeNavigationHref
+    : navItems && navItems.length > 0 ? findActiveHref(pathname, navItems.map((item) => item.href)) : null;
   const activeBottomHref =
     bottomNavItems && bottomNavItems.length > 0
       ? findActiveHref(
-          pathname,
+          activeNavigationHref ?? pathname,
           bottomNavItems.filter((item) => !item.primary).map((item) => item.href)
         )
       : null;
@@ -314,7 +321,7 @@ export function MikkeAppShell({
         <div className="flex min-w-0 flex-1 flex-col">
           <AppHeader title={title} onMenuClick={() => setMenuOpen(true)} menuOpen={menuOpen} hideMenuOnDesktop={hasSidebar} />
 
-          <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-5 pb-10 md:py-8">{children}</div>
+          <div className={`mx-auto w-full ${contentWidth === "full" ? "" : "max-w-7xl"} flex-1 px-4 py-5 pb-10 md:py-8`}>{children}</div>
 
           <footer className="mx-auto w-full max-w-7xl px-4 pb-8 text-center text-xs font-semibold text-[var(--mikke-muted-light)]">
             {footerLabel ?? `${appName} by mikke`}

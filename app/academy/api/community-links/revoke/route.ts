@@ -21,17 +21,21 @@ export async function POST(request: Request) {
   const accessToken = authorization?.startsWith("Bearer ") ? authorization.slice("Bearer ".length).trim() : "";
   if (!accessToken) return json({ ok: false, stoppedCount: 0, error: "ログインが必要です。" }, 401);
 
-  let body: { headquartersId?: unknown; mappingId?: unknown };
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return json({ ok: false, stoppedCount: 0, error: "リクエストの形式が不正です。" }, 400);
   }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return json({ ok: false, stoppedCount: 0, error: "リクエストの形式が不正です。" }, 400);
+  }
+  const { headquartersId, mappingId } = body as Record<string, unknown>;
   if (
-    typeof body.headquartersId !== "string"
-    || typeof body.mappingId !== "string"
-    || !uuidPattern.test(body.headquartersId)
-    || !uuidPattern.test(body.mappingId)
+    typeof headquartersId !== "string"
+    || typeof mappingId !== "string"
+    || !uuidPattern.test(headquartersId)
+    || !uuidPattern.test(mappingId)
   ) {
     return json({ ok: false, stoppedCount: 0, error: "接続情報を確認できませんでした。画面を再読み込みしてください。" }, 400);
   }
@@ -39,8 +43,8 @@ export async function POST(request: Request) {
   try {
     const result = await stopAcademyCommunityClaims({
       accessToken,
-      headquartersId: body.headquartersId,
-      mappingId: body.mappingId
+      headquartersId,
+      mappingId
     });
     return json({ ok: true, stoppedCount: result.stoppedCount }, 200);
   } catch (error) {

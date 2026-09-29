@@ -1,4 +1,6 @@
 "use client";
+import { academyCourseLabel } from "@/lib/academy/course-display";
+
 
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
@@ -78,7 +80,7 @@ export function ManualResourceForm({ courseId, onSaved, onCancel }: { courseId: 
             <option value="">選択してください</option>
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.code} {c.name}
+                {academyCourseLabel(c)}
               </option>
             ))}
           </select>

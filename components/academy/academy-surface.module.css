@@ -6,3 +6,5 @@
 .utility{font-size:12px;margin:0 0 20px;color:var(--mikke-muted)}
 .utility>summary{cursor:pointer;padding:5px 0}
 @media(max-width:600px){.page{padding-bottom:16px}.utility{margin-bottom:14px}}
+
+.fullWidth { max-width: none; width: 100%; }

@@ -1,13 +1,16 @@
 "use client";
+import { academyCourseCode, academyCourseLabel } from "@/lib/academy/course-display";
+
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Instagram, MapPin, Monitor } from "lucide-react";
 import { getListedInstructor, getPublicCourse } from "@/lib/academy/lp";
+import { AcademyPublicServices } from "@/components/academy/AcademyPublicServices";
 import type { AcademyCourse, AcademyInstructor } from "@/types/database";
 
 // 講師の営業用ページ（公開）
-// 本部が作った講座情報 + 講師プロフィール。このページ経由の申込は講師受付になる。
+// 講師紹介URLを保ち、公開サービスのoiページへ申込を案内する。
 
 function InstructorPublicInner({ instructorId }: { instructorId: string }) {
   const [instructor, setInstructor] = useState<AcademyInstructor | null>(null);
@@ -43,7 +46,7 @@ function InstructorPublicInner({ instructorId }: { instructorId: string }) {
         </h1>
         {course ? (
           <p className="mt-1 text-xs font-bold tracking-[0.2em] text-[var(--mikke-accent-strong)]">
-            {course.code} 認定講師
+            {academyCourseLabel(course)} 認定講師
             {instructor.instructor_number ? ` ・ No.${instructor.instructor_number}` : ""}
           </p>
         ) : null}
@@ -83,19 +86,21 @@ function InstructorPublicInner({ instructorId }: { instructorId: string }) {
         <section className="mt-6 overflow-hidden rounded-[2rem] border border-[var(--mikke-line)] bg-white">
           {course.main_image_url ? <img src={course.main_image_url} alt="" className="h-48 w-full object-cover md:h-64" /> : null}
           <div className="p-6 text-center md:p-8">
-            <p className="text-[10px] font-bold tracking-[0.25em] text-[var(--mikke-accent-strong)]">{course.code}</p>
+            {academyCourseCode(course.code) && <p className="text-[10px] font-bold tracking-[0.25em] text-[var(--mikke-accent-strong)]">{academyCourseCode(course.code)}</p>}
             <h2 className="mt-1 text-lg font-bold text-[var(--mikke-text)] md:text-xl">{course.name}</h2>
             {course.subtitle ? <p className="mt-1 text-xs text-[var(--mikke-muted)]">{course.subtitle}</p> : null}
             <p className="mt-3 text-sm font-bold text-[var(--mikke-text)]">
-              受講料 {course.price.toLocaleString()}円
+              講座の基本価格 {course.price.toLocaleString()}円
               {course.duration_text ? <span className="ml-2 text-xs font-normal text-[var(--mikke-muted)]">{course.duration_text}</span> : null}
             </p>
             <div className="mt-5 space-y-2">
-              <p className="text-sm">お申込みは、この講師から案内された募集ページをご利用ください。</p>
+              <a href="#services" className="text-sm underline">サービスの詳細・申込を見る</a>
             </div>
           </div>
         </section>
       ) : null}
+
+      <AcademyPublicServices key={instructor.id} headquartersId={instructor.headquarters_id} instructorId={instructor.id} courseId={instructor.course_id} />
 
       <p className="mt-8 text-center text-[10px] tracking-widest text-[var(--mikke-muted-light)]">POWERED BY Academy</p>
     </div>

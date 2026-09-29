@@ -1,23 +1,26 @@
 "use client";
+import { academyCourseCode } from "@/lib/academy/course-display";
+
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ExternalLink, FileText, Link2, Video } from "lucide-react";
-import { useAuth } from "@/components/AuthGate";
-import { supabase } from "@/lib/supabase/client";
+import { AuthGate, useAuth } from "@/components/AuthGate";
+import { ownedLearnerMaterialApplication } from "@/lib/academy2/learner-material-route.mjs";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { getCoursesByIds, getMyInstructorRecords, listMaterialsForInstructor } from "@/lib/academy/instructor-portal";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
 import { getLearnerPageForViewer } from "@/lib/academy/learner-page";
-import { listMyLearnerApplications } from "@/lib/academy/learner-portal";
+import { listMyLearnerCourseMemberships } from "@/lib/academy/learner-portal";
 import { listMyCourseAccessGrants, resolveCourseAccessGrant } from "@/lib/academy/course-access";
 import { getAcademyRouteContext, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { PageBlocks } from "@/components/academy/PageBlocks";
 import { AcademyLessonContent } from "@/components/academy/AcademyLessonContent";
+import { LearnerMaterials } from "@/components/academy2/LearnerMaterials";
 import { PrivateMaterialFiles } from "@/components/academy/PrivateMaterialFiles";
 import { isAcademyLocalReview, academyPreviewCourses } from "@/lib/academy/preview";
-import type { AcademyApplication, AcademyCourse, AcademyCourseAccessGrant, AcademyInstructor, AcademyInstructorPage, AcademyLearnerPage, AcademyMaterial } from "@/types/database";
+import type { AcademyCourse, AcademyCourseAccessGrant, AcademyInstructor, AcademyInstructorPage, AcademyLearnerPage, AcademyMaterial } from "@/types/database";
 
 function formatAccessDate(value: string) {
   return new Intl.DateTimeFormat("ja-JP", {
@@ -41,8 +44,7 @@ function StudyContent() {
   const searchParams = useSearchParams();
   const selectedCourseId = searchParams.get("course");
   const [records, setRecords] = useState<AcademyInstructor[]>([]);
-  const [learnerApps, setLearnerApps] = useState<AcademyApplication[]>([]);
-  const [offeringCourseIds, setOfferingCourseIds] = useState<string[]>([]);
+  const [learnerCourseIds, setLearnerCourseIds] = useState<string[]>([]);
   const [loadError, setLoadError] = useState("");
   const [courseMap, setCourseMap] = useState<Record<string, AcademyCourse>>({});
   const [materials, setMaterials] = useState<AcademyMaterial[]>([]);
@@ -61,22 +63,16 @@ function StudyContent() {
     async function load() {
       try {
       const academyId = getAcademyRouteContext()?.academyId;
-      let offeringQuery = supabase.from("academy_offering_applications").select("course_ids").eq("learner_user_id", profile.user_id).eq("status", "paid");
-      if (academyId) offeringQuery = offeringQuery.eq("headquarters_id", academyId);
-      const { data: offeringApps, error: offeringError } = await offeringQuery;
-      if (offeringError) throw offeringError;
-      const newCourseIds = [...new Set((offeringApps ?? []).flatMap(row => Array.isArray(row.course_ids) ? row.course_ids.filter((id: unknown): id is string => typeof id === "string") : []))] as string[];
-      const [myRecords, myLearnerApps] = await Promise.all([
+      const [myRecords, membership] = await Promise.all([
         getMyInstructorRecords(profile.user_id, academyId),
-        listMyLearnerApplications(profile.user_id, academyId)
+        listMyLearnerCourseMemberships(profile.user_id, academyId)
       ]);
       if (cancelled) return;
       setRecords(myRecords);
-      setLearnerApps(myLearnerApps);
-      setOfferingCourseIds(newCourseIds);
-      if (!requestedView) setView(myLearnerApps.length > 0 || newCourseIds.length > 0 ? "learner" : "instructor");
+      setLearnerCourseIds(membership.courseIds);
+      if (!requestedView) setView(membership.courseIds.length > 0 ? "learner" : "instructor");
       const instructorCourseIds = myRecords.map((record) => record.course_id);
-      const learnerCourseIds = [...new Set([...myLearnerApps.map((application) => application.course_id), ...newCourseIds])];
+      const learnerCourseIds = membership.courseIds;
       const courseIds = [...new Set([...instructorCourseIds, ...learnerCourseIds])];
       const [courses, mats, pages, learnerPages, grants] = await Promise.all([
         getCoursesByIds(courseIds),
@@ -101,19 +97,19 @@ function StudyContent() {
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
   if (loadError) return <p role="alert" className="py-8 text-sm text-[var(--mikke-danger)]">{loadError}</p>;
   if (view === "learner") {
-    const learnerCourseIds = [...new Set([...learnerApps.map((application) => application.course_id), ...offeringCourseIds])];
     if (learnerCourseIds.length === 0) {
       return <div className="rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-sm leading-7"><h2 className="font-bold">講座復習ページを表示できる受講履歴がありません</h2><p>講座復習ページは、受講の登録と教材の閲覧権限がある講座に表示されます。講師として登録されているだけでは表示されません。</p><p>受講済みなのに表示されない場合は、本部に受講登録のアカウントをご確認ください。本部で作成中のページは編集画面の「プレビュー」から確認できます。</p><Link className="mt-3 inline-block text-[var(--mikke-primary)]" href="?view=instructor">講師マニュアルページを確認する →</Link></div>;
     }
+    if (selectedCourseId && !learnerCourseIds.includes(selectedCourseId)) return <p role="status" className="py-8 text-sm text-[var(--mikke-muted)]">この講座の復習ページは表示できません。マイページから受講登録のある講座を選んでください。</p>;
     return (
       <div className="mx-auto max-w-3xl space-y-4">
-        {learnerCourseIds.map((courseId) => {
+        {learnerCourseIds.filter(courseId => !selectedCourseId || courseId === selectedCourseId).map((courseId) => {
           const course = courseMap[courseId] ?? (isAcademyLocalReview() ? academyPreviewCourses.find((item) => item.id === courseId) : undefined);
           const page = learnerPageMap[courseId];
           const access = resolveCourseAccessGrant(accessGrants, courseId);
           return <section key={courseId} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
+            {academyCourseCode(course?.code) && <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{academyCourseCode(course?.code)}</span>}
             <h2 className="text-base font-bold text-[var(--mikke-text)]">{course?.name}</h2>
           </div>
           {access.state === "active" ? (
@@ -157,7 +153,7 @@ function StudyContent() {
         return (
           <section key={rec.id} className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
             <div className="flex items-center gap-2">
-              <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
+              {academyCourseCode(course?.code) && <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{academyCourseCode(course?.code)}</span>}
               <h2 className="text-sm font-bold text-[var(--mikke-text)] md:text-base">{course?.name}</h2>
             </div>
 
@@ -207,20 +203,36 @@ function StudyContent() {
 }
 
 function StudyPageContent() {
-  const requestedView = useSearchParams().get("view");
+  const params = useSearchParams();
+  const requestedView = params.get("view");
+  const pathname = usePathname();
+  const { profile } = useAuth();
   const returnHref = `/academy/portal${requestedView === "instructor" || requestedView === "learner" ? `?view=${requestedView}` : ""}`;
   return (
-    <KoushiShell title="講座復習ページ・講師マニュアルページ">
+    <>
       <nav aria-label="教材ページの切り替え" className="mx-auto mb-4 flex max-w-3xl flex-wrap gap-2">
         <Link className="inline-flex min-h-11 items-center px-2 text-sm font-bold text-[var(--mikke-primary)]" href={toCurrentAcademyContextHref(returnHref)}>マイページへ戻る</Link>
         <Link className="rounded-lg border border-[var(--mikke-line)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]" href="?view=learner">講座復習ページ</Link>
         <Link className="rounded-lg border border-[var(--mikke-line)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]" href="?view=instructor">講師マニュアルページ</Link>
       </nav>
-      <StudyContent />
-    </KoushiShell>
+      {params.get("application") ? <LearnerMaterials key={`${profile.user_id}:${params.get("application")}`} applicationId={params.get("application")!} /> : <StudyContent key={`${profile.user_id}:${pathname}:${params.toString()}`} />}
+    </>
   );
 }
 
+function OwnedStudyMaterials({applicationId}:{applicationId:string}) {
+  const {user}=useAuth();
+  return <main className="mx-auto max-w-3xl px-4 py-8"><Link href="/academy/learner-home" className="mb-4 inline-flex min-h-11 items-center underline">← 受講者ホームへ</Link><LearnerMaterials key={`${user.id}:${applicationId}`} applicationId={applicationId}/></main>;
+}
+function StudyRoute() {
+  const params = useSearchParams();
+  const applicationId = ownedLearnerMaterialApplication(params.get('view'), params.get('application'));
+  // V2 purchases have their own immutable enrollment/material rights. Do not require
+  // legacy instructor membership or widen that gate. This RPC checks the actual owner,
+  // payment and material availability on every load, including direct URLs/reloads.
+  if (applicationId) return <AuthGate><OwnedStudyMaterials applicationId={applicationId}/></AuthGate>;
+  return <KoushiShell title="講座復習ページ・講師マニュアルページ"><StudyPageContent /></KoushiShell>;
+}
 export default function StudyPage() {
-  return <Suspense fallback={<p className="p-6">教材を読み込んでいます…</p>}><StudyPageContent /></Suspense>;
+  return <Suspense fallback={<p className="p-6">教材を読み込んでいます…</p>}><StudyRoute /></Suspense>;
 }

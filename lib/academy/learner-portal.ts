@@ -33,3 +33,22 @@ export async function listMyLearnerApplications(userId: string, academyId?: stri
   if (error) throw error;
   return (data ?? []) as AcademyApplication[];
 }
+
+/** Course membership is not permission to read lesson content. Keep grant checks in the viewer. */
+export async function listMyLearnerCourseMemberships(userId: string, academyId?: string) {
+  const explicitAcademyId = academyId ?? getAcademyRouteContext()?.academyId;
+  if (isAcademyLocalReview()) {
+    const legacyApplications = await listMyLearnerApplications(userId, explicitAcademyId);
+    return { legacyApplications, courseIds: [...new Set(legacyApplications.map(row => row.course_id))] };
+  }
+  let query = supabase.from("academy_offering_applications").select("course_ids")
+    .eq("learner_user_id", userId).eq("status", "paid");
+  if (explicitAcademyId) query = query.eq("headquarters_id", explicitAcademyId);
+  const [legacyApplications, offeringResult] = await Promise.all([
+    listMyLearnerApplications(userId, explicitAcademyId), query
+  ]);
+  if (offeringResult.error) throw offeringResult.error;
+  const offeringCourseIds = (offeringResult.data ?? []).flatMap(row =>
+    Array.isArray(row.course_ids) ? row.course_ids.filter((id: unknown): id is string => typeof id === "string") : []);
+  return { legacyApplications, courseIds: [...new Set<string>([...legacyApplications.map(row => row.course_id), ...offeringCourseIds])] };
+}

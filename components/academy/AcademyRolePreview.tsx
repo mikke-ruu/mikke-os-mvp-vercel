@@ -8,12 +8,12 @@ type Props = { role: Role; title: string; courseNames: string[]; price?: number 
 const menus = {
   learner: [
     ["教材・復習", "入金確認と閲覧期間の条件を満たすと、受講する講座の教材が表示されます。ここには教材本文を読み込んでいません。"],
-    ["申し込んだ募集", "申込時の金額・支払方法・入金状況を確認します。段階購入は前の講座の修了後に、元の募集ページから次の講座へ進みます。"],
+    ["申し込んだサービス", "申込時の金額・支払方法・入金状況を確認します。段階購入は前の講座の修了後に、元のサービスページから次の講座へ進みます。"],
   ],
   instructor: [
     ["講師マニュアル", "本部が用意した講座運営のマニュアルや資料を確認します。実際の表示は講師登録と権限に従います。"],
-    ["自分の募集ページ", "有効な資格がある講座の本部募集を選びます。本部の講座内容・価格はそのままで、プロフィールと追加の案内を編集します。"],
-    ["募集ページからの申込", "自分の募集ページから届いた担当申込だけを確認します。入金確認は本部で行います。"],
+    ["自分のサービスページ", "有効な資格がある講座の本部サービスを選びます。本部の講座内容・価格はそのままで、プロフィールと追加の案内を編集します。"],
+    ["サービスページからの申込", "自分のサービスページから届いた担当申込だけを確認します。入金確認は本部で行います。"],
     ["プロフィール・紹介URL・QR", "営業プロフィールを整え、紹介URLやQRコードで案内します。この見本には実際のURLやQRコードを表示していません。"],
     ["Community", "参加しているCommunityを確認します。講師認定だけで自動参加にはならず、別途招待・参加が必要です。"],
   ],
@@ -42,7 +42,7 @@ export function AcademyRolePreview({ role, title, courseNames, price }: Props) {
             <p className="mt-1 text-xs text-[var(--mikke-muted)]">{role === "learner" ? "受講者の見本" : "講師の見本（個人情報は未使用）"}</p>
             <div className="my-4 border-y border-[var(--mikke-line)] py-3"><h4 className="break-words font-bold">{title.trim() || "入力した講座・募集名"}</h4><p className="mt-1 text-xs">{role === "instructor" ? "認定済みの表示例" : stage === "applied" ? "入金確認待ちの表示例" : stage === "learning" ? "教材利用中の表示例" : "修了済みの表示例（自動認定ではありません）"}</p>{courseNames.length > 0 ? <ul className="mt-3 space-y-1 text-sm">{courseNames.map((name, index) => <li key={index}>{name || "講座名未入力"}</li>)}</ul> : <p className="mt-3 text-sm">講座を選ぶと、ここに講座名が表示されます。</p>}{role === "learner" && Number.isFinite(price) ? <p className="mt-3 text-sm">入力中の募集価格 ¥{price!.toLocaleString("ja-JP")} <span className="text-xs">（実際の申込金額ではありません）</span></p> : null}</div>
             <div className="divide-y divide-[var(--mikke-line)]">{items.map(([name], index) => <button type="button" key={name} aria-pressed={selected === index} onClick={() => setSelected(index)} className="flex min-h-12 w-full items-center justify-between gap-2 py-3 text-left text-sm aria-pressed:font-bold aria-pressed:text-[var(--mikke-primary)]"><span>{name}</span><span aria-hidden="true">›</span></button>)}</div>
-            <div className="mt-4 flex justify-around gap-2 border-t border-[var(--mikke-line)] pt-3 text-xs" aria-label="下部メニューの見本"><span>ホーム</span><span>{role === "learner" ? "復習・資料" : "募集"}</span><span>{role === "learner" ? "自分の申込" : "募集の申込"}</span></div>
+            <div className="mt-4 flex justify-around gap-2 border-t border-[var(--mikke-line)] pt-3 text-xs" aria-label="下部メニューの見本"><span>ホーム</span><span>{role === "learner" ? "復習・資料" : "サービス"}</span><span>{role === "learner" ? "自分の申込" : "サービスの申込"}</span></div>
           </section>
           <aside className="text-sm leading-7" aria-live="polite"><h3 className="font-bold">{items[selected]?.[0]}</h3><p className="mt-2">{items[selected]?.[1]}</p>{role === "learner" && selected === 0 ? <p className="mt-3">{stage === "applied" ? "この段階では教材を開けません。" : stage === "learning" ? "実際の教材は入金確認・閲覧期間の条件に従って表示されます。" : "修了後の閲覧は設定した期間に従います。修了後に期間が始まる教材は、修了記録後に利用できます。"}</p> : null}<p className="mt-4 text-xs text-[var(--mikke-muted)]">メニューを押すと説明が変わります。実際のページには移動しません。</p></aside>
         </div>

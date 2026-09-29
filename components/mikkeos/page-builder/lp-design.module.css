@@ -12,3 +12,7 @@
 @keyframes lpFade{from{opacity:0}to{opacity:1}}@keyframes lpRise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @container academy-lp (max-width:480px){.content .styled{--active-size:var(--lp-m-size,var(--lp-size,inherit));--active-line:var(--lp-m-lineHeight,var(--lp-lineHeight,1.7));--active-font:var(--lp-m-font,var(--lp-font,inherit));--active-tracking:var(--lp-m-letterSpacing,var(--lp-letterSpacing,normal));--active-columns:var(--lp-m-columns,1);--active-gap:var(--lp-m-gap,var(--lp-gap,16px));color:var(--lp-m-color,var(--lp-color,inherit));background:var(--lp-m-background,var(--lp-background,transparent));padding:var(--lp-m-padding,var(--lp-padding,0));border-color:var(--lp-m-border,var(--lp-border,transparent));border-radius:var(--lp-m-radius,var(--lp-radius,0));box-shadow:var(--lp-m-shadow,var(--lp-shadow,none))}}
 @media(prefers-reduced-motion:reduce){.styled[data-motion]{animation:none}}
+
+.content .styled[data-media] img{object-fit:var(--lp-media-fit,contain)}
+.content .styled[data-media-height] :is(img,iframe,video){height:var(--lp-media-height);max-height:none;aspect-ratio:auto}
+.settings input[type=color]{height:40px;min-height:40px;padding:3px}

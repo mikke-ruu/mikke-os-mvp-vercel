@@ -21,6 +21,7 @@ export async function listAcademyClasses(headquartersId: string) {
 
 export type AcademyClassInput = {
   courseId: string;
+  materialMode?: "legacy_program" | "course_current";
   title: string;
   scheduleMode: AcademyClass["schedule_mode"];
   startsAt: string;
@@ -40,10 +41,11 @@ export async function createAcademyClass(
 ) {
   assertAcademyWritable();
   const features = resolveAcademyCourseFeaturesForCourse(course);
-  const program = features.stepLearning
+  const materialMode = input.materialMode ?? "legacy_program";
+  const program = materialMode === "legacy_program" && features.stepLearning
     ? await getCourseProgram(headquartersId, course.id)
     : null;
-  if (features.stepLearning && !program) {
+  if (materialMode === "legacy_program" && features.stepLearning && !program) {
     throw new Error("先に講座のステップ教材を作成し、現在の内容を確定してください。");
   }
 
@@ -52,6 +54,7 @@ export async function createAcademyClass(
     .insert({
       headquarters_id: headquartersId,
       course_id: course.id,
+      ...(materialMode === "course_current" ? { material_mode: materialMode } : {}),
       program_id: program?.id ?? null,
       program_version_id: null,
       instructor_id: null,

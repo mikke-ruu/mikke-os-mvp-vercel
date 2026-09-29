@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { getAcademyRouteContext, toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { supabase } from "@/lib/supabase/client";
+import { MyOfferingBookings, PaidApplicationAssignment } from "./AcademyClassBookings";
 
 type Application = {
   id: string; headquarters_id: string; offering_title: string;
@@ -24,7 +26,10 @@ export function OfferingApplications({ audience }: { audience: Audience }) {
 }
 
 function Applications({ userId, academyId, audience }: { userId: string; academyId?: string; audience: Audience }) {
+  const searchParams = useSearchParams();
+  const status = audience === "hq" ? searchParams.get("status") : null;
   const [rows, setRows] = useState<Application[]>([]);
+  const visibleRows = rows.filter(row => status !== "pending" && status !== "paid" || row.status === status);
   const [instructorPages, setInstructorPages] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -97,18 +102,22 @@ function Applications({ userId, academyId, audience }: { userId: string; academy
   }
 
   return <div className="mx-auto max-w-3xl space-y-4">
+    {audience === "learner" ? <MyOfferingBookings key={`${userId}:${academyId ?? ""}`} userId={userId} headquartersId={academyId} /> : null}
+      {audience === "hq" ? <nav aria-label="入金状況で絞り込み" className="flex gap-4">{[["", "すべて"], ["pending", "入金確認待ち"], ["paid", "入金確認済み"]].map(([value,label]) => <Link key={value} aria-current={(status ?? "") === value ? "page" : undefined} className="min-h-11 py-3 underline aria-[current=page]:font-bold" href={toCurrentAcademyContextHref(`/academy/offering-applications${value ? `?status=${value}` : ""}`)}>{label}</Link>)}</nav> : null}
     {audience === "hq" && <header className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-[11px] tracking-[.14em]">MY ACADEMY</p><h1 className="mt-1 text-2xl font-bold">申込</h1></div></header>}
-    <p className="text-sm text-[var(--mikke-muted)]">{audience === "hq" ? "募集ページから届いた申込です。振込・現地払いの受領を確認してから教材を利用可能にします。カード決済の確認には使えません。" : audience === "instructor" ? "自分の募集ページから届いた申込です。入金確認と本部による修了確認は本部で行います。" : "募集ページから申し込んだ内容を確認できます。入金確認後に教材の利用が始まります。"}</p>
+    <p className="text-sm text-[var(--mikke-muted)]">{audience === "hq" ? "サービスページから届いた申込です。振込・現地払いの受領を確認し、入金済みとして記録します。カード決済の確認には使えません。" : audience === "instructor" ? "自分のサービスページから届いた申込です。入金確認と本部による修了確認は本部で行います。" : "サービスページから申し込んだ内容を確認できます。教材の利用開始日は講座の設定により異なります。"}</p>
     <button type="button" disabled={loading || saving} onClick={() => setRefresh(value => value + 1)} className="min-h-11 text-sm font-bold text-[var(--mikke-primary)] disabled:opacity-50">再読み込み</button>
     {error ? <p role="alert" className="text-sm text-[var(--mikke-danger)]">{error}</p> : null}
-    {loading ? <p role="status">読み込み中…</p> : !error && rows.length === 0 ? <p className="py-6 text-sm">募集ページからの申込はまだありません。</p> : null}
-    {rows.map(row => <section key={row.id} className="border-t border-[var(--mikke-line)] py-5">
+    {loading ? <p role="status">読み込み中…</p> : !error && visibleRows.length === 0 ? <p className="py-6 text-sm">{status === "pending" || status === "paid" ? "この入金状況の申込はありません。" : "サービスページからの申込はまだありません。"}</p> : null}
+    {visibleRows.map(row => <section key={row.id} className="border-t border-[var(--mikke-line)] py-5">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold">{row.offering_title}</h2><span className="text-sm font-bold">{row.status === "paid" ? "入金確認済み" : row.status === "pending" ? "入金確認待ち" : "状態を確認中"}</span></div>
       <p className="mt-2 text-xs text-[var(--mikke-muted)]">申込日 {new Date(row.created_at).toLocaleDateString("ja-JP")} / 受付番号 {row.id}</p>
       {audience !== "learner" ? <p className="mt-2 break-all text-sm">{row.applicant_name} / {row.applicant_email}</p> : null}
       <p className="mt-3 font-bold">申込金額（税込） {Number.isFinite(Number(row.price)) ? `¥${Number(row.price).toLocaleString("ja-JP")}` : "確認が必要です"}</p>
       <p className="text-sm">{row.payment_method === "bank" ? "銀行振込" : row.payment_method === "onsite" ? "現地払い" : "支払方法を確認してください"}</p>
+      {audience === "learner" && row.status === "pending" && row.payment_method === "bank" && <p className="mt-2 text-sm">お振込みの名義は、お申込みのお名前と同じにしてください。</p>}
       <details className="mt-3 text-sm"><summary className="cursor-pointer py-2">申込時の講座内容</summary><ul className="list-disc space-y-1 pl-5">{Array.isArray(row.course_snapshot) ? row.course_snapshot.map(course => <li key={course.id}>{course.name}</li>) : null}</ul></details>
+      {audience === "hq" && ["paid", "pending"].includes(row.status) ? <PaidApplicationAssignment applicationId={row.id} headquartersId={row.headquarters_id} applicantName={row.applicant_name} paid={row.status === "paid"} /> : null}
       {audience === "learner" && row.status === "paid" ? <Link className="mt-3 inline-flex min-h-11 items-center font-bold text-[var(--mikke-primary)]" href={toAcademyContextHref("/academy/portal/study?view=learner", row.headquarters_id, "teach")}>教材を確認する →</Link> : null}
       {(row.stage_index > 0 || row.course_snapshot.some(course => course.learner_access_mode === "days_after_completion")) && <div className="mt-3 text-sm">
         <p>{row.stage_index > 0 ? `第${row.stage_index}講座` : "まとめて申し込んだ講座"} {row.completed_at ? "修了済み" : ""}</p>
@@ -116,7 +125,7 @@ function Applications({ userId, academyId, audience }: { userId: string; academy
         {row.status === "paid" && !row.completed_at && audience === "learner" && (row.purchase_snapshot?.completion_mode ?? "hq") === "hq" && <p>本部の修了確認をお待ちください。</p>}
         {audience === "learner" && row.stage_index > 0 && row.completed_at && row.stage_index < (row.purchase_snapshot?.course_ids?.length ?? 0) && <Link className="inline-flex min-h-11 items-center font-bold text-[var(--mikke-primary)]" href={instructorPages[row.id] ? `/academy/oi/${instructorPages[row.id]}#apply` : `/academy/o/${row.offering_id}#apply`}>次の講座へ進む →</Link>}
       </div>}
-      {audience === "hq" && row.status === "pending" && ["bank", "onsite"].includes(row.payment_method) ? confirmId === row.id ? <div className="mt-3 space-y-2 bg-[var(--mikke-surface-soft)] p-3"><p className="text-sm">上記の金額を受け取りましたか？確認すると対象講座の教材が利用可能になります。返金や取消の操作ではありません。</p><div className="flex flex-wrap gap-3"><button type="button" disabled={saving} onClick={() => void confirmPayment(row)} className="min-h-11 rounded-lg bg-[var(--mikke-primary)] px-4 font-bold text-white disabled:opacity-50">{saving ? "保存中…" : "受領済みとして確定する"}</button><button type="button" disabled={saving} onClick={() => setConfirmId(null)} className="min-h-11 px-3">戻る</button></div></div> : <button type="button" disabled={saving} onClick={() => setConfirmId(row.id)} className="mt-3 min-h-11 rounded-lg border border-[var(--mikke-line)] px-4 font-bold">入金を確認する</button> : null}
+      {audience === "hq" && row.status === "pending" && ["bank", "onsite"].includes(row.payment_method) ? confirmId === row.id ? <div className="mt-3 space-y-2 bg-[var(--mikke-surface-soft)] p-3"><p className="text-sm">上記の金額を受け取りましたか？入金確認後は、講座で設定された条件に沿って教材の利用が始まります。返金や取消の操作ではありません。</p><div className="flex flex-wrap gap-3"><button type="button" disabled={saving} onClick={() => void confirmPayment(row)} className="min-h-11 rounded-lg bg-[var(--mikke-primary)] px-4 font-bold text-white disabled:opacity-50">{saving ? "保存中…" : "受領済みとして確定する"}</button><button type="button" disabled={saving} onClick={() => setConfirmId(null)} className="min-h-11 px-3">戻る</button></div></div> : <button type="button" disabled={saving} onClick={() => setConfirmId(row.id)} className="mt-3 min-h-11 rounded-lg border border-[var(--mikke-line)] px-4 font-bold">入金を確認する</button> : null}
     </section>)}
   </div>;
 }

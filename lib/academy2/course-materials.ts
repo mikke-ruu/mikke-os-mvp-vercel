@@ -1,0 +1,7 @@
+import {supabase} from '@/lib/supabase/client';
+import {assertAcademyWritable} from '@/lib/academy/preview';
+import type {AcademyPageBlock} from '@/types/database';
+export type Academy2CourseMaterials={courseId:string;headquartersId:string;revision:number;blocks:AcademyPageBlock[];curriculum:string[];source:'academy2_draft'|'legacy'|'empty';legacyUpdatedAt:string|null;deliveryChanged:false};
+function materialError(error:{code?:string}):Error{return new Error(error.code==='42501'?'この教材を確認・変更する権限がありません。':error.code==='PT409'?'別の変更が保存されています。入力内容を控えて、最新の教材を確認してください。':error.code==='22023'?'教材の入力内容を確認してください。':error.code==='PGRST202'||error.code==='42883'?'教材の保存接続を準備しています。':'教材の保存状態を確認できませんでした。入力内容は残っています。');}
+export async function getAcademy2CourseMaterials(hq:string,course:string):Promise<Academy2CourseMaterials>{const {data,error}=await supabase.rpc('academy2_course_materials',{p_headquarters_id:hq,p_course_id:course});if(error)throw materialError(error);return data as Academy2CourseMaterials;}
+export async function saveAcademy2CourseMaterials(current:Academy2CourseMaterials,blocks:AcademyPageBlock[]):Promise<Academy2CourseMaterials>{assertAcademyWritable();const {data,error}=await supabase.rpc('academy2_save_course_materials',{p_headquarters_id:current.headquartersId,p_course_id:current.courseId,p_expected_revision:current.revision,p_blocks:blocks,p_legacy_updated_at:current.legacyUpdatedAt});if(error)throw materialError(error);return data as Academy2CourseMaterials;}

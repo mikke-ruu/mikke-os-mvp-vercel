@@ -1,10 +1,13 @@
 "use client";
+import { academyCourseCode } from "@/lib/academy/course-display";
+
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Copy, ExternalLink, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { KoushiShell } from "@/components/academy/AcademyShell";
+import { AcademyContextBoundary } from "@/components/academy/AcademyContextBoundary";
 import { QrCode } from "@/components/academy/QrCode";
 import { getCoursesByIds, getMyInstructorRecords, updateMyInstructorProfile, type InstructorProfileEdit } from "@/lib/academy/instructor-portal";
 import {
@@ -251,19 +254,28 @@ function UrlContent() {
   const [origin, setOrigin] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
     setOrigin(window.location.origin);
+    let active = true;
+    setLoading(true); setLoadError("");
     async function load() {
+      try {
       const myRecords = await getMyInstructorRecords(profile.user_id);
+      const courses = await getCoursesByIds(myRecords.map((r) => r.course_id));
+      if (!active) return;
       setRecords(myRecords);
       setCourseMap(
-        Object.fromEntries((await getCoursesByIds(myRecords.map((r) => r.course_id))).map((c) => [c.id, c]))
+        Object.fromEntries(courses.map((c) => [c.id, c]))
       );
-      setLoading(false);
+      } catch { if (active) setLoadError("プロフィールを読み込めませんでした。もう一度お試しください。"); }
+      finally { if (active) setLoading(false); }
     }
     load();
-  }, [profile.user_id]);
+    return () => { active = false; };
+  }, [profile.user_id, revision]);
 
   async function copy(id: string, url: string) {
     await navigator.clipboard.writeText(url);
@@ -272,26 +284,27 @@ function UrlContent() {
   }
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
+  if (loadError) return <div className="space-y-3 py-8"><p role="alert" className="text-sm text-[var(--mikke-danger)]">{loadError}</p><button type="button" className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3" onClick={() => setRevision(value => value + 1)}>再読み込み</button></div>;
   if (records.length === 0) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">まだ講師登録されていません。</p>;
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <Link href="/academy/portal/offerings" className="block rounded-lg border border-[var(--mikke-line)] p-3 text-sm font-bold">本部の募集を使って自分の募集ページをつくる</Link>
+      <Link href="/academy/portal/offerings" className="block rounded-lg border border-[var(--mikke-line)] p-3 text-sm font-bold">本部のサービスを使って自分のサービスページをつくる</Link>
       {records.map((rec) => {
         const course = courseMap[rec.course_id];
         const salesUrl = `${origin}/academy/i/${rec.id}`;
         return (
           <section key={rec.id} className="space-y-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-4 md:p-6">
             <div className="flex items-center gap-2">
-              <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{course?.code}</span>
+              {academyCourseCode(course?.code) && <span className="rounded bg-[var(--mikke-accent-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--mikke-accent-strong)]">{academyCourseCode(course?.code)}</span>}
               <h2 className="text-sm font-bold text-[var(--mikke-text)]">{course?.name}</h2>
             </div>
 
             <div className="flex flex-col gap-4 md:flex-row md:items-start">
               <div className="flex-1">
-                <p className="text-xs font-bold text-[var(--mikke-accent)]">あなたの営業用URL</p>
+                <p className="text-xs font-bold text-[var(--mikke-accent)]">講師紹介ページのURL</p>
                 <p className="mt-1 text-[11px] text-[var(--mikke-muted)]">
-                  プロフィール付きの講師紹介ページです。SNSやブログでご活用ください。このURLからの申込はあなたに紐づきます。
+                  プロフィールを紹介するURLです。申込を受け付けるときは「自分のサービスページ」で公開したサービスのURLをご案内ください。
                 </p>
                 <div className="mt-2 flex items-center gap-2">
                   <input readOnly className={`${inputClass} bg-[var(--mikke-surface-soft)]`} value={salesUrl} />
@@ -350,7 +363,7 @@ function UrlContent() {
 export default function UrlPage() {
   return (
     <KoushiShell title="営業用URL">
-      <UrlContent />
+      <AcademyContextBoundary><UrlContent /></AcademyContextBoundary>
     </KoushiShell>
   );
 }

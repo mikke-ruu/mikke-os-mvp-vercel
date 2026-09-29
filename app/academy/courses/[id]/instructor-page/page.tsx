@@ -1,8 +1,13 @@
 "use client";
+import { academyCourseLabel } from "@/lib/academy/course-display";
+
 
 import { use, useEffect, useRef, useState } from "react";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { CourseMaterials } from "@/components/academy2/CourseMaterials";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AcademyLessonActions } from "@/components/academy/AcademyLessonActions";
 import { AcademyLessonEditor } from "@/components/academy/AcademyLessonEditor";
 import { readLessons, writeLessons } from "@/lib/academy/lesson-content";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
@@ -20,6 +25,7 @@ import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { getCourse } from "@/lib/academy/courses";
 import { getInstructorPage, saveInstructorPageBlocks } from "@/lib/academy/instructor-page";
 import { getLearnerPage, saveLearnerPage } from "@/lib/academy/learner-page";
+import { materialSaveErrorMessage } from "@/lib/academy/material-save-error";
 import type { AcademyCourse, AcademyHeadquarters, AcademyPageBlock, AcademyMaterial } from "@/types/database";
 
 function BuilderContent({ courseId, audience }: { courseId: string; audience: "learner" | "instructor" }) {
@@ -32,6 +38,7 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [isPublished, setIsPublished] = useState(false);
   const revision = useRef(0);
@@ -56,11 +63,15 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
           const existingBlocks = page?.blocks ?? [];
           setBlocks(existingBlocks.length ? existingBlocks : writeLessons(readLessons([], loadedCourse?.feature_settings?.marketing?.curriculum ?? [])));
           setIsPublished(page?.is_published ?? false);
+          setSaved(Boolean(page && existingBlocks.length));
+          setDirty(!page || !existingBlocks.length);
         } else {
           const page = await getInstructorPage(foundHq.id, courseId);
           if (cancelled) return;
           setBlocks(page?.blocks ?? []);
           setIsPublished(true);
+          setSaved(Boolean(page));
+          setDirty(!page);
         }
       }
       } catch {
@@ -71,11 +82,26 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
     return () => { cancelled = true; };
   }, [audience, profile.user_id, courseId]);
 
+  useEffect(() => {
+    if (!dirty && !saving) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty, saving]);
+
+  function markChanged() {
+    revision.current += 1;
+    setSaved(false);
+    setDirty(true);
+    setSaveError("");
+  }
+
   async function save() {
     if (!hq || !course || savePending.current) return;
     savePending.current = true;
     const savingRevision = revision.current;
     setSaving(true);
+    setSaved(false);
     setSaveError("");
     try {
       if (audience === "learner") {
@@ -85,8 +111,10 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
         await saveInstructorPageBlocks(profile, hq.id, course.id, blocks);
       }
       setSaved(revision.current === savingRevision);
-    } catch {
-      setSaveError("保存できませんでした。入力内容はこの画面に残っています。通信状態を確認して、もう一度保存してください。");
+      setDirty(revision.current !== savingRevision);
+    } catch (error) {
+      setDirty(true);
+      setSaveError(materialSaveErrorMessage(error));
     } finally {
       savePending.current = false;
       setSaving(false);
@@ -101,13 +129,14 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
     <AcademyCourseWorkspace course={course} activeTab={audience}>
       <div className="space-y-4">
       {audience === "learner" ? <>
-        <AcademyLessonEditor blocks={blocks} curriculum={[]} onChange={next => { revision.current += 1; setBlocks(next); setSaved(false); }} />
+        <AcademyLessonEditor blocks={blocks} curriculum={[]} onChange={next => { markChanged(); setBlocks(next); }} />
         <div className="flex justify-end"><Link className="inline-flex min-h-11 items-center rounded-lg border border-[var(--mikke-line)] bg-white px-4 text-sm font-bold" href={toCurrentAcademyContextHref(`/academy/courses/${course.id}`)}>講座情報に戻る</Link></div>
-        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={isPublished} onChange={event => { revision.current += 1; setIsPublished(event.target.checked); setSaved(false); }} />受講者のマイページに表示する</label>
+        <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={isPublished} onChange={event => { markChanged(); setIsPublished(event.target.checked); }} />受講者のマイページに表示する</label>
+        <p className="text-xs text-[var(--mikke-muted)]">チェックを外すと、受講者へ公開せず下書きとして保存します。体験利用中も下書き保存できます。</p>
         {privateMaterialUiEnabled && <details className="border-t border-[var(--mikke-line)] py-4"><summary className="min-h-11 cursor-pointer text-sm font-bold">受講生向けPDF資料</summary>{learnerPageId ? <PrivateMaterialFiles parent={{ audience: "learner", parentId: learnerPageId }} editable /> : <p className="mt-2 text-sm">教材を保存すると、PDFを追加できます。</p>}</details>}
       </> : <>
       <div>
-        <p className="truncate text-xs text-[var(--mikke-muted)]">{course.code} {course.name}</p>
+        <p className="truncate text-xs text-[var(--mikke-muted)]">{academyCourseLabel(course)}</p>
         <h2 className="text-base font-bold text-[var(--mikke-text)]">講師マニュアル</h2>
       </div>
       <p className="rounded-xl bg-[var(--mikke-accent-soft)] px-4 py-3 text-sm font-bold leading-6 text-[var(--mikke-text)]">
@@ -115,17 +144,19 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
       </p>
 
       <EditorPreview preview={<PageBlocks blocks={[...blocks.filter((block) => block.type !== "materials-list"), ...(audience === "instructor" && previewMaterials.some((material) => material.is_published) ? [{ type: "materials-list" } as const] : [])]} materials={previewMaterials.filter((material) => material.is_published)} />}>
-      <AcademyContentEditor blocks={blocks} onChange={next => { revision.current += 1; setBlocks(next); setSaved(false); }} />
+      <AcademyContentEditor blocks={blocks} onChange={next => { markChanged(); setBlocks(next); }} />
       {audience === "instructor" ? <section id="resources" className="border-t border-[var(--mikke-line)] pt-6"><ManualResources courseId={course.id} onChange={setPreviewMaterials} /></section> : null}
       </EditorPreview>
       </>}
-      <div className="flex items-center justify-end gap-3 rounded-xl border border-[var(--mikke-line)] bg-white p-4">
+      {audience === "learner" ? <AcademyLessonActions blocks={blocks} saving={saving} saved={saved} error={saveError} onSave={save} /> : <><div className="flex items-center justify-end gap-3 rounded-xl border border-[var(--mikke-line)] bg-white p-4">
         <button onClick={save} disabled={saving} className="rounded-xl bg-[var(--mikke-accent)] px-4 py-3 text-sm font-bold text-white disabled:opacity-60">
           {saving ? "保存中…" : "保存する"}
         </button>
-        {saved ? <span className="text-xs font-bold text-[var(--mikke-success)]">保存しました</span> : null}
+        <span role="status" aria-live="polite" className={`text-xs font-bold ${saveError ? "text-[var(--mikke-danger)]" : saved ? "text-[var(--mikke-success)]" : "text-[var(--mikke-muted)]"}`}>
+          {saving ? "保存中です" : saveError ? "保存に失敗しました（未保存）" : saved ? "保存済み" : "未保存の内容があります"}
+        </span>
       </div>
-      {saveError ? <p role="alert" className="text-sm text-[var(--mikke-danger)]">{saveError}</p> : null}
+      {saveError ? <p role="alert" className="text-sm text-[var(--mikke-danger)]">{saveError}</p> : null}</>}
       </div>
     </AcademyCourseWorkspace>
   );
@@ -137,7 +168,9 @@ export default function InstructorPageBuilder({ params }: { params: Promise<{ id
   const audience = searchParams.get("audience") === "learner" ? "learner" : "instructor";
   return (
     <HonbuShell title={audience === "learner" ? "レッスン教材" : "講師マニュアル"}>
-      <BuilderContent key={`${id}:${audience}`} courseId={id} audience={audience} />
+      <BuilderIdentity courseId={id} audience={audience} />
     </HonbuShell>
   );
 }
+
+function BuilderIdentity({courseId,audience}:{courseId:string;audience:"learner"|"instructor"}){const hq=useAcademy2Headquarters();if(hq)return audience==='learner'?<CourseMaterials key={hq.id+':'+courseId} headquartersId={hq.id} courseId={courseId}/>:<p>講師マニュアルの接続を準備しています。</p>;return <BuilderContent key={courseId+':'+audience} courseId={courseId} audience={audience}/>;}

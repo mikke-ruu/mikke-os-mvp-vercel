@@ -16,6 +16,9 @@ export type MikkeContentBlock = {
   items?: string[];
   title?: string;
   url?: string;
+  /** Optional lesson link presentation; absent preserves the existing card. */
+  lessonLinkDisplay?: "card" | "text";
+  lessonVideoPreview?: boolean;
   links?: {label:string;url:string}[];
   images?: {url:string;alt:string;caption?:string;href?:string;assetId?:string}[];
   imageSide?: "left" | "right";

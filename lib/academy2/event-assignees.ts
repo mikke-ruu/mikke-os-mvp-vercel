@@ -1,0 +1,10 @@
+import {supabase} from '@/lib/supabase/client';
+import {assertAcademyWritable} from '@/lib/academy/preview';
+export type EventAssigneeKind='headquarters'|'external';
+export type EventAssigneeView={assignment:{revision:number;kind:EventAssigneeKind;assigneeId:string;name:string}|null;staff:{id:string;name:string}[];external:{id:string;name:string}[];certified:never[];certifiedHold:string};
+async function call<T>(name:string,args:Record<string,unknown>):Promise<T>{const {data,error}=await supabase.rpc(name,args);if(error)throw new Error(error.code==='42501'?'この本部の担当情報を操作する権限がありません。':error.code==='PT409'?'担当情報が更新されています。最新の内容を確認してください。':error.code==='22023'?'対象の依頼・担当者と現在の状態を確認してください。保存済みの内容は変更していません。':'担当情報の接続を確認できませんでした。入力内容を残して、もう一度お試しください。');return data as T;}
+export function getEventAssignees(headquartersId:string,eventId:string){return call<EventAssigneeView>('academy2_event_assignees',{p_headquarters_id:headquartersId,p_event_id:eventId});}
+export function saveEventAssignee(headquartersId:string,eventId:string,revision:number,requestId:string,kind:EventAssigneeKind,assigneeId:string){assertAcademyWritable();return call<EventAssigneeView>('academy2_set_event_assignee',{p_headquarters_id:headquartersId,p_event_id:eventId,p_expected_revision:revision,p_request_id:requestId,p_kind:kind,p_assignee_id:assigneeId});}
+export type InstructorRequestFee={requestId:string;revision:number;amountYen:number|null;requestStatus:string;editable:boolean;paymentExecutionAvailable:false};
+export function getInstructorRequestFee(headquartersId:string,requestId:string){return call<InstructorRequestFee>('academy2_request_fee',{p_headquarters_id:headquartersId,p_request_id:requestId});}
+export function saveInstructorRequestFee(headquartersId:string,requestId:string,revision:number,amountYen:number){assertAcademyWritable();return call<InstructorRequestFee>('academy2_save_request_fee',{p_headquarters_id:headquartersId,p_request_id:requestId,p_expected_revision:revision,p_amount_yen:amountYen});}

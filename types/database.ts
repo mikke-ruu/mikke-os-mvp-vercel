@@ -422,6 +422,7 @@ export type AcademyInstructor = {
 };
 
 export type AcademyClass = {
+  material_mode?: "legacy_program" | "course_current";
   id: string;
   headquarters_id: string;
   course_id: string;

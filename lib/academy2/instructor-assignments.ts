@@ -1,0 +1,12 @@
+import {supabase} from '@/lib/supabase/client';
+import {assertAcademyWritable} from '@/lib/academy/preview';
+export type AssignmentRequest={id:string;headquartersId:string;eventId:string;instructorId:string;instructorName:string|null;status:'requested'|'consulting'|'accepted'|'declined'|'cancelled';requestNote:string|null;responseNote:string|null;revision:number;feeYen:number|null;feeRevision:number|null;feeEditable:boolean;canAccept:boolean;event:{title:string;startsAt:string|null;endsAt:string|null;format:string;venue:string|null}};
+export type AssignmentCandidates={candidates:{id:string;name:string|null}[];requests:AssignmentRequest[]};
+export type AssignmentPreference={id:string;name:string|null;headquartersId:string;courseName:string|null;acceptRequests:boolean;connectReady:boolean};
+export const assignmentLabels={requested:'回答待ち',consulting:'相談中',accepted:'承諾',declined:'辞退',cancelled:'取消'};
+async function rpc<T>(name:string,args:Record<string,unknown>):Promise<T>{const {data,error}=await supabase.rpc(name,args);if(error)throw new Error(error.code==='42501'?'対象講師の権限・契約・カード決済の登録状態を確認してください。':error.code==='PT409'?'依頼の状態が変わりました。再読み込みして確認してください。':'依頼を保存できませんでした。入力内容を残して、もう一度お試しください。');return data as T;}
+export const assignmentCandidates=(hq:string,event:string)=>rpc<AssignmentCandidates>('academy2_assignment_candidates',{p_hq:hq,p_event:event});
+export const assignmentRequests=(hq:string|null=null,event:string|null=null)=>rpc<AssignmentRequest[]>('academy2_assignment_requests',{p_hq:hq,p_event:event});
+export function requestAssignment(hq:string,event:string,instructor:string,command:string,amount:number,note:string){assertAcademyWritable();return rpc<AssignmentCandidates>('academy2_request_assignment',{p_hq:hq,p_event:event,p_instructor:instructor,p_command:command,p_amount:amount,p_note:note});}
+export function respondAssignment(request:AssignmentRequest,command:string,response:'accepted'|'declined'|'consulting',note:string){assertAcademyWritable();return rpc<AssignmentRequest[]>('academy2_respond_assignment',{p_request:request.id,p_revision:request.revision,p_command:command,p_response:response,p_note:note,p_fee:request.feeYen});}
+export function myAssignmentPreferences(instructor:string|null=null,accept:boolean|null=null){if(accept!==null)assertAcademyWritable();return rpc<AssignmentPreference[]>('academy2_my_assignment_preferences',{p_instructor:instructor,p_accept:accept});}

@@ -1,0 +1,2 @@
+/* Current course editor/list typography. Shared values; no global CSS. */
+.courseTypography{--academy-font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;--academy-text-page:16px;--academy-text-section:15px;--academy-text-body:14px;--academy-text-note:13px;--academy-weight-body:400;--academy-weight-label:800;--academy-weight-button:850;--academy-weight-tab:800;--academy-weight-section:400;--academy-line-note:1.65;--academy-line-body:normal;--academy-line-heading:normal}

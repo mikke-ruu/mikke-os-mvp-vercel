@@ -8,6 +8,8 @@ export type LpStyle = {
   radius?: number; border?: string; shadow?: boolean; columns?: 1 | 2 | 3;
 };
 export type LpBlock = MikkeContentBlock & { lp?: {
+  button?: import("./LpButton").LpButtonStyle;
+  media?: { width?: number; height?: number; fit?: "contain" | "cover"; align?: "left" | "center" | "right" };
   reference?: { kind: string; id: string; imageSide?: "left" | "right" };
   desktop?: LpStyle; mobile?: LpStyle; children?: LpBlock[]; template?: "faq";
   motion?: "none" | "fade" | "rise";

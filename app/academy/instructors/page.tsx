@@ -5,6 +5,8 @@ import Link from "next/link";
 import { toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { AlertTriangle, Hash, Plus, Settings, Users } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
+import { HeadquartersInstructorReadOnly } from "@/components/academy2/HeadquartersInstructorReadOnly";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyListTools } from "@/components/academy/AcademyListTools";
 import { isAcademyLocalReview } from "@/lib/academy/preview";
@@ -187,6 +189,7 @@ function InstructorsContent() {
 
   return (
     <div className="space-y-4">
+      {<Link className="inline-flex min-h-11 items-center rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-accent-soft)] px-4 text-sm font-bold" href={toCurrentAcademyContextHref("/academy/instructors/roster")}>mikke IDがない先生を登録する</Link>}
       <div>
         <div>
           <p className="text-xs text-[var(--mikke-muted)]">{hq.name}</p>
@@ -274,10 +277,11 @@ function InstructorsContent() {
   );
 }
 
+function InstructorReadBoundary() { const hq=useAcademy2Headquarters(); return hq ? <HeadquartersInstructorReadOnly/> : <InstructorsContent/>; }
 export default function InstructorsPage() {
   return (
     <HonbuShell title="講師管理">
-      <InstructorsContent />
+      <InstructorReadBoundary />
     </HonbuShell>
   );
 }

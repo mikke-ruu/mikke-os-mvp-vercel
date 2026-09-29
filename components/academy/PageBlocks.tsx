@@ -1,6 +1,7 @@
 import { ExternalLink, FileText, Link2, Video } from "lucide-react";
 import { LinkedImage } from "./LinkedImage";
 import { AcademyLpContent } from "./AcademyLpContent";
+import { AcademyContentLink } from "./AcademyContentRenderer";
 import type { AcademyMaterial, AcademyPageBlock } from "@/types/database";
 
 function kindIcon(kind: AcademyMaterial["kind"]) {
@@ -44,14 +45,7 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
           ) : null;
 
         if (b.type === "video")
-          return b.url ? (
-            <div key={i}>
-              <a href={b.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] px-3 py-2 text-sm font-bold text-[var(--mikke-text)]">
-                <span className="min-w-0 flex-1 truncate">▶ {b.caption || "動画を見る"}</span>
-                <ExternalLink size={12} className="shrink-0 text-[var(--mikke-muted)]" />
-              </a>
-            </div>
-          ) : null;
+          return b.url ? <AcademyContentLink key={i} block={{ id: `legacy-video-${i}`, type: "video", url: b.url, title: b.caption }} /> : null;
 
         if (b.type === "image-text")
           return (

@@ -1,4 +1,6 @@
 "use client";
+import { academyCourseLabel } from "@/lib/academy/course-display";
+
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -7,6 +9,10 @@ import { CalendarCheck, Plus } from "lucide-react";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { AcademyListTools } from "@/components/academy/AcademyListTools";
+import { AcademyClassRoster } from "@/components/academy/AcademyClassBookings";
+import { AcademyContextBoundary } from "@/components/academy/AcademyContextBoundary";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { Academy2EventList } from "@/components/academy2/EventList";
 import {
   cancelClassInstructorRequest,
   CLASS_INSTRUCTOR_REQUEST_STATUS_LABELS,
@@ -36,7 +42,7 @@ function formatDateTime(value: string | null) {
   }).format(new Date(value));
 }
 
-function ClassesContent() {
+function LegacyClassesContent() {
   const query = useSearchParams();
   const selectedClass = query.get("class");
   const { profile } = useAuth();
@@ -49,6 +55,7 @@ function ClassesContent() {
   const [respondByClass, setRespondByClass] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [message, setMessage] = useState("");
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
@@ -56,6 +63,7 @@ function ClassesContent() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const nextHeadquarters = await getOwnedHeadquarters(profile.user_id);
       setHeadquarters(nextHeadquarters);
@@ -75,7 +83,7 @@ function ClassesContent() {
       setInstructors(nextInstructors.filter((item) => item.is_active));
       setRequests(nextRequests);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "開催日程を読み込めませんでした。");
+      setLoadError("開催日程を読み込めませんでした。もう一度お試しください。");
     } finally {
       setLoading(false);
     }
@@ -137,6 +145,7 @@ function ClassesContent() {
   if (loading) {
     return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">開催日程を確認しています…</p>;
   }
+  if (loadError) return <div className="space-y-3 py-8"><p role="alert" className="text-sm text-[var(--mikke-danger)]">{loadError}</p><button type="button" className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-3" onClick={() => void load()}>再読み込み</button></div>;
 
   if (!headquarters) {
     return (
@@ -184,7 +193,7 @@ function ClassesContent() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-[var(--mikke-accent-strong)]">
-                    {classItem.course?.code} {classItem.course?.name}
+                    {classItem.course ? academyCourseLabel(classItem.course) : ""}
                   </p>
                   <h3 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{classItem.title}</h3>
                   <p className="mt-2 text-sm text-[var(--mikke-muted)]">
@@ -203,6 +212,7 @@ function ClassesContent() {
                 </span>
               </div>
 
+              {classItem.material_mode === "course_current" ? <AcademyClassRoster classId={classItem.id} headquartersId={classItem.headquarters_id} /> : null}
               {classRequests.length ? (
                 <div className="mt-4 space-y-2 border-t border-[var(--mikke-line)] pt-4">
                   <p className="text-xs font-bold text-[var(--mikke-text)]">依頼履歴</p>
@@ -291,6 +301,11 @@ function ClassesContent() {
       )}
     </div>
   );
+}
+
+function ClassesContent() {
+  const headquarters = useAcademy2Headquarters();
+  return headquarters ? <Academy2EventList key={headquarters.id} headquartersId={headquarters.id} /> : <AcademyContextBoundary><LegacyClassesContent /></AcademyContextBoundary>;
 }
 
 export default function AcademyClassesPage() {

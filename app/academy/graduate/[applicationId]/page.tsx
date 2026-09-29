@@ -1,4 +1,6 @@
 "use client";
+import { academyCourseCode } from "@/lib/academy/course-display";
+
 
 import { use, useEffect, useState } from "react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
@@ -130,7 +132,7 @@ function GraduateContent({ applicationId }: { applicationId: string }) {
   return (
     <div className="mx-auto max-w-lg space-y-5 px-5 py-8">
       <div>
-        {course ? <p className="text-xs font-bold tracking-widest text-[var(--mikke-accent-strong)]">{course.code}</p> : null}
+        {course ? academyCourseCode(course.code) && <p className="text-xs font-bold tracking-widest text-[var(--mikke-accent-strong)]">{academyCourseCode(course.code)}</p> : null}
         <h1 className="mt-1 text-lg font-bold text-[var(--mikke-text)]">{course?.name ?? "講座"} 受講後のご案内</h1>
         <p className="mt-1 text-xs text-[var(--mikke-muted)]">{application.applicant_name}さん、ご受講ありがとうございました。</p>
       </div>

@@ -12,6 +12,11 @@ import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { createCourse, getCourse } from "@/lib/academy/courses";
 import { duplicateCourseInput } from "@/lib/academy/course-draft-copy";
 import type { AcademyHeadquarters } from "@/types/database";
+import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
+import { CourseEditorConnected } from "@/components/academy2/CourseEditorConnected";
+import { CourseSamples } from "@/components/academy2/CourseCatalog";
+import workspaceStyles from "@/components/academy/academy-course-workspace.module.css";
+
 
 function NewCourseContent() {
   const { profile } = useAuth();
@@ -94,9 +99,24 @@ function NewCourseContent() {
 export default function NewCoursePage() {
   return (
     <HonbuShell title="講座を作成">
-      <div className="mx-auto min-w-0 max-w-5xl">
-        <Suspense fallback={<p>読み込み中…</p>}><NewCourseContent /></Suspense>
+      <div className="mx-auto min-w-0 w-full">
+        <Suspense fallback={<p>読み込み中…</p>}><NewCourseIdentity /></Suspense>
       </div>
     </HonbuShell>
   );
+}
+
+function NewCourseIdentity() {
+  const context = useAcademy2Headquarters();
+  const { user } = useAuth();
+  const duplicateId = useSearchParams().get("duplicate");
+  if (context) return <NewAcademy2Course key={`${user.id}:${context.id}:${duplicateId ?? "new"}`} headquartersId={context.id} duplicate={duplicateId !== null} />;
+  return <NewCourseContent />;
+}
+
+function NewAcademy2Course({ headquartersId, duplicate }: { headquartersId: string; duplicate: boolean }) {
+ const params=useSearchParams();const sampleId=params.get('sample');
+ if(duplicate)return <div className={workspaceStyles.workspace}><p>この本部では講座の複製を準備しています。既存の講座は変更していません。</p></div>;
+ if(!sampleId&&params.get('blank')!=='1')return <CourseSamples/>;
+ return <CourseEditorConnected headquartersId={headquartersId} sampleId={sampleId}/>;
 }
