@@ -1,6 +1,6 @@
 {
   "preparedAt": "2026-09-29T15:22:45.552Z",
-  "scope": "2026-09-30 courses/materials/six-step UI; manual payments; no payment launch",
+  "scope": "2026-09-30 courses/materials/six-step UI; manual payments; legacy personal read compatibility; no payment launch",
   "productionApplyAllowed": false,
   "productionChanged": false,
   "steps": [
@@ -352,6 +352,12 @@
       "path": "docs/academy2-sept30-candidate/65_assignment_replacement.sql",
       "sha256": "b390d9955d0bf9cc8ea637f25543b66c34eff1cc5216aa33a65d868fd4d421e6",
       "source": "supabase/local/academy2_event_assignment_replacement.sql"
+    },
+    {
+      "order": 66,
+      "path": "supabase/migrations/20260930120000_academy2_legacy_personal_read_compat.sql",
+      "sha256": "be34ec606bbcae1a2c252a21af34cb888e543827107a1597e38e85988c7b146b",
+      "source": "supabase/migrations/20260930120000_academy2_legacy_personal_read_compat.sql"
     }
   ]
 }

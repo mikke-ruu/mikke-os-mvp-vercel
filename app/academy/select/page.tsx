@@ -32,11 +32,17 @@ function AcademySelector() {
       .then(([legacy, headquarters]) => {
         if (!current) return;
         const newIds = new Set(headquarters.map(row => row.id));
-        setContexts([...legacy.filter(row => !newIds.has(row.academy_id)), ...headquarters.map(row => ({
-          academy_id: row.id, academy_name: row.name, academy_handle: row.handle, roles: [row.role],
-          portals: ['manage'] as ['manage'], capabilities: [], academy2: true,
-          manageStart: '/academy',
-        }))]);
+        const legacyById = new Map(legacy.map(row => [row.academy_id, row]));
+        setContexts([...legacy.filter(row => !newIds.has(row.academy_id)), ...headquarters.map(row => {
+          const personal = legacyById.get(row.id);
+          return {
+            academy_id: row.id, academy_name: row.name, academy_handle: row.handle,
+            roles: [row.role, ...(personal?.roles.filter(role => role === 'instructor' || role === 'learner') ?? [])],
+            portals: personal?.portals.includes('teach') ? ['manage', 'teach'] as ['manage', 'teach'] : ['manage'] as ['manage'],
+            capabilities: personal?.capabilities ?? [], academy2: true,
+            manageStart: '/academy',
+          };
+        })]);
       })
       .catch(() => setLoadError(true))
       .finally(() => { if (current) setLoading(false); });
@@ -84,7 +90,7 @@ function AcademySelector() {
                 <div>
                   <h2 className="font-bold text-[var(--mikke-text)]">{context.academy_name}</h2>
                   <p className="mt-1 text-xs text-[var(--mikke-muted)]">
-                    {context.roles.map((role) => context.academy2 ? ACADEMY2_ROLE_LABELS[role as Academy2Role] : ROLE_LABELS[role]).join("・")}
+                    {context.roles.map((role) => context.academy2 && role in ACADEMY2_ROLE_LABELS ? ACADEMY2_ROLE_LABELS[role as Academy2Role] : ROLE_LABELS[role as keyof typeof ROLE_LABELS]).join("・")}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
