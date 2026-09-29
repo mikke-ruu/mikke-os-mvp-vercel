@@ -358,6 +358,12 @@
       "path": "supabase/migrations/20260930120000_academy2_legacy_personal_read_compat.sql",
       "sha256": "be34ec606bbcae1a2c252a21af34cb888e543827107a1597e38e85988c7b146b",
       "source": "supabase/migrations/20260930120000_academy2_legacy_personal_read_compat.sql"
+    },
+    {
+      "order": 67,
+      "path": "supabase/migrations/20260929223746_academy2_legacy_owner_course_compat.sql",
+      "sha256": "83c899a99bf4a059df769d8ff209b95061515753b18c7ec6d07c86f48493889a",
+      "source": "supabase/migrations/20260929223746_academy2_legacy_owner_course_compat.sql"
     }
   ]
 }

@@ -10,7 +10,7 @@ import { listAcademy2Headquarters } from "@/lib/academy2/context";
 import { type Academy2Role } from "@/lib/academy2/permissions.mjs";
 
 type SelectionContext = Omit<AcademyAccessContext, 'roles'> & { roles: (AcademyAccessContext['roles'][number] | Academy2Role)[]; academy2?: boolean; manageStart?: string };
-const ACADEMY2_ROLE_LABELS = { owner: '本部責任者', administrator: '本部運営担当', learning_operator: '受講運営担当', course_editor: '講座編集担当' };
+const ACADEMY2_ROLE_LABELS = { owner: '本部責任者', administrator: '本部運営担当', learning_operator: '受講運営担当', course_editor: '講座編集担当', legacy_owner: '本部オーナー（講座編集）' };
 
 const ROLE_LABELS = {
   owner: "オーナー",

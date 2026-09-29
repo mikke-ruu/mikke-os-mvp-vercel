@@ -8,7 +8,7 @@ export function HeadquartersShell({name,role,mikkeId,nav,activeHref,createLinks,
  const [menu,setMenu]=useState(false),[create,setCreate]=useState(false);
  useEffect(()=>{setMenu(false);setCreate(false);},[activeHref]);
  useEffect(()=>{const close=(e:KeyboardEvent)=>{if(e.key==='Escape'){setMenu(false);setCreate(false);}};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close);},[]);
- const roles:Record<string,string>={owner:'本部責任者',administrator:'本部運営者',learning_operator:'受講管理担当',course_editor:'講座編集担当'};
+ const roles:Record<string,string>={owner:'本部責任者',administrator:'本部運営者',learning_operator:'受講管理担当',course_editor:'講座編集担当',legacy_owner:'本部オーナー（講座編集）'};
  const course=nav.find(item=>item.label==='講座');const applications=nav.find(item=>item.label==='申込');
  const navLink=(item:NavItem)=> <Link key={item.href} href={item.href} aria-current={activeHref===item.href?'page':undefined} className={activeHref===item.href?styles.on:undefined} onClick={()=>setMenu(false)}>{item.label}</Link>;
  return <div className={styles.app}>
