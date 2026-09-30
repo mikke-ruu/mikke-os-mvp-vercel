@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy UI-02 Courses v0.1</title>
+<style>
+:root{--pink:#f9d3d2;--yellow:#ffd370;--blue:#3f4eb5;--green:#8bc7ad;--orange:#f75a3b;--ink:#202126;--muted:#777982;--line:#e8e8eb;--bg:#f7f6f3}
+*{box-sizing:border-box}body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}a{text-decoration:none;color:inherit}button,input{font:inherit}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid var(--line);padding:20px 14px}.brand{font-size:18px;font-weight:800;padding:4px 10px 20px}.brand small{display:block;font-size:12px;color:var(--muted);font-weight:500}.nav div{padding:10px 12px;border-radius:9px;margin:2px 0;color:#565860}.nav .on{background:var(--blue);color:#fff;font-weight:700}.top{height:62px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}.wrap{max-width:1100px;margin:auto;padding:30px 30px 80px}
+.titlebar{background:var(--green);padding:12px 16px 10px;border-radius:13px 13px 0 0}.titlebar .en{color:#fff;font-size:15px;font-weight:900;letter-spacing:.08em}.titlebar .jp{color:#202126;font-size:10px;font-weight:750;margin-top:4px}
+.headbox{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:18px 18px 16px;display:flex;justify-content:space-between;align-items:center;gap:18px}.headbox p{margin:0;color:var(--muted);line-height:1.65}.create{background:var(--orange);color:#fff;border:0;border-radius:10px;padding:11px 15px;font-weight:850;white-space:nowrap;cursor:pointer}
+.tools{display:flex;gap:9px;align-items:center;margin:20px 0 12px}.search{flex:1;max-width:360px;height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:0 12px}.filter{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;font-weight:700;color:#555}
+.list{display:grid;gap:10px}.course{display:grid;grid-template-columns:62px 1fr auto;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;transition:.12s}.course:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.05)}.thumb{width:62px;height:62px;border-radius:11px;background:linear-gradient(135deg,#dbeee6,var(--green));display:grid;place-items:center;font-weight:900;color:#47725f}.course h3{font-size:14px;margin:0 0 5px}.course-meta{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted)}.course-meta b{color:#45484b}.arrow{font-size:21px;color:#8b8d92}
+.empty-tip{margin-top:18px;border:1px dashed var(--green);border-radius:13px;padding:14px 16px;background:#fbfefd;display:flex;justify-content:space-between;align-items:center;gap:14px}.empty-tip strong{font-size:12px}.empty-tip p{margin:3px 0 0;color:var(--muted);font-size:11px}.text-link{color:#4f806c;font-size:11px;font-weight:850;white-space:nowrap}
+
+/* create modal */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(20,22,24,.32);z-index:50;align-items:center;justify-content:center;padding:18px}.modal-bg.open{display:flex}.modal{width:min(650px,100%);background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 18px 60px rgba(0,0,0,.2)}.modal-head{background:var(--green);padding:15px 18px}.modal-head strong{display:block;color:#fff;font-size:15px}.modal-head small{display:block;color:#202126;font-weight:700;margin-top:4px}.modal-body{padding:18px}.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.choice{border:1px solid var(--line);border-radius:13px;padding:17px;cursor:pointer;background:#fff}.choice:hover{border-color:var(--green);background:#fbfefd}.choice-icon{width:35px;height:35px;border-radius:10px;background:var(--green);display:grid;place-items:center;margin-bottom:12px}.choice strong{display:block;font-size:13px}.choice p{font-size:11px;color:var(--muted);line-height:1.55;margin:5px 0 0}.close{display:block;margin:15px auto 0;border:0;background:none;color:var(--muted);font-weight:700;cursor:pointer}
+
+/* mobile */
+.mobile-bottom{display:none}.mobile-create-menu{display:none}
+@media(max-width:820px){
+ .app{display:block}.side{display:none}.top{height:54px;padding:0 14px}.top:before{content:"☰";font-size:19px}.top strong{margin-right:auto;margin-left:12px}.wrap{padding:16px 12px 80px}.headbox{display:block}.headbox .create{width:100%;margin-top:13px}.tools{margin-top:15px}.search{max-width:none}.filter{display:none}.course{grid-template-columns:50px 1fr auto;padding:10px}.thumb{width:50px;height:50px}.course-meta{gap:6px 10px}.empty-tip{display:block}.empty-tip .text-link{display:inline-block;margin-top:8px}.choice-grid{grid-template-columns:1fr}
+ .mobile-bottom{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:0;right:0;bottom:0;height:66px;background:#fff;border-top:1px solid var(--line);z-index:29;padding:0 6px env(safe-area-inset-bottom)}.mobile-bottom a,.create-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}.mobile-bottom small{font-size:9px;font-weight:700}.nav-icon{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.mobile-bottom a:nth-child(2){color:#4f806c}.create-slot{position:relative}.create-btn{position:absolute;left:50%;top:-23px;transform:translateX(-50%);width:54px;height:54px;border-radius:50%;background:var(--orange);border:4px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.16)}.create-btn:before,.create-btn:after{content:"";position:absolute;left:50%;top:50%;background:#fff;transform:translate(-50%,-50%);border-radius:2px}.create-btn:before{width:23px;height:2px}.create-btn:after{width:2px;height:23px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side"><div class="brand">mikkeOS<small>Academy</small></div><div class="nav"><div>ホーム</div><div class="on">講座</div><div>販売プラン</div><div>開催</div><div>申込</div><div>認定</div><div>講師</div><div>ページ</div><div>設定</div></div></aside>
+<div><header class="top"><strong>灯りのアトリエ キャンドル教室</strong><span>本部責任者 ▾</span></header>
+<main class="wrap">
+<section>
+<div class="titlebar"><div class="en">COURSES</div><div class="jp">講座</div></div>
+<div class="headbox"><p>教える内容とレッスン教材を管理します。<br>価格や販売方法は、あとで「販売プラン」で設定します。</p><button class="create" onclick="document.getElementById('createModal').classList.add('open')">＋ 講座をつくる</button></div>
+</section>
+
+<div class="tools"><input class="search" placeholder="講座名で検索"><button class="filter">並び替え ▾</button></div>
+
+<section class="list">
+<a class="course" href="#course-candle-basic"><div class="thumb">01</div><div><h3>キャンドル基礎</h3><div class="course-meta"><span><b>3</b> レッスン</span><span><b>4</b> 教材</span><span>更新 9/20</span></div></div><span class="arrow">›</span></a>
+<a class="course" href="#course-aroma"><div class="thumb">02</div><div><h3>香りの基礎</h3><div class="course-meta"><span><b>2</b> レッスン</span><span><b>3</b> 教材</span><span>更新 9/18</span></div></div><span class="arrow">›</span></a>
+<a class="course" href="#course-practice"><div class="thumb">03</div><div><h3>アロマクラフト実技</h3><div class="course-meta"><span><b>4</b> レッスン</span><span><b>6</b> 教材</span><span>更新 9/12</span></div></div><span class="arrow">›</span></a>
+</section>
+
+<div class="empty-tip"><div><strong>何から作ればいいか迷ったら</strong><p>体験・基礎講座・実技講座など、見本から始められます。</p></div><a class="text-link" href="#samples" onclick="document.getElementById('createModal').classList.add('open');return false">講座見本を見る →</a></div>
+</main></div></div>
+
+<div class="modal-bg" id="createModal" onclick="if(event.target===this)this.classList.remove('open')"><div class="modal">
+<div class="modal-head"><strong>CREATE A COURSE</strong><small>講座の作り方を選ぶ</small></div>
+<div class="modal-body"><div class="choice-grid">
+<a class="choice" href="#samples"><div class="choice-icon">✦</div><strong>見本からつくる</strong><p>レッスン構成や説明のヒントが入った見本を選び、自分の内容に書き換えます。</p></a>
+<a class="choice" href="#blank"><div class="choice-icon">＋</div><strong>まっさらからつくる</strong><p>講座名からレッスン構成まで、自分で一から作成します。</p></a>
+</div><button class="close" onclick="document.getElementById('createModal').classList.remove('open')">閉じる</button></div>
+</div></div>
+
+<nav class="mobile-bottom">
+<a href="#home"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/></svg><small>ホーム</small></a>
+<a href="#courses"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 5.5h6.5c1.1 0 1.5.5 1.5 1.5v12c0-1-.5-1.5-1.5-1.5H4z"/><path d="M20 5.5h-6.5C12.5 5.5 12 6 12 7v12c0-1 .5-1.5 1.5-1.5H20z"/></svg><small>講座</small></a>
+<div class="create-slot"><button class="create-btn" onclick="document.getElementById('createModal').classList.add('open')" aria-label="作成"></button></div>
+<a href="#applications"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.8h6V4M9 9h6M9 13h6M9 17h4"/></svg><small>申込</small></a>
+<a href="#more"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg><small>その他</small></a>
+</nav>
+</body></html>

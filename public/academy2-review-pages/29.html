@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy UI-25 Learner Learning v0.1</title>
+<style>
+:root{
+  --pink:#f9d3d2;--yellow:#ffd370;--blue:#3f4eb5;--green:#8bc7ad;--orange:#f75a3b;
+  --ink:#202126;--muted:#777982;--line:#e8e8eb;--bg:#f7f6f3;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}
+button,input{font:inherit}button{cursor:pointer}a{text-decoration:none;color:inherit}
+
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.side{background:#fff;border-right:1px solid var(--line);padding:20px 14px}
+.brand{font-size:18px;font-weight:800;padding:4px 10px 20px}
+.brand small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.nav div{padding:10px 12px;border-radius:9px;margin:2px 0;color:#565860}
+.nav .on{background:var(--blue);color:#fff;font-weight:700}
+.top{height:62px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+.wrap{max-width:1100px;margin:auto;padding:30px 30px 80px}
+
+.titlebar{background:#8bc7ad;padding:12px 16px 10px;border-radius:13px 13px 0 0}
+.titlebar .en{font-size:15px;font-weight:900;letter-spacing:.08em;color:#fff}
+.titlebar .jp{font-size:10px;font-weight:750;margin-top:4px}
+.headbox{padding:18px 18px 16px;background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;line-height:1.65}
+.headbox p{margin:0;color:var(--muted)}
+
+.tools{display:flex;gap:9px;margin:20px 0 12px}
+.search{width:100%;max-width:360px;height:40px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:#fff}
+
+.list{display:grid;gap:10px}
+.manual{
+  display:grid;grid-template-columns:62px 1fr auto;gap:14px;padding:12px 14px;
+  background:#fff;border:1px solid var(--line);border-radius:14px;align-items:center;cursor:pointer
+}
+.thumb{width:62px;height:62px;border-radius:11px;background:linear-gradient(135deg,#dcefe6,#f2f4f3);display:grid;place-items:center;color:#537764;font-weight:900;font-size:16px}
+.manual h3{font-size:14px;margin:0 0 5px}
+.meta{font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.badge{font-size:9px;padding:6px 8px;border-radius:999px;background:#eaf7f0;color:#3d765e;font-weight:850}
+.arrow{font-size:18px;color:#999;margin-left:10px}
+
+.view{display:none}.view.on{display:block}
+.back{border:0;background:none;color:#4f806c;font-size:11px;font-weight:850;padding:0}
+.detail-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px}
+.detail-title h1{font-size:22px;margin:7px 0 3px}
+.detail-title p{font-size:11px;color:var(--muted);margin:0}
+
+.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+.card h2{font-size:14px;margin:0 0 7px}
+.card p{font-size:11px;color:#5f6470;line-height:1.75;margin:0}
+.section{padding:15px 0;border-top:1px solid var(--line)}
+.section:first-of-type{border-top:0;padding-top:0}
+.section h3{font-size:13px;margin:0 0 7px}
+.block{background:#f8faf9;border:1px solid #e2ece7;border-radius:11px;padding:11px;margin-top:8px}
+.block strong{font-size:11px;display:block;margin-bottom:4px}
+.block p{font-size:10px;line-height:1.6;color:#667069}
+.resource{display:flex;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid var(--line);padding:10px 0}
+.resource:first-child{border-top:0}
+.resource strong{font-size:11px}.resource small{display:block;font-size:9px;color:var(--muted);margin-top:2px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;font-size:10px;font-weight:850}
+.sidecard{position:sticky;top:78px}
+.sidecard .row{display:flex;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding:9px 0}
+.sidecard .row:first-of-type{border-top:0}.sidecard b{font-size:10px;color:#666}.sidecard span{font-size:11px;font-weight:750}
+.notice{margin-top:12px;background:#fff8dc;border-radius:10px;padding:10px 11px;font-size:10px;line-height:1.55;color:#6d634c}
+
+.mobile-bottom{display:none}
+@media(max-width:820px){
+  body{padding-bottom:74px}.app{display:block}.side{display:none}.top{height:54px;padding:0 14px}.wrap{padding:16px 12px 80px}
+  .manual{grid-template-columns:50px 1fr auto;padding:10px;gap:10px}.thumb{width:50px;height:50px}
+  .detail-head{display:block}.detail-title h1{font-size:20px}.detail-grid{grid-template-columns:1fr}.sidecard{position:static}
+  .mobile-bottom{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:0;right:0;bottom:0;height:66px;background:#fff;border-top:1px solid var(--line);z-index:40}
+  .mobile-bottom a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#45484b;text-decoration:none}
+  .mobile-bottom small{font-size:9px;font-weight:700}.nav-icon{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+<aside class="side">
+  <div class="brand">mikkeOS<small>Academy｜受講者</small></div>
+  <div class="nav">
+    <div>ホーム</div>
+    <div class="on">学ぶ</div>
+    <div>予定</div>
+    <div>お知らせ</div>
+    <div>認定・証書</div>
+    <div>設定</div>
+  </div>
+</aside>
+
+<div>
+<header class="top"><strong>灯りのアトリエ｜受講者ページ</strong><span>鈴木 里奈 ▾</span></header>
+
+<main class="wrap">
+<section class="view on" id="listView">
+  <div class="titlebar">
+    <div class="en">LEARNING</div>
+    <div class="jp">学ぶ</div>
+  </div>
+  <div class="headbox">
+    <p>受講中・修了済みの講座を開いて、レッスン教材・動画・PDFなどを確認できます。</p>
+  </div>
+
+  <div class="tools"><input class="search" placeholder="講座名・教材名・キーワードで検索"></div>
+
+  <div class="list">
+    <div class="manual" onclick="openDetail()">
+      <div class="thumb">認</div>
+      <div>
+        <h3>ベーシックキャンドルコース</h3>
+        <div class="meta"><span>受講中・Lesson 02まで完了</span><span>PDF 2件</span><span>動画 1件</span></div>
+      </div>
+      <div><span class="badge">受講中</span><span class="arrow">›</span></div>
+    </div>
+
+    <div class="manual" onclick="openDetail()">
+      <div class="thumb">AR</div>
+      <div>
+        <h3>アロマ基礎講座</h3>
+        <div class="meta"><span>修了済み・復習できます</span><span>PDF 1件</span></div>
+      </div>
+      <div><span class="badge">修了済み</span><span class="arrow">›</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="detailView">
+  <div class="detail-head">
+    <div class="detail-title">
+      <button class="back" onclick="backToList()">← 学ぶ一覧へ</button>
+      <h1>ベーシックキャンドルコース</h1>
+      <p>学ぶ｜受講中・Lesson 02まで完了</p>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="card">
+      <div class="section">
+        <h2>この講座について</h2>
+        <p>この講座のレッスン教材を順番に確認できます。完了条件がある場合は、条件を満たすと次の教材へ進めます。</p>
+      </div>
+
+      <div class="section">
+        <h3>1. Lesson 02｜制作実技</h3>
+        <p>受講者の理解度を確認しながら、指定されたカリキュラムの順番で進めてください。</p>
+        <div class="block">
+          <strong>ポイント</strong>
+          <p>レッスン内容や認定条件を独自に変更せず、本部の最新カリキュラムを使用します。</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>2. Lesson 01｜基本を学ぶ</h3>
+        <p>申込詳細から開講ライセンス・キット・開催日程を確認します。必要な教材や備品を事前に準備してください。</p>
+      </div>
+
+      <div class="section">
+        <h3>3. 指導時の注意事項</h3>
+        <p>安全管理、材料の扱い、説明の順番、受講者へのサポートについて講座からのお知らせに従います。</p>
+      </div>
+
+      <div class="section">
+        <h3>4. 修了・修了について</h3>
+        <p>指定された内容を修了したことを確認し、申込詳細から修了報告を行います。最終認定は本部が行います。</p>
+      </div>
+
+      <div class="section">
+        <h3>資料</h3>
+        <div class="resource">
+          <div><strong>指導チェックリスト.pdf</strong><small>PDF｜1.8MB</small></div>
+          <button class="btn">開く</button>
+        </div>
+        <div class="resource">
+          <div><strong>修了について.pdf</strong><small>PDF｜820KB</small></div>
+          <button class="btn">開く</button>
+        </div>
+        <div class="resource">
+          <div><strong>指導デモ動画</strong><small>動画｜12分</small></div>
+          <button class="btn">見る</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>FAQ</h3>
+        <div class="block"><strong>日程変更になった場合は？</strong><p>申込詳細の日程を変更し、必要な案内を受講者へ行います。</p></div>
+        <div class="block"><strong>キットが届かない場合は？</strong><p>申込詳細の発送状況を確認し、必要に応じて本部へ連絡してください。</p></div>
+      </div>
+    </div>
+
+    <aside class="card sidecard">
+      <h2>マニュアル情報</h2>
+      <div class="row"><b>対象講座</b><span>ベーシックキャンドルコース</span></div>
+      <div class="row"><b>状態</b><span style="color:#3d765e">閲覧可能</span></div>
+      <div class="row"><b>最終更新</b><span>2026/09/20</span></div>
+      <div class="row"><b>本部</b><span>灯りのアトリエ</span></div>
+      <div class="notice">マニュアルは本部が更新します。常に最新の内容を確認して開催してください。</div>
+    </aside>
+  </div>
+</section>
+</main>
+</div>
+</div>
+
+<nav class="mobile-bottom">
+<a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/></svg><small>ホーム</small></a>
+<a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.8h6V4M9 9h6M9 13h6M9 17h4"/></svg><small>学ぶ</small></a>
+<a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3v5M16 3v5M4 10h16"/></svg><small>予定</small></a>
+<a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><small>マニュアル</small></a>
+<a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg><small>その他</small></a>
+</nav>
+
+<script>
+function openDetail(){document.getElementById('listView').classList.remove('on');document.getElementById('detailView').classList.add('on');window.scrollTo(0,0)}
+function backToList(){document.getElementById('detailView').classList.remove('on');document.getElementById('listView').classList.add('on');window.scrollTo(0,0)}
+</script>
+</body></html>

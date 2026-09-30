@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ja">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy UI-14 Instructor Portal v0.1</title>
+<style>
+:root{--pink:#f9d3d2;--yellow:#ffd370;--blue:#3f4eb5;--green:#8bc7ad;--orange:#f75a3b;--ink:#202126;--muted:#777982;--line:#e8e8eb;--bg:#f7f6f3}
+*{box-sizing:border-box}body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}a{text-decoration:none;color:inherit}button,input,select,textarea{font:inherit}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid var(--line);padding:20px 14px}.brand{font-size:18px;font-weight:800;padding:4px 10px 20px}.brand small{display:block;font-size:12px;color:var(--muted);font-weight:500}.nav div{padding:10px 12px;border-radius:9px;margin:2px 0;color:#565860}.nav .on{background:var(--blue);color:#fff;font-weight:700}.top{height:62px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}.wrap{max-width:1100px;margin:auto;padding:30px 30px 80px}
+.titlebar{background:var(--green);padding:12px 16px 10px;border-radius:13px 13px 0 0}.titlebar .en{color:#fff;font-size:15px;font-weight:900;letter-spacing:.08em}.titlebar .jp{color:#202126;font-size:10px;font-weight:750;margin-top:4px}
+.headbox{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:18px 18px 16px;display:flex;justify-content:space-between;align-items:center;gap:18px}.headbox p{margin:0;color:var(--muted);line-height:1.65}.create{background:var(--orange);color:#fff;border:0;border-radius:10px;padding:11px 15px;font-weight:850;white-space:nowrap;cursor:pointer}
+.guide{display:flex;gap:8px;align-items:center;margin:18px 0 0;padding:11px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;font-size:11px;overflow:auto;white-space:nowrap}.guide b{color:#4f806c}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px;margin-top:18px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}.card h2{font-size:14px;margin:0 0 5px}.card h3{font-size:12px;margin:0 0 8px}.help{font-size:11px;color:var(--muted);line-height:1.55}
+.profile{display:flex;gap:12px;align-items:center}.avatar{width:62px;height:62px;border-radius:11px;background:linear-gradient(135deg,#dbeee6,var(--green));display:grid;place-items:center;font-weight:900;color:#47725f}.profile strong{display:block;font-size:14px;margin-bottom:4px}.profile p{font-size:11px;color:var(--muted);margin:0}
+.status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.status-card{border:1px solid var(--line);border-radius:11px;padding:12px}.status-card b{display:block;font-size:10px;color:var(--muted);margin-bottom:5px}.status-card strong{font-size:13px}
+.toggle-list{display:grid;gap:10px;margin-top:10px}.toggle-row{display:flex;justify-content:space-between;gap:14px;align-items:center;border:1px solid var(--line);border-radius:11px;padding:11px 12px}.toggle-row strong{display:block;font-size:12px}.toggle-row p{font-size:11px;color:var(--muted);margin:3px 0 0}.switch{width:44px;height:24px;border-radius:999px;background:#d7d8db;position:relative;flex:0 0 auto;cursor:pointer}.switch.on{background:var(--green)}.switch:after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}.switch.on:after{left:23px}
+.list{display:grid;gap:10px}.item{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px 13px}.item strong{display:block;font-size:12px;margin-bottom:4px}.item p{font-size:11px;color:var(--muted);line-height:1.45;margin:0}.badge{display:inline-block;border-radius:999px;padding:5px 8px;font-size:10px;font-weight:800}.green{background:#eaf7f0;color:#3d765e}.yellow{background:#fff3c9;color:#7b6100}.blue{background:#eef1ff;color:#4051a6}.gray{background:#eee;color:#666}.orange{background:#fff0e7;color:#a24c2d}
+.section{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;font-weight:700;color:#555;cursor:pointer}.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.btn.orange{background:var(--orange);color:#fff;border-color:var(--orange)}
+.link-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.link-card{border:1px solid var(--line);border-radius:12px;padding:12px;cursor:pointer}.link-card:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.05)}.link-card strong{display:block;font-size:12px;margin-bottom:4px}.link-card p{font-size:11px;color:var(--muted);line-height:1.45;margin:0}
+.todo{position:sticky;top:80px}.todo-item{border-top:1px solid var(--line);padding:11px 0}.todo-item:first-of-type{border-top:0}.todo-item b{display:block;font-size:11px;margin-bottom:4px}.todo-item p{font-size:11px;color:var(--muted);line-height:1.5;margin:0 0 8px}
+.message-preview{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}.message-preview strong{display:block;font-size:11px;margin-bottom:5px}.message-preview p{font-size:11px;color:var(--muted);line-height:1.5;margin:0}
+@media(max-width:820px){.app{display:block}.side{display:none}.top{height:54px;padding:0 14px}.wrap{padding:16px 12px 80px}.headbox{display:block}.headbox .create{width:100%;margin-top:13px}.grid{grid-template-columns:1fr}.todo{position:static}.status-grid,.link-grid{grid-template-columns:1fr}.profile{align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="brand">mikkeOS<small>Academy｜講師</small></div>
+  <div class="nav">
+    <div class="on">ホーム</div>
+    <div>申込</div>
+    <div>開催</div>
+    <div>開講</div>
+    <div>修了報告</div>
+    <div>マニュアル</div>
+    <div>Community</div>
+    <div>本部メッセージ</div>
+    <div>設定</div>
+  </div>
+</aside>
+
+<div>
+<header class="top"><strong>灯りのアトリエ｜講師ページ</strong><span>鈴木 里奈 ▾</span></header>
+<main class="wrap">
+
+<div class="titlebar"><div class="en">INSTRUCTOR HOME</div><div class="jp">講師ホーム</div></div>
+<div class="headbox">
+  <p>申込・担当依頼・開催・開講・修了報告、本部からのお知らせを確認します。</p>
+  <button class="create">講師営業ページを見る</button>
+</div>
+
+<div class="guide"><b>申込</b><span>→</span><b>開催</b><span>→</span><b>開講ライセンス</b><span>→</span><b>修了報告</b><span>→</span><b>本部認定</b></div>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <div class="profile">
+        <div class="avatar">鈴</div>
+        <div><strong>鈴木 里奈</strong><p>講師番号 L-0012 / ベーシックキャンドルコース</p></div>
+      </div>
+
+      <div class="status-grid">
+        <div class="status-card"><b>講師ライセンス</b><strong>有効</strong></div>
+        <div class="status-card"><b>講師契約</b><strong>契約中</strong></div>
+        <div class="status-card"><b>Community</b><strong>利用中</strong></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>活動・掲載・受付</h3>
+      <div class="help">この3つは講師本人が切り替えます。</div>
+
+      <div class="toggle-list">
+        <div class="toggle-row">
+          <div><strong>活動中</strong><p>一時的に活動を休止する場合はOFFにします。</p></div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="toggle-row">
+          <div><strong>本部ホームページに掲載</strong><p>本部HPの講師一覧へ掲載するかを選びます。</p></div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+        <div class="toggle-row">
+          <div><strong>新規申込を受付</strong><p>新しい受講申込を受け付けるかを選びます。</p></div>
+          <div class="switch on" onclick="this.classList.toggle('on')"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>対応できる開催方法</h3>
+      <div class="list">
+        <div class="item"><div><strong>対面</strong><p>杉並区・中野区</p></div><span class="badge green">対応中</span></div>
+        <div class="item"><div><strong>オンライン</strong><p>Zoomで対応できます。</p></div><span class="badge green">対応中</span></div>
+      </div>
+      <div class="actions"><button class="btn">対応方法・地域を変更</button></div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>現在の対応</h3>
+      <div class="list">
+        <div class="item">
+          <div><strong>本部から担当依頼</strong><p>10/12〜18頃 / ベーシックキャンドルコース / 対面</p></div>
+          <span class="badge yellow">回答待ち</span>
+        </div>
+        <div class="item">
+          <div><strong>新しい受講申込</strong><p>田中 美咲さん / 日程相談 / 杉並区</p></div>
+          <span class="badge blue">要対応</span>
+        </div>
+        <div class="item">
+          <div><strong>修了報告待ち</strong><p>10/05開催 / 受講者1名</p></div>
+          <span class="badge orange">報告待ち</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <h3>講師向けメニュー</h3>
+      <div class="link-grid">
+        <div class="link-card"><strong>申込</strong><p>新しい受講依頼と日程相談を確認します。</p></div>
+        <div class="link-card"><strong>開催</strong><p>予定している開催・参加者を確認します。</p></div>
+        <div class="link-card"><strong>開講</strong><p>受講者情報・受講日・開講ライセンス・キット注文を管理します。</p></div>
+        <div class="link-card"><strong>修了報告</strong><p>開催後、本部へ修了状況を報告します。</p></div>
+        <div class="link-card"><strong>講師マニュアル</strong><p>本部から提供された指導・運営資料を確認します。</p></div>
+        <div class="link-card"><strong>Community</strong><p>講師Communityを開きます。</p></div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="card todo">
+    <h2>本部から</h2>
+
+    <div class="message-preview">
+      <strong>担当依頼が届いています</strong>
+      <p>10/12〜18頃でベーシックキャンドルコースをお願いできますか？</p>
+      <div class="actions"><button class="btn primary">依頼を見る</button></div>
+    </div>
+
+    <div class="message-preview">
+      <strong>本部メッセージ</strong>
+      <p>会場について確認事項があります。返信をお願いします。</p>
+      <div class="actions"><button class="btn">メッセージを開く</button></div>
+    </div>
+
+    <div class="todo-item">
+      <b>開講ライセンス</b>
+      <p>次の開催に必要な開講手続きを確認します。</p>
+      <button class="btn">開講へ</button>
+    </div>
+
+    <div class="todo-item">
+      <b>講師マニュアル</b>
+      <p>最新のマニュアルが更新されています。</p>
+      <button class="btn">マニュアルを見る</button>
+    </div>
+  </aside>
+</div>
+
+</main>
+</div>
+</div>
+</body>
+</html>

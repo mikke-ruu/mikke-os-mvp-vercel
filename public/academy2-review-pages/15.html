@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ja">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy UI-30 Headquarters Homepage Builder v0.8</title>
+<style>
+:root{--pink:#f9d3d2;--yellow:#ffd370;--blue:#3f4eb5;--green:#8bc7ad;--orange:#f75a3b;--ink:#202126;--muted:#777982;--line:#e8e8eb;--bg:#f7f6f3;--white:#fff}
+*{box-sizing:border-box}
+body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}
+button,input,textarea,select{font:inherit}button{cursor:pointer}a{text-decoration:none;color:inherit}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.side{background:#fff;border-right:1px solid var(--line);padding:20px 14px}
+.brand{font-size:18px;font-weight:850;padding:4px 10px 20px}.brand small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.nav div{padding:10px 12px;border-radius:9px;margin:2px 0;color:#565860}.nav .on{background:var(--blue);color:#fff;font-weight:750}
+.top{height:62px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+.wrap{max-width:1260px;margin:auto;padding:26px 30px 80px}.wrap.builder-full{max-width:none;padding:18px 22px 80px}
+.back{font-size:11px;font-weight:850;color:#4f806c}
+.headrow{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-top:12px}
+.title h1{font-size:22px;margin:0}.title p{font-size:11px;color:var(--muted);margin:5px 0 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.btn{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 12px;font-size:10px;font-weight:800}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:#fff}.btn.orange{background:var(--orange);border-color:var(--orange);color:#fff}
+.notice{margin-top:16px;background:#f5faf7;border:1px solid #dfece5;border-radius:12px;padding:11px 13px;font-size:10px;line-height:1.55}
+.tabs{display:flex;gap:7px;margin:18px 0 14px;flex-wrap:wrap}.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:10px;font-weight:800}.tab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.panel{display:none}.panel.on{display:block}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px}.card h3{font-size:12px;margin:0 0 5px}.help{font-size:10px;color:var(--muted);line-height:1.55}
+.template-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.template-card{background:#fff;border:1px solid var(--line);border-radius:13px;overflow:hidden}
+.template-thumb{height:176px;display:flex;align-items:flex-end;padding:14px;font-size:18px;font-weight:900;line-height:1.05}
+.template-card:nth-child(1) .template-thumb{background:linear-gradient(135deg,#f4dfdb,#dceee6)}
+.template-card:nth-child(2) .template-thumb{background:linear-gradient(135deg,#dfe3ff,#f5e9d2)}
+.template-card:nth-child(3) .template-thumb{background:linear-gradient(135deg,#e7f3ef,#fff0cf)}
+.template-card:nth-child(4) .template-thumb{background:linear-gradient(135deg,#f4e3ef,#dfe7ff)}
+.template-card:nth-child(5) .template-thumb{background:linear-gradient(135deg,#efe8df,#f8f5f0)}
+.template-card:nth-child(6) .template-thumb{background:linear-gradient(135deg,#dff1ec,#fbe6df)}
+.template-body{padding:12px}.template-body strong{font-size:11px}.template-body p{font-size:9px;color:#777;line-height:1.5;min-height:40px}.template-body button{width:100%;border:1px solid var(--line);background:#fff;border-radius:8px;padding:9px;font-size:9px;font-weight:850}
+
+.builder-tools{display:flex;justify-content:space-between;margin-bottom:10px;gap:10px}.builder-tools .left,.builder-tools .right{display:flex;gap:6px;flex-wrap:wrap}
+.builder-layout{display:grid;grid-template-columns:235px minmax(760px,1fr) 270px;gap:12px;align-items:start}
+.builder-side,.builder-settings{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;height:max-content;position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto}
+.builder-side h3,.builder-settings h3{font-size:11px;margin:0 0 10px}.left-sticky-controls{margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}.left-tabs{margin:0 0 8px;gap:5px;flex-wrap:nowrap}.left-tabs .tab{padding:7px 8px;font-size:9px;flex:1}.left-page-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}.left-page-actions.single{grid-template-columns:1fr}.left-page-actions .btn{padding:8px 6px;font-size:9px}.sticky-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line)}.sticky-actions .btn{padding:8px 6px;font-size:9px}
+.group-title{font-size:8px;color:#888;font-weight:900;margin:13px 0 5px;letter-spacing:.08em}
+.block{border:1px solid var(--line);border-radius:8px;padding:9px;margin:7px 0;font-size:9px;font-weight:800;background:#fff}
+.block.data{background:#f4f8ff}.block.free{background:#fffaf0}
+.canvas{background:#dedddb;border-radius:12px;padding:14px;min-height:calc(100vh - 180px)}
+.canvas-page{background:#fff;border-radius:9px;min-height:calc(100vh - 208px);overflow:hidden}
+.canvas-section{border:2px solid transparent;position:relative}.canvas-section:hover{border-color:#aeb8eb}
+.canvas-section:after{content:"編集";display:none;position:absolute;right:6px;top:6px;background:var(--blue);color:#fff;padding:4px 6px;border-radius:5px;font-size:7px}.canvas-section:hover:after{display:block}
+.setting{margin-bottom:10px}.setting label{display:block;font-size:8px;font-weight:800;margin-bottom:4px}.setting input,.setting textarea,.setting select{width:100%;border:1px solid #ddd;border-radius:7px;padding:7px;font-size:9px}.setting textarea{min-height:60px}
+.lock-note{font-size:8px;color:#777;line-height:1.5;background:#f6f6f7;border-radius:8px;padding:8px;margin-top:10px}
+
+.public{background:#fff}.pub-top{height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid #eee}
+.pub-brand{font-weight:900;font-size:14px}.pub-nav{font-size:9px;color:#666}
+.hero{display:grid;grid-template-columns:1.08fr .92fr;min-height:340px}
+.hero-copy{padding:48px 42px;display:flex;flex-direction:column;justify-content:center}
+.eyebrow{font-size:9px;font-weight:900;color:#4f806c;letter-spacing:.12em}.hero h2{font-size:30px;line-height:1.3;margin:10px 0 12px}.hero p{font-size:11px;color:#666;line-height:1.8;margin:0 0 18px}
+.cta{display:inline-block;background:var(--orange);color:#fff;border:0;border-radius:9px;padding:12px 18px;font-size:10px;font-weight:850;width:max-content}
+.hero-img{background:linear-gradient(135deg,rgba(139,199,173,.10),rgba(249,211,210,.18)),url('https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=1100&q=80') center/cover}
+.section{padding:38px 42px;border-top:1px solid #f0f0f1}.section.alt{background:#faf9f7}
+.section-head b{display:block;font-size:9px;color:#4f806c;letter-spacing:.1em}.section-head h3{font-size:21px;margin:6px 0}.section-head p{font-size:10px;color:#777;line-height:1.7;margin:0 0 16px}
+.course-grid,.teacher-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.course-card,.teacher-card{border:1px solid #e8e8ea;border-radius:11px;overflow:hidden;background:#fff}
+.course-photo{height:100px;background:linear-gradient(135deg,#f2e2de,#e3f0eb)}
+.course-body,.teacher-body{padding:11px}.course-body b,.teacher-body b{font-size:9px;color:#4f806c}.course-body strong,.teacher-body strong{display:block;font-size:11px;margin:3px 0}.course-body p,.teacher-body p{font-size:9px;color:#777;line-height:1.5;margin:0}
+.teacher-photo{height:90px;background:linear-gradient(135deg,#edf4f0,#faf0ed)}
+.split-entry{display:grid;grid-template-columns:1fr 1fr;gap:10px}.entry-box{border:1px solid #e7e7ea;border-radius:12px;padding:16px}.entry-box strong{font-size:12px}.entry-box p{font-size:9px;color:#777;line-height:1.6}.entry-box button{border:0;background:var(--blue);color:#fff;border-radius:8px;padding:9px 12px;font-size:9px;font-weight:850}
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:center}.about-img{height:180px;border-radius:12px;background:linear-gradient(135deg,#dceee6,#f3dfdb)}
+.about-copy h3{font-size:20px;margin:0 0 8px}.about-copy p{font-size:10px;color:#666;line-height:1.8}
+.faq{display:grid;gap:8px}.faq-item{border:1px solid #e8e8ea;border-radius:10px;padding:11px;font-size:10px}
+.pub-footer{padding:22px 42px;background:#202126;color:#fff;font-size:9px;display:flex;justify-content:space-between}
+
+.publish-grid{display:grid;grid-template-columns:1fr 360px;gap:16px}.publish-card,.preview-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}.publish-card h3,.preview-card h3{font-size:13px;margin:0 0 6px}.publish-card p,.preview-card p{font-size:10px;color:var(--muted);line-height:1.55;margin:0}
+.status-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.pill{font-size:9px;padding:6px 8px;border-radius:999px;font-weight:800}.pill.green{background:#eaf7f0;color:#3d765e}.pill.gray{background:#eee;color:#666}
+.url-box{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px}.url-box input{border:1px solid var(--line);border-radius:9px;padding:10px;font-size:10px;background:#fafafa}
+.check-list{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.check{display:flex;justify-content:space-between;gap:10px;padding:8px 0;font-size:10px;border-bottom:1px solid #f1f1f2}.check:last-child{border-bottom:0}
+
+
+.template-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;padding:24px}
+.template-modal.on{display:flex;align-items:center;justify-content:center}
+.template-modal-inner{width:min(1180px,96vw);height:min(780px,92vh);background:#fff;border-radius:16px;overflow:hidden;display:flex;flex-direction:column}
+.template-modal-head{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line)}
+.template-modal-head strong{font-size:13px}
+.template-modal-body{flex:1;overflow:auto;background:#ecebea;padding:18px}
+.template-preview-page{max-width:980px;margin:auto;background:#fff;min-height:100%;border-radius:10px;overflow:hidden}
+.mobile-save{display:none}
+
+.mobile-bottom{display:none}
+@media(max-width:900px){
+.app{display:block}.side{display:none}.top{height:54px;padding:0 14px}.wrap{padding:16px 12px 90px}.headrow{display:block}.actions{justify-content:flex-start;margin-top:12px}
+.template-grid,.builder-layout,.publish-grid{grid-template-columns:1fr}.builder-side,.builder-settings{position:static}.builder-layout{display:flex;flex-direction:column}.canvas{order:1;padding:8px;min-height:auto}.canvas-page{min-height:auto}.builder-side{order:2;position:static;max-height:none;overflow:visible}.builder-settings{order:3;position:static;max-height:none;overflow:visible}.sticky-actions{display:none}.left-sticky-controls{display:none}
+.hero{grid-template-columns:1fr}.hero-img{height:220px}.hero-copy{padding:32px 22px}.hero h2{font-size:25px}.section{padding:30px 22px}.course-grid,.teacher-grid,.split-entry,.about-grid{grid-template-columns:1fr}
+.mobile-save{position:fixed;left:12px;right:12px;bottom:76px;display:block;z-index:70}.mobile-save .btn{width:100%;padding:12px;font-size:12px}.mobile-bottom{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:0;right:0;bottom:0;height:66px;background:#fff;border-top:1px solid var(--line);z-index:50}.mobile-bottom a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:9px;color:#45484b}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side"><div class="brand">mikkeOS<small>Academy</small></div><div class="nav"><div>ホーム</div><div>講座</div><div>販売プラン</div><div>開催</div><div>申込</div><div>認定</div><div>講師</div><div class="on">ページ</div><div>設定</div></div></aside>
+<div>
+<header class="top"><strong>灯りのアトリエ キャンドル教室</strong><span>本部責任者 ▾</span></header>
+<main class="wrap">
+<a class="back" href="#">← ページ一覧へ</a>
+<div class="headrow">
+  <div class="title"><h1>本部ホームページ</h1><p>Academyの講座・認定講師情報を使って、スクールの公式ホームページを作ります。</p></div>
+
+</div>
+
+<div class="notice"><b>販売ページ・講師営業ページと同じページビルダーを使用します。</b><br>講座・価格・講師プロフィールなどのAcademy情報は正本を参照し、ホームページ用に同じ情報を再入力しません。</div>
+
+<section class="panel on" id="templates">
+  <div class="tabs">
+    <button class="tab on" data-tab="templates" onclick="switchTab('templates',this)">テンプレート</button>
+    <button class="tab" data-tab="builder" onclick="switchTab('builder',this)">ビルダー</button>
+    <button class="tab" data-tab="publish" onclick="switchTab('publish',this)">公開</button>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <h3>ホームページのテンプレートから作る</h3>
+    <div class="help">完成したホームページ構成を選びます。講座や認定講師などのAcademy情報は自動で反映し、選択後は共通ビルダーで自由に編集できます。</div>
+  </div>
+  <div class="template-grid">
+    <div class="template-card"><div class="template-thumb">ATELIER<br>CRAFT</div><div class="template-body"><strong>ATELIER</strong><p>作品写真・講座・先生を軽やかに見せる、ハンドメイド・クラフト向け。</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button onclick="previewTemplate('ATELIER')">プレビュー</button><button onclick="useTemplate('ATELIER')">このテンプレートを使う</button></div></div></div>
+    <div class="template-card"><div class="template-thumb">MODERN<br>SCHOOL</div><div class="template-body"><strong>SCHOOL</strong><p>講座・認定制度・講師を整理して見せるスクール向け。</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button onclick="previewTemplate('SCHOOL')">プレビュー</button><button onclick="useTemplate('SCHOOL')">このテンプレートを使う</button></div></div></div>
+    <div class="template-card"><div class="template-thumb">NATURAL<br>SALON</div><div class="template-body"><strong>SALON</strong><p>世界観・サービス・人柄を中心に見せる美容・ウェルネス向け。</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button onclick="previewTemplate('SALON')">プレビュー</button><button onclick="useTemplate('SALON')">このテンプレートを使う</button></div></div></div>
+    <div class="template-card"><div class="template-thumb">FOOD<br>STUDIO</div><div class="template-body"><strong>FOOD & COOKING</strong><p>教室・メニュー・レッスン案内を写真中心で見せる構成。</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button onclick="previewTemplate('FOOD')">プレビュー</button><button onclick="useTemplate('FOOD')">このテンプレートを使う</button></div></div></div>
+    <div class="template-card"><div class="template-thumb">SESSION<br>ROOM</div><div class="template-body"><strong>SESSION</strong><p>相談・セッション・個別サービス向けの落ち着いた構成。</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button onclick="previewTemplate('SESSION')">プレビュー</button><button onclick="useTemplate('SESSION')">このテンプレートを使う</button></div></div></div>
+    <div class="template-card"><div class="template-thumb">CREATIVE<br>LAB</div><div class="template-body"><strong>CREATIVE</strong><p>クリエイティブ・ビジネス講座をシャープに見せる構成。</p><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button onclick="previewTemplate('CREATIVE')">プレビュー</button><button onclick="useTemplate('CREATIVE')">このテンプレートを使う</button></div></div></div>
+  </div>
+</section>
+
+<section class="panel" id="builder">
+
+  <div class="builder-layout">
+    <aside class="builder-side">
+      <div class="left-sticky-controls">
+        <div class="tabs left-tabs">
+          <button class="tab" data-tab="templates" onclick="switchTab('templates',this)">テンプレート</button>
+          <button class="tab on" data-tab="builder" onclick="switchTab('builder',this)">ビルダー</button>
+          <button class="tab" data-tab="publish" onclick="switchTab('publish',this)">公開</button>
+        </div>
+        <div class="left-page-actions single">
+          <button class="btn">ページ設定</button>
+        </div>
+      </div>
+      <h3>セクションを追加</h3>
+      <div class="group-title">ACADEMY連携</div>
+      <div class="block data">＋ 講座一覧</div>
+      <div class="block data">＋ 講座から探す</div>
+      <div class="block data">＋ 認定講師一覧</div>
+      <div class="block data">＋ 講師から探す</div>
+      <div class="block data">＋ 開催予定</div>
+      <div class="group-title">自由セクション</div>
+      <div class="block free">＋ HERO</div>
+      <div class="block free">＋ テキスト</div>
+      <div class="block free">＋ 画像</div>
+      <div class="block free">＋ 本部・スクール紹介</div>
+      <div class="block free">＋ ギャラリー</div>
+      <div class="block free">＋ お客様の声</div>
+      <div class="block free">＋ FAQ</div>
+      <div class="block free">＋ CTA / ボタン</div>
+      <div class="block free">＋ 区切り</div>
+    </aside>
+
+    <div class="canvas">
+      <div class="canvas-page">
+        <div class="canvas-section">
+          <div class="public">
+            <div class="pub-top"><div class="pub-brand">灯りのアトリエ</div><div class="pub-nav">ABOUT　COURSES　INSTRUCTORS　FAQ</div></div>
+            <section class="hero">
+              <div class="hero-copy"><div class="eyebrow">AKARI NO ATELIER</div><h2>手を動かす時間が、<br>暮らしの灯りになる。</h2><p>キャンドルづくりを基礎から学べる教室です。体験レッスンから認定講座まで、自分に合った学び方を選べます。</p><button class="cta">講座を探す</button></div>
+              <div class="hero-img"></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="canvas-section">
+          <section class="section">
+            <div class="section-head"><b>COURSES</b><h3>講座から探す</h3><p>Academyで公開中の販売プランから表示します。</p></div>
+            <div class="course-grid">
+              <div class="course-card"><div class="course-photo"></div><div class="course-body"><b>COURSE</b><strong>ベーシックキャンドルコース</strong><p>基礎から順番に学べる3講座コース。</p></div></div>
+              <div class="course-card"><div class="course-photo"></div><div class="course-body"><b>WORKSHOP</b><strong>季節のキャンドル体験</strong><p>初めての方にもおすすめの1DAY体験。</p></div></div>
+              <div class="course-card"><div class="course-photo"></div><div class="course-body"><b>COURSE</b><strong>アロマ基礎講座</strong><p>香りと素材の基本を学ぶ講座。</p></div></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="canvas-section">
+          <section class="section alt">
+            <div class="section-head"><b>FIND</b><h3>自分に合った受講方法を探す</h3><p>講座からでも、先生からでも探せます。</p></div>
+            <div class="split-entry">
+              <div class="entry-box"><strong>講座から探す</strong><p>受けたい講座 → 対面 / オンライン → 対面なら希望エリアから対応講師を探します。</p><button>講座から探す</button></div>
+              <div class="entry-box"><strong>講師から探す</strong><p>先生のプロフィール・活動地域・対応講座を見て、先生から選べます。</p><button>講師から探す</button></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="canvas-section">
+          <section class="section">
+            <div class="section-head"><b>INSTRUCTORS</b><h3>認定講師</h3><p>掲載条件を満たしている講師の共通プロフィールを自動表示します。</p></div>
+            <div class="teacher-grid">
+              <div class="teacher-card"><div class="teacher-photo"></div><div class="teacher-body"><b>東京都杉並区</b><strong>鈴木 里奈</strong><p>対面 / オンライン<br>キャンドル認定講座</p></div></div>
+              <div class="teacher-card"><div class="teacher-photo"></div><div class="teacher-body"><b>東京都中野区</b><strong>山田 花子</strong><p>対面<br>キャンドル認定講座</p></div></div>
+              <div class="teacher-card"><div class="teacher-photo"></div><div class="teacher-body"><b>オンライン</b><strong>佐藤 美香</strong><p>オンライン<br>アロマ認定講座</p></div></div>
+            </div>
+          </section>
+        </div>
+
+        <div class="canvas-section">
+          <section class="section alt">
+            <div class="about-grid"><div class="about-img"></div><div class="about-copy"><h3>灯りのアトリエについて</h3><p>手を動かすこと、学ぶこと、誰かに伝えること。キャンドルを通して、小さな活動を長く続けられる場所を目指しています。</p></div></div>
+          </section>
+        </div>
+
+        <div class="canvas-section">
+          <section class="section">
+            <div class="section-head"><b>FAQ</b><h3>よくある質問</h3></div>
+            <div class="faq"><div class="faq-item">Q. 初めてでも参加できますか？</div><div class="faq-item">Q. オンラインでも受講できますか？</div><div class="faq-item">Q. 認定講座について教えてください。</div></div>
+          </section>
+        </div>
+        <div class="canvas-section"><footer class="pub-footer"><span>© 灯りのアトリエ</span><span>利用規約　プライバシーポリシー</span></footer></div>
+      </div>
+    </div>
+
+    <aside class="builder-settings">
+      <div class="sticky-actions">
+        <button class="btn">PC</button>
+        <button class="btn">スマホ</button>
+        <button class="btn">プレビュー</button>
+        <button class="btn orange">保存</button>
+      </div>
+      <h3>選択中：HERO</h3>
+      <div class="setting"><label>小見出し</label><input value="AKARI NO ATELIER"></div>
+      <div class="setting"><label>見出し</label><textarea>手を動かす時間が、暮らしの灯りになる。</textarea></div>
+      <div class="setting"><label>紹介文</label><textarea>キャンドルづくりを基礎から学べる教室です。</textarea></div>
+      <div class="setting"><label>画像</label><button class="btn" style="width:100%">画像を変更</button></div>
+      <div class="setting"><label>ボタン</label><select><option>講座を探す</option><option>講師を探す</option><option>なし</option></select></div>
+      <div class="lock-note">講座一覧・認定講師一覧などのAcademy連携セクションは、正本データを参照します。講座名・公式価格・講師プロフィール等をホームページ用に別入力しません。</div>
+    </aside>
+  </div>
+</section>
+
+<section class="panel" id="publish">
+  <div class="tabs">
+    <button class="tab" data-tab="templates" onclick="switchTab('templates',this)">テンプレート</button>
+    <button class="tab" data-tab="builder" onclick="switchTab('builder',this)">ビルダー</button>
+    <button class="tab on" data-tab="publish" onclick="switchTab('publish',this)">公開</button>
+  </div>
+  <div class="publish-grid">
+    <div class="publish-card">
+      <h3>公開</h3><p>保存と公開は別です。内容を確認してから公式ホームページとして公開します。</p>
+      <div class="status-row"><span class="pill gray">現在：下書き</span></div>
+      <div class="url-box"><input value="https://academy.mikke.app/akari-atelier" readonly><button class="btn">URLをコピー</button></div>
+      <div class="check-list">
+        <div class="check"><span>HERO・スクール紹介</span><b>設定済み</b></div>
+        <div class="check"><span>公開中の講座</span><b>3件</b></div>
+        <div class="check"><span>HP掲載対象の認定講師</span><b>3名</b></div>
+        <div class="check"><span>講座から探す / 講師から探す</span><b>表示中</b></div>
+        <div class="check"><span>スマホプレビュー</span><b>確認してください</b></div>
+      </div>
+      <div class="actions" style="justify-content:flex-start;margin-top:16px"><button class="btn orange">ホームページを公開</button><button class="btn">プレビュー</button></div>
+    </div>
+    <div class="preview-card">
+      <h3>公開ページ</h3><p>公開後はこのURLから本部・スクールの公式ページを確認できます。</p>
+      <div style="margin-top:16px;padding:18px;border-radius:12px;background:linear-gradient(135deg,#dceee6,#f4dfdb);height:180px;display:flex;align-items:end;font-size:18px;font-weight:900">灯りのアトリエ</div>
+      <button class="btn" style="width:100%;margin-top:12px">公開ページを見る</button>
+    </div>
+  </div>
+</section>
+
+</main></div></div>
+
+
+<div class="mobile-save" id="mobileSave">
+  <button class="btn orange">保存</button>
+</div>
+
+<nav class="mobile-bottom">
+<a href="#">ホーム</a><a href="#">講座</a><a href="#">申込</a><a href="#" style="color:var(--blue)">ページ</a><a href="#">その他</a>
+</nav>
+
+<div class="template-modal" id="templateModal">
+  <div class="template-modal-inner">
+    <div class="template-modal-head">
+      <strong id="templateModalTitle">テンプレートプレビュー</strong>
+      <button class="btn" onclick="closeTemplatePreview()">閉じる</button>
+    </div>
+    <div class="template-modal-body">
+      <div class="template-preview-page">
+        <div class="pub-top"><div class="pub-brand">灯りのアトリエ</div><div class="pub-nav">ABOUT　COURSES　INSTRUCTORS　FAQ</div></div>
+        <section class="hero">
+          <div class="hero-copy"><div class="eyebrow">AKARI NO ATELIER</div><h2>手を動かす時間が、<br>暮らしの灯りになる。</h2><p>テンプレートの完成イメージをここで確認します。</p><button class="cta">講座を探す</button></div>
+          <div class="hero-img"></div>
+        </section>
+        <section class="section"><div class="section-head"><b>COURSES</b><h3>講座から探す</h3><p>講座情報はAcademyから反映されます。</p></div></section>
+        <section class="section alt"><div class="section-head"><b>INSTRUCTORS</b><h3>認定講師</h3><p>講師プロフィールは共通プロフィールから反映されます。</p></div></section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(id,el){
+  document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  document.querySelectorAll('[data-tab="'+id+'"]').forEach(x=>x.classList.add('on'));
+  document.querySelector('.wrap').classList.toggle('builder-full', id==='builder');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function useTemplate(name){
+  document.querySelector('[data-tab=builder]').click();
+}
+function previewTemplate(name){
+  document.getElementById('templateModalTitle').textContent = name + '｜テンプレートプレビュー';
+  document.getElementById('templateModal').classList.add('on');
+}
+function closeTemplatePreview(){
+  document.getElementById('templateModal').classList.remove('on');
+}
+</script>
+</body></html>

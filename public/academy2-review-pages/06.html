@@ -1,0 +1,323 @@
+<!doctype html><html lang="ja"><head><meta name="robots" content="noindex,nofollow"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Academy UI-05 Course Plan Wizard v0.10</title>
+<style>
+:root{--pink:#f9d3d2;--yellow:#ffd370;--blue:#3f4eb5;--green:#8bc7ad;--orange:#f75a3b;--ink:#202126;--muted:#777982;--line:#e8e8eb;--bg:#f7f6f3}
+*{box-sizing:border-box}body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}a{text-decoration:none;color:inherit}button,input{font:inherit}.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid var(--line);padding:20px 14px}.brand{font-size:18px;font-weight:800;padding:4px 10px 20px}.brand small{display:block;font-size:12px;color:var(--muted);font-weight:500}.nav div{padding:10px 12px;border-radius:9px;margin:2px 0;color:#565860}.nav .on{background:var(--blue);color:#fff;font-weight:700}.top{height:62px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}.wrap{max-width:1080px;margin:auto;padding:28px 30px 90px}
+.back{font-size:11px;font-weight:850;color:#4f806c}.titlebar{margin-top:12px;background:var(--green);padding:12px 16px 10px;border-radius:13px 13px 0 0}.en{color:#fff;font-size:15px;font-weight:900;letter-spacing:.08em}.jp{font-size:10px;font-weight:750;margin-top:4px}.intro{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:16px}.intro strong{font-size:14px}.intro p{font-size:11px;color:var(--muted);margin:5px 0 0}
+.steps{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:18px 0}.step{background:#e9e9e7;border-radius:8px;padding:8px 7px;font-size:9px;font-weight:800;text-align:center}.step.on{background:var(--green)}.step.done{background:#dceee6}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:17px}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:17px}.card h2{font-size:15px;margin:0 0 5px}.help{font-size:11px;color:var(--muted);line-height:1.6}.course-list{display:grid;gap:8px;margin-top:14px}.course{display:grid;grid-template-columns:30px 50px 1fr auto;align-items:center;gap:9px;border:1px solid var(--line);border-radius:11px;padding:9px}.drag{font-size:17px;color:#aaa}.thumb{width:50px;height:45px;border-radius:8px;background:linear-gradient(135deg,#dceee6,var(--green));display:grid;place-items:center;font-size:9px;font-weight:900}.course strong{font-size:11px}.course small{display:block;font-size:9px;color:var(--muted);margin-top:3px}.remove{border:0;background:none;color:#999;font-size:16px}.add{margin-top:10px;border:1px solid var(--green);background:#fff;color:#4f806c;border-radius:8px;padding:8px 10px;font-size:10px;font-weight:850}
+.preview{position:sticky;top:80px}.preview-label{font-size:10px;font-weight:900;color:#4f806c;margin-bottom:9px}.pitem{border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:7px}.pitem b{font-size:9px;color:#4f806c}.pitem strong{display:block;font-size:11px;margin:3px 0}.pitem span{font-size:9px;color:var(--muted)}.down{text-align:center;color:#aaa}.preview a{display:block;margin-top:10px;color:#4f806c;font-size:10px;font-weight:850}
+.actions{display:flex;justify-content:space-between;margin-top:14px}.secondary{border:1px solid var(--line);background:#fff;border-radius:9px;padding:10px 13px;font-size:11px;font-weight:800}.next{border:0;background:var(--orange);color:#fff;border-radius:9px;padding:10px 14px;font-size:11px;font-weight:850}
+.note{margin-top:13px;background:#fff8dc;border-radius:10px;padding:10px;font-size:10px;line-height:1.55}
+.mobile-bottom{display:none}
+@media(max-width:820px){.app{display:block}.side{display:none}.top{height:54px;padding:0 14px}.top:before{content:"☰";font-size:19px}.top strong{margin-right:auto;margin-left:12px}.wrap{padding:16px 12px 84px}.steps{display:flex;overflow:auto}.step{min-width:90px}.layout{grid-template-columns:1fr}.preview{position:static}.course{grid-template-columns:25px 42px 1fr auto}.thumb{width:42px;height:40px}.mobile-bottom{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:0;right:0;bottom:0;height:66px;background:#fff;border-top:1px solid var(--line);z-index:29}.mobile-bottom a,.slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}.mobile-bottom small{font-size:9px;font-weight:700}.nav-icon{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8}.slot{position:relative}.plus{position:absolute;top:-23px;width:54px;height:54px;border-radius:50%;border:4px solid #fff;background:var(--orange)}.plus:before,.plus:after{content:"";position:absolute;left:50%;top:50%;background:#fff;transform:translate(-50%,-50%)}.plus:before{width:23px;height:2px}.plus:after{width:2px;height:23px}}
+
+/* v0.3 wizard interactions */
+.course{cursor:pointer}.course-details{grid-column:2/5;display:none;margin-top:2px;padding:9px 10px;background:#f8faf9;border-radius:8px;font-size:10px;color:#555;line-height:1.6}.course.open .course-details{display:block}
+.course .thumb{background-size:cover;background-position:center;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.35)}
+.course:nth-child(1) .thumb{background-image:linear-gradient(rgba(40,40,40,.08),rgba(40,40,40,.08)),url('https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=160&q=60')}
+.course:nth-child(2) .thumb{background-image:linear-gradient(rgba(40,40,40,.08),rgba(40,40,40,.08)),url('https://images.unsplash.com/photo-1602874801006-e26c8e84c6f7?auto=format&fit=crop&w=160&q=60')}
+.course:nth-child(3) .thumb{background-image:linear-gradient(rgba(40,40,40,.08),rgba(40,40,40,.08)),url('https://images.unsplash.com/photo-1608181831718-c9ffd66e3e29?auto=format&fit=crop&w=160&q=60')}
+.schedule-options{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}.option{border:1px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;background:#fff}.option:hover,.option.on{border-color:var(--green);background:#f7fcf9}.option strong{display:block;font-size:11px}.option p{font-size:9px;color:var(--muted);line-height:1.5;margin:4px 0 0}.schedule-note{margin-top:12px;background:#f3f8f5;border-radius:10px;padding:10px;font-size:10px;line-height:1.55}.back-step{border:1px solid var(--line);background:#fff;border-radius:9px;padding:10px 13px;font-size:11px;font-weight:800}
+@media(max-width:820px){.schedule-options{grid-template-columns:1fr}.course-details{grid-column:1/5}}
+
+/* v0.4 step 4 price */
+.price-summary{margin-top:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}.price-head{background:#f4f5f3;padding:9px 11px;font-size:10px;font-weight:850}.price-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px 11px;border-top:1px solid var(--line);font-size:10px}.price-row:first-of-type{border-top:0}.price-row b{font-size:11px}.price-total{display:flex;justify-content:space-between;padding:11px;background:#f7fcf9;border-top:1px solid var(--line);font-size:11px}.price-total strong{font-size:14px}.field{margin-top:14px}.field label{display:block;font-size:11px;font-weight:850;margin-bottom:6px}.input-wrap{display:flex;align-items:center;border:1px solid #dcdde2;border-radius:10px;background:#fff;height:44px;padding:0 11px;max-width:280px}.input-wrap span{font-weight:800}.input-wrap input{border:0;outline:0;width:100%;font-size:15px;font-weight:850;padding-left:5px}.price-warning{display:none;margin-top:10px;background:#fff1e9;border-left:4px solid var(--orange);border-radius:8px;padding:9px 10px;font-size:10px;line-height:1.5}.price-warning.show{display:block}.discount{margin-top:8px;font-size:10px;color:#4f806c;font-weight:800}
+.lp-note{margin-top:12px;background:#f4f7ff;border-radius:10px;padding:10px;font-size:10px;line-height:1.55}
+
+/* v0.5 step navigation + payment model + step 5 */
+.step{cursor:pointer}.step:hover{outline:1px solid var(--green)}
+.course-price{display:block;margin-top:3px;font-size:9px;font-weight:800;color:#4f806c}
+.billing-model{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}.billing-choice{border:1px solid var(--line);border-radius:11px;padding:13px;background:#fff;cursor:pointer}.billing-choice.on{border-color:var(--green);background:#f7fcf9}.billing-choice strong{font-size:11px}.billing-choice p{font-size:9px;color:var(--muted);line-height:1.5;margin:4px 0 0}
+.pay-options{display:grid;gap:9px;margin-top:14px}.pay-option{border:1px solid var(--line);border-radius:11px;padding:12px;display:flex;gap:10px;align-items:flex-start}.check{width:20px;height:20px;border-radius:6px;background:var(--green);display:grid;place-items:center;font-size:11px;font-weight:900;flex:0 0 auto}.pay-option strong{font-size:11px}.pay-option p{font-size:9px;color:var(--muted);margin:3px 0 0}.pay-config{margin-top:12px;background:#f8faf9;border-radius:10px;padding:11px;font-size:10px;line-height:1.6}
+@media(max-width:820px){.billing-model{grid-template-columns:1fr}}
+
+/* v0.6 step 3 learning style + step 6 after-course + step 7 review */
+.study-options{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.study-choice,.method-choice,.after-choice{border:1px solid var(--line);border-radius:11px;padding:13px;background:#fff;cursor:pointer}
+.study-choice.on,.method-choice.on,.after-choice.on{border-color:var(--green);background:#f7fcf9}
+.study-choice strong,.method-choice strong,.after-choice strong{font-size:11px}
+.study-choice p,.method-choice p,.after-choice p{font-size:9px;color:var(--muted);line-height:1.5;margin:4px 0 0}
+.conditional{margin-top:12px;padding:12px;background:#f8faf9;border-radius:10px}
+.conditional h3{font-size:11px;margin:0 0 8px}
+.method-options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.method-choice{padding:10px}
+.radio-line{display:flex;align-items:flex-start;gap:8px;margin:7px 0;font-size:10px}
+.radio-dot{width:16px;height:16px;border:1px solid #bbb;border-radius:50%;margin-top:1px;position:relative;flex:0 0 auto}
+.radio-line.on .radio-dot:after{content:"";position:absolute;inset:3px;background:var(--green);border-radius:50%}
+.after-list{display:grid;gap:8px;margin-top:14px}
+.after-choice{display:flex;gap:10px;align-items:flex-start}
+.after-check{width:20px;height:20px;border-radius:6px;border:1px solid #cfd0d4;display:grid;place-items:center;flex:0 0 auto;font-weight:900}
+.after-choice.on .after-check{background:var(--green);border-color:var(--green)}
+.after-choice.on .after-check:after{content:"✓"}
+.subsettings{display:none;margin:8px 0 0 30px;padding:10px;background:#f8faf9;border-radius:9px;font-size:10px;line-height:1.6}
+.after-choice.on + .subsettings{display:block}
+.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.review-box{border:1px solid var(--line);border-radius:11px;padding:11px}
+.review-box b{display:block;font-size:10px;color:#4f806c;margin-bottom:4px}
+.review-box strong{font-size:11px}
+.review-box p{font-size:9px;color:var(--muted);line-height:1.5;margin:4px 0 0}
+.ready{margin-top:12px;background:#f7fcf9;border-left:4px solid var(--green);border-radius:8px;padding:10px;font-size:10px;line-height:1.55}
+.publish-warning{margin-top:10px;background:#fff8dc;border-radius:10px;padding:10px;font-size:10px;line-height:1.55}
+.page-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.page-actions button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:9px 11px;font-size:10px;font-weight:800}
+.page-actions .primary-page{background:var(--blue);color:#fff;border-color:var(--blue)}
+@media(max-width:820px){
+  .study-options,.method-options,.review-grid{grid-template-columns:1fr}
+}
+
+
+/* v0.7 kit, certificate controls, application form, page launch choices */
+.kit-panel,.cert-panel,.form-panel,.launch-panel{margin-top:12px;background:#f8faf9;border-radius:10px;padding:12px}
+.toggle-row{display:flex;align-items:flex-start;gap:9px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fff;cursor:pointer;margin-top:8px}
+.toggle-box{width:20px;height:20px;border-radius:6px;border:1px solid #cfd0d4;display:grid;place-items:center;flex:0 0 auto}
+.toggle-row.on{border-color:var(--green);background:#f7fcf9}
+.toggle-row.on .toggle-box{background:var(--green);border-color:var(--green)}
+.toggle-row.on .toggle-box:after{content:"✓";font-weight:900}
+.mini-fields{display:none;margin:8px 0 0 29px;gap:8px}
+.toggle-row.on + .mini-fields{display:grid}
+.mini-fields label{font-size:9px;font-weight:800;color:#555}
+.mini-fields input,.mini-fields select,.form-row input,.form-row select{width:100%;border:1px solid #dcdde2;border-radius:8px;padding:8px;background:#fff;font-size:10px}
+.cert-settings{display:none;margin:8px 0 0 30px;padding:10px;background:#fff;border:1px solid var(--line);border-radius:9px}
+.after-choice.on + .cert-settings{display:block}
+.cert-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.cert-grid label{font-size:9px;font-weight:800}
+.form-builder{display:grid;gap:8px;margin-top:12px}
+.form-row{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
+.form-row strong{font-size:10px}
+.form-row p{font-size:9px;color:var(--muted);margin:3px 0 0}
+.form-badge{display:inline-block;font-size:8px;font-weight:850;background:#eef5f1;color:#4f806c;padding:3px 6px;border-radius:999px;margin-left:5px}
+.form-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.form-actions button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;font-size:9px;font-weight:800}
+.launch-options{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:12px}
+.launch-card{border:1px solid var(--line);border-radius:11px;padding:13px;background:#fff}
+.launch-card strong{display:block;font-size:11px;margin-bottom:4px}
+.launch-card p{font-size:9px;color:var(--muted);line-height:1.5;margin:0 0 10px}
+.launch-card button{width:100%;border:0;border-radius:8px;padding:9px;font-size:9px;font-weight:850}
+.launch-card .plain{background:#eef7f2;color:#3d735e}
+.launch-card .builder{background:var(--blue);color:#fff}
+.launch-card .template{background:#fff3c9;color:#735b00}
+.publish-checklist{margin-top:12px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.publish-checklist div{display:flex;justify-content:space-between;padding:9px 10px;border-top:1px solid var(--line);font-size:10px}
+.publish-checklist div:first-child{border-top:0}
+.status-ok{color:#4f806c;font-weight:850}.status-warn{color:#a27600;font-weight:850}
+@media(max-width:820px){.cert-grid,.launch-options{grid-template-columns:1fr}}
+
+
+/* v0.10 application form conditional preview */
+.auto-fields{margin-top:12px;background:#f4f7ff;border-radius:10px;padding:11px}
+.auto-fields h3{font-size:10px;margin:0 0 5px}
+.auto-fields p{font-size:9px;color:#666;line-height:1.55;margin:0 0 8px}
+.auto-item{background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px;margin-top:7px;font-size:9px}
+.auto-item b{display:block;font-size:9px;margin-bottom:3px}
+.preview-form-btn{margin-top:10px;border:1px solid var(--blue);background:#fff;color:var(--blue);border-radius:8px;padding:9px 11px;font-size:9px;font-weight:850}
+.form-overlay{position:fixed;inset:0;background:rgba(32,33,38,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:120}
+.form-overlay.on{display:flex}
+.form-modal{width:min(720px,100%);max-height:92vh;overflow:auto;background:#fff;border-radius:15px;box-shadow:0 20px 70px rgba(0,0,0,.24)}
+.form-modal-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#fff;z-index:2}
+.form-modal-head strong{font-size:12px}.form-close{border:0;background:#eee;border-radius:8px;width:30px;height:30px;font-weight:900}
+.customer-form{padding:18px}
+.customer-form h2{font-size:18px;margin:0 0 4px}
+.customer-form .lead{font-size:9px;color:#777;line-height:1.55;margin-bottom:14px}
+.consult-note{background:#fff8dc;border-radius:10px;padding:10px;font-size:9px;line-height:1.6;margin-bottom:12px}
+.customer-field{margin-top:10px}
+.customer-field label{display:block;font-size:9px;font-weight:850;margin-bottom:5px}
+.customer-field input,.customer-field textarea,.customer-field select{width:100%;border:1px solid #d9dbe0;border-radius:8px;padding:9px;font-size:10px;background:#fff}
+.customer-field textarea{min-height:70px}
+.date-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.submit-demo{margin-top:15px;border:0;background:var(--orange);color:#fff;border-radius:9px;padding:11px 15px;font-size:10px;font-weight:850;width:100%}
+@media(max-width:700px){.date-grid{grid-template-columns:1fr}}
+
+</style></head><body>
+<div class="app"><aside class="side"><div class="brand">mikkeOS<small>Academy</small></div><div class="nav"><div>ホーム</div><div>講座</div><div class="on">販売プラン</div><div>開催</div><div>申込</div><div>認定</div><div>講師</div><div>ページ</div><div>設定</div></div></aside>
+<div><header class="top"><strong>灯りのアトリエ キャンドル教室</strong><span>本部責任者 ▾</span></header><main class="wrap">
+<a class="back" href="#plans">← 販売プラン一覧へ</a>
+<div class="titlebar"><div class="en">COURSE</div><div class="jp">コースをつくる</div></div><div class="intro"><strong>質問に答えていけば、販売プランが完成します。</strong><p>選んだ内容に必要な設定だけを表示します。</p></div>
+<div class="steps"><div class="step on" onclick="goStep1()">1 講座・順番</div><div class="step" onclick="goStep2()">2 受講スタイル</div><div class="step" onclick="goStep3()">3 金額</div><div class="step" onclick="goStep4()">4 支払い</div><div class="step" onclick="goStep5()">5 受講後</div><div class="step" onclick="goStep6()">6 申込フォーム</div><div class="step" onclick="goStep7()">7 確認・販売ページ</div></div>
+<div class="layout">
+<section class="card"><h2>このコースに入れる講座を選ぶ</h2><div class="help">作成済みの講座から選びます。ここでは販売する講座の組み合わせだけを決めます。</div>
+<div class="course-list">
+<div class="course" onclick="this.classList.toggle('open')"><span class="drag">☰</span><div class="thumb">01</div><div><strong>キャンドル基礎</strong><small>3レッスン・4教材<span class="course-price">単品参考 ¥8,000</span></small></div><button class="remove" onclick="event.stopPropagation()">×</button><div class="course-details"><b>講座内容</b><br>キャンドルの基本 → 材料と道具 → 基本の制作<br><a href="#course-1" style="color:#4f806c;font-weight:800">講座を確認 →</a></div></div>
+<div class="course" onclick="this.classList.toggle('open')"><span class="drag">☰</span><div class="thumb">02</div><div><strong>制作実技</strong><small>4レッスン・6教材<span class="course-price">単品参考 ¥7,000</span></small></div><button class="remove" onclick="event.stopPropagation()">×</button><div class="course-details"><b>講座内容</b><br>制作準備 → 基本制作 → 仕上げ → 振り返り<br><a href="#course-2" style="color:#4f806c;font-weight:800">講座を確認 →</a></div></div>
+<div class="course" onclick="this.classList.toggle('open')"><span class="drag">☰</span><div class="thumb">03</div><div><strong>応用デザイン</strong><small>2レッスン・3教材<span class="course-price">単品参考 ¥6,000</span></small></div><button class="remove" onclick="event.stopPropagation()">×</button><div class="course-details"><b>講座内容</b><br>デザインの考え方 → 応用制作<br><a href="#course-3" style="color:#4f806c;font-weight:800">講座を確認 →</a></div></div>
+</div><button class="add">＋ 講座を追加</button>
+<div class="note">次のSTEPで、受講する順番を決めます。レッスンや教材の並び替えは、それぞれの「講座」編集で行います。</div>
+<div class="actions"><span></span><button class="next" onclick="goStep2()">次へ：受講する順番 →</button></div></section>
+<aside class="card preview"><div class="preview-label">現在選んでいる講座</div><div class="pitem"><b>COURSE 01</b><strong>キャンドル基礎</strong><span>材料と道具の基本から学びます。</span></div><div class="down">↓</div><div class="pitem"><b>COURSE 02</b><strong>制作実技</strong><span>実際に制作しながら身につけます。</span></div><div class="down">↓</div><div class="pitem"><b>COURSE 03</b><strong>応用デザイン</strong><span>応用デザインを学びます。</span></div><a href="#learner-preview">受講者から見る →</a></aside>
+</div>
+</main></div></div>
+<nav class="mobile-bottom"><a href="#home"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/></svg><small>ホーム</small></a><a href="#courses"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 5.5h6.5c1.1 0 1.5.5 1.5 1.5v12c0-1-.5-1.5-1.5-1.5H4z"/><path d="M20 5.5h-6.5C12.5 5.5 12 6 12 7v12c0-1 .5-1.5 1.5-1.5H20z"/></svg><small>講座</small></a><div class="slot"><button class="plus"></button></div><a href="#applications"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/></svg><small>申込</small></a><a href="#more"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg><small>その他</small></a></nav>
+<script>
+
+function markStep(n){document.querySelectorAll('.step').forEach((x,i)=>{x.classList.remove('on');if(i<n-1)x.classList.add('done');else x.classList.remove('done')});document.querySelectorAll('.step')[n-1].classList.add('on')}
+function C(){return document.querySelector('.layout > .card')}
+function cleanup(c){c.querySelectorAll('.schedule-options,.study-panel,.price-panel,.payment-panel,.after-panel,.form-panel,.review-panel,.launch-panel').forEach(x=>x.remove())}
+function showCourses(c){c.querySelector('.course-list').style.display='grid';c.querySelector('.add').style.display='inline-block';c.querySelector('.note').style.display='block'}
+function hideCourses(c){c.querySelector('.course-list').style.display='none';c.querySelector('.add').style.display='none';c.querySelector('.note').style.display='none'}
+
+function goStep1(){
+  markStep(1);let c=C();cleanup(c);showCourses(c);
+  c.querySelector('h2').textContent='講座を選んで、受講する順番を決める';
+  c.querySelector('.help').textContent='作成済みの講座から選び、そのままドラッグして受講する順番に並べます。講座を押すと内容を確認できます。';
+  c.querySelector('.note').textContent='この順番は講座単位です。各講座内のレッスン・教材の順番は、それぞれの「講座」編集で管理します。';
+  c.querySelector('.actions').innerHTML='<span></span><button class="next" onclick="goStep2()">次へ：受講スタイル →</button>';
+}
+
+function goStep2(){
+  markStep(2);let c=C();cleanup(c);hideCourses(c);
+  c.querySelector('h2').textContent='どうやって受講しますか？';
+  c.querySelector('.help').textContent='この販売プラン全体の受講スタイルを決めます。日程や定員はここでは設定しません。';
+  let b=document.createElement('div');b.className='study-panel';
+  b.innerHTML=`
+    <div class="study-options">
+      <div class="study-choice on" data-mode="teacher"><strong>先生から受講する</strong><p>対面やオンラインで、先生から直接レッスンを受けます。</p></div>
+      <div class="study-choice" data-mode="self"><strong>レッスン教材だけで学ぶ</strong><p>動画・PDF・文章などを使って、自分で学びます。</p></div>
+    </div>
+
+    <div class="conditional" id="teacherOptions">
+      <h3>この販売プランで利用できる開催方法</h3>
+      <div class="method-options">
+        <div class="method-choice on"><strong>対面</strong><p>会場で受講できるようにします。</p></div>
+        <div class="method-choice on"><strong>オンライン</strong><p>Zoom等で受講できるようにします。</p></div>
+      </div>
+      <div style="margin-top:12px;font-size:10px;font-weight:850">レッスン教材も使いますか？</div>
+      <div class="radio-line on"><span class="radio-dot"></span><span><b>使わない</b><br><small>受講者には教材を公開しません。</small></span></div>
+      <div class="radio-line"><span class="radio-dot"></span><span><b>受講前から見せる</b><br><small>講座中に一緒に使う場合もこちらです。</small></span></div>
+      <div class="radio-line"><span class="radio-dot"></span><span><b>受講後に見せる</b><br><small>復習教材として受講後から利用できます。</small></span></div>
+    </div>
+
+    <div class="conditional" id="selfOptions" style="display:none">
+      <h3>レッスン教材について</h3>
+      <div style="font-size:10px;line-height:1.6">講座に設定されているレッスン・教材・順番を使います。開催の登録は必要ありません。</div>
+    </div>
+
+    <div class="kit-panel">
+      <h3 style="font-size:11px;margin:0">受講に必要なキット・発送物はありますか？</h3>
+      <div class="toggle-row" id="kitToggle"><span class="toggle-box"></span><div><strong>キット・発送物あり</strong><p>材料セット、道具、冊子などを受講者へ渡す場合に設定します。</p></div></div>
+      <div class="mini-fields">
+        <label>キット・発送物の名前<input value="キャンドル制作キット"></label>
+        <div>
+          <div style="font-size:9px;font-weight:800;color:#555;margin-bottom:6px">受け渡し方法</div>
+          <div class="method-options">
+            <div class="method-choice on" id="kitShip"><strong>事前に発送</strong><p>オンライン受講など、開催前に受講者へ送ります。</p></div>
+            <div class="method-choice on" id="kitHand"><strong>会場で手渡し</strong><p>対面開催で、当日に直接お渡しします。</p></div>
+          </div>
+          <div style="font-size:9px;color:var(--muted);margin-top:7px">両方選べます。実際にどちらで渡すかは、各「開催」で決めます。</div>
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--muted);margin-top:7px">※ 講師が認定講座を開講するときに本部へ注文する「開講用キット」とは別の設定です。</div>
+    </div>
+
+    <div class="schedule-note"><b>日程・受付方法・担当者・定員は、作成後に「開催」で設定します。</b></div>`;
+  c.insertBefore(b,c.querySelector('.actions'));
+
+  b.querySelectorAll('.study-choice').forEach(o=>o.onclick=()=>{
+    b.querySelectorAll('.study-choice').forEach(x=>x.classList.remove('on'));o.classList.add('on');
+    let teacher=o.dataset.mode==='teacher';b.querySelector('#teacherOptions').style.display=teacher?'block':'none';b.querySelector('#selfOptions').style.display=teacher?'none':'block';
+  });
+  b.querySelectorAll('.method-choice').forEach(o=>o.onclick=()=>o.classList.toggle('on'));
+  b.querySelectorAll('.radio-line').forEach(o=>o.onclick=()=>{b.querySelectorAll('.radio-line').forEach(x=>x.classList.remove('on'));o.classList.add('on')});
+  b.querySelector('#kitToggle').onclick=()=>b.querySelector('#kitToggle').classList.toggle('on');
+  c.querySelector('.actions').innerHTML='<button class="back-step" onclick="goStep1()">← 戻る</button><button class="next" onclick="goStep3()">次へ：金額 →</button>';
+}
+
+function goStep3(){
+  markStep(3);let c=C();cleanup(c);hideCourses(c);
+  c.querySelector('h2').textContent='このコースの金額を決める';
+  c.querySelector('.help').textContent='単品参考価格を見ながら、この販売プランでの実際の料金を設定します。';
+  let b=document.createElement('div');b.className='price-panel';
+  b.innerHTML=`<div class="price-summary"><div class="price-head">選んだ講座の単品参考価格</div><div class="price-row"><span>キャンドル基礎</span><b>¥8,000</b></div><div class="price-row"><span>制作実技</span><b>¥7,000</b></div><div class="price-row"><span>応用デザイン</span><b>¥6,000</b></div><div class="price-total"><span>参考価格の合計</span><strong>¥21,000</strong></div></div>
+  <div class="billing-model"><div class="billing-choice on" data-billing="bundle"><strong>コースまとめて料金</strong><p>コース全体の価格を決めて、まとめて販売します。</p></div><div class="billing-choice" data-billing="step"><strong>講座ごとに料金</strong><p>前の講座を修了後、次の講座ごとに購入する方式です。</p></div></div>
+  <div id="bundlePrice"><div class="field"><label>コース販売価格</label><div class="input-wrap"><span>¥</span><input id="planPrice" value="18000" oninput="checkPrice()"></div><div class="discount" id="discount"></div><div class="price-warning" id="priceWarning"><b>参考価格より大きく下回っています。</b><br>入力間違いや必要な費用が含まれているか確認してください。</div></div></div>
+  <div id="stepPrices" style="display:none"><div class="price-summary"><div class="price-head">このコースでの価格</div><div class="price-row"><span>01 キャンドル基礎</span><b>¥7,000</b></div><div class="price-row"><span>02 制作実技</span><b>¥6,000</b></div><div class="price-row"><span>03 応用デザイン</span><b>¥5,000</b></div><div class="price-total"><span>コース内合計</span><strong>¥18,000</strong></div></div><div class="note">これはクレジットカードの分割払いではありません。前の講座を修了し、次の講座のお支払い確認後に次へ進みます。</div></div>`;
+  c.insertBefore(b,c.querySelector('.actions'));
+  b.querySelectorAll('.billing-choice').forEach(o=>o.onclick=()=>{b.querySelectorAll('.billing-choice').forEach(x=>x.classList.remove('on'));o.classList.add('on');let bundle=o.dataset.billing==='bundle';b.querySelector('#bundlePrice').style.display=bundle?'block':'none';b.querySelector('#stepPrices').style.display=bundle?'none':'block'});
+  c.querySelector('.actions').innerHTML='<button class="back-step" onclick="goStep2()">← 戻る</button><button class="next" onclick="goStep4()">次へ：支払い →</button>';checkPrice();
+}
+function checkPrice(){let v=Number(document.getElementById('planPrice')?.value||0),sum=21000,d=document.getElementById('discount'),w=document.getElementById('priceWarning');if(!d)return;d.textContent=v<sum?`参考合計より ¥${(sum-v).toLocaleString()} お得`:v>sum?`参考合計より ¥${(v-sum).toLocaleString()} 高い設定`:'参考価格の合計と同額';w.classList.toggle('show',v>0&&v<sum*.65)}
+
+function goStep4(){markStep(4);let c=C();cleanup(c);hideCourses(c);c.querySelector('h2').textContent='支払い方法を決める';c.querySelector('.help').textContent='受講者が使える支払い方法を選びます。必要な方法だけ設定してください。';let b=document.createElement('div');b.className='payment-panel';b.innerHTML=`<div class="pay-options"><div class="pay-option"><span class="check">✓</span><div><strong>カード決済</strong><p>Academy上でクレジットカード決済を受け付けます。</p></div></div><div class="pay-option"><span class="check">✓</span><div><strong>銀行振込</strong><p>受講者に振込先を案内します。</p></div></div><div class="pay-option"><span class="check">✓</span><div><strong>外部の決済サービスを使う</strong><p>Squareなど、すでに利用している決済ページへ案内します。</p></div></div></div>`;c.insertBefore(b,c.querySelector('.actions'));c.querySelector('.actions').innerHTML='<button class="back-step" onclick="goStep3()">← 戻る</button><button class="next" onclick="goStep5()">次へ：受講後 →</button>'}
+
+function goStep5(){markStep(5);let c=C();cleanup(c);hideCourses(c);c.querySelector('h2').textContent='受講後はどうしますか？';c.querySelector('.help').textContent='必要なものだけ選びます。選んだ内容に必要な設定だけが表示されます。';let b=document.createElement('div');b.className='after-panel';b.innerHTML=`<div class="after-list">
+<div class="after-choice on"><span class="after-check"></span><div><strong>修了として記録する</strong><p>このコースを修了した記録を残します。</p></div></div><div class="subsettings">修了条件の詳細は、講座側の完了・確認条件と販売プラン全体の条件に従います。</div>
+<div class="after-choice"><span class="after-check"></span><div><strong>証書を発行する</strong><p>修了証、認定証・デュプロマ、その他の証書を発行できます。</p></div></div><div class="cert-settings"><b>証書の設定</b><div class="cert-grid"><label>証書の種類<select><option>修了証</option><option>認定証・デュプロマ</option><option>その他</option></select></label><label>発行方法<select><option>デジタル</option><option>現物を発送</option><option>デジタル＋現物</option></select></label></div></div>
+<div class="after-choice"><span class="after-check"></span><div><strong>スキル認定する</strong><p>この講座で学んだ技術・知識を習得したことを認定します。</p></div></div><div class="subsettings">認定するスキル・対象を設定します。</div>
+<div class="after-choice"><span class="after-check"></span><div><strong>商用利用を許可する</strong><p>認定した技術を仕事に使えるようにします。</p></div></div><div class="subsettings">商用利用ライセンスの対象技術・継続条件を設定します。</div>
+<div class="after-choice"><span class="after-check"></span><div><strong>この講座を教えられるようにする</strong><p>本部の講座を、講師として販売・開催できるようにします。</p></div></div><div class="subsettings">講師登録・契約・会費・マニュアル・営業ページ・開講ライセンス等を設定します。</div></div>`;c.insertBefore(b,c.querySelector('.actions'));b.querySelectorAll('.after-choice').forEach(o=>o.onclick=()=>o.classList.toggle('on'));c.querySelector('.actions').innerHTML='<button class="back-step" onclick="goStep4()">← 戻る</button><button class="next" onclick="goStep6()">次へ：申込フォーム →</button>'}
+
+function goStep6(){
+  markStep(6);let c=C();cleanup(c);hideCourses(c);
+  c.querySelector('h2').textContent='申込フォームを設定する';
+  c.querySelector('.help').textContent='募集時に、お客様へ入力してもらう内容を決めます。開催の受付方法に応じて、必要な質問は自動で追加されます。';
+  let b=document.createElement('div');b.className='form-panel';
+  b.innerHTML=`
+    <div class="form-builder">
+      <div class="form-row"><strong>お名前 <span class="form-badge">必須</span></strong><p>申込者のお名前</p></div>
+      <div class="form-row"><strong>メールアドレス <span class="form-badge">必須</span></strong><p>申込確認や連絡に使用します。</p></div>
+      <div class="form-row"><strong>電話番号</strong><p>必要な場合のみ入力してもらいます。</p></div>
+      <div class="form-row"><strong>備考・質問</strong><p>受講前に伝えておきたいことを入力できます。</p></div>
+      <div class="form-row"><strong>申込規約への同意 <span class="form-badge">必須</span></strong><p>申込フォームの最後に表示します。</p></div>
+    </div>
+
+    <div class="auto-fields">
+      <h3>開催に応じて自動で追加される質問</h3>
+      <p>販売プラン側で同じ質問を作る必要はありません。申込者が選んだ開催・受付方法に合わせて表示します。</p>
+      <div class="auto-item"><b>「申込後に日程相談」を選んだ場合</b>「日程はお申込み後、本部と相談して決定します」と案内し、第1〜第3希望日・希望時間帯・補足を表示します。</div>
+      <div class="auto-item"><b>受講者への事前発送が必要な場合</b>発送先を追加します。対面で当日手渡しのみなら表示しません。</div>
+      <div class="auto-item"><b>証書を発行する場合</b>証書記載名を追加し、現物発送なら必要な発送情報も表示します。</div>
+    </div>
+
+    <div class="form-actions">
+      <button>＋ 質問を追加</button>
+      <button>項目の並び替え</button>
+    </div>
+    <button class="preview-form-btn" onclick="openFormPreview()">受講者の申込フォームをプレビュー →</button>
+  `;
+  c.insertBefore(b,c.querySelector('.actions'));
+  c.querySelector('.actions').innerHTML='<button class="back-step" onclick="goStep5()">← 戻る</button><button class="next" onclick="goStep7()">次へ：確認・販売ページ →</button>';
+}
+
+function goStep7(){markStep(7);let c=C();cleanup(c);hideCourses(c);c.querySelector('h2').textContent='内容を確認して、販売ページを準備する';c.querySelector('.help').textContent='この内容だけでも標準の販売ページとして使えます。必要ならビルダーやテンプレートで見せ方をカスタムできます。';let b=document.createElement('div');b.className='review-panel';b.innerHTML=`<div class="review-grid"><div class="review-box"><b>販売タイプ</b><strong>コース</strong><p>3講座を順番に受講</p></div><div class="review-box"><b>受講スタイル</b><strong>先生から受講</strong><p>対面・オンラインに対応</p></div><div class="review-box"><b>講座構成</b><strong>3講座</strong><p>キャンドル基礎 → 制作実技 → 応用デザイン</p></div><div class="review-box"><b>金額</b><strong>¥18,000</strong></div><div class="review-box"><b>支払い</b><strong>カード・銀行振込・外部決済</strong></div><div class="review-box"><b>申込フォーム</b><strong>設定済み</strong></div></div>
+<div class="ready"><b>この内容だけでも販売ページとして使えます。</b><br>販売プランの情報から標準ページを自動生成します。</div>
+<div class="launch-options"><div class="launch-card"><strong>このまま使う</strong><p>標準ページをそのまま利用します。</p><button class="plain">標準ページを確認 →</button></div><div class="launch-card"><strong>ビルダーでカスタム</strong><p>標準ページを土台に、配置・写真・文章・セクションを自由に編集します。</p><button class="builder">ビルダーで編集 →</button></div><div class="launch-card"><strong>テンプレートから作る</strong><p>完成テンプレートに販売プランの内容を流し込みます。</p><button class="template">テンプレートを選ぶ →</button></div></div>`;c.insertBefore(b,c.querySelector('.actions'));c.querySelector('.actions').innerHTML='<button class="back-step" onclick="goStep6()">← 戻る</button><button class="next">販売プランを保存</button>'}
+
+function openFormPreview(){document.getElementById('formPreview').classList.add('on')}
+function closeFormPreview(){document.getElementById('formPreview').classList.remove('on')}
+document.getElementById('formPreview')?.addEventListener('click',e=>{if(e.target.id==='formPreview')closeFormPreview()});
+</script>
+
+<div class="form-overlay" id="formPreview">
+  <div class="form-modal">
+    <div class="form-modal-head">
+      <strong>受講者から見る｜申込フォーム</strong>
+      <button class="form-close" onclick="closeFormPreview()">×</button>
+    </div>
+    <div class="customer-form">
+      <h2>ベーシックキャンドルコース お申込み</h2>
+      <div class="lead">受付方法：申込後に日程相談 / 対面</div>
+
+      <div class="consult-note">
+        <b>日程はお申込み後、本部と相談して決定します。</b><br>
+        下記にご希望の日程を入力してください。担当者よりご連絡し、日程を調整いたします。
+      </div>
+
+      <div class="customer-field"><label>お名前 *</label><input placeholder="例：山田 花子"></div>
+      <div class="customer-field"><label>メールアドレス *</label><input placeholder="example@email.com"></div>
+      <div class="customer-field"><label>電話番号</label><input placeholder="090-0000-0000"></div>
+
+      <div class="date-grid">
+        <div class="customer-field"><label>第1希望日 *</label><input type="date"></div>
+        <div class="customer-field"><label>希望時間帯</label><select><option>指定なし</option><option>午前</option><option>午後</option><option>夕方以降</option></select></div>
+        <div class="customer-field"><label>第2希望日</label><input type="date"></div>
+        <div class="customer-field"><label>第3希望日</label><input type="date"></div>
+      </div>
+
+      <div class="customer-field"><label>日程についての補足</label><textarea placeholder="例：平日は14時以降希望、土日は終日可能 など"></textarea></div>
+      <div class="customer-field"><label>備考・質問</label><textarea></textarea></div>
+      <div class="customer-field"><label><input type="checkbox" style="width:auto"> 申込規約に同意する *</label></div>
+
+      <button class="submit-demo">この内容で申し込む</button>
+    </div>
+  </div>
+</div>
+
+</body></html>

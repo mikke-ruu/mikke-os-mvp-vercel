@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="ja">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy UI-18 Instructor Applications Flow v0.3</title>
+<style>
+:root{
+  --pink:#f9d3d2;
+  --yellow:#ffd370;
+  --blue:#3f4eb5;
+  --green:#8bc7ad;
+  --green-deep:#5b8f78;
+  --orange:#f75a3b;
+  --ink:#1f2430;
+  --muted:#6f7480;
+  --line:#e8e8eb;
+  --bg:#f7f6f3;
+  --white:#fff;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;
+  color:var(--ink);
+  background:var(--bg);
+}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+a{text-decoration:none;color:inherit}
+
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.side{
+  background:#fff;border-right:1px solid var(--line);padding:20px 14px
+}
+.brand{font-size:18px;font-weight:800;padding:4px 10px 20px}
+.brand small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.nav div{
+  padding:10px 12px;border-radius:9px;margin:2px 0;color:#575d66
+}
+.nav .on{background:var(--blue);color:#fff;font-weight:700}
+
+.top{
+  height:62px;background:#fff;border-bottom:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;padding:0 28px
+}
+.top strong{font-size:15px}
+.top span{font-size:12px}
+
+.wrap{max-width:1100px;margin:auto;padding:30px 30px 100px}
+
+.titlebar{
+  background:var(--green);
+  padding:12px 16px 10px;
+  border-radius:13px 13px 0 0
+}
+.titlebar .en{
+  color:#fff;font-size:15px;font-weight:900;letter-spacing:.08em
+}
+.titlebar .jp{
+  font-size:10px;font-weight:800;margin-top:4px
+}
+.headbox{
+  padding:18px 18px 16px;background:#fff;border:1px solid var(--line);
+  border-top:0;border-radius:0 0 14px 14px
+}
+.headbox p{
+  margin:0;color:#606673;line-height:1.7;font-size:13px
+}
+
+.tools{
+  display:flex;gap:9px;margin:20px 0 12px;flex-wrap:wrap
+}
+.search{
+  flex:1;max-width:360px;height:42px;border:1px solid var(--line);
+  border-radius:10px;padding:0 12px;background:#fff;font-size:12px
+}
+.filter{
+  padding:10px 13px;border:1px solid var(--line);border-radius:10px;
+  background:#fff;font-weight:800;font-size:12px
+}
+.filter.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+.list{display:grid;gap:10px}
+.application{
+  display:grid;grid-template-columns:62px 1fr auto;gap:14px;padding:12px 14px;background:#fff;
+  border:1px solid var(--line);border-radius:14px;align-items:center;cursor:pointer
+}
+.application:hover{box-shadow:0 4px 14px rgba(0,0,0,.04)}
+.avatar{
+  width:62px;height:62px;border-radius:11px;background:linear-gradient(135deg,#dcefe6,#eff4f1);
+  display:grid;place-items:center;font-weight:900;color:#546584;font-size:22px
+}
+.application h3{font-size:14px;margin:0 0 4px}
+.meta{font-size:11px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+.right{text-align:right}
+.status{
+  display:inline-block;font-size:9px;padding:6px 9px;border-radius:999px;font-weight:850
+}
+.status.orange{background:#fff0ea;color:#b84228}
+.status.yellow{background:#fff7d8;color:#7b6200}
+.status.green{background:#eaf7f0;color:#3d765e}
+.status.gray{background:#efefef;color:#666}
+.next{font-size:9px;color:var(--muted);margin-top:6px}
+
+.view{display:none}
+.view.on{display:block}
+
+.detail-head{
+  display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:14px
+}
+.back{
+  border:0;background:none;padding:0;color:var(--green-deep);
+  font-weight:850;font-size:12px
+}
+.detail-title h1{font-size:22px;margin:8px 0 3px}
+.detail-title p{font-size:11px;color:var(--muted);margin:0}
+.detail-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+.btn{
+  border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 13px;
+  font-size:11px;font-weight:850
+}
+.btn.blue{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn.orange{background:var(--orange);color:#fff;border-color:var(--orange)}
+.btn.green{background:var(--green);color:#1e3b31;border-color:var(--green)}
+
+.progress{
+  display:grid;grid-template-columns:repeat(6,1fr);background:#fff;border:1px solid var(--line);
+  border-radius:14px;padding:12px;margin-bottom:14px;gap:6px
+}
+.step{
+  text-align:center;font-size:10px;color:#818692;padding:10px 5px;border-radius:10px;font-weight:700
+}
+.step b{
+  display:grid;place-items:center;width:24px;height:24px;border-radius:50%;
+  background:#ececed;margin:0 auto 6px;font-size:11px
+}
+.step.done{color:#3d765e}
+.step.done b{background:#dff2e8}
+.step.current{background:#fff3ee;color:#c34d2c}
+.step.current b{background:var(--orange);color:#fff}
+
+.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) 310px;gap:16px}
+.stack{display:grid;gap:12px}
+.card{
+  background:#fff;border:1px solid var(--line);border-radius:14px;padding:17px
+}
+.card.green-soft{
+  background:linear-gradient(180deg,#f9fffc 0%,#ffffff 100%);
+  border-color:#dcece4;
+}
+.card h2{font-size:14px;line-height:1.35;margin:0 0 4px}
+.card .desc{font-size:11px;color:var(--muted);line-height:1.65;margin-bottom:12px}
+.row{
+  display:flex;justify-content:space-between;gap:14px;padding:10px 0;border-top:1px solid var(--line);align-items:center
+}
+.row:first-of-type{border-top:0}
+.row b{font-size:11px;color:#59606c}
+.row span{font-size:12px;font-weight:750;text-align:right}
+.pill{
+  display:inline-block;font-size:9px;border-radius:999px;padding:6px 9px;background:#f1f2f3;font-weight:850
+}
+.pill.green{background:#eaf7f0;color:#3d765e}
+.pill.orange{background:#fff0ea;color:#b84228}
+.pill.yellow{background:#fff7d8;color:#7b6200}
+.pill.gray{background:#eee;color:#666}
+.actionbox{
+  margin-top:10px;background:#f7faf8;border:1px solid #e2ece7;border-radius:11px;padding:12px
+}
+.actionbox strong{display:block;font-size:12px;margin-bottom:4px}
+.actionbox p{font-size:10px;color:var(--muted);line-height:1.6;margin:0 0 10px}
+.field{margin-top:10px}
+.field label{display:block;font-size:10px;font-weight:850;margin-bottom:5px}
+.field input,.field select,.field textarea{
+  width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:#fff;font-size:12px
+}
+.field textarea{min-height:80px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.buttons{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+
+.timeline{display:grid;gap:10px}
+.log{display:grid;grid-template-columns:10px 1fr;gap:9px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);margin-top:7px}
+.log strong{font-size:11px;display:block}
+.log p{font-size:10px;color:var(--muted);line-height:1.55;margin:3px 0 0}
+
+.license-box{
+  border:1px solid #dfece5;background:#fbfefc;border-radius:11px;padding:12px
+}
+.license-box h3{font-size:12px;margin:0 0 5px}
+.license-box p{font-size:10px;color:#657466;line-height:1.6;margin:0}
+.license-items{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+.license-items span{
+  font-size:9px;background:#fff;border:1px solid #dfece5;border-radius:999px;padding:5px 8px
+}
+
+.info-note{
+  background:#edf7f1;border:1px solid #d7e9de;border-radius:12px;padding:12px 13px
+}
+.info-note strong{display:block;font-size:12px;margin-bottom:4px}
+.info-note p{margin:0;font-size:10px;color:#5f6f64;line-height:1.6}
+
+.muted-link{font-size:10px;color:var(--green-deep);font-weight:800}
+
+.modal-bg{
+  display:none;position:fixed;inset:0;background:rgba(20,22,24,.38);z-index:100;align-items:center;justify-content:center;padding:16px
+}
+.modal-bg.open{display:flex}
+.modal{
+  width:min(560px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.2)
+}
+.modal-head{
+  padding:14px 16px;background:var(--green);display:flex;justify-content:space-between;gap:10px;align-items:center
+}
+.modal-head strong{font-size:14px}
+.modal-head button{border:0;background:rgba(255,255,255,.75);width:30px;height:30px;border-radius:8px}
+.modal-body{padding:16px}
+.summary{background:#f8faf8;border:1px solid #e2ece7;border-radius:10px;padding:10px;margin-bottom:12px}
+.summary div{display:flex;justify-content:space-between;gap:10px;font-size:11px;padding:5px 0}
+.summary b{color:#666}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+
+.mobile-bottom{display:none}
+
+@media(max-width:820px){
+  body{padding-bottom:74px}
+  .app{display:block}
+  .side{display:none}
+  .top{height:54px;padding:0 14px}
+  .top strong{font-size:15px}
+  .top span{font-size:11px}
+  .wrap{padding:16px 12px 100px}
+  .headbox p{font-size:12px}
+  .tools{overflow-x:auto;flex-wrap:nowrap;padding-bottom:2px}
+  .search{min-width:220px}
+  .filter{white-space:nowrap}
+  .application{grid-template-columns:50px 1fr auto;padding:10px;gap:10px}
+  .avatar{width:50px;height:50px;font-size:19px}
+  .application h3{font-size:14px}
+  .application .meta{gap:6px 10px;font-size:11px}
+  .right{min-width:82px}
+  .detail-head{display:block}
+  .detail-title h1{font-size:20px}
+  .detail-title p{font-size:11px}
+  .detail-actions{justify-content:flex-start;margin-top:12px}
+  .progress{grid-template-columns:repeat(3,1fr)}
+  .detail-grid{display:flex;flex-direction:column}
+  .detail-grid aside{display:contents}
+  .detail-grid>.stack:first-child{display:contents}
+  .grid2{grid-template-columns:1fr}
+  .card h2{font-size:20px}
+  .card .desc{font-size:13px}
+  .row b{font-size:11px}
+  .row span{font-size:14px}
+  .field input,.field select,.field textarea{font-size:14px}
+  .actionbox strong{font-size:14px}
+  .actionbox p{font-size:10px}
+  .mobile-bottom{
+    position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:0;right:0;bottom:0;height:66px;background:#fff;border-top:1px solid var(--line);z-index:50;padding:0 6px env(safe-area-inset-bottom)
+  }
+  .mobile-bottom a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#45484b}
+  .mobile-bottom small{font-size:9px;font-weight:700}
+  .nav-icon{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .mobile-bottom a:nth-child(2){color:#4f806c}
+  .modal-bg{align-items:flex-end;padding:0}
+  .modal{width:100%;border-radius:18px 18px 0 0;max-height:90vh}
+}
+
+.detail-main{display:contents}
+.mobile-status{display:none}
+@media(max-width:820px){
+  .mobile-status{display:block;order:-3}
+  .mobile-next{order:-2}
+  .mobile-current{order:-1}
+  .detail-main{display:contents}
+  .order-application{order:1}
+  .order-mail{order:2}
+  .order-schedule{order:3}
+  .order-payment{order:4}
+  .order-license{order:5}
+  .order-kit{order:6}
+  .order-finish{order:7}
+}
+
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand">mikkeOS<small>Academy｜講師</small></div>
+    <div class="nav">
+      <div>ホーム</div>
+      <div class="on">申込</div>
+      <div>開催</div>
+      <div>開講</div>
+      <div>修了報告</div>
+      <div>講師マニュアル</div>
+      <div>Community</div>
+      <div>本部メッセージ</div>
+      <div>営業ページ</div>
+      <div>設定</div>
+    </div>
+  </aside>
+
+  <div>
+    <header class="top">
+      <strong>灯りのアトリエ｜講師ページ</strong>
+      <span>鈴木 里奈 ▾</span>
+    </header>
+
+    <main class="wrap">
+
+      <section class="view on" id="listView">
+        <div class="titlebar">
+          <div class="en">APPLICATIONS</div>
+          <div class="jp">申込</div>
+        </div>
+        <div class="headbox">
+          <p>申込後の対応はここで進めます。受講者との連絡、日程、受講料確認、開講ライセンス申込、開催、修了まで受講者ごとに管理します。</p>
+        </div>
+
+        <div class="tools">
+          <input class="search" placeholder="名前・講座名で検索">
+          <button class="filter on">対応待ち</button>
+          <button class="filter">日程調整中</button>
+          <button class="filter">入金確認待ち</button>
+          <button class="filter">開講準備</button>
+          <button class="filter">開催確定</button>
+          <button class="filter">完了</button>
+          <button class="filter">すべて</button>
+        </div>
+
+        <div class="list">
+          <div class="application" onclick="openDetail()">
+            <div class="avatar">田</div>
+            <div>
+              <h3>田中 花子</h3>
+              <div class="meta">
+                <span>ベーシックキャンドルコース</span>
+                <span>オンライン希望</span>
+                <span>9/25申込</span>
+              </div>
+            </div>
+            <div class="right">
+              <span class="status orange">対応待ち</span>
+              <div class="next">次：日程確認</div>
+            </div>
+          </div>
+
+          <div class="application" onclick="openDetail()">
+            <div class="avatar">佐</div>
+            <div>
+              <h3>佐藤 由美</h3>
+              <div class="meta">
+                <span>ベーシックキャンドルコース</span>
+                <span>対面</span>
+                <span>10/8 13:00</span>
+              </div>
+            </div>
+            <div class="right">
+              <span class="status yellow">開講準備</span>
+              <div class="next">次：ライセンス申込</div>
+            </div>
+          </div>
+
+          <div class="application" onclick="openDetail()">
+            <div class="avatar">山</div>
+            <div>
+              <h3>山本 美香</h3>
+              <div class="meta">
+                <span>ベーシックキャンドルコース</span>
+                <span>対面</span>
+                <span>10/2 11:00</span>
+              </div>
+            </div>
+            <div class="right">
+              <span class="status green">開催確定</span>
+              <div class="next">キット発送済</div>
+            </div>
+          </div>
+
+          <div class="application" onclick="openDetail()">
+            <div class="avatar">高</div>
+            <div>
+              <h3>高橋 舞</h3>
+              <div class="meta">
+                <span>ベーシックキャンドルコース</span>
+                <span>オンライン</span>
+                <span>9/20終了</span>
+              </div>
+            </div>
+            <div class="right">
+              <span class="status gray">修了報告待ち</span>
+              <div class="next">次：修了報告</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="detailView">
+        <div class="detail-head">
+          <div class="detail-title">
+            <button class="back" onclick="backToList()">← 申込一覧へ</button>
+            <h1>田中 花子</h1>
+            <p>ベーシックキャンドルコース｜オンライン希望</p>
+          </div>
+          <div class="detail-actions">
+            <button class="btn">受講者ページを見る</button>
+            <button class="btn blue">受講者にメールする</button>
+          </div>
+        </div>
+
+        <div class="progress">
+          <div class="step done"><b>✓</b>申込</div>
+          <div class="step current" id="stepSchedule"><b>2</b>日程</div>
+          <div class="step" id="stepPayment"><b>3</b>支払い</div>
+          <div class="step" id="stepLicense"><b>4</b>開講準備</div>
+          <div class="step" id="stepEvent"><b>5</b>開催</div>
+          <div class="step" id="stepFinish"><b>6</b>修了</div>
+        </div>
+
+        <div class="detail-grid">
+          <div class="stack">
+
+            <section class="card green-soft order-application">
+              <h2>申込内容</h2>
+              <div class="desc">お客様が申込時に入力した内容です。</div>
+              <div class="row"><b>申込日</b><span>2026/09/25 09:12</span></div>
+              <div class="row"><b>メール</b><span>hanako@example.com</span></div>
+              <div class="row"><b>電話番号</b><span>090-1234-5678</span></div>
+              <div class="row"><b>受講方法</b><span>オンライン</span></div>
+              <div class="row"><b>希望日</b><span>10/10・10/12・10/15</span></div>
+              <div class="row"><b>備考</b><span>平日は14時以降希望</span></div>
+            </section>
+
+            <section class="card order-mail" id="mailHistoryCard">
+              <h2>自動メール履歴</h2>
+              <div class="desc">申込や日程確定時に、講師の登録メールアドレスを返信先として自動送信されます。</div>
+
+              <div class="timeline">
+                <div class="log">
+                  <span class="dot"></span>
+                  <div>
+                    <strong>申込受付メール</strong>
+                    <p>9/25 09:12 送信済み</p>
+                    <button class="btn" style="margin-top:7px" onclick="openMailPreview('申込受付メール')">内容を見る</button>
+                  </div>
+                </div>
+                <div class="log">
+                  <span class="dot"></span>
+                  <div>
+                    <strong>日程確定メール</strong>
+                    <p>日程確定時に自動送信</p>
+                    <button class="btn" style="margin-top:7px" onclick="openMailPreview('日程確定メール')">内容を見る</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="actionbox">
+                <strong>日程調整などの個別連絡</strong>
+                <p>講師のメールから受講者と直接連絡を取り、日程を決めてください。</p>
+                <div class="row" style="padding-bottom:0">
+                  <b>受講者メール</b>
+                  <span>hanako@example.com</span>
+                </div>
+                <div class="buttons">
+                  <button class="btn blue">受講者にメールする</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="card green-soft order-schedule" id="scheduleCard">
+              <h2>日程</h2>
+              <div class="desc">「申込後に日程相談」の申込です。候補日を確認して確定します。</div>
+
+              <div class="grid2">
+                <div class="field">
+                  <label>開催日</label>
+                  <input type="date" value="2026-10-10">
+                </div>
+                <div class="field">
+                  <label>時間</label>
+                  <input value="14:00 - 16:00">
+                </div>
+              </div>
+
+              <div class="field">
+                <label>参加URL</label>
+                <input value="https://zoom.us/j/example">
+              </div>
+
+              <div class="buttons">
+                <button class="btn blue" onclick="confirmSchedule()">この日程で確定</button>
+                <button class="btn">候補日をメールする</button>
+              </div>
+            </section>
+
+            <section class="card order-payment" id="paymentCard">
+              <h2>受講料</h2>
+              <div class="desc">この講座の受講料です。受講者様からの入金を確認します。</div>
+              <div class="row"><b>受講料</b><span>¥18,000</span></div>
+              <div class="row"><b>決済方法</b><span>銀行振込</span></div>
+              <div class="row"><b>状態</b><span id="paymentStatus"><span class="pill orange">入金確認待ち</span></span></div>
+              <div class="buttons">
+                <button class="btn green" onclick="markPaid()">入金済みにする</button>
+                <button class="btn">支払い案内を再送</button><button class="btn" onclick="openMailPreview('支払い案内メール')">メール内容を見る</button>
+              </div>
+            </section>
+
+            <section class="card green-soft order-license" id="licenseCard">
+              <h2>開講ライセンス申込</h2>
+              <div class="desc">この講座を開講するためのライセンス費用です。本部へ申込をおこないます。</div>
+
+              <div class="license-box">
+                <h3>ベーシックキャンドルコース｜開講ライセンス ¥8,000</h3>
+                <p>この講座の設定では、以下が開講ライセンスに含まれています。</p>
+                <div class="license-items">
+                  <span>キット</span>
+                  <span>テキスト</span>
+                  <span>デュプロマ</span>
+                  <span>教材</span>
+                  <span>システム利用</span>
+                </div>
+              </div>
+
+              <div class="row"><b>状態</b><span id="licenseStatus"><span class="pill orange">未申込</span></span></div>
+              <div class="buttons">
+                <button class="btn orange" id="licenseButton" onclick="openLicenseModal()">開講ライセンスを申し込む</button>
+              </div>
+            </section>
+
+            <section class="card order-kit" id="kitCard">
+              <h2>キット・発送</h2>
+              <div class="desc">開講ライセンスに含まれるキットの発送状況です。</div>
+              <div class="row"><b>キット</b><span>あり</span></div>
+              <div class="row"><b>発送先</b><span>講師登録住所</span></div>
+              <div class="row"><b>発送状態</b><span id="kitStatus"><span class="pill gray">ライセンス申込前</span></span></div>
+              <div class="actionbox">
+                <strong>講師側で発送操作は不要です</strong>
+                <p>開講ライセンス申込後、本部が発送準備を行います。発送されるとここに追跡情報を表示します。</p>
+              </div>
+            </section>
+
+            <section class="card green-soft order-finish" id="finishCard">
+              <h2>開催・修了</h2>
+              <div class="desc">開催後は出席を確認し、修了報告を行います。</div>
+              <div class="row"><b>出席</b><span id="attendanceStatus"><span class="pill gray">未確認</span></span></div>
+              <div class="buttons">
+                <button class="btn" onclick="markAttendance()">出席済みにする</button>
+                <button class="btn blue" onclick="openFinishModal()">修了報告をする</button>
+              </div>
+            </section>
+
+          </div>
+
+          <aside class="stack">
+            <section class="card mobile-status">
+              <h2>ステータス</h2>
+              <div class="row"><b>現在</b><span><span class="pill orange">日程調整中</span></span></div>
+            </section>
+            <section class="card green-soft mobile-next">
+              <h2>今やること</h2>
+              <div class="actionbox" id="nextAction">
+                <strong>日程を確定してください</strong>
+                <p>受講者の希望日を確認し、開催日と時間を決めます。</p>
+                <button class="btn orange" onclick="document.getElementById('scheduleCard').scrollIntoView({behavior:'smooth'})">日程設定へ</button>
+              </div>
+            </section>
+
+            <section class="card mobile-current">
+              <h2>現在の状況</h2>
+              <div class="row"><b>日程</b><span id="sideSchedule">未確定</span></div>
+              <div class="row"><b>受講料</b><span id="sidePayment">未入金</span></div>
+              <div class="row"><b>開講ライセンス</b><span id="sideLicense">未申込</span></div>
+              <div class="row"><b>キット</b><span id="sideKit">未手配</span></div>
+              <div class="row"><b>修了</b><span id="sideFinish">未開催</span></div>
+            </section>
+
+            </aside>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<div class="modal-bg" id="licenseModal" onclick="if(event.target===this)closeModal('licenseModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <strong>開講ライセンス申込</strong>
+      <button onclick="closeModal('licenseModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="summary">
+        <div><b>講師</b><span>鈴木 里奈</span></div>
+        <div><b>受講者</b><span>田中 花子</span></div>
+        <div><b>講座</b><span>ベーシックキャンドルコース</span></div>
+        <div><b>開講ライセンス料</b><span>¥8,000</span></div>
+      </div>
+
+      <div class="license-box">
+        <h3>含まれるもの</h3>
+        <div class="license-items">
+          <span>キット</span><span>テキスト</span><span>デュプロマ</span><span>教材</span><span>システム利用</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>キット発送先</label>
+        <select>
+          <option>講師登録住所へ発送</option>
+          <option>受講者へ直接発送</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>支払い方法</label>
+        <select>
+          <option>登録済みカードで支払う</option>
+          <option>銀行振込</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('licenseModal')">キャンセル</button>
+        <button class="btn orange" onclick="submitLicense()">¥8,000で申し込む</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="finishModal" onclick="if(event.target===this)closeModal('finishModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <strong>修了報告</strong>
+      <button onclick="closeModal('finishModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="summary">
+        <div><b>受講者</b><span>田中 花子</span></div>
+        <div><b>講座</b><span>ベーシックキャンドルコース</span></div>
+      </div>
+
+      <div class="field">
+        <label>修了日</label>
+        <input type="date" value="2026-10-10">
+      </div>
+
+      <div class="field">
+        <label>修了確認</label>
+        <select>
+          <option>すべての講座・課題を修了</option>
+          <option>未修了項目あり</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>本部へのメモ</label>
+        <textarea placeholder="必要があれば入力"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('finishModal')">キャンセル</button>
+        <button class="btn blue" onclick="submitFinish()">修了報告をする</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="mailModal" onclick="if(event.target===this)closeModal('mailModal')">
+  <div class="modal">
+    <div class="modal-head">
+      <strong id="mailModalTitle">メール内容</strong>
+      <button onclick="closeModal('mailModal')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="info-note">
+        <strong>内容確認のみ</strong>
+        <p>自動メール・案内メールの編集は本部側で行います。</p>
+      </div>
+      <div class="field">
+        <label>件名</label>
+        <input id="mailSubject" value="お申込みありがとうございます" readonly>
+      </div>
+      <div class="field">
+        <label>本文</label>
+        <textarea id="mailBody" readonly>お申込みありがとうございます。内容を確認のうえ、講師よりご連絡いたします。</textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<nav class="mobile-bottom">
+  <a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/></svg><small>ホーム</small></a>
+  <a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.8h6V4M9 9h6M9 13h6M9 17h4"/></svg><small>申込</small></a>
+  <a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3v5M16 3v5M4 10h16"/></svg><small>開催</small></a>
+  <a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><small>メッセージ</small></a>
+  <a href="#"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg><small>その他</small></a>
+</nav>
+
+<script>
+let state={schedule:false,payment:false,license:false,attendance:false,finish:false};
+
+function openMailPreview(title){
+  document.getElementById('mailModalTitle').textContent=title;
+  const subject=document.getElementById('mailSubject');
+  const body=document.getElementById('mailBody');
+  if(title==='支払い案内メール'){
+    subject.value='受講料のお支払いについて';
+    body.value='受講料のお支払い方法をご案内します。内容をご確認のうえ、お手続きをお願いします。';
+  }else if(title==='日程確定メール'){
+    subject.value='開催日程が確定しました';
+    body.value='開催日程が確定しました。日時と参加方法をご確認ください。';
+  }else{
+    subject.value='お申込みありがとうございます';
+    body.value='お申込みありがとうございます。内容を確認のうえ、講師よりご連絡いたします。';
+  }
+  document.getElementById('mailModal').classList.add('open');
+}
+function openDetail(){
+  document.getElementById('listView').classList.remove('on');
+  document.getElementById('detailView').classList.add('on');
+  window.scrollTo(0,0);
+}
+function backToList(){
+  document.getElementById('detailView').classList.remove('on');
+  document.getElementById('listView').classList.add('on');
+  window.scrollTo(0,0);
+}
+function confirmSchedule(){
+  state.schedule=true;
+  document.getElementById('sideSchedule').textContent='10/10 14:00';
+  updateSteps(); updateNext();
+}
+function markPaid(){
+  state.payment=true;
+  document.getElementById('paymentStatus').innerHTML='<span class="pill green">入金済み</span>';
+  document.getElementById('sidePayment').textContent='入金済み';
+  updateSteps(); updateNext();
+}
+function openLicenseModal(){document.getElementById('licenseModal').classList.add('open')}
+function openFinishModal(){document.getElementById('finishModal').classList.add('open')}
+function closeModal(id){document.getElementById(id).classList.remove('open')}
+function submitLicense(){
+  state.license=true;
+  closeModal('licenseModal');
+  document.getElementById('licenseStatus').innerHTML='<span class="pill green">申込・支払済み</span>';
+  document.getElementById('sideLicense').textContent='取得済み';
+  document.getElementById('kitStatus').innerHTML='<span class="pill yellow">本部発送準備中</span>';
+  document.getElementById('sideKit').textContent='発送準備中';
+  document.getElementById('licenseButton').style.display='none';
+  updateSteps(); updateNext();
+}
+function markAttendance(){
+  state.attendance=true;
+  document.getElementById('attendanceStatus').innerHTML='<span class="pill green">出席済み</span>';
+  document.getElementById('sideFinish').textContent='開催済み';
+  updateSteps(); updateNext();
+}
+function submitFinish(){
+  state.finish=true;
+  closeModal('finishModal');
+  document.getElementById('sideFinish').textContent='本部確認待ち';
+  updateSteps(); updateNext();
+}
+function updateSteps(){
+  ['stepSchedule','stepPayment','stepLicense','stepEvent','stepFinish'].forEach(id=>{
+    document.getElementById(id).className='step';
+  });
+  if(state.schedule){
+    const e=document.getElementById('stepSchedule');
+    e.className='step done'; e.querySelector('b').textContent='✓';
+  }
+  if(state.payment){
+    const e=document.getElementById('stepPayment');
+    e.className='step done'; e.querySelector('b').textContent='✓';
+  }
+  if(state.license){
+    const e=document.getElementById('stepLicense');
+    e.className='step done'; e.querySelector('b').textContent='✓';
+  }
+  if(state.attendance){
+    const e=document.getElementById('stepEvent');
+    e.className='step done'; e.querySelector('b').textContent='✓';
+  }
+  if(state.finish){
+    const e=document.getElementById('stepFinish');
+    e.className='step done'; e.querySelector('b').textContent='✓';
+    return;
+  }
+  const current=!state.schedule?'stepSchedule':!state.payment?'stepPayment':!state.license?'stepLicense':!state.attendance?'stepEvent':'stepFinish';
+  document.getElementById(current).className='step current';
+}
+function updateNext(){
+  const box=document.getElementById('nextAction');
+  if(!state.schedule){
+    box.innerHTML='<strong>日程を確定してください</strong><p>受講者の希望日を確認し、開催日と時間を決めます。</p><button class="btn orange" onclick="document.getElementById(\'scheduleCard\').scrollIntoView({behavior:\'smooth\'})">日程設定へ</button>';
+  }else if(!state.payment){
+    box.innerHTML='<strong>受講料の入金を確認してください</strong><p>入金後に開講ライセンス申込へ進みます。</p><button class="btn orange" onclick="document.getElementById(\'paymentCard\').scrollIntoView({behavior:\'smooth\'})">入金確認へ</button>';
+  }else if(!state.license){
+    box.innerHTML='<strong>開講ライセンスを申し込んでください</strong><p>本部へ開講ライセンスを申し込みます。</p><button class="btn orange" onclick="document.getElementById(\'licenseCard\').scrollIntoView({behavior:\'smooth\'})">申込へ</button>';
+  }else if(!state.attendance){
+    box.innerHTML='<strong>開催準備OK</strong><p>本部のキット発送状況を確認し、開催後に出席を記録してください。</p><button class="btn" onclick="document.getElementById(\'finishCard\').scrollIntoView({behavior:\'smooth\'})">開催・修了へ</button>';
+  }else if(!state.finish){
+    box.innerHTML='<strong>修了報告をしてください</strong><p>出席・修了を確認し、修了報告を送ります。</p><button class="btn blue" onclick="openFinishModal()">修了報告をする</button>';
+  }else{
+    box.innerHTML='<strong>本部確認待ち</strong><p>修了報告を送信しました。本部の認定処理をお待ちください。</p>';
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="ja">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy UI-16 Instructor Profile & Sales Page v0.1</title>
+<style>
+:root{
+  --pink:#f9d3d2;--yellow:#ffd370;--blue:#3f4eb5;--green:#8bc7ad;--orange:#f75a3b;
+  --ink:#202126;--muted:#777982;--line:#e8e8eb;--bg:#f7f6f3;--white:#fff;
+}
+*{box-sizing:border-box}
+body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+a{text-decoration:none;color:inherit}
+
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.side{background:#fff;border-right:1px solid var(--line);padding:20px 14px}
+.brand{font-size:18px;font-weight:800;padding:4px 10px 20px}
+.brand small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.nav div{padding:10px 12px;border-radius:9px;margin:2px 0;color:#565860}
+.nav .on{background:var(--blue);color:#fff;font-weight:700}
+.top{height:62px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+.wrap{max-width:1100px;margin:auto;padding:30px 30px 90px}
+
+.titlebar{background:var(--green);padding:12px 16px 10px;border-radius:13px 13px 0 0}
+.titlebar .en{color:#fff;font-size:15px;font-weight:900;letter-spacing:.08em}
+.titlebar .jp{color:#202126;font-size:10px;font-weight:750;margin-top:4px}
+.headbox{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:18px 18px 16px;display:flex;justify-content:space-between;align-items:center;gap:18px}
+.headbox p{margin:0;color:var(--muted);line-height:1.65}
+.create{background:var(--orange);color:#fff;border:0;border-radius:10px;padding:11px 15px;font-weight:850;white-space:nowrap}
+
+.tabs{display:flex;gap:8px;margin:18px 0 14px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;font-size:10px;font-weight:800}
+.tab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+.panel{display:none}
+.panel.on{display:block}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+.card h2{font-size:14px;margin:0 0 5px}
+.card h3{font-size:12px;margin:0 0 8px}
+.help{font-size:11px;color:var(--muted);line-height:1.55}
+
+.profile-head{display:flex;gap:14px;align-items:center}
+.avatar{width:78px;height:78px;border-radius:50%;background:linear-gradient(135deg,#dbeee6,var(--green));display:grid;place-items:center;font-weight:900;color:#47725f;font-size:18px}
+.profile-head strong{display:block;font-size:16px}
+.profile-head p{font-size:11px;color:var(--muted);line-height:1.5;margin:4px 0 0}
+
+.field{margin-top:12px}
+.field:first-child{margin-top:0}
+.field label{display:block;font-size:10px;font-weight:850;margin-bottom:6px}
+.field input,.field textarea,.field select{width:100%;border:1px solid #dcdde2;border-radius:10px;padding:10px 11px;background:#fff}
+.field textarea{min-height:92px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.upload{border:1px dashed var(--green);border-radius:12px;padding:15px;text-align:center;font-size:11px;color:#4f806c;background:#fbfefd}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;font-weight:800;color:#555}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.orange{background:var(--orange);border-color:var(--orange);color:#fff}
+
+.course-list{display:grid;gap:10px;margin-top:10px}
+.course-card{border:1px solid var(--line);border-radius:12px;padding:12px}
+.course-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.course-card strong{display:block;font-size:12px}
+.course-card p{margin:3px 0 0;font-size:10px;color:var(--muted);line-height:1.45}
+.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.badge{font-size:9px;padding:5px 7px;border-radius:999px;background:#f4f5f6;color:#555}
+.badge.on{background:#eaf7f0;color:#3d765e}
+.badge.off{background:#efefef;color:#777}
+.badge.warn{background:#fff3c9;color:#7b6100}
+
+.preview-shell{background:#ebeae8;border-radius:14px;padding:14px}
+.preview-page{background:#fff;border:1px solid #ddd;border-radius:12px;overflow:hidden}
+.preview-top{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+.preview-top strong{font-size:12px}
+.preview-hero{padding:28px 22px;background:linear-gradient(135deg,#f6fbf8,#fff5f1)}
+.preview-hero small{font-size:9px;color:#4f806c;font-weight:900;letter-spacing:.08em}
+.preview-hero h2{font-size:24px;line-height:1.35;margin:7px 0 8px}
+.preview-hero p{font-size:11px;color:var(--muted);line-height:1.55;max-width:560px}
+.preview-profile{display:grid;grid-template-columns:70px 1fr;gap:12px;align-items:center;margin-top:14px}
+.preview-avatar{width:70px;height:70px;border-radius:50%;background:linear-gradient(135deg,#dbeee6,var(--green));display:grid;place-items:center;font-weight:900;color:#47725f}
+.preview-profile strong{font-size:13px}
+.preview-profile p{margin:4px 0 0;font-size:10px;color:var(--muted);line-height:1.5}
+.preview-section{padding:18px 22px;border-top:1px solid var(--line)}
+.preview-section h3{font-size:14px;margin:0 0 10px}
+.preview-course{border:1px solid var(--line);border-radius:11px;padding:12px;margin-top:8px}
+.preview-course strong{display:block;font-size:12px}
+.preview-course p{margin:4px 0 0;font-size:10px;color:var(--muted);line-height:1.45}
+.price{font-size:20px;font-weight:900;margin-top:8px}
+.cta{display:inline-block;margin-top:10px;background:var(--orange);color:#fff;border-radius:9px;padding:10px 14px;font-size:10px;font-weight:850}
+
+.side-info{position:sticky;top:78px}
+.info-row{padding:10px 0;border-top:1px solid var(--line)}
+.info-row:first-of-type{border-top:0}
+.info-row b{display:block;font-size:10px;color:var(--muted);margin-bottom:4px}
+.info-row span{font-size:11px;font-weight:700}
+.notice{margin-top:12px;border-radius:10px;padding:10px 11px;background:#fff8dc;font-size:10px;line-height:1.5}
+
+.mobile-bottom{display:none}
+
+@media(max-width:820px){
+  body{padding-bottom:74px}
+  .app{display:block}
+  .side{display:none}
+  .top{height:54px;padding:0 14px}
+  .wrap{padding:16px 12px 100px}
+  .headbox{display:block}
+  .headbox .create{width:100%;margin-top:13px}
+  .layout{grid-template-columns:1fr}
+  .side-info{position:static}
+  .grid2{grid-template-columns:1fr}
+  .preview-hero h2{font-size:21px}
+  .mobile-bottom{
+    position:fixed;display:grid;grid-template-columns:repeat(5,1fr);
+    left:0;right:0;bottom:0;height:66px;background:#fff;border-top:1px solid var(--line);z-index:30;
+    padding:0 6px env(safe-area-inset-bottom)
+  }
+  .mobile-bottom a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:#45484b}
+  .mobile-bottom small{font-size:9px;font-weight:700}
+  .nav-icon{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+  .mobile-bottom a:first-child{color:#4f806c}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+<aside class="side">
+  <div class="brand">mikkeOS<small>Academy｜講師</small></div>
+  <div class="nav">
+    <div>ホーム</div>
+    <div>申込</div>
+    <div>開催</div>
+    <div>開講</div>
+    <div>修了報告</div>
+    <div>講師マニュアル</div>
+    <div>Community</div>
+    <div>本部メッセージ</div>
+    <div class="on">営業ページ</div>
+    <div>設定</div>
+  </div>
+</aside>
+
+<div>
+<header class="top">
+  <strong>灯りのアトリエ｜講師ページ</strong>
+  <span>鈴木 里奈 ▾</span>
+</header>
+
+<main class="wrap">
+
+<div class="titlebar">
+  <div class="en">PROFILE & SALES PAGE</div>
+  <div class="jp">プロフィール・営業ページ</div>
+</div>
+<div class="headbox">
+  <p>プロフィール情報を整え、本部公式の講座情報と組み合わせて、お客様に見せる講師営業ページを作ります。</p>
+  <button class="create" onclick="switchTab('preview')">公開ページを見る</button>
+</div>
+
+<div class="tabs">
+  <button class="tab on" data-tab="profile" onclick="switchTab('profile')">プロフィール</button>
+  <button class="tab" data-tab="sales" onclick="switchTab('sales')">営業ページ設定</button>
+  <button class="tab" data-tab="preview" onclick="switchTab('preview')">プレビュー</button>
+</div>
+
+<!-- PROFILE -->
+<section class="panel on" id="profile">
+  <div class="layout">
+    <div>
+      <div class="card">
+        <div class="profile-head">
+          <div class="avatar">RINA</div>
+          <div>
+            <strong>鈴木 里奈</strong>
+            <p>キャンドル認定講師<br>プロフィールは本部HP・営業ページで共通利用します。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>プロフィール</h3>
+        <div class="upload">プロフィール写真を変更</div>
+
+        <div class="grid2">
+          <div class="field">
+            <label>表示名</label>
+            <input value="鈴木 里奈">
+          </div>
+          <div class="field">
+            <label>肩書き</label>
+            <input value="キャンドル認定講師">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>自己紹介</label>
+          <textarea>東京・杉並区を中心に、初心者の方にも楽しんでいただけるキャンドルレッスンを開催しています。</textarea>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label>活動地域</label>
+            <input value="東京都杉並区・中野区">
+          </div>
+          <div class="field">
+            <label>教室名（任意）</label>
+            <input value="Rina Candle Room">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>教室・会場について</label>
+          <textarea>杉並区周辺で開催しています。詳しい会場はお申込み後にご案内します。</textarea>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label>Instagram</label>
+            <input value="@rina_candle">
+          </div>
+          <div class="field">
+            <label>Web / SNSリンク</label>
+            <input placeholder="https://...">
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn">プレビュー</button>
+          <button class="btn primary">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="card side-info">
+      <h3>このプロフィールを使う場所</h3>
+      <div class="info-row"><b>本部ホームページ</b><span>講師一覧・講師詳細</span></div>
+      <div class="info-row"><b>講師営業ページ</b><span>自己紹介・写真・活動地域</span></div>
+      <div class="info-row"><b>申込時</b><span>お客様が講師を選ぶときの情報</span></div>
+      <div class="notice">講座ごとのHP掲載・申込受付は「あなたの認定」から設定します。</div>
+    </aside>
+  </div>
+</section>
+
+<!-- SALES SETTINGS -->
+<section class="panel" id="sales">
+  <div class="layout">
+    <div>
+      <div class="card">
+        <h3>掲載する講座</h3>
+        <div class="help">本部の許可・講師ライセンス・あなたの活動設定を満たす講座だけ表示できます。</div>
+
+        <div class="course-list">
+          <div class="course-card">
+            <div class="course-card-head">
+              <div>
+                <strong>ベーシックキャンドルコース</strong>
+                <p>本部公式価格 ¥18,000 / 対面・オンライン</p>
+              </div>
+              <span class="badge on">掲載中</span>
+            </div>
+            <div class="badges">
+              <span class="on">HP掲載 ON</span>
+              <span class="on">申込受付 ON</span>
+              <span class="on">対面</span>
+              <span class="on">オンライン</span>
+            </div>
+          </div>
+
+          <div class="course-card">
+            <div class="course-card-head">
+              <div>
+                <strong>アロマ基礎講座</strong>
+                <p>講師ライセンス有効</p>
+              </div>
+              <span class="badge off">HP非掲載</span>
+            </div>
+            <div class="badges">
+              <span class="off">HP掲載 OFF</span>
+              <span class="on">申込受付 ON</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>ページで追加できる内容</h3>
+        <div class="help">本部公式情報は変更できません。講師本人の案内だけを追加します。</div>
+
+        <div class="field">
+          <label>ページ用の紹介文</label>
+          <textarea>はじめての方でも安心して受講いただけるよう、ゆっくり丁寧に進めています。</textarea>
+        </div>
+
+        <div class="field">
+          <label>開催・会場についての補足</label>
+          <textarea>対面レッスンの詳しい場所は、お申込み後にご案内します。</textarea>
+        </div>
+
+        <div class="field">
+          <label>お客様へのメッセージ</label>
+          <textarea>キャンドルづくりが初めての方もお気軽にご参加ください。</textarea>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>受講料の受け取り方法</h3>
+        <div class="help">講師自身が受注する場合の決済方法を設定します。本部販売の担当講師として開催する場合には使用しません。</div>
+
+        <div class="field">
+          <label>決済方法</label>
+          <select>
+            <option>銀行振込</option>
+            <option>外部決済サービス</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>振込案内 / 決済URL</label>
+          <textarea placeholder="お客様へ表示する案内、または決済URL"></textarea>
+        </div>
+
+        <div class="actions">
+          <button class="btn">プレビュー</button>
+          <button class="btn primary">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <aside class="card side-info">
+      <h3>本部が管理する情報</h3>
+      <div class="info-row"><b>講座名</b><span>変更できません</span></div>
+      <div class="info-row"><b>公式説明・カリキュラム</b><span>本部設定を使用</span></div>
+      <div class="info-row"><b>公式価格</b><span>講師は変更不可</span></div>
+      <div class="info-row"><b>認定条件</b><span>本部設定を使用</span></div>
+      <div class="notice">申込済みのお客様には、申込時点の価格・条件・規約を保持します。</div>
+    </aside>
+  </div>
+</section>
+
+<!-- PREVIEW -->
+<section class="panel" id="preview">
+  <div class="preview-shell">
+    <div class="preview-page">
+      <div class="preview-top">
+        <strong>灯りのアトリエ 認定講師</strong>
+        <span style="font-size:10px;color:#777">お客様から見るページ</span>
+      </div>
+
+      <div class="preview-hero">
+        <small>CERTIFIED INSTRUCTOR</small>
+        <h2>鈴木里奈の<br>キャンドルレッスン</h2>
+        <p>東京・杉並区を中心に、初心者の方にも楽しんでいただけるキャンドルレッスンを開催しています。</p>
+
+        <div class="preview-profile">
+          <div class="preview-avatar">RINA</div>
+          <div>
+            <strong>鈴木 里奈｜キャンドル認定講師</strong>
+            <p>杉並区・中野区 / 対面・オンライン<br>@rina_candle</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <h3>受講できる講座</h3>
+
+        <div class="preview-course">
+          <strong>ベーシックキャンドルコース</strong>
+          <p>材料と道具の基本から、制作、応用デザインまで学ぶ3講座のコースです。</p>
+          <div class="price">¥18,000</div>
+          <div class="badges">
+            <span class="on">対面</span>
+            <span class="on">オンライン</span>
+            <span>杉並区・中野区</span>
+          </div>
+          <span class="cta">この先生に申し込む</span>
+        </div>
+      </div>
+
+      <div class="preview-section">
+        <h3>先生からのメッセージ</h3>
+        <p style="font-size:11px;color:#666;line-height:1.65;margin:0">はじめての方でも安心して受講いただけるよう、ゆっくり丁寧に進めています。キャンドルづくりが初めての方もお気軽にご参加ください。</p>
+      </div>
+
+      <div class="preview-section">
+        <h3>会場について</h3>
+        <p style="font-size:11px;color:#666;line-height:1.65;margin:0">杉並区周辺で開催しています。詳しい場所はお申込み後にご案内します。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+</div>
+
+<nav class="mobile-bottom">
+  <a href="#home">
+    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/></svg><small>ホーム</small>
+  </a>
+  <a href="#applications">
+    <svg class="nav-icon" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2.8h6V4M9 9h6M9 13h6M9 17h4"/></svg><small>申込</small>
+  </a>
+  <a href="#events">
+    <svg class="nav-icon" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3v5M16 3v5M4 10h16"/></svg><small>開催</small>
+  </a>
+  <a href="#messages">
+    <svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><small>メッセージ</small>
+  </a>
+  <a href="#more">
+    <svg class="nav-icon" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg><small>その他</small>
+  </a>
+</nav>
+
+<script>
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.tab===id));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('on',p.id===id));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ja">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy 2.0 画面見本 | mikkeOS</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;background:#f6f6f6;color:#222}
+header{position:sticky;top:0;z-index:5;background:white;border-bottom:1px solid #ddd;padding:14px 18px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{font-size:12px;color:#666}
+.wrap{max-width:1200px;margin:auto;padding:18px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}
+.tabs button{border:1px solid #ddd;background:white;border-radius:999px;padding:8px 12px;cursor:pointer}
+.tabs button.active{background:#222;color:white;border-color:#222}
+.section-title{font-size:18px;margin:24px 0 10px}
+.row{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;background:white;border:1px solid #e5e5e5;border-radius:12px;padding:12px 14px;margin:8px 0}
+.num{font-size:12px;color:#888}
+.title{font-weight:700}
+.file{font-size:11px;color:#777;margin-top:3px;word-break:break-all}
+.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:999px;background:#f0f0f0;margin-left:7px}
+.open{border:0;background:#f75a3b;color:white;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}
+.viewer{display:none;position:fixed;inset:0;background:#fff;z-index:20;flex-direction:column}
+.viewer.show{display:flex}
+.viewerbar{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #ddd;background:#fff}
+.viewerbar .vt{font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.viewerbar button{border:1px solid #ccc;background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}
+iframe{width:100%;height:100%;border:0;flex:1;background:white}
+.note{background:#fff7e8;border:1px solid #ffe0a8;border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:14px}
+@media(max-width:700px){
+  .row{grid-template-columns:38px 1fr}
+  .open{grid-column:1/-1;width:100%}
+}
+.review-home{background:#fff;border:1px solid #e0e6e1;border-radius:18px;padding:28px;margin-bottom:18px;background-image:linear-gradient(120deg,#fff 60%,#e5f3ed)}
+.review-home-kicker{font-size:12px;font-weight:800;letter-spacing:.12em;color:#3f4eb5}
+.review-home h2{font-size:26px;margin:8px 0 10px}.review-home p{margin:0 0 21px;color:#526057;font-size:14px}
+.review-home-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.review-home-grid button{background:#fff;border:1px solid #d7e5dc;border-radius:13px;text-align:left;padding:16px;cursor:pointer;min-height:116px;color:#202126}
+.review-home-grid button:hover,.review-home-grid button:focus-visible{border-color:#4b9376;box-shadow:0 5px 15px #b3d9c44d;outline:none}
+.review-home-grid span{display:block;color:#4b9376;font-size:12px;font-weight:800}.review-home-grid strong{display:block;font-size:16px;margin:8px 0 4px}.review-home-grid small{font-size:12px;color:#666}
+.review-home-all{display:inline-block;color:#3f4eb5;font-size:13px;font-weight:700;margin-top:18px;text-decoration:none}
+@media(max-width:700px){.review-home{padding:18px}.review-home h2{font-size:22px}.review-home-grid{grid-template-columns:1fr}.review-home-grid button{min-height:auto}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Academy 2.0 画面見本</h1>
+  <div class="sub">本部・講師・受講者の画面を確認できます</div>
+</header>
+<div class="wrap">
+  <section class="review-home" aria-labelledby="review-home-title">
+    <div class="review-home-kicker">ACADEMY 2.0</div>
+    <h2 id="review-home-title">Academy 2.0 ホーム</h2>
+    <p>本部・講師・受講者の画面見本を、ここから確認できます。</p>
+    <div class="review-home-grid">
+      <button type="button" data-open-page="0"><span>本部</span><strong>本部ホームを見る</strong><small>講座・販売プラン・開催の入口</small></button>
+      <button type="button" data-open-page="16"><span>講師</span><strong>講師ホームを見る</strong><small>申込・開催・担当依頼の入口</small></button>
+      <button type="button" data-open-page="27"><span>受講者</span><strong>受講者ホームを見る</strong><small>学ぶ・予定・認定の入口</small></button>
+    </div>
+    <a class="review-home-all" href="#review-screen-list">全33画面の一覧を見る →</a>
+  </section>
+  <div class="note">各画面は操作できるHTMLの見本です。入力内容はAcademyのデータベースには保存されません。</div>
+  <div id="review-screen-list" class="tabs">
+    <button class="active" data-filter="all">全部</button>
+    <button data-filter="本部">本部</button>
+    <button data-filter="講師">講師</button>
+    <button data-filter="受講者">受講者</button>
+  </div>
+  <div id="list"></div>
+</div>
+
+<div id="viewer" class="viewer">
+  <div class="viewerbar">
+    <button id="prev">← 前へ</button>
+    <div class="vt" id="viewerTitle"></div>
+    <button id="next">次へ →</button>
+    <button id="close">一覧に戻る</button>
+  </div>
+  <iframe id="frame"></iframe>
+</div>
+
+<script>
+const pages = [{"group":"本部","title":"ホーム","filename":"academy-ui-prototype-v2.6.html","status":"確認版"},{"group":"本部","title":"講座一覧","filename":"academy-ui-02-courses-v0.1.html","status":"LOCK寄り"},{"group":"本部","title":"講座表示例","filename":"academy-ui-02-course-samples-v0.1.html","status":"確認版"},{"group":"本部","title":"講座編集・教材","filename":"academy-ui-03-course-editor-v0.2.html","status":"確認版"},{"group":"本部","title":"販売プラン一覧","filename":"academy-ui-04-sales-plans-v0.1.html","status":"LOCK"},{"group":"本部","title":"販売プラン作成 7STEP","filename":"academy-ui-05-course-plan-wizard-v0.10.html","status":"LOCK"},{"group":"本部","title":"販売ページ／標準LP","filename":"academy-ui-06-sales-page-v0.2.html","status":"仕様LOCK"},{"group":"本部","title":"開催を作る","filename":"academy-ui-07-event-create-v0.3.html","status":"確認版"},{"group":"本部","title":"開催一覧","filename":"academy-ui-09-events-list-v0.8.html","status":"LOCK"},{"group":"本部","title":"開催詳細","filename":"academy-ui-10-event-detail-v0.1.html","status":"LOCK"},{"group":"本部","title":"申込一覧／申込管理","filename":"academy-ui-08-applications-v0.8.html","status":"LOCK"},{"group":"本部","title":"修了・認定","filename":"academy-ui-11-completion-certification-v0.2.html","status":"LOCK"},{"group":"本部","title":"講師登録","filename":"academy-ui-12-instructor-registration-v0.1.html","status":"確認済み"},{"group":"本部","title":"講師一覧・講師詳細","filename":"academy-ui-13-instructors-list-detail-v0.2.html","status":"確認済み"},{"group":"本部","title":"ページ／本部HPビルダー","filename":"academy-ui-30-headquarters-homepage-builder-v0.8.html","status":"確認版"},{"group":"本部","title":"設定","filename":"academy-ui-31-headquarters-settings-v0.2.html","status":"確認版"},{"group":"講師","title":"講師ホーム","filename":"academy-ui-14-instructor-portal-v0.1.html","status":"確認版"},{"group":"講師","title":"Personal Academy","filename":"academy-ui-15-personal-academy-v0.8.html","status":"要確認"},{"group":"講師","title":"講師プロフィール・営業ページ","filename":"academy-ui-16-instructor-profile-sales-page-v0.1.html","status":"確認版"},{"group":"講師","title":"営業ページビルダー","filename":"academy-ui-17-instructor-sales-page-builder-v0.1.html","status":"確認版"},{"group":"講師","title":"申込対応","filename":"academy-ui-18-instructor-applications-flow-v0.3.html","status":"確認版"},{"group":"講師","title":"開催対応","filename":"academy-ui-19-instructor-events-flow-v0.2.html","status":"確認版"},{"group":"講師","title":"修了報告・進捗","filename":"academy-ui-20-instructor-completion-status-v0.1.html","status":"確認済み"},{"group":"講師","title":"講師マニュアル","filename":"academy-ui-21-instructor-manual-v0.1.html","status":"LOCK"},{"group":"講師","title":"Community連携","filename":"academy-ui-22-instructor-community-link-v0.1.html","status":"確認版"},{"group":"講師","title":"本部メッセージ","filename":"academy-ui-23-instructor-hq-messages-v0.1.html","status":"確認版"},{"group":"講師","title":"講師設定","filename":"academy-ui-24-instructor-settings-v0.3.html","status":"LOCK"},{"group":"受講者","title":"受講者ホーム候補／Review","filename":"academy-ui-15-learner-review-v0.9.html","status":"要確認"},{"group":"受講者","title":"学ぶ／教材を見る","filename":"academy-ui-25-learner-learning-v0.2.html","status":"確認版"},{"group":"受講者","title":"予定・開催情報","filename":"academy-ui-26-learner-schedule-v0.5.html","status":"確認版"},{"group":"受講者","title":"お知らせ","filename":"academy-ui-27-learner-notices-v0.1.html","status":"確認版"},{"group":"受講者","title":"認定・資格","filename":"academy-ui-28-learner-certifications-v0.2.html","status":"確認版"},{"group":"受講者","title":"設定","filename":"academy-ui-29-learner-settings-v0.1.html","status":"確認版"}];
+let current = -1;
+
+function render(filter='all'){
+  const list = document.getElementById('list');
+  list.innerHTML='';
+  let lastGroup='';
+  pages.forEach((p,i)=>{
+    if(filter!=='all' && p.group!==filter) return;
+    if(filter==='all' && p.group!==lastGroup){
+      const h=document.createElement('h2');
+      h.className='section-title'; h.textContent=p.group;
+      list.appendChild(h); lastGroup=p.group;
+    }
+    const row=document.createElement('div'); row.className='row';
+    row.innerHTML = `
+      <div class="num">${String(i+1).padStart(2,'0')}</div>
+      <div>
+        <div class="title">${escapeHtml(p.title)} <span class="badge">${escapeHtml(p.status)}</span></div>
+        <div class="file">${escapeHtml(p.filename)}</div>
+      </div>
+      <button class="open">画面を開く</button>`;
+    row.querySelector('.open').onclick=()=>openPage(i);
+    list.appendChild(row);
+  });
+}
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function openPage(i){
+  current=i;
+  document.getElementById('viewerTitle').textContent = `${i+1}. ${pages[i].group}｜${pages[i].title}`;
+  document.getElementById('frame').src = '/academy2-review-pages/' + String(i+1).padStart(2,'0') + '.html';
+  document.getElementById('viewer').classList.add('show');
+}
+document.getElementById('close').onclick=()=>{
+  document.getElementById('viewer').classList.remove('show');
+  document.getElementById('frame').src='about:blank';
+};
+document.getElementById('prev').onclick=()=>{ if(current>0) openPage(current-1); };
+document.getElementById('next').onclick=()=>{ if(current<pages.length-1) openPage(current+1); };
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active'); render(b.dataset.filter);
+});
+document.querySelectorAll('[data-open-page]').forEach(button => {
+  button.addEventListener('click', () => openPage(Number(button.dataset.openPage)));
+});
+render();
+</script>
+</body>
+</html>

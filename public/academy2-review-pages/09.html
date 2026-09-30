@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ja">
+<head><meta name="robots" content="noindex,nofollow">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy UI-09 Events List v0.8</title>
+<style>
+:root{--pink:#f9d3d2;--yellow:#ffd370;--blue:#3f4eb5;--green:#8bc7ad;--orange:#f75a3b;--ink:#202126;--muted:#777982;--line:#e8e8eb;--bg:#f7f6f3}
+*{box-sizing:border-box}body{margin:0;font:14px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:var(--ink);background:var(--bg)}
+button,input,select{font:inherit}button{cursor:pointer}a{text-decoration:none;color:inherit}
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100vh}.side{background:#fff;border-right:1px solid var(--line);padding:20px 14px}
+.brand{font-size:18px;font-weight:850;padding:4px 10px 20px}.brand small{display:block;font-size:12px;color:var(--muted);font-weight:500}
+.nav div{padding:10px 12px;border-radius:9px;margin:2px 0;color:#565860}.nav .on{background:var(--blue);color:#fff;font-weight:750}
+.top{height:62px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px}
+.wrap{max-width:1100px;margin:auto;padding:30px 30px 80px}
+.hero-title{background:var(--green);padding:12px 16px 10px;border-radius:13px 13px 0 0}.hero-title .en{color:#fff;font-size:15px;font-weight:900;letter-spacing:.08em}.hero-title .jp{color:#202126;font-size:10px;font-weight:750;margin-top:4px}
+.hero-body{background:#fff;border:1px solid var(--line);border-top:0;border-radius:0 0 14px 14px;padding:18px 18px 16px;display:flex;justify-content:space-between;align-items:center;gap:18px}
+.hero-body p{margin:0;color:var(--muted);line-height:1.65}.primary{background:var(--orange);color:#fff;border:0;border-radius:10px;padding:11px 15px;font-weight:850;white-space:nowrap;cursor:pointer}
+.guide{display:flex;gap:8px;align-items:center;margin:18px 0 0;padding:11px 14px;background:#fff;border:1px solid var(--line);border-radius:12px;font-size:11px;overflow:auto;white-space:nowrap}
+.guide a{color:#2f6f5b;font-weight:850}.guide span{color:#aaa}
+.toolbar{display:flex;gap:9px;align-items:center;margin:20px 0 12px}.search{flex:1;max-width:360px;height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;padding:0 12px}.sort{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;font-weight:700;color:#555}
+.filters{display:flex;gap:7px;flex-wrap:wrap;margin:-2px 0 12px}.filter{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 11px;font-size:10px;font-weight:700}.filter.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.event-list{display:grid;gap:12px;margin-top:14px}.event-card{display:grid;grid-template-columns:62px 1fr auto;align-items:center;gap:14px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 14px;transition:.12s;cursor:pointer}
+.event-card:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.05)}.event-icon{width:62px;height:62px;border-radius:11px;background:#dceee6 center/cover no-repeat;display:grid;place-items:center;font-weight:900;color:#47725f;overflow:hidden}.event-icon.placeholder{background:linear-gradient(135deg,#dbeee6,var(--green))}
+.event-main strong{display:block;font-size:14px;margin:0 0 5px}.meta{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted)}.meta span{font-size:11px;color:var(--muted)}.meta .status{font-weight:850}.status.yellow{color:#8c6a00}.status.green{color:#3d765e}.status.blue{color:#4051a6}.status.orange{color:#a24c2d}.status.gray{color:#777}
+.chev{font-size:21px;color:#8b8d92}
+
+/* detail */
+.list-view.hide{display:none}.detail{display:none}.detail.on{display:block}.back{font-size:10px;color:#4f806c;font-weight:850;display:inline-block;margin-bottom:12px;cursor:pointer}
+.detail-grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:16px}.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:15px}
+.card h2{font-size:15px;margin:0 0 4px}.card h3{font-size:11px;margin:0 0 8px}.help{font-size:9px;color:#777;line-height:1.55}
+.header-info{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}.header-info strong{font-size:16px}.header-info p{font-size:9px;color:#777;line-height:1.55;margin:4px 0}
+.badge{display:inline-block;font-size:8px;font-weight:850;padding:5px 7px;border-radius:999px}.badge.yellow{background:#fff3c9;color:#7b6100}.badge.green{background:#eaf7f0;color:#3d765e}.badge.blue{background:#eef1ff;color:#4051a6}.badge.gray{background:#eee;color:#666}
+.section{margin-top:14px;padding-top:13px;border-top:1px solid var(--line)}.rows{display:grid;gap:8px}.row{display:grid;grid-template-columns:125px 1fr;gap:10px;font-size:9px}.row b{color:#777}.row span{font-weight:700}
+.people{display:grid;gap:8px;margin-top:8px}.person{border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.person strong{display:block;font-size:10px}.person p{font-size:8px;color:#777;line-height:1.45;margin:3px 0}
+.todo{position:sticky;top:80px}.todo-item{border-top:1px solid var(--line);padding:10px 0}.todo-item:first-of-type{border-top:0}.todo-item b{display:block;font-size:9px;margin-bottom:3px}.todo-item p{font-size:8px;color:#777;line-height:1.5;margin:0 0 8px}
+.todo-item button,.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 10px;font-size:8px;font-weight:850}.todo-item button{background:var(--blue);border-color:var(--blue);color:#fff}.todo-item .secondary{background:#fff;color:#555;border:1px solid var(--line)}
+.notice,.kitbox{border-radius:10px;padding:10px;font-size:9px;line-height:1.55}.notice{background:#fff8dc}.kitbox{background:#f8faf9}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.payment{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px}.payment strong{font-size:10px}.payment span{font-size:8px;color:#777}
+@media(max-width:850px){.app{display:block}.side{display:none}.top{height:54px;padding:0 14px}.wrap{padding:16px 12px 80px}.hero-body{align-items:flex-start;flex-direction:column}.toolbar{display:grid;grid-template-columns:1fr auto;gap:10px}.search{width:100%}.detail-grid{grid-template-columns:1fr}.todo{position:static}.event-card{grid-template-columns:50px 1fr auto;padding:10px}.event-icon{width:50px;height:50px}}
+</style>
+</head>
+<body>
+<div class="app">
+<aside class="side">
+  <div class="brand">mikkeOS<small>Academy</small></div>
+  <div class="nav"><div>ホーム</div><div>講座</div><div>販売プラン</div><div class="on">開催</div><div>申込</div><div>認定</div><div>講師</div><div>ページ</div><div>設定</div></div>
+</aside>
+
+<div>
+<header class="top"><strong>灯りのアトリエ キャンドル教室</strong><span>本部責任者 ▾</span></header>
+<main class="wrap">
+
+<section class="list-view" id="listView">
+  <div class="hero-title"><div class="en">EVENTS</div><div class="jp">開催</div></div>
+  <div class="hero-body">
+    <p>日時指定・日程相談・講師依頼・開催確定まで、実際の開催をここで管理します。</p>
+    <button class="primary">＋ 開催を追加</button>
+  </div>
+
+  <div class="guide">
+    <a href="#plans">販売プラン</a><span>→</span>
+    <a href="#events">開催</a><span>→</span>
+    <a href="#applications">申込</a><span>→</span>
+    <a href="#learners">受講・修了</a>
+  </div>
+
+  <div class="toolbar">
+    <input class="search" placeholder="販売プラン・受講者・講師で検索">
+    <button class="sort">並び替え ▾</button>
+  </div>
+
+  <div class="filters">
+    <button class="filter on">すべて</button>
+    <button class="filter">日程相談中</button>
+    <button class="filter">講師回答待ち</button>
+    <button class="filter">開催確定</button>
+    <button class="filter">本日</button>
+    <button class="filter">終了</button>
+  </div>
+
+  <div class="event-list">
+    <div class="event-card" onclick="openDetail()">
+      <div class="event-icon" style="background-image:url('https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=160&q=70')"></div>
+      <div class="event-main">
+        <strong>ベーシックキャンドルコース</strong>
+        <div class="meta">
+          <span>田中 美咲</span><span>希望日 10/12・14・18</span><span>担当 未確定</span><span class="status yellow">日程相談中</span>
+        </div>
+      </div><div class="chev">›</div>
+    </div>
+
+    <div class="event-card">
+      <div class="event-icon" style="background-image:url('https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=160&q=70')"></div>
+      <div class="event-main">
+        <strong>ベーシックキャンドルコース</strong>
+        <div class="meta">
+          <span>10/10 13:00</span><span>対面・杉並区</span><span>4 / 6名</span><span>担当 野田 あゆみ</span><span class="status green">開催確定</span>
+        </div>
+      </div><div class="chev">›</div>
+    </div>
+
+    <div class="event-card">
+      <div class="event-icon" style="background-image:url('https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&w=160&q=70')"></div>
+      <div class="event-main">
+        <strong>ベーシックキャンドルコース</strong>
+        <div class="meta">
+          <span>10/20 10:00</span><span>オンライン</span><span>3 / 8名</span><span>担当 山田 花子</span><span class="status blue">講師回答待ち</span>
+        </div>
+      </div><div class="chev">›</div>
+    </div>
+
+    <div class="event-card">
+      <div class="event-icon" style="background-image:url('https://images.unsplash.com/photo-1608181831718-c9ffd66e3e29?auto=format&fit=crop&w=160&q=70')"></div>
+      <div class="event-main">
+        <strong>キャンドル体験ワークショップ</strong>
+        <div class="meta">
+          <span>9/30 11:00</span><span>対面・荻窪</span><span>5 / 6名</span><span>担当 本部</span><span class="status orange">本日</span>
+        </div>
+      </div><div class="chev">›</div>
+    </div>
+  </div>
+</section>
+
+<section class="detail" id="detailView">
+  <a class="back" onclick="backList()">← 開催一覧へ</a>
+
+  <div class="detail-grid">
+    <div>
+      <div class="card">
+        <div class="header-info">
+          <div><strong>ベーシックキャンドルコース</strong><p>受付方法：申込後に日程相談<br>受講方法：対面</p></div>
+          <span class="badge yellow">日程相談中</span>
+        </div>
+        <div class="status-line"><span class="badge gray">受講者1名</span><span class="badge yellow">講師未確定</span><span class="badge yellow">日時未確定</span></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>受講者</h3>
+        <div class="people">
+          <div class="person">
+            <div><strong>田中 美咲</strong><p>希望日：10/12午後・10/14午後・10/18<br>希望エリア：東京都杉並区</p></div>
+            <span class="badge yellow">日程調整中</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <h3>希望日</h3>
+          <div class="rows">
+            <div class="row"><b>第1希望</b><span>10/12 午後</span></div>
+            <div class="row"><b>第2希望</b><span>10/14 午後</span></div>
+            <div class="row"><b>第3希望</b><span>10/18 指定なし</span></div>
+            <div class="row"><b>補足</b><span>平日は14時以降、土日は終日可能</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>担当講師</h3>
+        <div class="notice"><b>まだ担当講師は決まっていません。</b><br>受講者の希望日を確認してから、この販売プランを担当できる認定講師へ依頼できます。</div>
+        <div class="actions" style="margin-top:10px"><button class="btn">対応できる講師を探す</button></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>日程・会場</h3>
+        <div class="rows">
+          <div class="row"><b>開催日</b><span>未確定</span></div>
+          <div class="row"><b>時間</b><span>未確定</span></div>
+          <div class="row"><b>会場</b><span>杉並区予定 / 詳細は申込後案内</span></div>
+        </div>
+        <div class="actions" style="margin-top:10px"><button class="btn orange">日程を確定する</button></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>支払い</h3>
+        <div class="payment"><div><strong>銀行振込 ¥18,000</strong><br><span>入金確認前</span></div><span class="badge yellow">未確認</span></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>キット</h3>
+        <div class="kitbox"><b>認定講師が担当する場合</b><br>対面開催では、担当講師の指定キット受取住所へ本部から発送します。担当確定前は発送しません。</div>
+      </div>
+    </div>
+
+    <aside class="card todo">
+      <h2>次にやること</h2>
+      <div class="help">この開催で、現在必要な対応だけを表示します。</div>
+
+      <div class="todo-item">
+        <b>1. 希望日を確認</b>
+        <p>受講者から3つの希望日が届いています。</p>
+        <button>希望日を見る</button>
+      </div>
+
+      <div class="todo-item">
+        <b>2. 担当講師を探す</b>
+        <p>この販売プランを担当できる認定講師から依頼先を選びます。</p>
+        <button>講師を探す</button>
+      </div>
+
+      <div class="todo-item">
+        <b>3. 講師へ担当依頼</b>
+        <p>講師マイページ＋メール通知で依頼します。</p>
+        <button class="secondary">講師選択待ち</button>
+      </div>
+
+      <div class="todo-item">
+        <b>4. 受講者へメール</b>
+        <p>日程候補や確定日時は本部からメールで連絡します。</p>
+        <button>メールを作成</button>
+      </div>
+
+      <div class="todo-item">
+        <b>5. 日程を確定</b>
+        <p>講師・受講者の確認後、開催日時を登録します。</p>
+        <button class="secondary">調整中</button>
+      </div>
+    </aside>
+  </div>
+</section>
+
+</main>
+</div>
+</div>
+
+<script>
+function openDetail(){
+  document.getElementById('listView').classList.add('hide');
+  document.getElementById('detailView').classList.add('on');
+  window.scrollTo(0,0);
+}
+function backList(){
+  document.getElementById('listView').classList.remove('hide');
+  document.getElementById('detailView').classList.remove('on');
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>
