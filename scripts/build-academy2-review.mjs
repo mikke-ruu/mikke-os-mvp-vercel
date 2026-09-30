@@ -44,7 +44,7 @@ replaceOnce('<div class="note">上から順番に確認してください。画�
   <div class="note">各画面は操作できるHTMLの見本です。入力内容はAcademyのデータベースには保存されません。</div>`);
 replaceOnce('<div class="tabs">', '<div id="review-screen-list" class="tabs">');
 replaceOnce(' sandbox="allow-scripts allow-forms allow-modals allow-popups allow-same-origin"', '');
-replaceOnce("document.getElementById('frame').srcdoc = pages[i].html;", "document.getElementById('frame').src = '/academy2-review-pages/' + String(i+1).padStart(2,'0') + '.html';");
+replaceOnce("document.getElementById('frame').srcdoc = pages[i].html;", "document.getElementById('frame').src = 'academy2-review-pages/' + String(i+1).padStart(2,'0') + '.html';");
 replaceOnce("document.getElementById('frame').srcdoc='';", "document.getElementById('frame').src='about:blank';");
 replaceOnce('</style>', `.review-home{background:#fff;border:1px solid #e0e6e1;border-radius:18px;padding:28px;margin-bottom:18px;background-image:linear-gradient(120deg,#fff 60%,#e5f3ed)}
 .review-home-kicker{font-size:12px;font-weight:800;letter-spacing:.12em;color:#3f4eb5}

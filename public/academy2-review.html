@@ -113,7 +113,7 @@ function escapeHtml(s){
 function openPage(i){
   current=i;
   document.getElementById('viewerTitle').textContent = `${i+1}. ${pages[i].group}｜${pages[i].title}`;
-  document.getElementById('frame').src = '/academy2-review-pages/' + String(i+1).padStart(2,'0') + '.html';
+  document.getElementById('frame').src = 'academy2-review-pages/' + String(i+1).padStart(2,'0') + '.html';
   document.getElementById('viewer').classList.add('show');
 }
 document.getElementById('close').onclick=()=>{
