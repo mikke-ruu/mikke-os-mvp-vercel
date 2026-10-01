@@ -7,6 +7,7 @@ import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBound
 import { CourseMaterials } from "@/components/academy2/CourseMaterials";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import {useMaterialLeaveGuard} from '@/components/academy/useMaterialLeaveGuard';
 import { AcademyLessonActions } from "@/components/academy/AcademyLessonActions";
 import { AcademyLessonEditor } from "@/components/academy/AcademyLessonEditor";
 import { readLessons, writeLessons } from "@/lib/academy/lesson-content";
@@ -97,7 +98,7 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
   }
 
   async function save() {
-    if (!hq || !course || savePending.current) return;
+    if (!hq || !course || savePending.current) return false;
     savePending.current = true;
     const savingRevision = revision.current;
     setSaving(true);
@@ -112,15 +113,18 @@ function BuilderContent({ courseId, audience }: { courseId: string; audience: "l
       }
       setSaved(revision.current === savingRevision);
       setDirty(revision.current !== savingRevision);
+      return revision.current === savingRevision;
     } catch (error) {
       setDirty(true);
       setSaveError(materialSaveErrorMessage(error));
+      return false;
     } finally {
       savePending.current = false;
       setSaving(false);
     }
   }
 
+  useMaterialLeaveGuard({dirty:dirty&&revision.current>0,busy:saving||savePending.current,save});
   if (loading) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
   if (loadError) return <p role="alert" className="py-10 text-center text-sm text-[var(--mikke-danger)]">{loadError}</p>;
   if (!hq || !course) return <p className="py-10 text-center text-sm text-[var(--mikke-muted)]">講座が見つかりません。</p>;
@@ -173,4 +177,4 @@ export default function InstructorPageBuilder({ params }: { params: Promise<{ id
   );
 }
 
-function BuilderIdentity({courseId,audience}:{courseId:string;audience:"learner"|"instructor"}){const hq=useAcademy2Headquarters();if(hq)return audience==='learner'?<CourseMaterials key={hq.id+':'+courseId} headquartersId={hq.id} courseId={courseId}/>:<p>講師マニュアルの接続を準備しています。</p>;return <BuilderContent key={courseId+':'+audience} courseId={courseId} audience={audience}/>;}
+function BuilderIdentity({courseId,audience}:{courseId:string;audience:"learner"|"instructor"}){const {user}=useAuth();const hq=useAcademy2Headquarters();if(hq)return audience==='learner'?<CourseMaterials key={hq.id+':'+courseId} headquartersId={hq.id} courseId={courseId}/>:<p>講師マニュアルの接続を準備しています。</p>;return <BuilderContent key={user.id+':'+courseId+':'+audience} courseId={courseId} audience={audience}/>;}
