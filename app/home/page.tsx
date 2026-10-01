@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenText, CalendarDays, ExternalLink, LogIn } from "lucide-react";
+import { BookOpenText, CalendarDays, ExternalLink, LayoutDashboard, LogIn, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { MikkeAppsTileGrid } from "@/components/mikkeos/MikkeOwnerMenu";
@@ -70,6 +70,17 @@ export default function HomePage() {
                 </div>
               </section>
             ) : null}
+
+            <section className="mt-4 grid grid-cols-2 gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm">
+              <Link href="/manager" className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--mikke-line)] px-3 text-sm font-bold text-[var(--mikke-primary)]">
+                <LayoutDashboard size={18} />
+                Manager
+              </Link>
+              <Link href="/manager/settings" className="flex min-h-12 items-center gap-2 rounded-xl border border-[var(--mikke-line)] px-3 text-sm font-bold text-[var(--mikke-primary)]">
+                <SlidersHorizontal size={18} />
+                アプリ表示設定
+              </Link>
+            </section>
           </>
         ) : (
           <section className="mt-4 rounded-2xl border border-[var(--mikke-line)] bg-white p-5 shadow-sm">
