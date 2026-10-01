@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
+import {useMaterialLeaveGuard} from '@/components/academy/useMaterialLeaveGuard';
 import {LessonNoteEditor} from './LessonNoteEditor';
 import {readLessons,writeLessons,moveLesson} from '@/lib/academy/lesson-content';
 import {saveCourseEditor,type CourseEditorDocument} from '@/lib/academy2/course-editor';
@@ -26,6 +27,7 @@ export function CourseLessonEditorConnected({headquartersId,courseId,lessonId,in
   }catch(cause){setError(cause instanceof Error?cause.message:'教材を保存できませんでした。入力内容は残っています。');return false;}
   finally{pending.current=false;setSaving(false);}
  }
+ useMaterialLeaveGuard({dirty,busy:saving||pending.current,save});
  async function navigate(path:string){if(pending.current)return;if(dirty&&!await save())return;router.push(href(path));}
  const back=()=>void navigate('/academy/courses/'+courseId);
  const navigation=<nav className={styles.tabs} aria-label="講座編集項目"><button type="button" aria-pressed={false} disabled={saving} onClick={back}>基本情報</button><button className={styles.active} type="button" aria-pressed={true} disabled={saving}>レッスン・教材</button></nav>;
