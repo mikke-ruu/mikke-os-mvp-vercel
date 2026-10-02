@@ -1,5 +1,4 @@
--- Run after academy_release_candidate_e2e.sql and this feature migration in
--- one outer BEGIN/ROLLBACK transaction.
+-- Run in one outer BEGIN/ROLLBACK transaction against the current final schema.
 
 create or replace function pg_temp.billing_exclusion_assert(p_condition boolean, p_message text)
 returns void language plpgsql as $$
@@ -9,6 +8,45 @@ begin
   end if;
 end;
 $$;
+
+insert into auth.users (
+  id, aud, role, email, email_confirmed_at, raw_app_meta_data,
+  raw_user_meta_data, created_at, updated_at, is_sso_user, is_anonymous
+) values
+  ('a1000000-0000-4000-8000-000000000001', 'authenticated', 'authenticated', 'billing-admin@example.invalid', now(), '{}'::jsonb, '{}'::jsonb, now(), now(), false, false),
+  ('a1000000-0000-4000-8000-000000000002', 'authenticated', 'authenticated', 'billing-target@example.invalid', now(), '{}'::jsonb, '{}'::jsonb, now(), now(), false, false);
+
+insert into public.profiles (id, user_id, display_name, handle, member_number) values
+  ('b1000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 'Billing Admin', 'billing_admin', 991000000),
+  ('b1000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000002', 'Billing Target', 'academy_e2e_learner', 991000001);
+
+insert into public.academy_headquarters (
+  id, owner_user_id, owner_profile_id, name, handle, plan, is_active
+) values (
+  'c1000000-0000-4000-8000-000000000001',
+  'a1000000-0000-4000-8000-000000000001',
+  'b1000000-0000-4000-8000-000000000001',
+  'Billing Exclusion HQ', 'billing-exclusion-hq', 'small', true
+);
+
+insert into public.academy_headquarters_access_states (
+  headquarters_id, owner_user_id, access_kind, status, starts_at, paid_started_at
+) values (
+  'c1000000-0000-4000-8000-000000000001',
+  'a1000000-0000-4000-8000-000000000001',
+  'paid', 'active', now(), now()
+);
+
+insert into platform_billing_private.internal_resource_grants (
+  actor_user_id, product_key, resource_id, purpose, reason,
+  granted_by, evidence, starts_at
+) values (
+  'a1000000-0000-4000-8000-000000000001', 'academy_platform',
+  'c1000000-0000-4000-8000-000000000001', 'test_only',
+  'rollback-only exclusion fixture',
+  'a1000000-0000-4000-8000-000000000001',
+  'isolated current-master SQL test', now()
+);
 
 -- Fresh databases have no production users. Bind the deterministic Academy
 -- owner fixture as @ayumi only when the migration left the admin ledger empty.
@@ -78,10 +116,14 @@ set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', current_setting('billing_exclusion_test.admin_user_id'), true);
 
-select public.mikkeos_academy_billing_exclusion_grant(
-  current_setting('billing_exclusion_test.admin_user_id')::uuid,
-  'c1000000-0000-4000-8000-000000000001',
-  'academy_e2e_learner', 'rollback-only test account', null
+select set_config(
+  'billing_exclusion_test.exclusion_id',
+  public.mikkeos_academy_billing_exclusion_grant(
+    current_setting('billing_exclusion_test.admin_user_id')::uuid,
+    'c1000000-0000-4000-8000-000000000001',
+    'academy_e2e_learner', 'rollback-only test account', null
+  ) ->> 'id',
+  true
 );
 
 select pg_temp.billing_exclusion_assert(
@@ -102,13 +144,7 @@ select pg_temp.billing_exclusion_assert(
 
 select public.mikkeos_academy_billing_exclusion_revoke(
   current_setting('billing_exclusion_test.admin_user_id')::uuid,
-  (
-    select exclusion.id
-    from public.academy_instructor_billing_exclusions exclusion
-    where exclusion.headquarters_id = 'c1000000-0000-4000-8000-000000000001'
-      and exclusion.profile_id = 'b1000000-0000-4000-8000-000000000002'
-    order by exclusion.created_at desc limit 1
-  ),
+  current_setting('billing_exclusion_test.exclusion_id')::uuid,
   'rollback-only revoke verification'
 );
 reset role;

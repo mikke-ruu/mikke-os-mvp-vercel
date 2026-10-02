@@ -94,7 +94,6 @@ for (const raw of [null, undefined, [], {}, { data: fixture() }, { data: fixture
 const badAttempts = [null, [], {}, { ...baseAttempt(), created: true, status: 'paid' }, { ...baseAttempt(), created: true, status: ['prepared'] },
   { ...baseAttempt(), created: 'true' }, { ...baseAttempt(), created: true, quote_revision: 0 },
   { ...baseAttempt(), created: true, provider_idempotency_key: 'browser-key' }, { ...baseAttempt(), created: true, extra: 'raw' },
-  { ...baseAttempt(), created: true, status: 'provider_ready', provider_session_id: 'cs_live_fixture', provider_result_hash: 'a'.repeat(64) },
   { ...baseAttempt(), created: true, provider_session_id: session.id }];
 for (const [index, value] of badAttempts.entries()) await test(`malformed attempt ${index} fails safely`, async () => {
   const { store } = transport(value);
@@ -122,7 +121,7 @@ function execution(options = {}) {
     return { data: value, error: null };
   });
   return { calls, dependencies: {
-    ...store, now: () => now,
+    ...store, providerMode: options.providerMode ?? 'test', now: () => now,
     selectAuthorizedContext: async () => { calls.authorize++; return options.changeContext && calls.authorize > 1 ? { ...expected, ownerUserId: other } : expected; },
     createTestSession: async (_quote, key) => { calls.providerCreate++; assert.equal(key, `platform-checkout-${attemptId}`); if (options.providerMissing) throw new Error('provider not connected'); return options.session ?? session; },
     retrieveTestSession: async () => { calls.providerRetrieve++; return options.session ?? session; },
@@ -166,6 +165,11 @@ for (const bad of [{ ...session, id: 'cs_live_fixture' }, { ...session, url: 'ht
     const { dependencies } = execution({ session: bad }); assert.deepEqual(await executeTestCheckout(request(), dependencies, signal()), { state: 'pending' });
   });
 }
+await test('live provider mode accepts only a live Checkout session', async () => {
+  const live = { ...session, id: 'cs_live_fixture' };
+  const { dependencies } = execution({ session: live, providerMode: 'live' });
+  assert.deepEqual(await executeTestCheckout(request(), dependencies, signal()), { state: 'redirect', redirectUrl: live.url });
+});
 await test('existing ready attempt only retrieves hash-bound test session', async () => {
   const { calls, dependencies } = execution({ reserved: { created: false, status: 'provider_ready', provider_session_id: session.id, provider_result_hash: checkoutSessionHash(session) } });
   assert.deepEqual(await executeTestCheckout(request(), dependencies, signal()), { state: 'redirect', redirectUrl: session.url });
