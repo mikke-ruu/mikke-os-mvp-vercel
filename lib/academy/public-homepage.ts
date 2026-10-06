@@ -1,10 +1,12 @@
 import { academyPublicClient } from "./public-client";
+import { listPublicOfferings, type PublicOfferingSummary } from "./public-offerings";
 import type { AcademyCourse, AcademyHeadquarters, AcademyInstructor } from "@/types/database";
 
 export type PublicHomepage = {
   headquarters: Pick<AcademyHeadquarters, "id" | "name" | "handle" | "tagline" | "front_message" | "hero_image_url" | "front_blocks" | "contact_email">;
   courses: Pick<AcademyCourse, "id" | "code" | "name" | "subtitle" | "main_image_url" | "price" | "duration_text">[];
   instructors: Pick<AcademyInstructor, "id" | "business_name" | "area" | "photo_url" | "online_available">[];
+  offerings: PublicOfferingSummary[] | null;
 };
 
 export async function getPublicHomepage(handle: string): Promise<PublicHomepage | null> {
@@ -28,6 +30,7 @@ export async function getPublicHomepage(handle: string): Promise<PublicHomepage 
     .order("sort_order", { ascending: true }).order("created_at", { ascending: true }).abortSignal(signal);
   if (courseError) throw courseError;
   const publicCourses = (courses ?? []) as PublicHomepage["courses"];
+  const offeringsPromise = listPublicOfferings({ headquartersId: headquarters.id }).catch(() => null);
   let instructors: PublicHomepage["instructors"] = [];
   if (publicCourses.length) {
     const { data, error } = await academyPublicClient.from("academy_instructors")
@@ -38,5 +41,7 @@ export async function getPublicHomepage(handle: string): Promise<PublicHomepage 
     if (error) throw error;
     instructors = (data ?? []) as PublicHomepage["instructors"];
   }
-  return { headquarters: headquarters as PublicHomepage["headquarters"], courses: publicCourses, instructors };
+  // A failed service-list request must not hide the entire public homepage.
+  const offerings = await offeringsPromise;
+  return { headquarters: headquarters as PublicHomepage["headquarters"], courses: publicCourses, instructors, offerings };
 }

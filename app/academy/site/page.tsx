@@ -29,6 +29,7 @@ function SitePage() {
   const [hq, setHq] = useState<PublicHomepage["headquarters"] | null>(null);
   const [courses, setCourses] = useState<PublicHomepage["courses"]>([]);
   const [instructors, setInstructors] = useState<PublicHomepage["instructors"]>([]);
+  const [offerings, setOfferings] = useState<PublicHomepage["offerings"]>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -44,6 +45,7 @@ function SitePage() {
         setHq(result?.headquarters ?? null);
         setCourses(result?.courses ?? []);
         setInstructors(result?.instructors ?? []);
+        setOfferings(result?.offerings ?? null);
       } catch {
         if (!cancelled) setLoadError(true);
       } finally {
@@ -69,15 +71,15 @@ function SitePage() {
             <p className="mt-0.5 text-[9px] font-bold tracking-[0.3em] text-[var(--mikke-muted-light)]">Academy</p>
           </div>
           <a
-            href="#services"
+            href={offerings?.length ? "#services" : "#courses"}
             className="rounded-full bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90"
           >
-            講座に申し込む
+            {offerings?.length ? "講座に申し込む" : "講座一覧を見る"}
           </a>
         </div>
       </header>
 
-      <AcademyFrontHero design={document.design} title={hq.tagline || "わたしらしい学びで、誰かの未来を照らす。"} message={hq.front_message || `${hq.name}の講座やワークショップをご紹介します。`} imageUrl={hq.hero_image_url || ""} />
+      <AcademyFrontHero design={document.design} title={hq.tagline || "わたしらしい学びで、誰かの未来を照らす。"} message={hq.front_message || `${hq.name}の講座やワークショップをご紹介します。`} imageUrl={hq.hero_image_url || ""} canApply={Boolean(offerings?.length)} />
 
       {/* Wave F (AC-F3): フロントの自由ブロック（ヒーローと講座一覧の間） */}
       {document.blocks.length ? (
@@ -88,7 +90,7 @@ function SitePage() {
         </section>
       ) : null}
 
-      <div style={{ maxWidth: frontMaxWidth(document.design, 1024) }} className="mx-auto px-5"><AcademyPublicServices key={hq.id} headquartersId={hq.id} /></div>
+      {offerings === null || offerings.length > 0 ? <div style={{ maxWidth: frontMaxWidth(document.design, 1024) }} className="mx-auto px-5"><AcademyPublicServices key={hq.id} headquartersId={hq.id} /></div> : null}
 
       {/* 講座一覧 */}
       <section id="courses" className="bg-[var(--mikke-surface-soft)] px-5 py-12 md:py-16">
@@ -99,8 +101,11 @@ function SitePage() {
             <p className="mt-8 text-center text-sm text-[var(--mikke-muted)]">現在公開中の講座はありません。</p>
           ) : (
             <ul className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {courses.map((c) => (
-                <li key={c.id} className="overflow-hidden rounded-3xl border border-[var(--mikke-line)] bg-white">
+              {courses.map((c) => {
+                const matchingOfferings = offerings?.filter(offering => offering.course_ids.includes(c.id)) ?? [];
+                const offeringHref = matchingOfferings.length === 1 ? `/academy/o/${matchingOfferings[0].id}` : "#services";
+                return (
+                  <li key={c.id} className="overflow-hidden rounded-3xl border border-[var(--mikke-line)] bg-white">
                   {c.main_image_url ? (
                     <img src={c.main_image_url} alt="" className="h-44 w-full object-cover" />
                   ) : (
@@ -115,11 +120,12 @@ function SitePage() {
                         基本価格 {c.price.toLocaleString()}円
                         {c.duration_text ? <span className="ml-2 text-[11px] font-normal text-[var(--mikke-muted)]">{c.duration_text}</span> : null}
                       </p>
-                      <a href="#services" className="text-xs underline">サービスの詳細・申込を見る</a>
+                      {matchingOfferings.length ? <a href={offeringHref} className="text-xs underline">サービスの詳細・申込を見る</a> : <span className="text-xs text-[var(--mikke-muted)]">{offerings === null ? "申込状況を確認できません" : "申込受付前"}</span>}
                     </div>
                   </div>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
