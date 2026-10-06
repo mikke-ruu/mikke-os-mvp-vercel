@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { AcademyFrontDesign } from "@/lib/academy/front-design";
 import { frontMaxWidth } from "@/lib/academy/front-design";
 
-export function AcademyFrontHero({ design, title, message, imageUrl }: { design: AcademyFrontDesign; title: string; message: string; imageUrl: string }) {
+export function AcademyFrontHero({ design, title, message, imageUrl, canApply = true }: { design: AcademyFrontDesign; title: string; message: string; imageUrl: string; canApply?: boolean }) {
   const [selected, setSelected] = useState(0);
   if (design.hero === "hidden") return null;
   const slides = design.slides.filter(slide => slide.url);
@@ -13,7 +13,7 @@ export function AcademyFrontHero({ design, title, message, imageUrl }: { design:
     <div className={design.hero === "split" ? "" : "order-2"}>
       <h1 className="text-2xl font-bold leading-relaxed tracking-wide md:text-4xl">{title}</h1>
       <p className="mt-4 whitespace-pre-wrap text-sm leading-7 md:text-[15px]">{message}</p>
-      <div className="mt-6 flex flex-wrap items-center gap-4"><a href="#services" className="rounded-full bg-[var(--mikke-accent)] px-6 py-3 text-sm font-bold text-white">講座に申し込む</a><a href="#courses" className="text-sm font-bold text-[var(--mikke-accent-strong)]">講座一覧を見る →</a></div>
+      <div className="mt-6 flex flex-wrap items-center gap-4">{canApply ? <a href="#services" className="rounded-full bg-[var(--mikke-accent)] px-6 py-3 text-sm font-bold text-white">講座に申し込む</a> : null}<a href="#courses" className="text-sm font-bold text-[var(--mikke-accent-strong)]">講座一覧を見る →</a></div>
     </div>
     <div className="min-w-0">
       {active.url ? <img src={active.url} alt={active.alt} className={`w-full rounded-3xl object-cover ${design.hero === "split" ? "aspect-[4/3]" : "aspect-[16/9]"}`} /> : <div className="aspect-[4/3] rounded-3xl bg-[var(--mikke-surface-soft)]" />}
