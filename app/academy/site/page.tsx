@@ -90,7 +90,7 @@ function SitePage() {
         </section>
       ) : null}
 
-      <div style={{ maxWidth: frontMaxWidth(document.design, 1024) }} className="mx-auto px-5"><AcademyPublicServices key={hq.id} headquartersId={hq.id} /></div>
+      {offerings === null || offerings.length > 0 ? <div style={{ maxWidth: frontMaxWidth(document.design, 1024) }} className="mx-auto px-5"><AcademyPublicServices key={hq.id} headquartersId={hq.id} /></div> : null}
 
       {/* 講座一覧 */}
       <section id="courses" className="bg-[var(--mikke-surface-soft)] px-5 py-12 md:py-16">
