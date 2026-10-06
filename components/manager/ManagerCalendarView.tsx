@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/components/AuthGate";
 import { ManagerScheduleList } from "./ManagerCards";
@@ -8,7 +9,7 @@ import { useManagerSnapshot } from "@/lib/manager/collect-manager-items";
 import { useManagerPersonalEvents } from "@/lib/manager/store";
 import type { ManagerPersonalEvent } from "@/lib/manager/types";
 
-export function ManagerCalendarView() {
+export function ManagerCalendarView({ legacyOnly = false }: { legacyOnly?: boolean }) {
   const { profile } = useAuth();
   const snapshot = useManagerSnapshot(profile.id, profile.user_id);
   const { personalEvents, createPersonalEvent, updatePersonalEvent, removePersonalEvent, togglePersonalEventCompleted } = useManagerPersonalEvents();
@@ -24,7 +25,7 @@ export function ManagerCalendarView() {
     if (!title.trim() || !date) return;
     if (editingId) {
       updatePersonalEvent(editingId, { title: title.trim(), date, startTime, endTime, note: note.trim() });
-    } else {
+    } else if (!legacyOnly) {
       createPersonalEvent({ title: title.trim(), date, startTime, endTime, note: note.trim() });
     }
     resetForm();
@@ -53,11 +54,30 @@ export function ManagerCalendarView() {
   }
 
   return (
-    <ManagerShell title="予定" subtitle="各アプリの予定と、Manager内だけの個人予定をまとめます。">
+    <ManagerShell
+      title={legacyOnly ? "以前の個人予定" : "予定"}
+      subtitle={legacyOnly
+        ? "この端末のManagerに残っている個人予定を確認・編集できます。"
+        : "各アプリの予定と、Manager内だけの個人予定をまとめます。"}
+    >
       <section className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr]">
-        <form onSubmit={handleSubmit} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
+        {legacyOnly && !editingId ? (
+          <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
+            <h2 className="text-lg font-bold tracking-normal">新しい予定はMarketNoteへ</h2>
+            <p className="mt-1 text-sm leading-6 text-[var(--mikke-muted)]">
+              ここでは過去にManagerへ保存した個人予定だけを保管します。新しい予定はMarketNoteのカレンダーから追加してください。
+            </p>
+            <Link
+              href="/marketnote?from=manager"
+              className="mt-4 inline-flex rounded-full bg-[var(--mikke-primary)] px-4 py-2 text-sm font-bold text-white"
+            >
+              MarketNoteで予定を管理
+            </Link>
+          </section>
+        ) : (
+          <form onSubmit={handleSubmit} className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm">
           <h2 className="text-lg font-bold tracking-normal">{editingId ? "個人予定を編集" : "個人予定を追加"}</h2>
-          <p className="mt-1 text-sm text-[var(--mikke-muted)]">この予定はManager内だけに保存され、StoryやDESKには流れません。</p>
+          <p className="mt-1 text-sm text-[var(--mikke-muted)]">この予定はManager内だけに保存され、他のアプリには公開されません。</p>
           <div className="mt-4 grid gap-3">
             <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="予定名" className="rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-sm font-semibold" />
             <div className="grid grid-cols-3 gap-2">
@@ -77,7 +97,8 @@ export function ManagerCalendarView() {
               ) : null}
             </div>
           </div>
-        </form>
+          </form>
+        )}
 
         <section className="rounded-2xl border border-[var(--mikke-line)] bg-white p-4 shadow-sm xl:col-start-1">
           <h2 className="mb-3 text-lg font-bold tracking-normal">個人予定</h2>
@@ -119,10 +140,12 @@ export function ManagerCalendarView() {
           )}
         </section>
 
-        <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
-          <h2 className="mb-3 text-lg font-bold tracking-normal">予定一覧</h2>
-          <ManagerScheduleList items={snapshot.schedules} />
-        </section>
+        {!legacyOnly ? (
+          <section className="rounded-2xl border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-4 shadow-sm">
+            <h2 className="mb-3 text-lg font-bold tracking-normal">予定一覧</h2>
+            <ManagerScheduleList items={snapshot.schedules} />
+          </section>
+        ) : null}
       </section>
     </ManagerShell>
   );
