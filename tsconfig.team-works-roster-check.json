@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "incremental": false },
+  "include": [
+    "next-env.d.ts",
+    "app/apps/team-works/portal-share/page.tsx",
+    "components/team-works/operations/TeamWorksOperationsClientPortal.tsx",
+    "lib/team-works-operations-client.ts",
+    "lib/team-works-operations-project.ts",
+    "lib/team-works-roster-names.ts"
+  ],
+  "exclude": ["node_modules", ".next", "supabase/functions"]
+}

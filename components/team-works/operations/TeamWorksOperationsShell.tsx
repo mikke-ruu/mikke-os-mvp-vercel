@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen, Briefcase, CalendarDays, Folder, Home, MessageSquare, Plus, Settings, Users } from "lucide-react";
+import { BookOpen, Briefcase, CalendarDays, Folder, Home, MessageSquare, Plus, Settings, Share2, Users } from "lucide-react";
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import type { TeamWorksLabels } from "@/lib/team-works-labels";
@@ -19,6 +19,7 @@ function buildTeamWorksNavItems(labels: TeamWorksLabels): MikkeShellNavItem[] {
     { label: `${labels.workers}管理`, href: "/apps/team-works/partners", icon: Users, section: "運営" },
     { label: "クライアント管理", href: "/apps/team-works/clients", icon: Briefcase, section: "運営" },
     { label: "マニュアル管理", href: "/apps/team-works/manuals", icon: BookOpen, section: "運営" },
+    { label: "ポータルを共有", href: "/apps/team-works/portal-share", icon: Share2, section: "設定" },
     { label: "企業設定", href: "/apps/team-works/settings", icon: Settings, section: "設定" }
   ];
 }

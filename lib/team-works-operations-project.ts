@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadOperationsRosterNames } from "@/lib/team-works-roster-names";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 import { fetchOperationsProjects, resolveStaffOrganizationIds } from "@/lib/team-works-operations";
 import { GENERAL_PURPOSE_LABELS } from "@/lib/team-works-labels";
@@ -449,7 +450,7 @@ export async function loadOperationsProjectDetail(
     currentManualNo: row.current_manual_no,
     status: row.status
   }));
-  const participantNameById = new Map(participants.map((participant) => [participant.id, participant.name]));
+  const participantNameById = await loadOperationsRosterNames(client, [projectId], participants, rosterRows);
   const formNameById = new Map(
     ((formResult.data ?? []) as { id: string; name: string }[]).map((row) => [row.id, row.name])
   );
