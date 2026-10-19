@@ -4,6 +4,7 @@ import { CircleUserRound, FolderKanban, Users } from "lucide-react";
 import { MikkeAppShell, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import { useTeamWorksPortalRoles } from "@/components/team-works/useTeamWorksPortalRoles";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
+import { TeamWorksRoleSwitcher } from "@/components/team-works/TeamWorksRoleSwitcher";
 
 export function TeamWorksClientProjectsShell({
   title,
@@ -37,6 +38,7 @@ export function TeamWorksClientProjectsShell({
       otherApps={[]}
       suggestedApps={[]}
     >
+      <TeamWorksRoleSwitcher current="client" />
       <div className="mb-6 flex flex-col gap-3 border-b border-[var(--mikke-line)] pb-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="inline-flex items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]">
           <FolderKanban size={16} /> 運営型プロジェクト

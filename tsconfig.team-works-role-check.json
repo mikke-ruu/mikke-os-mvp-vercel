@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "incremental": false },
+  "include": ["next-env.d.ts", "components/team-works/TeamWorksRoleSwitcher.tsx", "components/team-works/operations/TeamWorksOperationsShell.tsx", "components/team-works/operations/TeamWorksOperationsPartnerPortal.tsx", "components/team-works/client-projects/TeamWorksClientProjectsShell.tsx"],
+  "exclude": ["node_modules", ".next", "supabase/functions"]
+}

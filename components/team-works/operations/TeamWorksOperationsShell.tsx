@@ -4,6 +4,7 @@ import { BookOpen, Briefcase, CalendarDays, Folder, Home, MessageSquare, Plus, S
 import { MikkeAppShell, type MikkeShellBottomNavItem, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 import type { TeamWorksLabels } from "@/lib/team-works-labels";
+import { TeamWorksRoleSwitcher } from "@/components/team-works/TeamWorksRoleSwitcher";
 
 /**
  * 承認済みクリックプロトタイプ`.side` `.nav`の6項目（順序・section区切りとも忠実に再現）が土台。
@@ -68,6 +69,7 @@ export function TeamWorksOperationsShell({
       otherApps={[]}
       suggestedApps={[]}
     >
+      <TeamWorksRoleSwitcher current="staff" />
       {children}
     </MikkeAppShell>
   );

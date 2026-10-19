@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { MikkeAppShell, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
+import { TeamWorksRoleSwitcher } from "@/components/team-works/TeamWorksRoleSwitcher";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
 import { MikkeSection } from "@/components/mikkeos/MikkeSection";
 import { ClientMonthCalendar } from "@/components/team-works/operations/ClientMonthCalendar";
@@ -114,6 +115,7 @@ export function TeamWorksOperationsPartnerPortal({
       otherApps={[]}
       suggestedApps={[]}
     >
+      <TeamWorksRoleSwitcher current="worker" />
       <div className="mb-5 flex items-center justify-between border-b border-[var(--mikke-line)] pb-4">
         <p className="inline-flex items-center gap-2 text-xs font-bold text-[var(--mikke-muted)]">
           <FolderKanban size={15} /> 運営型プロジェクト
