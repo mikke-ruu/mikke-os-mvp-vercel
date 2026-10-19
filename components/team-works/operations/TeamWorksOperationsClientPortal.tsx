@@ -14,6 +14,7 @@ import { buildSampleClientPortalData, loadSampleProjectShell } from "@/lib/team-
 import { supabase } from "@/lib/supabase/client";
 import {
   approveOperationsClientProject,
+  archiveOperationsClientParticipant,
   loadOperationsClientPendingProjects,
   loadOperationsClientPortal,
   loadOperationsClientPortalAs,
@@ -559,7 +560,9 @@ function RosterEditor({
   const participantById = new Map(participants.map((participant) => [participant.id, participant]));
   const selectedParticipants = selectedIds.flatMap((id) => {
     const participant = participantById.get(id);
-    return participant ? [participant] : [];
+    if (participant) return [{ id: participant.id, name: participant.name, removed: false }];
+    const saved = session.roster.find((row) => row.participantId === id);
+    return saved ? [{ id, name: saved.participantName, removed: true }] : [];
   });
   const visibleParticipants = groupFilter === "all"
     ? participants
@@ -594,7 +597,8 @@ function RosterEditor({
               <li key={participant.id} className="flex items-center gap-2 rounded-xl border border-[#ffd370] bg-white p-2.5">
                 <GripVertical size={15} className="shrink-0 text-[var(--mikke-muted)]" aria-hidden="true" />
                 <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-[var(--mikke-primary)] text-xs font-extrabold text-white">{index + 1}</span>
-                <span className="min-w-0 flex-1 truncate text-sm font-extrabold">{participant.name}</span>
+                <span className="min-w-0 flex-1 text-sm font-extrabold"><span className="block truncate">{participant.name}</span>{participant.removed ? <span className="block text-xs font-normal text-[var(--mikke-muted)]">{labels.rosterNoun}から削除済み</span> : null}</span>
+                {participant.removed ? <button type="button" disabled={isViewAs} onClick={() => toggle(participant.id)} className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-2 py-1.5 text-xs disabled:opacity-50">この回から外す</button> : null}
                 <div className="flex shrink-0 gap-1">
                   <button type="button" disabled={index === 0} onClick={() => move(participant.id, -1)} aria-label={`${participant.name}さんを一つ前へ`} className="rounded-lg border border-[var(--mikke-line)] bg-white p-1.5 text-[var(--mikke-primary)] disabled:opacity-25"><ChevronUp size={16} /></button>
                   <button type="button" disabled={index === selectedParticipants.length - 1} onClick={() => move(participant.id, 1)} aria-label={`${participant.name}さんを一つ後ろへ`} className="rounded-lg border border-[var(--mikke-line)] bg-white p-1.5 text-[var(--mikke-primary)] disabled:opacity-25"><ChevronDown size={16} /></button>
@@ -647,6 +651,7 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
   const [groupName, setGroupName] = useState("");
   const [groupNotice, setGroupNotice] = useState<MutationNotice | null>(null);
   const [participantNotice, setParticipantNotice] = useState<MutationNotice | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const groups = data.groups.filter((group) => group.projectId === project.id);
   const participants = data.participants.filter((participant) => participant.projectId === project.id);
   const groupNameById = new Map(groups.map((group) => [group.id, group.name]));
@@ -681,6 +686,23 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
     setGroupName("");
   }
 
+  async function remove(participant: typeof participants[number]) {
+    if (isViewAs || removingId) return;
+    if (!window.confirm(`「${participant.name}」を${labels.rosterNoun}から削除しますか？\n登録済みの予定と${labels.sessionNoun}の記録は残ります。予定の${labels.attendanceNoun}順から外す場合は、その回で変更してください。`)) return;
+    setRemovingId(participant.id);
+    setParticipantNotice(null);
+    try {
+      const result = await mutate(
+        () => archiveOperationsClientParticipant(supabase, { projectId: project.id, participantId: participant.id }),
+        `「${participant.name}」を${labels.rosterNoun}から削除しました。`
+      );
+      setParticipantNotice(result);
+      if (result.tone === "success" && editingId === participant.id) edit();
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <MikkeSection title={labels.groupNoun} tone="editorial">
@@ -707,7 +729,15 @@ function ProjectRosterTab({ data, project, mutate }: { data: OperationsClientPor
           <select value={groupId} onChange={(event) => setGroupId(event.target.value)} className="rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2.5 text-sm"><option value="">{labels.groupNoun}未設定</option>{groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select>
           <div className="flex flex-wrap items-center gap-2"><button disabled={isViewAs} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white disabled:bg-[var(--mikke-line)] disabled:text-[var(--mikke-muted)]">{editingId ? `${labels.rosterNoun}を更新` : <span className="inline-flex items-center gap-1"><Plus size={15} />{labels.rosterNoun}に登録</span>}</button><InlineMutationNotice notice={participantNotice} /></div>
         </form>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2">{participants.map((participant) => <button key={participant.id} type="button" onClick={() => edit(participant)} className="rounded-xl border border-[var(--mikke-line)] bg-white p-3 text-left"><p className="font-extrabold">{participant.name}</p><p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{participant.groupId ? groupNameById.get(participant.groupId) ?? labels.groupNoun : `${labels.groupNoun}未設定`}{participant.level ? ` ／ ${participant.level}` : ""}</p></button>)}</div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">{participants.map((participant) => (
+          <div key={participant.id} className="flex items-center gap-2 rounded-xl border border-[var(--mikke-line)] bg-white p-3">
+            <button type="button" disabled={Boolean(removingId)} onClick={() => edit(participant)} className="min-w-0 flex-1 text-left disabled:opacity-50">
+              <p className="break-words font-extrabold">{participant.name}</p>
+              <p className="mt-1 text-xs font-semibold text-[var(--mikke-muted)]">{participant.groupId ? groupNameById.get(participant.groupId) ?? labels.groupNoun : `${labels.groupNoun}未設定`}{participant.level ? ` ／ ${participant.level}` : ""}</p>
+            </button>
+            <button type="button" disabled={isViewAs || Boolean(removingId)} onClick={() => void remove(participant)} aria-label={`${participant.name}を${labels.rosterNoun}から削除`} className="shrink-0 rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold text-[var(--tw-action)] disabled:opacity-50">{removingId === participant.id ? "削除中…" : "削除"}</button>
+          </div>
+        ))}</div>
         {!participants.length ? <MikkeEmptyState title={`${labels.rosterNoun}はまだありません`} helper={`上のフォームから${labels.participantNoun}を登録してください。`} /> : null}
       </MikkeSection>
     </div>

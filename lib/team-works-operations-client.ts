@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { loadOperationsRosterNames } from "@/lib/team-works-roster-names";
 import { isJapanDayOffKey } from "@/lib/japanese-calendar";
 import { isMissingSupabaseField } from "@/lib/supabase-schema-compat";
 import {
@@ -295,7 +296,7 @@ async function buildClientPortalData(
   const rosterRows = (rosterResult.data ?? []) as { id: string; session_id: string; participant_id: string; order_index: number }[];
   const projectTitleById = new Map(projectRows.map((project) => [project.id, project.title]));
   const partnerContactVisibleByProject = new Map(projectRows.map((project) => [project.id, project.client_partner_contact_visible]));
-  const participantById = new Map(participants.map((participant) => [participant.id, participant]));
+  const participantNames = await loadOperationsRosterNames(client, operationsProjectIds, participants, rosterRows);
   const contacts = projectMembers.flatMap((member) => {
     if (member.project_role === "client") return [];
     // Archiving a partner/staff org_member row doesn't delete their old
@@ -335,8 +336,8 @@ async function buildClientPortalData(
       zoomPasscode: session.zoom_passcode ?? null,
       workDescription: session.work_description ?? null,
       roster: rosterRows.filter((row) => row.session_id === session.id).flatMap((row) => {
-        const participant = participantById.get(row.participant_id);
-        return participant ? [{ id: row.id, participantId: row.participant_id, orderIndex: row.order_index, participantName: participant.name }] : [];
+        const name = participantNames.get(row.participant_id);
+        return [{ id: row.id, participantId: row.participant_id, orderIndex: row.order_index, participantName: name ?? "対象者" }];
       })
     })),
     holidays: ((holidayResult.data ?? []) as { id: string; project_id: string | null; organization_id: string; holiday_date: string; memo: string | null }[]).map((holiday) => ({
@@ -422,6 +423,22 @@ export async function saveOperationsClientParticipant(client: SupabaseClient, in
   }
   const { error } = await client.from("team_works_participants").insert({ project_id: input.projectId, name, level: input.level.trim() || null, group_id: input.groupId || null, status: "active" });
   if (error) throw error;
+}
+
+export async function archiveOperationsClientParticipant(
+  client: SupabaseClient,
+  input: { projectId: string; participantId: string }
+) {
+  await requireClientProjectMembership(client, input.projectId);
+  const now = new Date().toISOString();
+  // Keep the participant row and every session reference. No DELETE permission
+  // or new policy is needed; the existing project-scoped UPDATE RLS applies.
+  const { data, error } = await client.from("team_works_participants")
+    .update({ status: "archived", archived_at: now, updated_at: now })
+    .eq("id", input.participantId).eq("project_id", input.projectId)
+    .select("id").maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("名簿を削除できませんでした。画面を更新して、もう一度お試しください。");
 }
 
 export async function saveOperationsClientGroup(
