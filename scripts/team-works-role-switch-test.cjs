@@ -41,8 +41,12 @@ for(const n of nodes(component.TeamWorksRoleSwitcher({current:'client'})).filter
 console.log('PASS preview switches to own account without preview parameters');
 
 async function hookTest(memberRoles, owned, expected, failure=false){
+  global.window={addEventListener(){},removeEventListener(){}};
+  global.document={hidden:false,addEventListener(){},removeEventListener(){}};
   let cursor=0; const states=[]; let effect; const filters=[];
-  const supabase={auth:{getUser:async()=>({data:{user:{id:'self'}},error:null})},from(table){
+  let activated=false;
+  const supabase={rpc:async(name)=>{assert.equal(name,'team_works_activate_portal_membership');activated=true;return {error:null}},auth:{getUser:async()=>({data:{user:{id:'self'}},error:null})},from(table){
+    assert.ok(activated,'roles must be read after activation completes');
     const q={select(){return q},eq(k,v){filters.push([table,k,v]);return q},limit(){return q},then(resolve){return Promise.resolve({data:table==='team_works_organizations'?(owned?[{id:'org'}]:[]):memberRoles.map(role=>({role})),error:failure?new Error('test failure'):null}).then(resolve)}};return q;
   }};
   const hook=load('components/team-works/useTeamWorksPortalRoles.ts',name=>name==='react'?{useState(v){const i=cursor++;if(!(i in states))states[i]=v;return [states[i],v=>states[i]=v]},useEffect(fn){effect=fn}}:{supabase});
