@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.team-works-role-check.json",
+  "include": [
+    "next-env.d.ts",
+    "components/team-works/operations/TeamWorksOperationsProjectDetail.tsx",
+    "components/team-works/TeamWorksRoleSwitcher.tsx"
+  ]
+}

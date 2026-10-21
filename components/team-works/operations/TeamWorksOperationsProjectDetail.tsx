@@ -1054,10 +1054,10 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
         setMessage(`${result.email} さんはまだポータルにログインしていません。「${labels.workers}管理」の固定URLを渡してログインしてもらうと開通し、その後この追加が有効になります。`);
         setPendingOpen(true);
       }
-      await reloadMembers();
     } catch (submitError) {
       setMessage(submitError instanceof Error ? submitError.message : `${labels.workers}をプロジェクトに追加できませんでした。`);
     } finally {
+      await reloadMembers();
       setBusy(false);
     }
   }
@@ -1066,12 +1066,12 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
     setBusy(true);
     setMessage("");
     try {
-      await revokeOperationsProjectInvite(supabase, invite.id);
+      await revokeOperationsProjectInvite(supabase, data.project.id, invite);
       setMessage(`${invite.email} への参加依頼を削除しました。`);
-      await reloadMembers();
     } catch (revokeError) {
       setMessage(revokeError instanceof Error ? revokeError.message : "参加依頼を削除できませんでした。");
     } finally {
+      await reloadMembers();
       setBusy(false);
     }
   }
@@ -1169,7 +1169,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
       <TabIntro
         icon={Clock3}
         title={labels.workers}
-        description={`登録済み${labels.workers}をプロジェクトに追加します。開通済みの人は招待リンクなしで参加、未開通の人だけ Pending invites に残します。`}
+        description={`登録済み${labels.workers}をプロジェクトに追加します。相手がポータルで参加を承認すると、担当プロジェクトとして表示されます。`}
       />
 
       <MikkeSection title="Invite" tone="editorial">
@@ -1204,7 +1204,7 @@ function PartnersTab({ data, onSelectTab }: { data: OperationsProjectDetailData;
         ) : null}
       </MikkeSection>
 
-      <MikkeSection title="Pending invites" tone="editorial">
+      <MikkeSection title="参加依頼中" tone="editorial">
         <button
           type="button"
           onClick={() => setPendingOpen((current) => !current)}
@@ -1782,15 +1782,16 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
       if (result.status === "assigned") {
         setMessage(`${result.displayName} さんはすでにこのプロジェクトへ参加しています。重複招待は作成しませんでした。`);
       } else if (result.status === "invited") {
+        setPendingOpen(true);
         setMessage(`${result.displayName} さんをこのプロジェクトに追加しました。クライアントのポータルに「承認のお知らせ」が届き、承認すると参加が有効になります。`);
       } else {
         setMessage(`${result.email} さんはまだポータルにログインしていません。「クライアント管理」の固定URLを渡してログインしてもらうと開通し、その後この追加が有効になります。`);
         setPendingOpen(true);
       }
-      await reload();
     } catch (submitError) {
       setMessage(submitError instanceof Error ? submitError.message : "クライアントをプロジェクトに追加できませんでした。");
     } finally {
+      await reload();
       setBusy(false);
     }
   }
@@ -1799,12 +1800,12 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
     setBusy(true);
     setMessage("");
     try {
-      await revokeOperationsProjectInvite(supabase, invite.id);
+      await revokeOperationsProjectInvite(supabase, data.project.id, invite);
       setMessage(`${invite.email} への招待を削除しました。`);
-      await reload();
     } catch (revokeError) {
       setMessage(revokeError instanceof Error ? revokeError.message : "招待を削除できませんでした。");
     } finally {
+      await reload();
       setBusy(false);
     }
   }
@@ -1812,7 +1813,7 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
   return (
     <MikkeSection title="クライアント招待" tone="editorial">
       <p className="-mt-2 text-xs leading-6 text-[var(--mikke-muted)]">
-        登録済みクライアントをプロジェクトに追加します。開通済みの人は招待なしで参加、未開通の人だけ Pending invites に残します。
+        登録済みクライアントへ参加を依頼します。相手がポータルで承認すると、このプロジェクトへ参加できます。
       </p>
       <form onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
         <TeamWorksProjectField label="追加するクライアント" required>
@@ -1846,7 +1847,7 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
         className="mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-[var(--mikke-line)] bg-white px-4 py-3 text-left"
       >
         <span>
-          <span className="block text-sm font-extrabold">ポータル未開通 / 招待中</span>
+          <span className="block text-sm font-extrabold">招待中・参加承認待ち</span>
           <span className="mt-1 block text-xs font-semibold text-[var(--mikke-muted)]">
             {pendingInvites.length === 0 ? "招待中のクライアントはいません" : `${pendingInvites.length}件の招待があります`}
           </span>
@@ -1864,7 +1865,7 @@ function ClientInvitePanel({ data }: { data: OperationsProjectDetailData }) {
               <div key={invite.id} className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--mikke-line)] bg-white px-3 py-2.5">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold">{invite.email}</p>
-                  <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">未ログイン・「クライアント管理」の固定URLでログインすると開通します</p>
+                  <p className="text-[11px] font-semibold text-[var(--mikke-muted)]">クライアントポータルでログインし、参加を承認してください</p>
                 </div>
                 <button
                   type="button"

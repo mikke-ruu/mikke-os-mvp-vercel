@@ -1793,6 +1793,7 @@ export type OperationsPendingInvite = {
   email: string;
   role: string;
   expiresAt: string;
+  approvalPending?: boolean;
 };
 
 export type OperationsProjectPartnerAddResult =
@@ -1932,9 +1933,25 @@ export async function loadOperationsProjectMembers(
     .eq("project_id", projectId)
     .eq("status", "pending");
   if (inviteResult.error) throw inviteResult.error;
-  const pendingInvites = ((inviteResult.data ?? []) as { id: string; email: string; role: string; expires_at: string }[]).map(
+  const pendingInvites: OperationsPendingInvite[] = ((inviteResult.data ?? []) as { id: string; email: string; role: string; expires_at: string }[]).map(
     (row) => ({ id: row.id, email: row.email, role: row.role, expiresAt: row.expires_at })
   );
+
+  // An already activated client has no member_invites row. The directory link
+  // is the source of truth until they approve the project in their portal.
+  const linksResult = await client.from("team_works_project_clients")
+    .select("client_id").eq("project_id", projectId).eq("status", "invited");
+  if (linksResult.error) throw linksResult.error;
+  const clientIds = ((linksResult.data ?? []) as { client_id: string }[]).map((row) => row.client_id);
+  if (clientIds.length) {
+    const directoryResult = await client.from("team_works_clients")
+      .select("id,email").in("id", clientIds).eq("status", "active");
+    if (directoryResult.error) throw directoryResult.error;
+    for (const row of (directoryResult.data ?? []) as { id: string; email: string }[]) {
+      const existing = pendingInvites.find((invite) => invite.role === "client_user" && invite.email.toLowerCase() === row.email.toLowerCase());
+      if (!existing) pendingInvites.push({ id: `client:${row.id}`, email: row.email, role: "client_user", expiresAt: "", approvalPending: true });
+    }
+  }
 
   return { members, pendingInvites };
 }
@@ -2022,16 +2039,13 @@ export async function updateOperationsProjectPartnerOffer(
   if (error) throw error;
 }
 
-export async function revokeOperationsProjectInvite(client: SupabaseClient, inviteId: string) {
-  const { data, error } = await client
-    .from("team_works_member_invites")
-    .update({ status: "revoked", updated_at: new Date().toISOString() })
-    .eq("id", inviteId)
-    .eq("status", "pending")
-    .select("id")
-    .maybeSingle();
+export async function revokeOperationsProjectInvite(client: SupabaseClient, projectId: string, invite: OperationsPendingInvite) {
+  const { error } = await client.rpc("team_works_cancel_project_invitation", {
+    target_project_id: projectId,
+    target_email: invite.email,
+    target_role: invite.role
+  });
   if (error) throw error;
-  if (!data) throw new Error("招待を削除できませんでした。権限と招待状態を確認してください。");
 }
 
 export async function createOperationsProjectInvite(
@@ -2180,7 +2194,7 @@ export async function addOperationsPartnerToProject(
       // before fixed-URL self-activation) is now moot: this person is
       // already active. Clear it so it stops showing as a ghost "Pending
       // invites" row in the staff UI.
-      await client
+      const { error: revokeError } = await client
         .from("team_works_member_invites")
         .update({ status: "revoked", updated_at: new Date().toISOString() })
         .eq("organization_id", project.organization_id)
@@ -2188,6 +2202,7 @@ export async function addOperationsPartnerToProject(
         .eq("email", normalizedEmail)
         .eq("role", "worker")
         .eq("status", "pending");
+      if (revokeError) throw revokeError;
 
       const { error: projectPartnerError } = await client
         .from("team_works_project_partners")
@@ -2216,10 +2231,12 @@ export async function addOperationsPartnerToProject(
         );
       if (projectMemberError) throw projectMemberError;
 
+      const existingSettings = await loadOperationsProjectPartnerSettings(client, project.id);
+      const existingSetting = existingSettings.find((setting) => setting.organizationMemberId === member.id);
       await updateOperationsProjectPartnerSetting(client, {
         projectId: project.id,
         organizationMemberId: member.id,
-        hourlyWage: null,
+        hourlyWage: existingSetting?.hourlyWage ?? null,
         status: "active"
       });
 
@@ -2372,7 +2389,7 @@ export async function addOperationsClientToProject(
       // before fixed-URL self-activation) is now moot: this person is
       // already active. Clear it so it stops showing as a ghost "Pending
       // invites" row in the staff UI.
-      await client
+      const { error: revokeError } = await client
         .from("team_works_member_invites")
         .update({ status: "revoked", updated_at: new Date().toISOString() })
         .eq("organization_id", project.organization_id)
@@ -2380,6 +2397,7 @@ export async function addOperationsClientToProject(
         .eq("email", normalizedEmail)
         .eq("role", "client_user")
         .eq("status", "pending");
+      if (revokeError) throw revokeError;
 
       const existingMembershipResult = await client
         .from("team_works_project_members")

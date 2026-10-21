@@ -23,6 +23,10 @@ export function useTeamWorksPortalRoles(): TeamWorksPortalRoles {
         const { data: userData, error: userError } = await supabase.auth.getUser();
         if (userError) throw userError;
         if (!userData.user) return;
+        // Activation can add a second role during this very first portal visit.
+        // Resolve it before reading roles so the switcher cannot race the portal.
+        const { error: activationError } = await supabase.rpc("team_works_activate_portal_membership");
+        if (activationError) throw activationError;
         const [members, owned] = await Promise.all([supabase
           .from("team_works_organization_members")
           .select("role")
@@ -44,8 +48,13 @@ export function useTeamWorksPortalRoles(): TeamWorksPortalRoles {
       }
     }
     void load();
+    const refresh = () => { if (!document.hidden) void load(); };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
       cancelled = true;
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, []);
 
