@@ -9,8 +9,11 @@ function load(file, req) {
   return mod.exports;
 }
 let roles, viewAs=false;
+let signOutResult={error:null}, signOutCalls=[], stateUpdates=[];
 const component = load('components/team-works/TeamWorksRoleSwitcher.tsx', name => {
   if(name==='react/jsx-runtime') return {jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})};
+  if(name==='react') return {useState:v=>[v,next=>stateUpdates.push(next)],useRef:v=>({current:v})};
+  if(name==='@/lib/supabase/client') return {supabase:{auth:{signOut:async options=>{signOutCalls.push(options);return signOutResult}}}};
   if(name==='next/link') return {default:'a'};
   if(name.endsWith('useTeamWorksPortalRoles')) return {useTeamWorksPortalRoles:()=>roles};
   if(name.endsWith('useTeamWorksLabels')) return {useTeamWorksLabels:()=>({workers:'講師'})};
@@ -21,6 +24,7 @@ function nodes(tree){if(Array.isArray(tree))return tree.flatMap(nodes);if(!tree|
 for(let mask=0;mask<8;mask++){
   roles={hasStaff:!!(mask&1),hasClient:!!(mask&2),hasWorker:!!(mask&4),loading:false};
   const tree=component.TeamWorksRoleSwitcher({current:'client'});
+  assert.equal(nodes(tree).filter(n=>n.type==='button').length,1,'logout available with zero or one role');
   const links=nodes(tree).filter(n=>n.type==='a');
   const count=Number(roles.hasStaff)+Number(roles.hasClient)+Number(roles.hasWorker);
   assert.equal(links.length,count<2?0:count);
@@ -31,7 +35,8 @@ for(let mask=0;mask<8;mask++){
 }
 console.log('PASS all 8 role combinations show only available destinations');
 roles={hasStaff:true,hasClient:true,hasWorker:true,loading:true};
-assert.equal(component.TeamWorksRoleSwitcher({current:'staff'}),null);
+assert.equal(nodes(component.TeamWorksRoleSwitcher({current:'staff'})).filter(n=>n.type==='a').length,0);
+assert.equal(nodes(component.TeamWorksRoleSwitcher({current:'staff'})).filter(n=>n.type==='button').length,1);
 console.log('PASS no premature links during loading');
 roles.loading=false; viewAs=true;
 for(const n of nodes(component.TeamWorksRoleSwitcher({current:'client'})).filter(n=>n.type==='a')){
@@ -58,6 +63,23 @@ async function hookTest(memberRoles, owned, expected, failure=false){
   assert.ok(filters.some(f=>f[1]==='owner_user_id'&&f[2]==='self'));
 }
 (async()=>{
+  for(const current of ['staff','client','worker']) {
+    let destination; global.window={location:{replace:v=>destination=v}};
+    const button=nodes(component.TeamWorksRoleSwitcher({current})).find(n=>n.type==='button');
+    signOutCalls=[]; button.props.onClick(); button.props.onClick();
+    await new Promise(r=>setImmediate(r));
+    assert.deepEqual(signOutCalls,[{scope:'local'}]);
+    assert.equal(new URL(destination,'https://example.test').searchParams.get('next'),current==='staff'?'/apps/team-works':'/apps/team-works/portal/'+current);
+    assert.ok(!destination.includes('viewAs'));
+  }
+  let redirected=false;global.window={location:{replace:()=>redirected=true}};
+  signOutResult={error:new Error('network')};stateUpdates=[];
+  const failedButton=nodes(component.TeamWorksRoleSwitcher({current:'client'})).find(n=>n.type==='button');
+  failedButton.props.onClick();await new Promise(r=>setImmediate(r));
+  assert.equal(redirected,false);assert.ok(stateUpdates.some(v=>typeof v==='string'&&v.includes('ログアウトできませんでした')));
+  signOutResult={error:null};failedButton.props.onClick();await new Promise(r=>setImmediate(r));assert.equal(redirected,true);
+  console.log('PASS local-only logout, three return destinations, duplicate click guard and failure retry');
+
   await hookTest(['client_user','worker'],false,{hasStaff:false,hasClient:true,hasWorker:true});
   await hookTest(['manager'],false,{hasStaff:true,hasClient:false,hasWorker:false});
   await hookTest([],true,{hasStaff:true,hasClient:false,hasWorker:false});
