@@ -8,13 +8,17 @@ const projectId='00000000-0000-4000-8000-000000000020';
 function db(responses){const calls=[]; return {calls,from(table){const request={table,filters:[]};calls.push(request); const q={then(resolve){return Promise.resolve(responses[table]??{data:[],error:null}).then(resolve)}};for(const method of ['select','eq','in','neq','is','order','limit'])q[method]=(...args)=>{request.filters.push([method,...args]);return q};return q;}}}
 (async()=>{
  const pending={id:'legacy',email:'old@example.test',role:'client_user',expires_at:'2026-12-01'};
- const client=db({team_works_member_invites:{data:[pending],error:null},team_works_project_clients:{data:[{client_id:'a'},{client_id:'b'}],error:null},team_works_clients:{data:[{id:'a',email:'old@example.test'},{id:'b',email:'active@example.test'}],error:null}});
+ const client=db({team_works_member_invites:{data:[pending],error:null},team_works_project_clients:{data:[{client_id:'a',status:'invited'},{client_id:'b',status:'invited'}],error:null},team_works_clients:{data:[{id:'a',email:'old@example.test'},{id:'b',email:'active@example.test'}],error:null}});
  const result=await api.loadOperationsProjectMembers(client,projectId);
  assert.equal(result.pendingInvites.length,2);
  assert.equal(result.pendingInvites.find(i=>i.email==='active@example.test').approvalPending,true);
  assert.equal(result.pendingInvites.filter(i=>i.email==='old@example.test').length,1);
  assert.ok(client.calls.find(c=>c.table==='team_works_project_clients').filters.some(f=>f[1]==='project_id'&&f[2]===projectId));
  console.log('PASS activated client remains visible and duplicate sources are merged');
+ const accepted=db({team_works_member_invites:{data:[pending,{...pending,id:'worker',role:'worker'}],error:null},team_works_project_clients:{data:[{client_id:'a',status:'active'}],error:null},team_works_clients:{data:[{id:'a',email:'OLD@example.test'}],error:null}});
+ const acceptedResult=await api.loadOperationsProjectMembers(accepted,projectId);
+ assert.deepEqual(acceptedResult.pendingInvites.map(i=>i.role),['worker']);
+ console.log('PASS active client suppresses obsolete invitation without hiding same-email partner invitation');
  const failing=db({team_works_project_clients:{data:null,error:new Error('load failed')}});
  await assert.rejects(api.loadOperationsProjectMembers(failing,projectId),/load failed/);
  console.log('PASS load failure cannot be reported as an empty invitation list');

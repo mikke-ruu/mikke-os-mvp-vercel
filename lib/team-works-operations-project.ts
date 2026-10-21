@@ -1933,21 +1933,26 @@ export async function loadOperationsProjectMembers(
     .eq("project_id", projectId)
     .eq("status", "pending");
   if (inviteResult.error) throw inviteResult.error;
-  const pendingInvites: OperationsPendingInvite[] = ((inviteResult.data ?? []) as { id: string; email: string; role: string; expires_at: string }[]).map(
+  let pendingInvites: OperationsPendingInvite[] = ((inviteResult.data ?? []) as { id: string; email: string; role: string; expires_at: string }[]).map(
     (row) => ({ id: row.id, email: row.email, role: row.role, expiresAt: row.expires_at })
   );
 
   // An already activated client has no member_invites row. The directory link
   // is the source of truth until they approve the project in their portal.
   const linksResult = await client.from("team_works_project_clients")
-    .select("client_id").eq("project_id", projectId).eq("status", "invited");
+    .select("client_id,status").eq("project_id", projectId).in("status", ["invited", "active"]);
   if (linksResult.error) throw linksResult.error;
-  const clientIds = ((linksResult.data ?? []) as { client_id: string }[]).map((row) => row.client_id);
+  const clientLinks = (linksResult.data ?? []) as { client_id: string; status: string }[];
+  const clientIds = clientLinks.map((row) => row.client_id);
   if (clientIds.length) {
     const directoryResult = await client.from("team_works_clients")
       .select("id,email").in("id", clientIds).eq("status", "active");
     if (directoryResult.error) throw directoryResult.error;
     for (const row of (directoryResult.data ?? []) as { id: string; email: string }[]) {
+      if (clientLinks.some((link) => link.client_id === row.id && link.status === "active")) {
+        pendingInvites = pendingInvites.filter((invite) => invite.role !== "client_user" || invite.email.toLowerCase() !== row.email.toLowerCase());
+        continue;
+      }
       const existing = pendingInvites.find((invite) => invite.role === "client_user" && invite.email.toLowerCase() === row.email.toLowerCase());
       if (!existing) pendingInvites.push({ id: `client:${row.id}`, email: row.email, role: "client_user", expiresAt: "", approvalPending: true });
     }
