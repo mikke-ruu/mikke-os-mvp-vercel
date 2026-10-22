@@ -1,0 +1,58 @@
+const {PGlite}=require(process.env.PGLITE_MODULE||'@electric-sql/pglite');
+const fs=require('fs'),path=require('path'),assert=require('node:assert/strict');
+const fixture=require('./fixtures/team-works-training-schema.json');
+fixture.policies.push(...require('./fixtures/team-works-training-staff-policies.json'));
+const id=n=>`00000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
+(async()=>{
+const db=new PGlite();
+await db.exec(`create role authenticated;create role anon;create role service_role;create schema auth;create schema private;
+create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;`);
+for(const name of [...new Set(fixture.columns.map(c=>c.table))]){
+ const cols=fixture.columns.filter(c=>c.table===name).map(c=>`${c.column} ${c.type}${c.column==='id'?' primary key default gen_random_uuid()':''}`);
+ await db.exec(`create table public.${name}(${cols.join(',')})`);
+}
+await db.exec(`
+create function private.team_works_is_org_staff(org uuid) returns boolean language sql stable security definer set search_path='' as $$select exists(select 1 from public.team_works_organizations o where o.id=org and o.owner_user_id=auth.uid())$$;
+create function private.team_works_has_project_role(proj uuid,r text) returns boolean language sql stable security definer set search_path='' as $$select exists(select 1 from public.team_works_project_members pm join public.team_works_organization_members m on m.id=pm.organization_member_id where pm.project_id=proj and pm.project_role=r and m.user_id=auth.uid() and m.status='active')$$;
+create function private.team_works_project_member_id_for(proj uuid,r text) returns uuid language sql stable security definer set search_path='' as $$select m.id from public.team_works_project_members pm join public.team_works_organization_members m on m.id=pm.organization_member_id where pm.project_id=proj and pm.project_role=r and m.user_id=auth.uid() and m.status='active' limit 1$$;
+create function private.team_works_is_own_project_member_id(proj uuid,member uuid) returns boolean language sql stable security definer set search_path='' as $$select exists(select 1 from public.team_works_project_members pm join public.team_works_organization_members m on m.id=pm.organization_member_id where pm.project_id=proj and m.id=member and m.user_id=auth.uid() and m.status='active')$$;
+create function private.team_works_ops_assigned_participant_ids(proj uuid) returns setof uuid language sql stable security definer set search_path='' as $$select r.participant_id from public.team_works_session_roster r join public.team_works_op_sessions s on s.id=r.session_id where s.project_id=proj and s.partner_member_id=private.team_works_project_member_id_for(proj,'worker')$$;
+create function private.team_works_is_project_staff(proj uuid) returns boolean language sql stable security definer set search_path='' as $$select private.team_works_is_org_staff(p.organization_id) from public.team_works_projects p where p.id=proj$$;
+grant usage on schema public,auth,private to authenticated;
+grant select,insert,update,delete on all tables in schema public to authenticated;
+`);
+for(const table of [...new Set(fixture.policies.map(p=>p.tablename))])await db.exec(`alter table public.${table} enable row level security`);
+for(const p of fixture.policies)await db.exec(`create policy ${p.policyname} on public.${p.tablename} for ${p.cmd} to authenticated ${p.qual?`using (${p.qual})`:''} ${p.with_check?`with check (${p.with_check})`:''}`);
+for(const fn of fixture.functions)await db.exec(fn);
+await db.exec(fs.readFileSync(path.join(__dirname,'../supabase/migrations/20261022064440_team_works_training_partner.sql'),'utf8'));
+await db.exec(`insert into team_works_organizations(id,owner_user_id) values('${id(10)}','${id(1)}');
+insert into team_works_projects(id,organization_id,style,status) values('${id(20)}','${id(10)}','operations','active'),('${id(21)}','${id(10)}','operations','active');
+insert into team_works_organization_members(id,organization_id,user_id,role,status) values('${id(30)}','${id(10)}','${id(2)}','worker','active'),('${id(31)}','${id(10)}','${id(3)}','worker','active'),('${id(32)}','${id(10)}','${id(4)}','worker','active');
+insert into team_works_project_members(project_id,organization_member_id,project_role) values('${id(20)}','${id(30)}','worker'),('${id(20)}','${id(31)}','worker'),('${id(21)}','${id(32)}','worker');
+insert into team_works_project_partner_settings(project_id,organization_member_id,status) values('${id(20)}','${id(31)}','active');
+insert into team_works_project_partner_offers(project_id,organization_member_id,status) values('${id(20)}','${id(31)}','accepted');
+insert into team_works_op_sessions(id,project_id,partner_member_id,training_partner_member_id,status,session_date) values('${id(40)}','${id(20)}','${id(30)}','${id(31)}','scheduled','2026-10-22'),('${id(41)}','${id(20)}','${id(30)}',null,'scheduled','2026-10-23');
+insert into team_works_participants(id,project_id,name,current_manual_no) values('${id(50)}','${id(20)}','Student',1),('${id(51)}','${id(20)}','Other',1);
+insert into team_works_session_roster(id,project_id,session_id,participant_id,attendance_status) values('${id(60)}','${id(20)}','${id(40)}','${id(50)}','scheduled'),('${id(61)}','${id(20)}','${id(41)}','${id(51)}','scheduled');`);
+const asUser=async(n,sql)=>{await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${id(n)}',false)`);try{return await db.query(sql)}finally{await db.exec('reset role')}};
+const rows=async(n,table)=>(await asUser(n,`select * from ${table}`)).rows;
+assert.equal((await rows(3,'team_works_op_sessions')).length,1);assert.equal((await rows(3,'team_works_session_roster')).length,1);assert.equal((await rows(3,'team_works_participants')).length,1);assert.equal((await rows(4,'team_works_op_sessions')).length,0);
+console.log('PASS trainee sees only assigned session, roster and participants; unrelated partner sees none');
+for(const sql of [`select team_works_update_partner_presence('${id(40)}','in_progress')`,`select team_works_save_partner_student_handoff('${id(60)}','present','{}','note',true)`,`select team_works_update_session_zoom('${id(40)}',false,'https://example.test','id','pass')`,`insert into team_works_ops_session_reports(project_id,session_id,submitted_by_member_id) values('${id(20)}','${id(40)}','${id(31)}')`])await assert.rejects(asUser(3,sql));
+for(const [table,key] of [['team_works_op_sessions',40],['team_works_session_roster',60],['team_works_participants',50]])assert.equal((await asUser(3,`update ${table} set id=id where id='${id(key)}' returning id`)).rows.length,0);
+console.log('PASS trainee cannot save presence, handoff, Zoom, report or directly update lesson records');
+await asUser(2,`select team_works_update_partner_presence('${id(40)}','in_progress')`);
+await asUser(2,`select team_works_save_partner_student_handoff('${id(60)}','present','{}','Saved by primary',true)`);
+assert.equal((await rows(3,'team_works_participants'))[0].current_manual_no,2);
+assert.equal((await rows(3,'team_works_session_roster'))[0].handoff_note,'Saved by primary');
+await asUser(2,`insert into team_works_ops_session_reports(project_id,session_id,submitted_by_member_id) values('${id(20)}','${id(40)}','${id(30)}')`);
+assert.equal((await rows(3,'team_works_ops_session_reports')).length,1);
+console.log('PASS primary saves and trainee reads committed progress/report');
+await assert.rejects(asUser(1,`update team_works_op_sessions set training_partner_member_id='${id(32)}' where id='${id(40)}'`),/参加を承認/);
+await assert.rejects(asUser(1,`update team_works_op_sessions set training_partner_member_id='${id(30)}' where id='${id(40)}'`),/training_distinct/);
+await asUser(1,`update team_works_op_sessions set training_partner_member_id=null where id='${id(40)}'`);assert.equal((await rows(3,'team_works_op_sessions')).length,0);
+await asUser(1,`update team_works_op_sessions set training_partner_member_id='${id(31)}' where id='${id(40)}'`);
+await db.exec(`update team_works_project_partner_settings set status='removed' where organization_member_id='${id(31)}'`);assert.equal((await rows(3,'team_works_op_sessions')).length,0);
+console.log('PASS invalid assignment rejected; removal immediately revokes training visibility');
+await db.close();
+})().catch(e=>{console.error(e);process.exitCode=1});

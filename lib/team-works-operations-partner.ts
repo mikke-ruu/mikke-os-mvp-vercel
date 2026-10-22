@@ -39,6 +39,7 @@ export type OperationsPartnerAssessment = {
 };
 
 export type OperationsPartnerSession = {
+  isTraining?: boolean;
   id: string;
   projectId: string;
   projectTitle: string;
@@ -85,6 +86,8 @@ type ProjectRow = {
   feature_settings?: Partial<TeamWorksOperationsFeatureSettings> | null;
 };
 type SessionRow = {
+  partner_member_id: string | null;
+  training_partner_member_id: string | null;
   id: string;
   project_id: string;
   session_date: string;
@@ -388,9 +391,9 @@ async function buildPartnerPortalData(
   const through = dateKey(addDays(new Date(), 30));
   let sessionResult = await client
     .from("team_works_op_sessions")
-    .select("id,project_id,session_date,start_time,duration_min,status,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,partner_standby_at,partner_ended_at,work_description")
+    .select("id,project_id,partner_member_id,training_partner_member_id,session_date,start_time,duration_min,status,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,partner_standby_at,partner_ended_at,work_description")
     .in("project_id", operationsProjectIds)
-    .in("partner_member_id", memberIds)
+    .or(`partner_member_id.in.(${memberIds.join(",")}),training_partner_member_id.in.(${memberIds.join(",")})`)
     .gte("session_date", today)
     .lte("session_date", through)
     .neq("status", "cancelled")
@@ -399,9 +402,9 @@ async function buildPartnerPortalData(
   if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default", "work_description"])) {
     sessionResult = await client
       .from("team_works_op_sessions")
-      .select("id,project_id,session_date,start_time,duration_min,status")
+      .select("id,project_id,partner_member_id,training_partner_member_id,session_date,start_time,duration_min,status")
       .in("project_id", operationsProjectIds)
-      .in("partner_member_id", memberIds)
+      .or(`partner_member_id.in.(${memberIds.join(",")}),training_partner_member_id.in.(${memberIds.join(",")})`)
       .gte("session_date", today)
       .lte("session_date", through)
       .neq("status", "cancelled")
@@ -455,6 +458,7 @@ async function buildPartnerPortalData(
 
   const mapped = sessions.map<OperationsPartnerSession>((session) => ({
     id: session.id,
+    isTraining: !memberIds.includes(session.partner_member_id ?? ""),
     projectId: session.project_id,
     projectTitle: projectTitleById.get(session.project_id) ?? "運営プロジェクト",
     sessionDate: session.session_date,

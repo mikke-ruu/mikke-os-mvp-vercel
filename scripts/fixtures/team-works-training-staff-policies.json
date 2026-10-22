@@ -1,0 +1,72 @@
+[
+  {
+    "tablename": "team_works_project_partner_offers",
+    "policyname": "team_works_operations_offers_staff",
+    "cmd": "ALL",
+    "qual": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_project_partner_offers.project_id) AND (p.style = 'operations'::text) AND private.team_works_is_org_staff(p.organization_id))))",
+    "with_check": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_project_partner_offers.project_id) AND (p.style = 'operations'::text) AND private.team_works_is_org_staff(p.organization_id))))"
+  },
+  {
+    "tablename": "team_works_project_partner_offers",
+    "policyname": "team_works_project_partner_offers_staff_insert",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "private.team_works_is_project_staff(project_id)"
+  },
+  {
+    "tablename": "team_works_project_partner_offers",
+    "policyname": "team_works_project_partner_offers_staff_select",
+    "cmd": "SELECT",
+    "qual": "private.team_works_is_project_staff(project_id)",
+    "with_check": null
+  },
+  {
+    "tablename": "team_works_project_partner_offers",
+    "policyname": "team_works_project_partner_offers_staff_update",
+    "cmd": "UPDATE",
+    "qual": "private.team_works_is_project_staff(project_id)",
+    "with_check": "private.team_works_is_project_staff(project_id)"
+  },
+  {
+    "tablename": "team_works_project_partner_offers",
+    "policyname": "team_works_project_partner_offers_worker_response",
+    "cmd": "UPDATE",
+    "qual": "(private.team_works_is_own_project_member_id(project_id, organization_member_id) AND (status = 'pending'::text))",
+    "with_check": "(private.team_works_is_own_project_member_id(project_id, organization_member_id) AND (status = ANY (ARRAY['accepted'::text, 'declined'::text])))"
+  },
+  {
+    "tablename": "team_works_project_partner_offers",
+    "policyname": "team_works_project_partner_offers_worker_select",
+    "cmd": "SELECT",
+    "qual": "private.team_works_is_own_project_member_id(project_id, organization_member_id)",
+    "with_check": null
+  },
+  {
+    "tablename": "team_works_project_partner_settings",
+    "policyname": "team_works_operations_settings_staff",
+    "cmd": "ALL",
+    "qual": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_project_partner_settings.project_id) AND (p.style = 'operations'::text) AND private.team_works_is_org_staff(p.organization_id))))",
+    "with_check": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_project_partner_settings.project_id) AND (p.style = 'operations'::text) AND private.team_works_is_org_staff(p.organization_id))))"
+  },
+  {
+    "tablename": "team_works_project_partner_settings",
+    "policyname": "team_works_project_partner_settings_insert",
+    "cmd": "INSERT",
+    "qual": null,
+    "with_check": "private.team_works_is_project_staff(project_id)"
+  },
+  {
+    "tablename": "team_works_project_partner_settings",
+    "policyname": "team_works_project_partner_settings_select",
+    "cmd": "SELECT",
+    "qual": "private.team_works_is_project_staff(project_id)",
+    "with_check": null
+  },
+  {
+    "tablename": "team_works_project_partner_settings",
+    "policyname": "team_works_project_partner_settings_update",
+    "cmd": "UPDATE",
+    "qual": "private.team_works_is_project_staff(project_id)",
+    "with_check": "private.team_works_is_project_staff(project_id)"
+  }
+]
