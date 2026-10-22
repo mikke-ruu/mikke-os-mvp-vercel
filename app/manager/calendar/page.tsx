@@ -1,11 +1,6 @@
-import { AuthGate } from "@/components/AuthGate";
-import { ManagerCalendarView } from "@/components/manager/ManagerCalendarView";
+import { redirect } from "next/navigation";
 
 export default function ManagerCalendarPage() {
-  return (
-    <AuthGate>
-      <ManagerCalendarView />
-    </AuthGate>
-  );
+  redirect("/marketnote?from=manager");
 }
 

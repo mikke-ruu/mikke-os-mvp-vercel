@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { APPLICATION_STATUS_LABELS, listApplications } from "@/lib/academy/applications";
 import { listCourses } from "@/lib/academy/courses";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
+import { isAcademyLocalReview } from "@/lib/academy/preview";
 import { getRenewalAlerts, INSTRUCTOR_STATUS_LABELS, listInstructors } from "@/lib/academy/instructors";
 import { KIT_STATUS_LABELS, listKitOrders } from "@/lib/academy/kits";
 import type { AcademyApplication, AcademyCourse, AcademyInstructor, AcademyKitOrder } from "@/types/database";
@@ -18,7 +19,7 @@ export function useAcademyManagerBridge(userId: string | undefined): ManagerBrid
   const [state, setState] = useState<ManagerBridge>(emptyBridge);
 
   useEffect(() => {
-    if (!userId) {
+    if (!userId || isAcademyLocalReview()) {
       setState(emptyBridge);
       return;
     }
