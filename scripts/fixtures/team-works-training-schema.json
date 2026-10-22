@@ -1,0 +1,776 @@
+{
+  "columns": [
+    {
+      "table": "team_works_op_sessions",
+      "column": "id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "project_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "generated_from_rule_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "partner_member_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "session_date",
+      "type": "date"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "start_time",
+      "type": "time without time zone"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "duration_min",
+      "type": "integer"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "updated_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "zoom_url",
+      "type": "text"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "zoom_meeting_id",
+      "type": "text"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "zoom_passcode",
+      "type": "text"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "zoom_uses_project_default",
+      "type": "boolean"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "partner_presence_status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "partner_standby_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "partner_ended_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_op_sessions",
+      "column": "work_description",
+      "type": "text"
+    },
+    {
+      "table": "team_works_ops_session_reports",
+      "column": "id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_ops_session_reports",
+      "column": "project_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_ops_session_reports",
+      "column": "session_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_ops_session_reports",
+      "column": "submitted_by_member_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_ops_session_reports",
+      "column": "attendance",
+      "type": "jsonb"
+    },
+    {
+      "table": "team_works_ops_session_reports",
+      "column": "progress",
+      "type": "jsonb"
+    },
+    {
+      "table": "team_works_ops_session_reports",
+      "column": "body",
+      "type": "text"
+    },
+    {
+      "table": "team_works_ops_session_reports",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "organization_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "user_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "source_local_id",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "display_name",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "role",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "archived_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "updated_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_organization_members",
+      "column": "invite_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "owner_user_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "source_local_id",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "name",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "archived_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "updated_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "email",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "phone",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "address",
+      "type": "text"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "shift_submission_deadline_day",
+      "type": "smallint"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "other_deadline_day",
+      "type": "smallint"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "payment_day",
+      "type": "smallint"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "label_settings",
+      "type": "jsonb"
+    },
+    {
+      "table": "team_works_organizations",
+      "column": "operation_settings",
+      "type": "jsonb"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "project_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "group_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "source_local_id",
+      "type": "text"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "name",
+      "type": "text"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "level",
+      "type": "text"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "cautions",
+      "type": "text"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "memo",
+      "type": "text"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "current_manual_no",
+      "type": "integer"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "archived_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_participants",
+      "column": "updated_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_project_members",
+      "column": "project_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_project_members",
+      "column": "organization_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_project_members",
+      "column": "organization_member_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_project_members",
+      "column": "project_role",
+      "type": "text"
+    },
+    {
+      "table": "team_works_project_members",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_project_partner_offers",
+      "column": "project_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_project_partner_offers",
+      "column": "organization_member_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_project_partner_offers",
+      "column": "status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_project_partner_offers",
+      "column": "requested_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_project_partner_offers",
+      "column": "responded_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_project_partner_offers",
+      "column": "updated_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_project_partner_settings",
+      "column": "project_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_project_partner_settings",
+      "column": "organization_member_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_project_partner_settings",
+      "column": "hourly_wage",
+      "type": "integer"
+    },
+    {
+      "table": "team_works_project_partner_settings",
+      "column": "status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_project_partner_settings",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_project_partner_settings",
+      "column": "updated_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "organization_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "source_local_id",
+      "type": "text"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "client_member_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "title",
+      "type": "text"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "client_visible",
+      "type": "boolean"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "payouts_enabled",
+      "type": "boolean"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "invoices_enabled",
+      "type": "boolean"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "archived_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "updated_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "style",
+      "type": "text"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "contract_started_on",
+      "type": "date"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "contract_ended_on",
+      "type": "date"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "description",
+      "type": "text"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "client_partner_contact_visible",
+      "type": "boolean"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "zoom_url",
+      "type": "text"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "zoom_meeting_id",
+      "type": "text"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "zoom_passcode",
+      "type": "text"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "delivery_due_on",
+      "type": "date"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "operation_settings",
+      "type": "jsonb"
+    },
+    {
+      "table": "team_works_projects",
+      "column": "feature_settings",
+      "type": "jsonb"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "session_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "project_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "participant_id",
+      "type": "uuid"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "order_index",
+      "type": "integer"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "attendance_status",
+      "type": "text"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "updated_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "partner_assessment",
+      "type": "jsonb"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "handoff_note",
+      "type": "text"
+    },
+    {
+      "table": "team_works_session_roster",
+      "column": "partner_completed_at",
+      "type": "timestamp with time zone"
+    }
+  ],
+  "policies": [
+    {
+      "schemaname": "public",
+      "tablename": "team_works_op_sessions",
+      "policyname": "team_works_op_sessions_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_op_sessions.project_id) AND private.team_works_is_org_staff(p.organization_id))))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_op_sessions",
+      "policyname": "team_works_op_sessions_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_op_sessions.project_id) AND private.team_works_is_org_staff(p.organization_id)))) OR private.team_works_has_project_role(project_id, 'client'::text) OR (private.team_works_has_project_role(project_id, 'worker'::text) AND (partner_member_id = private.team_works_project_member_id_for(project_id, 'worker'::text))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_op_sessions",
+      "policyname": "team_works_op_sessions_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_op_sessions.project_id) AND private.team_works_is_org_staff(p.organization_id))))",
+      "with_check": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_op_sessions.project_id) AND private.team_works_is_org_staff(p.organization_id))))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_ops_session_reports",
+      "policyname": "team_works_ops_reports_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(private.team_works_has_project_role(project_id, 'worker'::text) AND (submitted_by_member_id = private.team_works_project_member_id_for(project_id, 'worker'::text)) AND (EXISTS ( SELECT 1\n   FROM team_works_op_sessions s\n  WHERE ((s.id = team_works_ops_session_reports.session_id) AND (s.project_id = s.project_id) AND (s.partner_member_id = team_works_ops_session_reports.submitted_by_member_id) AND (s.status <> 'cancelled'::text)))))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_ops_session_reports",
+      "policyname": "team_works_ops_reports_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_ops_session_reports.project_id) AND private.team_works_is_org_staff(p.organization_id)))) OR private.team_works_is_own_project_member_id(project_id, submitted_by_member_id))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_participants",
+      "policyname": "team_works_participants_client_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "private.team_works_has_project_role(project_id, 'client'::text)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_participants",
+      "policyname": "team_works_participants_client_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "private.team_works_has_project_role(project_id, 'client'::text)",
+      "with_check": "private.team_works_has_project_role(project_id, 'client'::text)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_participants",
+      "policyname": "team_works_participants_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_participants.project_id) AND private.team_works_is_org_staff(p.organization_id))))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_participants",
+      "policyname": "team_works_participants_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_participants.project_id) AND private.team_works_is_org_staff(p.organization_id)))) OR private.team_works_has_project_role(project_id, 'client'::text) OR (private.team_works_has_project_role(project_id, 'worker'::text) AND (id IN ( SELECT private.team_works_ops_assigned_participant_ids(team_works_participants.project_id) AS team_works_ops_assigned_participant_ids))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_participants",
+      "policyname": "team_works_participants_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_participants.project_id) AND private.team_works_is_org_staff(p.organization_id))))",
+      "with_check": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_participants.project_id) AND private.team_works_is_org_staff(p.organization_id))))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_session_roster",
+      "policyname": "team_works_session_roster_client_delete",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "DELETE",
+      "qual": "private.team_works_has_project_role(project_id, 'client'::text)",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_session_roster",
+      "policyname": "team_works_session_roster_client_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "private.team_works_has_project_role(project_id, 'client'::text)"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_session_roster",
+      "policyname": "team_works_session_roster_insert",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "INSERT",
+      "qual": null,
+      "with_check": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_session_roster.project_id) AND private.team_works_is_org_staff(p.organization_id))))"
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_session_roster",
+      "policyname": "team_works_session_roster_select",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "SELECT",
+      "qual": "((EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_session_roster.project_id) AND private.team_works_is_org_staff(p.organization_id)))) OR private.team_works_has_project_role(project_id, 'client'::text) OR (private.team_works_has_project_role(project_id, 'worker'::text) AND (EXISTS ( SELECT 1\n   FROM team_works_op_sessions s\n  WHERE ((s.id = team_works_session_roster.session_id) AND (s.partner_member_id = private.team_works_project_member_id_for(s.project_id, 'worker'::text)))))))",
+      "with_check": null
+    },
+    {
+      "schemaname": "public",
+      "tablename": "team_works_session_roster",
+      "policyname": "team_works_session_roster_update",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "cmd": "UPDATE",
+      "qual": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_session_roster.project_id) AND private.team_works_is_org_staff(p.organization_id))))",
+      "with_check": "(EXISTS ( SELECT 1\n   FROM team_works_projects p\n  WHERE ((p.id = team_works_session_roster.project_id) AND private.team_works_is_org_staff(p.organization_id))))"
+    }
+  ],
+  "functions": [
+    "CREATE OR REPLACE FUNCTION public.team_works_save_partner_student_handoff(p_roster_id uuid, p_attendance_status text, p_assessment jsonb, p_handoff_note text, p_complete boolean DEFAULT false)\n RETURNS TABLE(current_manual_no integer, completed_at timestamp with time zone)\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  target_roster public.team_works_session_roster%rowtype;\n  target_session public.team_works_op_sessions%rowtype;\n  worker_member_id uuid;\n  completed_now boolean := false;\nbegin\n  if p_attendance_status not in ('scheduled', 'present', 'absent', 'late', 'excused') then\n    raise exception 'Unsupported attendance status';\n  end if;\n\n  if p_assessment is null or jsonb_typeof(p_assessment) <> 'object' then\n    raise exception 'Assessment must be an object';\n  end if;\n\n  if length(coalesce(p_handoff_note, '')) > 4000 then\n    raise exception 'Handoff note is too long';\n  end if;\n\n  select *\n    into target_roster\n  from public.team_works_session_roster\n  where id = p_roster_id\n  for update;\n\n  if target_roster.id is null then\n    raise exception 'Roster row not found';\n  end if;\n\n  select *\n    into target_session\n  from public.team_works_op_sessions\n  where id = target_roster.session_id\n    and status <> 'cancelled';\n\n  select pm.organization_member_id\n    into worker_member_id\n  from public.team_works_project_members pm\n  join public.team_works_organization_members om\n    on om.id = pm.organization_member_id\n  where pm.project_id = target_roster.project_id\n    and pm.project_role = 'worker'\n    and om.user_id = (select auth.uid())\n    and om.status = 'active'\n  limit 1;\n\n  if worker_member_id is null or target_session.partner_member_id is distinct from worker_member_id then\n    raise exception 'You are not assigned to this session';\n  end if;\n\n  completed_now := p_complete and target_roster.partner_completed_at is null;\n\n  update public.team_works_session_roster\n  set attendance_status = p_attendance_status,\n      partner_assessment = p_assessment,\n      handoff_note = nullif(trim(coalesce(p_handoff_note, '')), ''),\n      partner_completed_at = case\n        when completed_now then now()\n        else partner_completed_at\n      end,\n      updated_at = now()\n  where id = p_roster_id;\n\n  if completed_now then\n    update public.team_works_participants as participant\n    set current_manual_no = participant.current_manual_no + 1,\n        updated_at = now()\n    where participant.id = target_roster.participant_id;\n  end if;\n\n  return query\n  select participant.current_manual_no, roster.partner_completed_at\n  from public.team_works_participants participant\n  join public.team_works_session_roster roster on roster.id = p_roster_id\n  where participant.id = target_roster.participant_id;\nend;\n$function$\n",
+    "CREATE OR REPLACE FUNCTION public.team_works_update_partner_presence(p_session_id uuid, p_status text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\r\ndeclare\r\n  target_session public.team_works_op_sessions%rowtype;\r\n  worker_member_id uuid;\r\nbegin\r\n  if p_status not in ('not_started', 'standby', 'in_progress', 'ended') then\r\n    raise exception 'Unsupported partner presence status';\r\n  end if;\r\n\r\n  select *\r\n    into target_session\r\n  from public.team_works_op_sessions\r\n  where id = p_session_id\r\n    and status <> 'cancelled';\r\n\r\n  if target_session.id is null then\r\n    raise exception 'Session not found';\r\n  end if;\r\n\r\n  select pm.organization_member_id\r\n    into worker_member_id\r\n  from public.team_works_project_members pm\r\n  join public.team_works_organization_members om\r\n    on om.id = pm.organization_member_id\r\n  where pm.project_id = target_session.project_id\r\n    and pm.project_role = 'worker'\r\n    and om.user_id = (select auth.uid())\r\n    and om.status = 'active'\r\n  limit 1;\r\n\r\n  if worker_member_id is null or target_session.partner_member_id is distinct from worker_member_id then\r\n    raise exception 'You are not assigned to this session';\r\n  end if;\r\n\r\n  update public.team_works_op_sessions\r\n  set partner_presence_status = p_status,\r\n      partner_standby_at = case\r\n        when p_status = 'not_started' then null\r\n        when p_status in ('standby', 'in_progress') then coalesce(partner_standby_at, now())\r\n        else partner_standby_at\r\n      end,\r\n      partner_ended_at = case when p_status = 'ended' then now() else null end,\r\n      updated_at = now()\r\n  where id = p_session_id;\r\nend;\r\n$function$\n",
+    "CREATE OR REPLACE FUNCTION public.team_works_update_session_zoom(p_session_id uuid, p_use_project_default boolean, p_zoom_url text DEFAULT NULL::text, p_zoom_meeting_id text DEFAULT NULL::text, p_zoom_passcode text DEFAULT NULL::text)\n RETURNS void\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO ''\nAS $function$\ndeclare\n  v_project_id uuid;\n  v_organization_id uuid;\n  v_partner_member_id uuid;\n  v_session_date date;\n  v_worker_member_id uuid;\n  v_zoom_url text := nullif(btrim(p_zoom_url), '');\n  v_zoom_meeting_id text := nullif(btrim(p_zoom_meeting_id), '');\n  v_zoom_passcode text := nullif(btrim(p_zoom_passcode), '');\nbegin\n  if auth.uid() is null then\n    raise exception 'Authentication required';\n  end if;\n\n  select s.project_id, p.organization_id, s.partner_member_id, s.session_date\n    into v_project_id, v_organization_id, v_partner_member_id, v_session_date\n  from public.team_works_op_sessions s\n  join public.team_works_projects p on p.id = s.project_id\n  where s.id = p_session_id\n    and p.style = 'operations';\n\n  if v_project_id is null then\n    raise exception 'Session not found';\n  end if;\n  if v_session_date < current_date then\n    raise exception 'Past session Zoom settings cannot be changed';\n  end if;\n\n  v_worker_member_id :=\n    private.team_works_project_member_id_for(v_project_id, 'worker');\n\n  if not private.team_works_is_org_staff(v_organization_id)\n     and (v_worker_member_id is null or v_partner_member_id <> v_worker_member_id) then\n    raise exception 'Not authorized to update this session Zoom setting';\n  end if;\n\n  if coalesce(p_use_project_default, false) then\n    select p.zoom_url, p.zoom_meeting_id, p.zoom_passcode\n      into v_zoom_url, v_zoom_meeting_id, v_zoom_passcode\n    from public.team_works_projects p\n    where p.id = v_project_id;\n  end if;\n\n  update public.team_works_op_sessions\n  set zoom_url = v_zoom_url,\n      zoom_meeting_id = v_zoom_meeting_id,\n      zoom_passcode = v_zoom_passcode,\n      zoom_uses_project_default = coalesce(p_use_project_default, false),\n      updated_at = now()\n  where id = p_session_id;\nend;\n$function$\n"
+  ]
+}

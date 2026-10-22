@@ -492,6 +492,7 @@ function ProjectCalendarPanel({
   const [startTime, setStartTime] = useState("13:00");
   const [finishTime, setFinishTime] = useState("14:00");
   const [partnerMemberId, setPartnerMemberId] = useState("");
+  const [trainingPartnerMemberId, setTrainingPartnerMemberId] = useState("");
   const [workDescription, setWorkDescription] = useState("");
   const [scheduleMode, setScheduleMode] = useState<"once" | "weekly">("once");
   const [holidayMemo, setHolidayMemo] = useState("");
@@ -529,6 +530,7 @@ function ProjectCalendarPanel({
         if (scheduleMode === "once") {
           await createOperationsSession(supabase, data.project.id, {
             sessionDate: selectedDate,
+            trainingPartnerMemberId: trainingPartnerMemberId || null,
             startTime,
             durationMin,
             partnerMemberId: partnerMemberId || null,
@@ -674,7 +676,8 @@ function ProjectCalendarPanel({
                 </p>
               ) : null}
             </fieldset>
-            <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">担当未定</option>{data.partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            <select value={partnerMemberId} onChange={(event) => { setPartnerMemberId(event.target.value); if (!event.target.value || event.target.value === trainingPartnerMemberId) setTrainingPartnerMemberId(""); }} className={teamWorksProjectInputClass}><option value="">担当未定</option>{data.partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            {scheduleMode === "once" ? <label className="block text-xs font-bold">研修担当（閲覧のみ）<select disabled={!partnerMemberId} aria-label="研修担当" value={trainingPartnerMemberId} onChange={(event) => setTrainingPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">なし</option>{data.partners.filter((partner) => partner.memberId !== partnerMemberId).map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select></label> : <p className="text-xs">研修担当は予定を作成後、各回の詳細から設定できます。</p>}
             <input value={workDescription} onChange={(event) => setWorkDescription(event.target.value)} placeholder="作業内容（任意）" className={teamWorksProjectInputClass} />
             <button disabled={saving} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">{scheduleMode === "weekly" ? "毎週の予定を登録" : "登録"}</button>
           </form> : !selectedJapanDayOff.isDayOff ? <button type="button" onClick={() => setAdding(true)} className="mt-3 w-full rounded-xl border border-dashed border-[var(--mikke-line)] px-3 py-3 text-xs font-bold text-[var(--mikke-primary)]">＋ 予定追加</button> : null}
@@ -691,6 +694,7 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
   const [startTime, setStartTime] = useState(session.startTime);
   const [finishTime, setFinishTime] = useState(endTime(session.startTime, session.durationMin));
   const [partnerMemberId, setPartnerMemberId] = useState(session.partnerMemberId ?? "");
+  const [trainingPartnerMemberId, setTrainingPartnerMemberId] = useState(session.trainingPartnerMemberId ?? "");
   const [workDescription, setWorkDescription] = useState(session.workDescription ?? "");
   const [useProjectDefault, setUseProjectDefault] = useState(session.zoomUsesProjectDefault);
   const [zoomUrl, setZoomUrl] = useState(session.zoomUrl ?? "");
@@ -703,7 +707,7 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
       <div className="flex items-start gap-2">
         <button type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} className="flex min-w-0 flex-1 items-start justify-between gap-3 text-left text-xs font-bold">
           <span className="min-w-0">
-            <span className="flex flex-wrap items-center gap-2"><span><span className={dateLabel ? "mr-2 text-[var(--mikke-primary)] underline decoration-[var(--mikke-line)] underline-offset-4" : ""}>{dateLabel}</span>{session.startTime}〜{endTime(session.startTime, session.durationMin)}　担当 {session.partnerName ?? "未定"}　名簿{session.roster.length}名</span><PartnerPresenceBadge status={session.partnerPresenceStatus} /></span>
+            <span className="flex flex-wrap items-center gap-2"><span><span className={dateLabel ? "mr-2 text-[var(--mikke-primary)] underline decoration-[var(--mikke-line)] underline-offset-4" : ""}>{dateLabel}</span>{session.startTime}〜{endTime(session.startTime, session.durationMin)}　主担当 {session.partnerName ?? "未定"}{session.trainingPartnerName ? ` ／ 研修 ${session.trainingPartnerName}` : ""}　名簿{session.roster.length}名</span><PartnerPresenceBadge status={session.partnerPresenceStatus} /></span>
             {session.workDescription ? <span className="mt-1 block text-[11px] font-semibold text-[var(--mikke-text)]">作業内容：{session.workDescription}</span> : null}
             <span className="mt-1 block text-[11px] font-semibold text-[var(--mikke-muted)]">Zoom ID：{session.zoomMeetingId ?? "未設定"}</span>
           </span>
@@ -740,10 +744,11 @@ function CalendarSessionEditor({ session, partners, saving, mutate, dateLabel }:
               <label className="text-[11px] font-bold text-[var(--mikke-muted)]">開始時間<input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="開始時間" /></label>
               <label className="text-[11px] font-bold text-[var(--mikke-muted)]">終了時間<input type="time" value={finishTime} onChange={(event) => setFinishTime(event.target.value)} className={teamWorksProjectInputClass} aria-label="終了時間" /></label>
             </div>
-            <select value={partnerMemberId} onChange={(event) => setPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass} aria-label={`担当${labels.workers}`}><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            <select value={partnerMemberId} onChange={(event) => { setPartnerMemberId(event.target.value); if (!event.target.value || event.target.value === trainingPartnerMemberId) setTrainingPartnerMemberId(""); }} className={teamWorksProjectInputClass} aria-label={`担当${labels.workers}`}><option value="">担当未定</option>{partners.map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select>
+            <label className="block text-xs font-bold">研修担当（閲覧のみ）<select disabled={!partnerMemberId} aria-label="研修担当" value={trainingPartnerMemberId} onChange={(event) => setTrainingPartnerMemberId(event.target.value)} className={teamWorksProjectInputClass}><option value="">なし</option>{partners.filter((partner) => partner.memberId !== partnerMemberId).map((partner) => <option key={partner.memberId} value={partner.memberId}>{partner.displayName}</option>)}</select></label>
             <input value={workDescription} onChange={(event) => setWorkDescription(event.target.value)} placeholder="作業内容（任意）" className={teamWorksProjectInputClass} aria-label="作業内容" />
             <div className="flex gap-2">
-              <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null, workDescription }), "予定を更新しました。")} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">予定を保存</button>
+              <button type="button" disabled={saving} onClick={() => void mutate(() => updateOperationsSession(supabase, session.id, { sessionDate: session.sessionDate, startTime, durationMin: durationBetweenTimes(startTime, finishTime), partnerMemberId: partnerMemberId || null, trainingPartnerMemberId: trainingPartnerMemberId || null, workDescription }), "予定を更新しました。")} className="rounded-lg bg-[var(--tw-action)] px-3 py-2 text-xs font-bold text-[var(--tw-on-solid)]">予定を保存</button>
               {session.generatedFromRuleId ? (
                 <button
                   type="button"

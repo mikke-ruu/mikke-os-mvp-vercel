@@ -21,7 +21,7 @@ import {
   Users,
   UsersRound
 } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { MikkeAppShell, type MikkeShellNavItem } from "@/components/mikkeos/MikkeAppShell";
 import { TeamWorksRoleSwitcher } from "@/components/team-works/TeamWorksRoleSwitcher";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
@@ -511,7 +511,7 @@ function PartnerScheduleRow({ session, workWindow }: { session: OperationsPartne
   return (
     <article className="flex flex-col gap-3 rounded-xl border border-[var(--mikke-line)] bg-white p-3 sm:flex-row sm:items-center">
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-bold text-[var(--mikke-primary)]">{formatDate(session.sessionDate)}・{session.projectTitle}</p>
+        <p className="text-xs font-bold text-[var(--mikke-primary)]">{formatDate(session.sessionDate)}・{session.projectTitle}{session.isTraining ? "（研修）" : ""}</p>
         <p className="mt-1 text-sm font-extrabold">{session.startTime}〜{endTime(session.startTime, session.durationMin)}　{session.roster.length}名</p>
         <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-muted)]">{targetMinutes ? `1人あたり目安 ${targetMinutes}分` : `${labels.rosterNoun}未設定`}{session.zoomMeetingId ? ` ／ Zoom ID ${session.zoomMeetingId}` : ""}</p>
         {session.workDescription ? <p className="mt-1 text-[11px] font-semibold text-[var(--mikke-text)]">作業内容：{session.workDescription}</p> : null}
@@ -559,6 +559,8 @@ function openLessonWindow(sessionId: string, viewAsMemberId?: string, sampleProj
   if (!popup) window.location.href = url;
 }
 
+const TrainingReadOnlyContext = createContext(false);
+
 export function TeamWorksPartnerLessonConsole({
   session,
   onRefresh,
@@ -571,7 +573,7 @@ export function TeamWorksPartnerLessonConsole({
   workWindow?: TeamWorksWorkWindowSettings;
 }) {
   const labels = useTeamWorksLabels();
-  const isViewAs = useIsViewAs();
+  const isViewAs = useIsViewAs() || Boolean(session.isTraining);
   const [presence, setPresence] = useState(session.partnerPresenceStatus);
   const [presenceBusy, setPresenceBusy] = useState(false);
   const [presenceNotice, setPresenceNotice] = useState<SaveNotice>(null);
@@ -599,7 +601,20 @@ export function TeamWorksPartnerLessonConsole({
     return () => window.clearInterval(timerId);
   }, [timerRunning]);
 
+  useEffect(() => { setPresence(session.partnerPresenceStatus); }, [session.partnerPresenceStatus]);
+  useEffect(() => {
+    if (!session.isTraining) return;
+    let refreshing = false;
+    const timer = window.setInterval(() => {
+      if (document.hidden || refreshing) return;
+      refreshing = true;
+      void onRefresh().finally(() => { refreshing = false; });
+    }, 10000);
+    return () => window.clearInterval(timer);
+  }, [session.isTraining, onRefresh]);
+
   async function changePresence(next: "not_started" | "standby" | "in_progress" | "ended") {
+    if (isViewAs) return false;
     setPresenceBusy(true);
     setPresenceNotice(null);
     try {
@@ -635,7 +650,7 @@ export function TeamWorksPartnerLessonConsole({
     }
 
     const isFirstParticipant = selectedStudent?.orderIndex === 1;
-    if (isFirstParticipant && presence !== "in_progress") {
+    if (!isViewAs && isFirstParticipant && presence !== "in_progress") {
       const started = await changePresence("in_progress");
       if (!started) return;
     }
@@ -649,13 +664,14 @@ export function TeamWorksPartnerLessonConsole({
   }
 
   return (
-    <article className={`flex min-h-0 flex-col overflow-hidden border border-[var(--mikke-line)] bg-white ${standalone ? "h-dvh rounded-none" : "rounded-2xl"}`}>
+    <TrainingReadOnlyContext.Provider value={Boolean(session.isTraining)}><article className={`flex min-h-0 flex-col overflow-hidden border border-[var(--mikke-line)] bg-white ${standalone ? "h-dvh rounded-none" : "rounded-2xl"}`}>
       <header className="shrink-0 border-b border-[var(--mikke-line)] bg-[var(--mikke-surface-soft)] p-3 sm:p-4">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-extrabold">{session.projectTitle}</h2>
               <PresenceBadge status={presence} />
+              {session.isTraining && <span className="text-xs font-bold text-[var(--mikke-primary)]">研修担当・閲覧のみ（10秒ごとに更新）</span>}
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold text-[var(--mikke-muted)]">
               <span className="inline-flex items-center gap-1"><CalendarDays size={13} />{formatDate(session.sessionDate)}</span>
@@ -732,7 +748,7 @@ export function TeamWorksPartnerLessonConsole({
           </div>
           )}
         </div>
-        {workWindow.zoom && !controlsCollapsed ? <PartnerZoomSettings session={session} onUpdated={onRefresh} /> : null}
+        {!session.isTraining && workWindow.zoom && !controlsCollapsed ? <PartnerZoomSettings session={session} onUpdated={onRefresh} /> : null}
       </header>
 
       {!workWindow.roster ? null : session.roster.length ? (
@@ -818,7 +834,7 @@ export function TeamWorksPartnerLessonConsole({
           <MikkeEmptyState title={`${labels.rosterNoun}はまだ設定されていません`} helper={`本部が${labels.attendanceNoun}順を設定すると、この画面に表示されます。`} />
         </div>
       )}
-    </article>
+    </article></TrainingReadOnlyContext.Provider>
   );
 }
 
@@ -926,12 +942,14 @@ function StudentAccordion({
   onResetTimer: () => void;
   showTimer?: boolean;
 }) {
-  const isViewAs = useIsViewAs();
+  const trainingReadOnly = useContext(TrainingReadOnlyContext);
+  const isViewAs = useIsViewAs() || trainingReadOnly;
   const [assessment, setAssessment] = useState<OperationsPartnerAssessment>(item.assessment);
   const [handoffNote, setHandoffNote] = useState(item.handoffNote);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<SaveNotice>(null);
   async function save(complete: boolean) {
+    if (isViewAs) return;
     setSaving(true);
     setNotice(null);
     try {
@@ -954,6 +972,10 @@ function StudentAccordion({
     }
   }
 
+  if (trainingReadOnly) return <li className="border-b border-[var(--mikke-line)] p-4">
+    <button type="button" onClick={onOpen} className="w-full text-left text-sm font-bold">{item.orderIndex}. {item.participantName} ／ 進捗 No.{item.currentManualNo} ／ {item.completedAt ? "完了" : "未完了"}</button>
+    {open && <div className="mt-2 space-y-2 text-sm"><p>出欠：{{ present: "出席", absent: "欠席", late: "遅刻", unknown: "未確認", pending: "未確認" }[item.attendanceStatus] ?? "未確認"}</p><p>応答：{item.assessment.responseSmoothness} ／ 理解：{item.assessment.comprehension} ／ 発話：{item.assessment.speakingConfidence}</p><p className="whitespace-pre-wrap">{item.handoffNote || "引継ぎメモはありません"}</p></div>}
+  </li>;
   return (
     <li className="border-b border-[var(--mikke-line)] last:border-b-0">
       <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 px-4 py-3 text-left">
@@ -1119,13 +1141,15 @@ function PartnerZoomSettings({ session, onUpdated }: { session: OperationsPartne
 
 function LessonReport({ session, onSubmitted }: { session: OperationsPartnerSession; onSubmitted: () => Promise<void> }) {
   const labels = useTeamWorksLabels();
-  const isViewAs = useIsViewAs();
+  const trainingReadOnly = useContext(TrainingReadOnlyContext);
+  const isViewAs = useIsViewAs() || trainingReadOnly;
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<SaveNotice>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (isViewAs) return;
     setSaving(true);
     setNotice(null);
     try {
@@ -1145,6 +1169,7 @@ function LessonReport({ session, onSubmitted }: { session: OperationsPartnerSess
     }
   }
 
+  if (trainingReadOnly) return <p className="p-4 text-sm">{session.reportSubmitted ? "主担当が報告を提出済みです。" : "報告の提出は主担当が行います。"}</p>;
   return (
     <details className="border-t border-[var(--mikke-line)]">
       <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-[var(--mikke-primary)]">{labels.sessionNoun}全体の報告</summary>

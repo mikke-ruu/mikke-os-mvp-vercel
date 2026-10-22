@@ -77,6 +77,8 @@ export type OperationsScheduleRule = {
 };
 
 export type OperationsProjectSession = {
+  trainingPartnerMemberId?: string | null;
+  trainingPartnerName?: string | null;
   id: string;
   generatedFromRuleId: string | null;
   sessionDate: string;
@@ -286,7 +288,7 @@ export async function loadOperationsProjectDetail(
       .order("start_time"),
     client
       .from("team_works_op_sessions")
-      .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,work_description")
+      .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id,training_partner_member_id,zoom_url,zoom_meeting_id,zoom_passcode,zoom_uses_project_default,partner_presence_status,work_description")
       .eq("project_id", projectId)
       .gte("session_date", dateKey(addDays(new Date(), -14)))
       .lte("session_date", dateKey(addDays(new Date(), 90)))
@@ -339,7 +341,7 @@ export async function loadOperationsProjectDetail(
   if (sessionResult.error && isMissingSupabaseField(sessionResult.error, ["zoom_url", "zoom_meeting_id", "zoom_passcode", "zoom_uses_project_default", "partner_presence_status", "work_description"])) {
     sessionResult = await client
       .from("team_works_op_sessions")
-      .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id")
+      .select("id,generated_from_rule_id,session_date,start_time,duration_min,status,partner_member_id,training_partner_member_id")
       .eq("project_id", projectId)
       .gte("session_date", dateKey(addDays(new Date(), -14)))
       .lte("session_date", dateKey(addDays(new Date(), 90)))
@@ -399,6 +401,7 @@ export async function loadOperationsProjectDetail(
   }
 
   const sessionRows = (sessionResult.data ?? []) as {
+    training_partner_member_id: string | null;
     id: string;
     generated_from_rule_id: string | null;
     session_date: string;
@@ -534,6 +537,8 @@ export async function loadOperationsProjectDetail(
     sessions: sessionRows.map((row) => ({
       id: row.id,
       generatedFromRuleId: row.generated_from_rule_id ?? null,
+      trainingPartnerMemberId: row.training_partner_member_id ?? null,
+      trainingPartnerName: row.training_partner_member_id ? memberNameById.get(row.training_partner_member_id) ?? "研修担当" : null,
       sessionDate: row.session_date,
       startTime: row.start_time.slice(0, 5),
       durationMin: row.duration_min,
@@ -1368,7 +1373,7 @@ export async function updateOperationsScheduleRule(
 export async function createOperationsSession(
   client: SupabaseClient,
   projectId: string,
-  input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null; workDescription?: string | null }
+  input: { sessionDate: string; startTime: string; durationMin: number; trainingPartnerMemberId?: string | null; partnerMemberId: string | null; workDescription?: string | null }
 ) {
   const { settings, holidayLabel } = await loadProjectHolidayContext(client, projectId);
   if (isClosedDayKey(settings, input.sessionDate)) {
@@ -1376,6 +1381,7 @@ export async function createOperationsSession(
   }
   const payload: Record<string, unknown> = {
     project_id: projectId,
+    training_partner_member_id: input.trainingPartnerMemberId || null,
     session_date: input.sessionDate,
     start_time: input.startTime,
     duration_min: Math.max(1, Math.round(input.durationMin)),
@@ -1394,7 +1400,7 @@ export async function createOperationsSession(
 export async function updateOperationsSession(
   client: SupabaseClient,
   sessionId: string,
-  input: { sessionDate: string; startTime: string; durationMin: number; partnerMemberId: string | null; workDescription?: string | null }
+  input: { sessionDate: string; startTime: string; durationMin: number; trainingPartnerMemberId?: string | null; partnerMemberId: string | null; workDescription?: string | null }
 ) {
   const sessionRow = await client.from("team_works_op_sessions").select("project_id").eq("id", sessionId).maybeSingle();
   if (sessionRow.error) throw sessionRow.error;
@@ -1411,6 +1417,7 @@ export async function updateOperationsSession(
     partner_member_id: input.partnerMemberId || null,
     updated_at: new Date().toISOString()
   };
+  if (input.trainingPartnerMemberId !== undefined) payload.training_partner_member_id = input.trainingPartnerMemberId || null;
   // workDescription省略時は既存値を保持する(未指定=変更なし。他のUIから
   // 日時・担当だけを更新するときに作業内容を消してしまわないため)。
   if (input.workDescription !== undefined) payload.work_description = input.workDescription?.trim() || null;
