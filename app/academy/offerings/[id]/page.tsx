@@ -32,11 +32,15 @@ function Content({ id }: { id: string }) {
   if (error || !offering) return <p role="alert">{error || "サービスが見つかりません。"}</p>;
   return <OfferingEditor key={`${profile.user_id}:${offering.id}`} initial={offering} courses={courses} onRefreshCourses={async () => { const list = await listCourses(offering.headquarters_id); setCourses(list); }} onSave={async input => { const result = await updateOffering(offering.headquarters_id, offering.id, input); setOffering(result); return result; }} onArchive={async () => { const result = await archiveOffering(offering.headquarters_id, offering.id); setOffering(result); return result; }} />;
 }
+import {safeCreationReturn} from '@/lib/academy2/creation-return';
 function EditorIdentity({ id }: { id: string }) {
   const context = useAcademy2Headquarters();
   const { user } = useAuth();
   const router = useRouter();
-  const view = useSearchParams().get("preview");
+  const query=useSearchParams();
+  const returnTo=safeCreationReturn(query.get('returnTo'),context?.id??'');
+  const returnSuffix=returnTo?'&returnTo='+encodeURIComponent(returnTo):'';
+  const view = query.get("preview");
   const preview = view === "standard" || view === "builder" || view === "template";
   const [page, setPage] = useState<{ draft: SalesPlanDraft; courses: Academy2Course[] } | null>(null);
   const [previewError, setPreviewError] = useState("");
@@ -49,8 +53,8 @@ function EditorIdentity({ id }: { id: string }) {
     return () => { live = false; };
   }, [context?.id, id, preview, view]);
   if (!context) return <Content key={id} id={id} />;
-  if (preview) return previewError ? <div role="alert"><p>{previewError}</p><a href={toCurrentAcademyContextHref(`/academy/offerings/${id}`)}>販売プランへ戻る</a></div> : page ? view !== "standard" ? <SalesPlanPageEditor initialMode={view === "template" ? "template" : "builder"} key={`${id}:${view}`} draft={page.draft} courses={page.courses} onBack={() => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${id}`))} onPreview={() => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${id}?preview=standard`))} /> : <SalesPlanStandardPreview onMode={mode => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${id}?preview=${mode}`))} draft={page.draft} courses={page.courses} onBack={() => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${id}`))} /> : <p role="status">販売ページを読み込み中…</p>;
+  if (preview) return previewError ? <div role="alert"><p>{previewError}</p><a href={toCurrentAcademyContextHref(`/academy/offerings/${id}${returnSuffix?'?'+returnSuffix.slice(1):''}`)}>販売プランへ戻る</a></div> : page ? view !== "standard" ? <SalesPlanPageEditor initialMode={view === "template" ? "template" : "builder"} key={`${id}:${view}`} draft={page.draft} courses={page.courses} onBack={() => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${id}${returnSuffix?'?'+returnSuffix.slice(1):''}`))} onPreview={() => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${id}?preview=standard${returnSuffix}`))} /> : <SalesPlanStandardPreview onMode={mode => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${id}?preview=${mode}${returnSuffix}`))} draft={page.draft} courses={page.courses} onBack={() => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${id}${returnSuffix?'?'+returnSuffix.slice(1):''}`))} /> : <p role="status">販売ページを読み込み中…</p>;
   return <SalesPlanDraftEditor key={`${user.id}:${context.id}:${id}`} headquartersId={context.id} draftId={id}
-    onPageAction={(action, draft) => { router.replace(toCurrentAcademyContextHref(`/academy/offerings/${draft.id}?preview=${action}`)); }} />;
+    onPageAction={(action, draft) => { router.replace(toCurrentAcademyContextHref(`/academy/offerings/${draft.id}?preview=${action}${returnSuffix}`)); }} />;
 }
 export default function Page({ params }: { params: Promise<{ id: string }> }) { const { id } = use(params); return <HonbuShell title="販売プランを編集"><Suspense fallback={<p>読み込み中…</p>}><EditorIdentity id={id} /></Suspense></HonbuShell>; }

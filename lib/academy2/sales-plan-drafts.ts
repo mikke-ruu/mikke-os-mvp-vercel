@@ -6,6 +6,7 @@ import type { SalesPlan, SalesPlanType } from "./sales-plan.mjs";
 /** Inert draft settings. Publication/readiness must be validated separately. */
 export type SalesPlanDraftConfiguration = {
   title: string;
+  description?: string;
   kind: SalesPlanType;
   course_ids: string[];
   price: number | null;
@@ -29,6 +30,7 @@ export type SalesPlanDraft = {
 };
 
 function draftError(error: { code?: string;message?:string }): Error {
+  if(error.message==='読み取り専用の確認画面です。保存・アップロード・公開はできません。')return new Error('このローカル確認環境は読み取り専用のため、保存できません。入力内容は残っています。');
   if(error.message==='academy2_shipping_unconfigured')return new Error('選択した講座の発送物設定を保存してください。');
   if(error.message==='academy2_card_contract_required')return new Error('講師向け料金の回収にはAcademyカード決済の契約が必要です。決済設定を確認してください。');
   if(error.message==='academy2_invalid_instructor_fee')return new Error('講師向け料金は税込の整数で入力してください。金額未設定の下書きも保存できます。');
@@ -54,7 +56,7 @@ export async function listSalesPlanDrafts(headquartersId: string): Promise<Sales
 /** Keep the generated ID across retries. expectedRevision=0 creates a new draft. */
 export async function saveSalesPlanDraft(headquartersId: string, id: string, expectedRevision: number, configuration: SalesPlanDraftConfiguration): Promise<SalesPlanDraft> {
   assertAcademyWritable();
-  const { data, error } = await supabase.rpc("academy2_save_plan_six_step", {
+  const { data, error } = await supabase.rpc("academy2_save_plan_six_step_materials", {
     p_headquarters_id: headquartersId, p_id: id, p_expected_revision: expectedRevision,
     p_configuration: configuration,
   });

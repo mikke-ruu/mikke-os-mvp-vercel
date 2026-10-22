@@ -12,6 +12,8 @@ export async function getFirstPublicationState(headquartersId:string):Promise<Fi
   return data as FirstPublicationState;
 }
 const reasons: Record<string, string> = {
+  bank_transfer_instructions_required: '設定の「お支払い」で、振込先とお客様への支払い案内を登録してください。',
+  seller_disclosure_required: '設定の「規約・契約」で、販売者情報とキャンセル・返金ポリシー、プライバシーポリシーを確認してください。',
   ...monthlyPolicyReasonLabels,
   revision_changed: "販売プランまたはページが更新されています。最新の保存内容を確認してください。",
   page_needs_rebase: "更新した販売プランの内容で販売ページを確認し、保存してください。",

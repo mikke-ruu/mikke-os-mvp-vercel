@@ -27,3 +27,17 @@
 .sort{font-size:14px!important}
 .samplesWrap .jp{font-size:14px}.samplesWrap .back{font-size:13px}.samplesWrap .intro p{font-size:13px}.chip{font-size:13px;min-height:40px}.sample h3{font-size:15px}.sample-desc{font-size:13px;line-height:1.7}.sample-type{font-size:12px}.sampleAudience{font-size:13px;background:#f7faf8;border-radius:8px;padding:10px 12px;margin:10px 0 12px;line-height:1.6}.sampleAudience p{margin:4px 0 0;color:var(--muted)}.lesson{font-size:13px}.lesson b{font-size:12px;min-width:22px}.use span{font-size:12px}.use .sampleUse{font-size:14px;min-height:40px;display:inline-flex;align-items:center;padding:10px 12px}.blank strong{font-size:14px}.blank p{font-size:13px}.blank a{font-size:14px}
 @media(max-width:820px){.choice{min-height:0;padding:18px}.choice-grid{gap:12px}.tools{flex-wrap:wrap}.tools .filter{display:block}.tools .search{flex-basis:100%}.samplesWrap .filters{flex-wrap:wrap;overflow:visible}.sample .use{gap:8px;flex-wrap:wrap}}
+/* List scale candidate from sales-plan-catalog; CourseSamples and dialog stay separate. */
+.listScale .titlebar{line-height:1.65;letter-spacing:.01em}
+.listScale .titlebar .en{font-size:15px;font-weight:600;line-height:1.65;letter-spacing:.08em}
+.listScale .titlebar .jp{font-size:14px;font-weight:600;line-height:1.65;letter-spacing:.01em}
+.listScale .headbox p,.listScale .course-meta,.listScale .empty-tip p,.listScale .text-link,.listScale .count{font-size:14px;font-weight:400;line-height:1.65;letter-spacing:.01em;color:#555b63}
+.listScale .create,.listScale .filter,.listScale .search{font-size:14px;font-weight:600;line-height:1.65;letter-spacing:.01em}
+.listScale .search{font-weight:400;min-width:0}.listScale .filter{min-height:40px}
+.listScale .course{grid-template-columns:62px minmax(0,1fr) auto}
+.listScale .course h3,.listScale .empty-tip strong{font-size:14px;font-weight:600;line-height:1.65;letter-spacing:.01em}
+.listScale .course-meta{gap:4px 12px}.listScale .course-meta b{font-weight:400;color:#555b63}.listScale .course-meta span{overflow-wrap:anywhere}
+.listScale .text-link{color:#4f806c}
+@media(max-width:820px){.listScale .course{grid-template-columns:50px minmax(0,1fr) auto}}
+.listScale .course{grid-template-columns:80px minmax(0,1fr);gap:16px;min-height:126px}.listScale .thumb{width:80px;height:80px;background:#edf5f0;color:#537d68;border-radius:10px;display:grid;place-items:center}.listScale .course h3{font-size:16px;margin:0 0 8px}.listScale .course-meta{display:flex;flex-wrap:wrap;color:#4b535e}.listScale .course-meta span:first-child{flex-basis:100%}.listScale .create{background:#f75a3b;color:#fff}.listScale .list{gap:12px}@media(max-width:820px){.listScale .course{grid-template-columns:58px minmax(0,1fr);gap:12px;padding:14px 64px 14px 12px}.listScale .thumb{width:58px;height:58px}.listScale .course h3{font-size:15px}.listScale .course-meta{font-size:14px}}
+.listScale .headbox .create{display:inline-flex;align-items:center;justify-content:center;min-height:44px}@media(max-width:820px){.listScale .headbox .create{width:100%;margin-top:14px}}

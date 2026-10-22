@@ -42,6 +42,7 @@ import { getAcademyAccessNotice } from "@/lib/academy/access-notice";
 import { getMyInstructorRecords } from "@/lib/academy/instructor-portal";
 import { listPublicHeadquartersByIds } from "@/lib/academy/lp";
 import { supabase } from "@/lib/supabase/client";
+import { getAcademy2FreeCreationEntryAvailable } from "@/lib/academy2/onboarding";
 import type { AcademyAccessContext, AcademyHeadquartersAccess } from "@/types/database";
 
 const honbuNav: MikkeShellNavItem[] = [
@@ -145,6 +146,7 @@ function ShellInner({
   const [accessLoading, setAccessLoading] = useState(true);
   const [accessError, setAccessError] = useState(false);
   const [hasPortalAccess, setHasPortalAccess] = useState(false);
+  const [freeCreationEntryAvailable, setFreeCreationEntryAvailable] = useState(false);
   const [canSwitchPortal, setCanSwitchPortal] = useState(false);
   const [contextCount, setContextCount] = useState(0);
   const [selectedContext, setSelectedContext] = useState<AcademyAccessContext | null>(null);
@@ -203,20 +205,27 @@ function ShellInner({
       }
       try {
         setAccessError(false);
-        const [contexts, onboarding] = await Promise.all([
+        const [contexts, onboarding, freeCreationEntry] = await Promise.all([
           listMyAcademyContexts(),
           variant === "honbu"
             ? getAcademyOnboardingEligibility()
-            : Promise.resolve({ trial_available: false, paid_creation_available: false, trial_block_reason: null })
+            : Promise.resolve({ trial_available: false, paid_creation_available: false, trial_block_reason: null }),
+          variant === "honbu" && (pathname === "/academy" || pathname === "/academy/")
+            ? getAcademy2FreeCreationEntryAvailable()
+            : Promise.resolve(false)
         ]);
         if (!active) return;
         const currentPortal = variant === "honbu" ? "manage" : "teach";
         const otherPortal = variant === "honbu" ? "teach" : "manage";
-        const selected = routeContext
+        const candidate = routeContext
           ? contexts.find((context) => context.academy_id === routeContext.academyId) ?? null
           : !hasContextPathPrefix && contexts.length === 1
             ? contexts[0]
             : null;
+        // This is only the unscoped creation entry. All management routes keep
+        // their existing context checks. A learner context must not redirect
+        // an eligible unowned account into someone else's management route.
+        const selected = freeCreationEntry && !candidate?.portals.includes("manage") ? null : candidate;
         const routeMatchesPortal = !routeContext || routeContext.portal === currentPortal;
         const routeMatchesCapability =
           variant === "koushi" || canShowManageHref(selected, manageHrefForCapabilityCheck(pathname));
@@ -224,10 +233,12 @@ function ShellInner({
           ? await getMyAcademyHeadquartersAccess(selected.academy_id)
           : null;
         setContextCount(contexts.length);
+        setFreeCreationEntryAvailable(freeCreationEntry);
         setSelectedContext(selected);
         setHeadquartersAccess(access);
         setHasPortalAccess(
           (routeMatchesPortal && routeMatchesCapability && selected?.portals.includes(currentPortal)) ||
+            freeCreationEntry ||
             (!hasContextPathPrefix && contexts.length === 0 && variant === "honbu" &&
               (onboarding.trial_available || onboarding.paid_creation_available))
         );
@@ -236,6 +247,7 @@ function ShellInner({
         if (!active) return;
         setAccessError(true);
         setHasPortalAccess(false);
+        setFreeCreationEntryAvailable(false);
         setCanSwitchPortal(false);
         setContextCount(0);
         setSelectedContext(null);
@@ -455,7 +467,7 @@ function ShellInner({
     );
   }
 
-  if (!hasContextPathPrefix && contextCount > 1) {
+  if (!hasContextPathPrefix && contextCount > 1 && !freeCreationEntryAvailable) {
     return <main className="mx-auto max-w-lg px-5 py-12"><div className="rounded-3xl border border-[var(--mikke-line)] bg-white p-6"><GraduationCap className="mb-4 text-[#3f4eb5]" size={32} /><h1 className="text-2xl font-bold">どのAcademyを開きますか？</h1><p className="mt-3 text-sm leading-7 text-[var(--mikke-muted)]">複数のAcademyに所属しています。講座をつくるAcademyを選んでください。</p><Link href="/academy/select" className="mt-5 inline-flex min-h-12 items-center rounded-xl bg-[#f75a3b] px-5 py-3 text-sm font-bold text-white">Academyを選ぶ</Link></div></main>;
   }
 
@@ -618,6 +630,11 @@ export function HonbuShell({ title, children }: { title: string; children: React
       <HeadquartersBoundary title={title} legacy={<ShellInner variant="honbu" title={title}>{children}</ShellInner>}>{children}</HeadquartersBoundary>
     </AuthGate>
   );
+}
+
+/** Explicit legacy entry retains all existing context, access and read-only checks. */
+export function LegacyHonbuShell({ title, children }: { title: string; children: React.ReactNode }) {
+  return <AuthGate><ShellInner variant="honbu" title={title}>{children}</ShellInner></AuthGate>;
 }
 
 export function KoushiShell({ title, children }: { title: string; children: React.ReactNode }) {

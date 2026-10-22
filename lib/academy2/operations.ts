@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase/client";
 import { assertAcademyWritable } from "@/lib/academy/preview";
 
 export type Academy2EventSummary = {
-  id: string; headquarters_id: string; title: string;
+  id: string; headquarters_id: string; title: string; individual_consultation?:boolean;application_id?:string;parent_event_id?:string;
   sales_plan_id: string | null; sales_plan_name: string | null; course_name: string;
   main_image_url: string | null; instructor_name: string | null; applicant_names: string[];
   instructor_response_status: string | null;
@@ -13,7 +13,8 @@ export type Academy2EventSummary = {
 };
 export type EventSummary = Academy2EventSummary;
 export type EventKitMethod = 'shipping' | 'venue_handover';
-export type EventKitSettings = {enabled: boolean; name?: string; methods: EventKitMethod[]; recipient?: string};
+export type EventLocation = {address:string;address_visibility:'private'|'applicants'|'public';area:string;participant_note:string};
+export type EventKitSettings = {contract_version?:2; enabled: boolean; name?: string; methods: EventKitMethod[]; recipient?: string};
 export type Academy2EventDetail = Academy2EventSummary & {
   course_id: string;
   plan_revision: number | null;
@@ -22,6 +23,7 @@ export type Academy2EventDetail = Academy2EventSummary & {
   allowed_methods: ("online" | "in_person")[];
   venue_name: string | null;
   meeting_url: string | null;
+  location?: EventLocation | null;
 };
 async function call<T>(name: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.rpc(name, args);
@@ -35,6 +37,10 @@ async function call<T>(name: string, args: Record<string, unknown>): Promise<T> 
       academy2_event_full: "この開催は定員に達しています。別の開催を選んでください。",
       academy2_review_required: "入金状態と確認内容を確認してください。修了・認定には確認した内容の記録が必要です。",
       academy2_event_not_ready: "開催の受講方法と日程の設定を確認してください。",
+      academy2_kit_contract_not_ready: "物品の受け渡し方法と配送先の設定を確認してください。この開催の受付は開始されていません。",
+      academy2_event_source_mismatch: "この開催と公開済み販売プランの保存版が一致しません。販売プランと開催を確認してください。",
+      academy2_invalid_location: "住所・公開範囲・開催エリア・参加者への案内を確認してください。",
+      academy2_location_locked: "受付中または申込のある開催では、住所と参加者への案内を変更できません。入力内容は残っています。",
     };
     const message = Object.hasOwn(messages, error.message) ? messages[error.message] : error.code === "42501" ? "この本部の情報を操作する権限がありません。" : error.code === "PT409" ? "別の変更が保存されています。最新の状態を確認してください。" : error.code === "22023" ? "入力内容や現在の状態を確認してください。入力した内容はそのまま残っています。" : "処理を確認できませんでした。入力内容を残して、もう一度お試しください。";
     throw Object.assign(new Error(message), {code: error.code});
@@ -77,9 +83,16 @@ export type Academy2EventInput = {
   title: string; scheduleMode: "fixed" | "arranged_after_application";
   startsAt: string | null; endsAt: string | null; format: "online" | "in_person";
   capacity: number | null; venueName?: string; meetingUrl?: string; kitMethod?: EventKitMethod | null;
+  location?: EventLocation;
 };
 function eventInput(input: Academy2EventInput) {
   return {title: input.title,schedule_mode: input.scheduleMode,starts_at: input.startsAt,ends_at: input.endsAt,format: input.format,capacity: input.capacity,venue_name: input.venueName ?? null,meeting_url: input.meetingUrl ?? null,...(input.kitMethod === undefined ? {} : {kit_method:input.kitMethod})};
+}
+/** One transaction reuses the existing event/kit guards and records the private location. */
+export async function writeAcademy2EventWithLocation(headquartersId:string,eventId:string|null,expected:number,requestId:string,input:Academy2EventInput&{planId?:string;planRevision?:number;courseId?:string},fulfillment:{method:string;destination?:unknown}|null,individual:boolean):Promise<Academy2EventDetail> {
+ assertAcademyWritable();
+ const core=eventInput(input);if(fulfillment!==null)delete core.kit_method;
+ return call('academy2_write_event_with_location',{p_hq:headquartersId,p_event:eventId,p_expected:expected,p_request:requestId,p_input:{...core,...(!eventId?{plan_id:input.planId,plan_revision:input.planRevision,course_id:input.courseId}:{})},p_fulfillment:fulfillment,p_individual:individual,p_location:input.location??{address:'',address_visibility:'private',area:'',participant_note:''}});
 }
 export async function createAcademy2Event(headquartersId: string, requestId: string, input: Academy2EventInput & {planId: string; planRevision: number; courseId: string}): Promise<Academy2EventSummary> {
   assertAcademyWritable();
@@ -92,6 +105,10 @@ export async function updateAcademy2Event(headquartersId: string, eventId: strin
 export async function setAcademy2EventRegistration(headquartersId: string, eventId: string, expectedRevision: number, requestId: string, registrationStatus: "open" | "closed", offeringId: string | null = null): Promise<Academy2EventSummary> {
   assertAcademyWritable();
   return call("academy2_event_registration", {p_headquarters_id: headquartersId,p_event_id: eventId,p_expected_revision: expectedRevision,p_request_id: requestId,p_registration_status: registrationStatus,p_offering_id: offeringId});
+}
+export type EventRegistrationSource = {offering_id:string|null;public_path:string|null;ready:boolean;reasons:string[]};
+export function getAcademy2EventRegistrationSource(headquartersId:string,eventId:string):Promise<EventRegistrationSource> {
+ return call('academy2_event_registration_source',{p_headquarters_id:headquartersId,p_event_id:eventId});
 }
 
 /** Scheduling projection deliberately excludes plan prices and contract settings. */

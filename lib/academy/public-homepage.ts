@@ -3,16 +3,26 @@ import { listPublicOfferings, type PublicOfferingSummary } from "./public-offeri
 import type { AcademyCourse, AcademyHeadquarters, AcademyInstructor } from "@/types/database";
 
 export type PublicHomepage = {
+  mode?: "academy2";
   headquarters: Pick<AcademyHeadquarters, "id" | "name" | "handle" | "tagline" | "front_message" | "hero_image_url" | "front_blocks" | "contact_email">;
   courses: Pick<AcademyCourse, "id" | "code" | "name" | "subtitle" | "main_image_url" | "price" | "duration_text">[];
   instructors: Pick<AcademyInstructor, "id" | "business_name" | "area" | "photo_url" | "online_available">[];
   offerings: PublicOfferingSummary[] | null;
 };
 
+// Use installed public reads; no dependency on the absent homepage RPC.
+// The public-availability helper and existing RLS retain payment/publication gates.
 export async function getPublicHomepage(handle: string): Promise<PublicHomepage | null> {
   const normalized = handle.trim().toLowerCase();
   if (!normalized) return null;
   const signal = AbortSignal.timeout(30000);
+  const { data: v2, error: v2Error } = await academyPublicClient.rpc("academy2_public_homepage", { p_handle: normalized }).abortSignal(signal);
+  if (v2Error && v2Error.code !== "PGRST202") throw v2Error;
+  if (!v2Error) {
+    if (v2 === null) return null;
+    if (v2?.mode === "academy2" && v2.headquarters?.handle === normalized && Array.isArray(v2.courses) && Array.isArray(v2.instructors)) return v2 as PublicHomepage;
+    if (v2?.mode !== "legacy") throw new Error("invalid_public_homepage");
+  }
   const { data: headquarters, error: headquartersError } = await academyPublicClient
     .from("academy_headquarters")
     .select("id,name,handle,tagline,front_message,hero_image_url,front_blocks,contact_email")

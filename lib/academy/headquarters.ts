@@ -10,37 +10,16 @@ export async function getOwnedHeadquarters(userId: string, academyId?: string) {
   const explicitAcademyId = academyId ?? getAcademyRouteContext()?.academyId;
   if (explicitAcademyId) {
     const contexts = await listMyAcademyContexts();
-    const context = contexts.find((candidate) => candidate.academy_id === explicitAcademyId);
+    const context = contexts.find(candidate => candidate.academy_id === explicitAcademyId);
     if (!context?.portals.includes("manage")) return null;
-
-    const { data, error } = await supabase
-      .from("academy_headquarters")
-      .select("*")
-      .eq("id", explicitAcademyId)
-      .maybeSingle();
-    if (error) throw error;
-    return (data as AcademyHeadquarters | null) ?? null;
   }
-
-  const { data, error } = await supabase
-    .from("academy_headquarters")
-    .select("*")
-    .eq("owner_user_id", userId)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
+  // Existing authenticated management RPC preserves the private bank note for managers.
+  // No direct SELECT * after bank-column SELECT is removed.
+  const { data, error } = await supabase.rpc("academy_get_my_manageable_headquarters");
   if (error) throw error;
-  if (data) return data as AcademyHeadquarters;
-
-  const { data: manageable, error: manageableError } = await supabase.rpc(
-    "academy_get_my_manageable_headquarters"
-  );
-  if (manageableError) {
-    if (manageableError.code === "PGRST202" || manageableError.code === "42883") return null;
-    throw manageableError;
-  }
-  return ((manageable as AcademyHeadquarters[] | null) ?? [])[0] ?? null;
+  const rows = (data as AcademyHeadquarters[] | null) ?? [];
+  if (explicitAcademyId) return rows.find(row => row.id === explicitAcademyId) ?? null;
+  return rows.find(row => row.owner_user_id === userId) ?? rows[0] ?? null;
 }
 
 // 本部情報の更新（フロントページ編集用）

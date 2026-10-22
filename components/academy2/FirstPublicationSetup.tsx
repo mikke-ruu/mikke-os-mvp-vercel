@@ -1,4 +1,5 @@
 'use client';
+import {AcademyNoOperatingFeeNotice} from '@/components/academy/AcademyNoOperatingFeeNotice';
 import {useEffect,useState} from 'react';
 import {supabase} from '@/lib/supabase/client';
 import {AcademyFirstPublicationEnrollment} from '@/components/academy/AcademyFirstPublicationEnrollment';
@@ -8,6 +9,7 @@ export function FirstPublicationSetup({headquartersId}:{headquartersId:string}){
  useEffect(()=>{let live=true;setError('');Promise.all([getFirstPublicationState(headquartersId),supabase.auth.getUser()]).then(([value,user])=>{if(!user.data.user)throw new Error('ログイン状態を確認してください。');if(live){setState(value);setUserId(user.data.user.id);}}).catch(cause=>{if(live)setError(cause.message);});return()=>{live=false;};},[headquartersId,revision]);
  if(error)return <p role="alert">{error}<button type="button" onClick={()=>setRevision(n=>n+1)}>再確認</button></p>;
  if(!state||!userId)return <p role="status">初公開の契約状態を確認しています…</p>;
+ if(state.phase==='no_operating_fee')return <AcademyNoOperatingFeeNotice/>;
  if(state.first_published_at)return <p>初公開日：{new Date(state.first_published_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'})}。再公開で無料期間は変更されません。</p>;
  if(state.consented&&state.phase==='prepared')return <p role="status">利用契約の準備ができました。販売ページから募集を公開できます。無料期間は、初めて申込可能な募集を公開した時点から始まります。</p>;
  if(!state.can_consent)return <p>初公開の利用契約は本部責任者が確認します。</p>;

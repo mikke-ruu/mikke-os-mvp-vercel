@@ -355,14 +355,12 @@ function DetailContent({ appId }: { appId: string }) {
   );
 }
 
-function ConnectedDetail({ id }: { id: string }) { return useAcademy2Headquarters() ? <HeadquartersApplicationDetail applicationId={id} /> : <DetailContent appId={id} />; }
+function ConnectedDetail({ id }: { id: string }) { return useAcademy2Headquarters() ? <HeadquartersApplicationDetail applicationId={id} /> : <div className="mx-auto max-w-2xl"><DetailContent appId={id} /></div>; }
 export default function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   return (
     <HonbuShell title="申込詳細">
-      <div className="mx-auto max-w-2xl">
-        <ConnectedDetail id={id} />
-      </div>
+      <ConnectedDetail id={id} />
     </HonbuShell>
   );
 }

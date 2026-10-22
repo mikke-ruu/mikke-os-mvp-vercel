@@ -55,7 +55,7 @@ function Academy2CoursesContent({ headquartersId }: { headquartersId: string }) 
  }, [headquartersId, retry]);
  if (loading) return <p role="status" className="py-10 text-center text-sm">読み込み中…</p>;
  if (error) return <div role="alert"><p>{error}</p><button type="button" onClick={() => setRetry(value => value + 1)}>再読み込み</button></div>;
- return <CourseCatalog courses={courses} />;
+ return <CourseCatalog courses={courses} headquartersId={headquartersId} />;
 }
 function CoursesContent() {
  const context = useAcademy2Headquarters();

@@ -17,8 +17,9 @@ export function cardCheckoutHref(value:unknown):string|null{
  const result=value as Record<string,unknown>;
  return result.provider==='stripe_connect'&&['test','live'].includes(String(result.mode))&&typeof result.checkout_id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(result.checkout_id)?'/academy/course-stripe-checkout/'+result.checkout_id:null;
 }
-export function publicIntakeSubmission(instructor:boolean,method:PublicPaymentMethod,args:IntakeArguments,cardMode?:'test'|'live'){
+export function publicIntakeSubmission(instructor:boolean,method:PublicPaymentMethod,args:IntakeArguments,cardMode?:'test'|'live',sellerPublication?:string){
  if(instructor)return {name:'academy2_submit_public_intake_with_answers',args:{...args,p_instructor:true}};
  if(method==='card')return cardMode?{name:'academy2_submit_public_intake_stripe',args:{...args,p_mode:cardMode}}:{name:'academy2_submit_public_intake_card',args};
+ if(sellerPublication)return {name:'academy2_submit_reviewed_intake_payment',args:{...args,p_payment_method:method,p_seller_publication:sellerPublication}};
  return {name:'academy2_submit_public_intake_payment',args:{...args,p_instructor:false,p_payment_method:method}};
 }

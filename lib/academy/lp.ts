@@ -25,7 +25,7 @@ export async function getPublicHeadquarters(handle: string) {
 
   const { data, error } = await supabase
     .from("academy_headquarters")
-    .select("*")
+    .select("id,name,handle,tagline,logo_url,main_color,contact_email,is_active,hero_image_url,front_message,front_blocks")
     .eq("handle", normalizedHandle)
     .eq("is_active", true)
     .maybeSingle();
@@ -41,7 +41,7 @@ export async function listPublicHeadquartersByIds(headquartersIds: string[]) {
 
   const { data, error } = await supabase
     .from("academy_headquarters")
-    .select("*")
+    .select("id,name,handle,tagline,logo_url,main_color,contact_email,is_active,hero_image_url,front_message,front_blocks")
     .in("id", ids)
     .eq("is_active", true);
   if (error) throw error;

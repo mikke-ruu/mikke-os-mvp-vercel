@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.108.2";
+import { deliverStoredAcademy2BankMail } from "../_shared/academy2-offering-bank-intake.ts";
 
 function json(body: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json; charset=utf-8" } });
@@ -57,11 +58,27 @@ async function markDelivery(admin: SupabaseClient, input: {
   if (error) throw error;
 }
 
+// Preserve authentication on every POST while allowing browser preflight.
 Deno.serve(async (request) => {
-  if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  const origin = request.headers.get("Origin") ?? "";
+  const allowed = ["https://app.mikke-os.com", "https://mikke-os.com"].includes(origin)
+    || (() => { try { const u = new URL(origin); return u.protocol === "https:" && u.hostname.endsWith(".vercel.app"); } catch { return false; } })();
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS", "Vary": "Origin"
+  };
+  if (allowed) headers["Access-Control-Allow-Origin"] = origin;
+  const reply = (body: Record<string, unknown>, status = 200) => {
+    const response = json(body, status);
+    for (const [key, value] of Object.entries(headers)) response.headers.set(key, value);
+    return response;
+  };
+  if (origin && !allowed) return reply({ error: "Origin not allowed" }, 403);
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers });
+  if (request.method !== "POST") return reply({ error: "Method not allowed" }, 405);
   try {
     const authorization = request.headers.get("Authorization");
-    if (!authorization) return json({ error: "ログインが必要です。" }, 401);
+    if (!authorization) return reply({ error: "ログインが必要です。" }, 401);
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const userClient = createClient(Deno.env.get("SUPABASE_URL") ?? "", anonKey, {
       global: { headers: { Authorization: authorization } },
@@ -69,28 +86,47 @@ Deno.serve(async (request) => {
     });
     const token = authorization.replace(/^Bearer\s+/i, "");
     const { data: { user }, error: userError } = await userClient.auth.getUser(token);
-    if (userError || !user) return json({ error: "ログインを確認できませんでした。" }, 401);
+    if (userError || !user) return reply({ error: "ログインを確認できませんでした。" }, 401);
 
-    const body = await request.json() as { application_id?: string };
-    if (!body.application_id) return json({ error: "申込IDが必要です。" }, 400);
+    const body = await request.json() as { application_id?: string; offering_application_id?: string };
+    if (!body.application_id && !body.offering_application_id) return reply({ error: "申込IDが必要です。" }, 400);
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!serviceRoleKey) throw new Error("SUPABASE_SERVICE_ROLE_KEY is not configured");
     const admin = createClient(Deno.env.get("SUPABASE_URL") ?? "", serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false }
     });
+    if (body.offering_application_id) {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.offering_application_id))
+        return reply({ error: "申込IDを確認してください。" }, 400);
+      const { data: application, error: applicationError } = await admin.from("academy_offering_applications")
+        .select("id,headquarters_id,learner_user_id,request_token,offering_id,payment_method")
+        .eq("id", body.offering_application_id).maybeSingle();
+      if (applicationError || !application || application.payment_method !== "bank")
+        return reply({ error: "申込を確認できませんでした。" }, 404);
+      const { data: headquarters, error: roleError } = await userClient.rpc("academy2_my_headquarters");
+      if (roleError || !Array.isArray(headquarters) || !headquarters.some(item =>
+        item?.id === application.headquarters_id && item?.role === "administrator"))
+        return reply({ error: "メールを再送する権限がありません。" }, 403);
+      const { data: applicant, error: applicantError } = await admin.auth.admin.getUserById(application.learner_user_id);
+      if (applicantError || !applicant.user) return reply({ error: "申込者を確認できませんでした。" }, 409);
+      const status = await deliverStoredAcademy2BankMail(admin, applicant.user,
+        application.id, application.request_token, application.offering_id);
+      return reply({ sent: status === "sent", message: status === "sent"
+        ? "振込案内メールを確認しました。" : "配信状況を確認できません。二重送信を避けるため、履歴を確認してください。" });
+    }
     const { data: application, error: applicationError } = await admin
       .from("academy_applications")
       .select("id, headquarters_id, applicant_name, applicant_email, payment_provider, provider_checkout_url, academy_courses(name, payment_url), academy_headquarters(contact_email, default_payment_note)")
       .eq("id", body.application_id)
       .eq("intake_source", "honbu")
       .maybeSingle();
-    if (applicationError || !application) return json({ error: "本部受付の申込を確認できませんでした。" }, 404);
+    if (applicationError || !application) return reply({ error: "本部受付の申込を確認できませんでした。" }, 404);
 
     const { data: role, error: roleError } = await userClient.rpc("academy_get_my_headquarters_role", {
       p_headquarters_id: application.headquarters_id
     });
     if (roleError || !(["owner", "administrator"] as unknown[]).includes(role)) {
-      return json({ error: "メールを再送する権限がありません。" }, 403);
+      return reply({ error: "メールを再送する権限がありません。" }, 403);
     }
 
     const { data: existing, error: existingError } = await admin
@@ -127,7 +163,7 @@ Deno.serve(async (request) => {
       }] : [])
     ].filter((delivery) => delivery.to && !sentKinds.has(delivery.kind));
 
-    if (deliveries.length === 0) return json({ sent: true, sent_count: 0, message: "再送が必要なメールはありません。" });
+    if (deliveries.length === 0) return reply({ sent: true, sent_count: 0, message: "再送が必要なメールはありません。" });
     let sentCount = 0;
     for (const delivery of deliveries) {
       const attemptCount = (attemptCounts.get(delivery.kind) ?? 0) + 1;
@@ -155,8 +191,8 @@ Deno.serve(async (request) => {
         });
       }
     }
-    return json({ sent: sentCount === deliveries.length, sent_count: sentCount, attempted_count: deliveries.length });
+    return reply({ sent: sentCount === deliveries.length, sent_count: sentCount, attempted_count: deliveries.length });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "メール再送に失敗しました。" }, 500);
+    return reply({ error: error instanceof Error ? error.message : "メール再送に失敗しました。" }, 500);
   }
 });

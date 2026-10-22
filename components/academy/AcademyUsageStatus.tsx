@@ -9,8 +9,10 @@ function deadline(value: string | null) {
 export function AcademyUsageStatus({ access, sample, href }: { access: AcademyHeadquartersAccess | null; sample: boolean; href: string }) {
   const until = deadline(access?.ends_at ?? null);
   const trial = access?.access_kind === "trial";
+  const noFee = access?.access_kind === "no_operating_fee";
   const usable = access?.can_manage_drafts === true;
   const title = !access ? (sample ? "サンプル表示" : "利用状態を確認してください")
+    : noFee && usable ? "運営利用料の請求なし"
     : trial ? (usable ? "7日間無料体験中" : "無料体験は終了しました")
     : access.status === "internal_grant" && usable ? "利用可能（付与された利用権）"
     : access.status === "active" && usable ? "有料利用中"
@@ -23,8 +25,8 @@ export function AcademyUsageStatus({ access, sample, href }: { access: AcademyHe
       <Link href={href} className="ml-auto inline-flex min-h-11 shrink-0 items-center text-xs text-[var(--mikke-primary)]">利用状態・料金を確認 →</Link>
     </div>
     <details className="text-xs text-[var(--mikke-muted)]"><summary className="w-fit cursor-pointer py-1">{sample ? "確認用データについて" : "利用期間について"}</summary>
-      {access ? <p className="mt-1 leading-5">{until ? `${trial ? "無料体験" : "利用期間"}：${until}まで（日本時間）` : "利用期限：設定なし"}{trial && usable ? ` · あと${Math.max(0, access.days_remaining)}日` : ""}</p> : null}
-      <p className="mt-1 leading-5">{sample ? "確認用データです。実際の契約状態ではありません。" : trial ? "無料期間の終了だけでは自動課金されません。" : "利用期間は公開中の講座数ではなく、利用契約・利用権で決まります。"}</p>
+      {access ? <p className="mt-1 leading-5">{until ? `${trial ? "無料体験" : "利用期間"}：${until}まで（日本時間）` : "利用期限：設定なし"}{trial && usable ? ` · あと${Math.max(0, access.days_remaining ?? 0)}日` : ""}</p> : null}
+      <p className="mt-1 leading-5">{sample ? "確認用データです。実際の契約状態ではありません。" : noFee ? "Academy運営利用料は当面請求しません。初回公開から7日後の有料移行や月額請求はありません。" : trial ? "無料期間の終了だけでは自動課金されません。" : "利用期間は公開中の講座数ではなく、利用契約・利用権で決まります。"}</p>
     </details>
   </section>;
 }

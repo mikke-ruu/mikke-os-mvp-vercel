@@ -392,6 +392,10 @@ verify_jwt = false
 [functions.academy-application-email-retry]
 verify_jwt = true
 
+# Dedicated scheduler credential is checked by the worker; no browser/admin bypass.
+[functions.academy2-receipt-worker]
+verify_jwt = false
+
 [functions.academy-stripe-webhook]
 verify_jwt = false
 

@@ -1,3 +1,4 @@
+import type {ApplicationSchedule,IndividualSchedule} from './application-schedule';
 import { supabase } from '@/lib/supabase/client';
 import { assertAcademyWritable } from '@/lib/academy/preview';
 import type { Academy2Operation } from './operations';
@@ -8,12 +9,13 @@ export type HeadquartersApplicationSummary = {
   applicantName: string; planTitle: string; appliedAt: string; statusLabel: string;
   nextAction: string | null; revision: number;
   tuition?: { amount: number; currency: string; status: string; method: string };
-  kitStatus: string | null; completedAt: string | null; certifiedAt: string | null;
+  schedule?:ApplicationSchedule|null; kitStatus: string | null; completedAt: string | null; certifiedAt: string | null;
 };
 export type HeadquartersApplicationDetail = {
   summary: HeadquartersApplicationSummary;
   headquarters: (Academy2Operation & {
-    contactEmail: string | null; allowedActions: string[];
+    location?: import('./operations').EventLocation|null;
+    contactEmail: string | null; allowedActions: string[]; individualSchedule?:IndividualSchedule|null;scheduleWritable?:boolean;
     event: { id: string; revision: number; startsAt: string | null; endsAt: string | null; format: 'in_person' | 'online'; venueName: string | null; meetingUrl: string | null } | null;
     shipping: { required: boolean; recipient?: 'learner' | 'instructor'; eventId?: string | null; status: string; address: string | null; shippedAt: string | null; trackingNumber: string | null };
   }) | null;

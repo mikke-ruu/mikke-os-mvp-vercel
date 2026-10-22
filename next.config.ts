@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   // In the isolated dev runtime keep React debug data in the RSC response.
   // The separate debug WebSocket can stall hydration on slow local machines.
   // HMR remains enabled, and normal builds/deployments keep Next's defaults.
-  ...(localDist && process.env.NODE_ENV === "development"
+  ...((localDist || ["http://127.0.0.1:58072", "http://127.0.0.1:45972", "http://127.0.0.1:46772", "http://127.0.0.1:46872", "http://127.0.0.1:46972", "http://127.0.0.1:47072", "http://127.0.0.1:47172"].includes(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "")) && process.env.NODE_ENV === "development"
     ? { experimental: { reactDebugChannel: false } } : {}),
   devIndicators: false,
   async rewrites() {

@@ -5,7 +5,7 @@ import { pageJpFonts, pageJpFontOrder, buildPageFontsCssUrl, buildPageFontFamily
 import { bounded, lpFonts, lpBackground, safeLpColor, type LpBlock, type LpStyle } from "./lp-design";
 import styles from "./lp-design.module.css";
 
-export function LpDesignFields({ block, onChange, imagePicker, expanded = false, minimumFontSize = 12 }: { block: LpBlock; onChange: (b: LpBlock) => void; imagePicker?: ReactNode; expanded?: boolean; minimumFontSize?: 9 | 12 }) {
+export function LpDesignFields({ block, onChange, imagePicker, expanded = false, minimumFontSize = 12 }: { block: LpBlock; onChange: (b: LpBlock) => void; imagePicker?: ReactNode; expanded?: boolean; minimumFontSize?: 9 | 12 | 14 }) {
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const values = block.lp?.[device] ?? {};
   const patch = (delta: Partial<LpStyle>) => onChange({ ...block, lp: { ...block.lp, [device]: { ...values, ...delta } } });
@@ -56,12 +56,13 @@ function Slides({ block }: { block: LpBlock }) {
   </div>;
 }
 
-export function LpContent({ blocks, render, nested = false, decorate, standaloneButtons = false, minimumFontSize = 12 }: { blocks: LpBlock[]; render: (blocks: LpBlock[]) => ReactNode; nested?: boolean; standaloneButtons?: boolean; minimumFontSize?: 9 | 12; decorate?: (block: LpBlock, content: ReactNode) => ReactNode }) {
-  if (!decorate && !blocks.some(b => b.lp)) return <>{render(blocks)}</>;
+export function LpContent({ blocks, render, nested = false, decorate, standaloneButtons = false, minimumFontSize = 12, honorVisibility = false }: { blocks: LpBlock[]; render: (blocks: LpBlock[]) => ReactNode; nested?: boolean; honorVisibility?: boolean; standaloneButtons?: boolean; minimumFontSize?: 9 | 12 | 14; decorate?: (block: LpBlock, content: ReactNode) => ReactNode }) {
+  const visibleBlocks = honorVisibility ? blocks.filter(block => block.lp?.hidden !== true) : blocks;
+  if (!decorate && !visibleBlocks.some(b => b.lp)) return <>{render(visibleBlocks)}</>;
   const fontUrl = process.env.NEXT_PUBLIC_SUPABASE_URL === "http://127.0.0.1:57680" ? "" : buildPageFontsCssUrl(lpFonts(blocks), []);
-  return <div className={styles.content} data-lp-root={!nested || undefined}>{!nested && fontUrl && <link rel="stylesheet" href={fontUrl}/>}{blocks.map(block => {
+  return <div className={styles.content} data-lp-root={!nested || undefined}>{!nested && fontUrl && <link rel="stylesheet" href={fontUrl}/>}{visibleBlocks.map(block => {
     const content = !block.lp || block.type === "cta" && (standaloneButtons || block.lp.button) ? render([block]) : <section className={styles.styled} data-media={block.lp.media ? true : undefined} data-media-height={block.lp.media?.height !== undefined || undefined} data-size={block.lp.desktop?.size !== undefined || block.lp.mobile?.size !== undefined || undefined} data-motion={block.lp.motion} style={{ ...(block.lp.media ? { width: `${bounded(block.lp.media.width, 10, 100) ?? 100}%`, marginLeft: block.lp.media.align === "left" ? 0 : "auto", marginRight: block.lp.media.align === "right" ? 0 : "auto", "--lp-media-height": `${bounded(block.lp.media.height, 60, 1600) ?? 400}px`, "--lp-media-fit": block.lp.media.fit === "cover" ? "cover" : "contain" } as CSSProperties : {}), ...variables(block.lp.desktop ?? {}, "", minimumFontSize), ...variables(block.lp.mobile ?? {}, "m-", minimumFontSize), ...(lpBackground(block.lp.backgroundImage) ? { backgroundImage: lpBackground(block.lp.backgroundImage), backgroundSize: "cover", backgroundPosition: "center" } : {}) }}>
-      {block.lp.children ? <div className={styles.grid}>{block.lp.children.map(child => <LpContent minimumFontSize={minimumFontSize} standaloneButtons={standaloneButtons} nested key={child.id} blocks={[child]} render={render} decorate={decorate}/>)}</div> : block.lp.slideshow && block.type === "gallery" ? <Slides block={block}/> : render([block])}
+      {block.lp.children ? <div className={styles.grid}>{block.lp.children.map(child => <LpContent honorVisibility={honorVisibility} minimumFontSize={minimumFontSize} standaloneButtons={standaloneButtons} nested key={child.id} blocks={[child]} render={render} decorate={decorate}/>)}</div> : block.lp.slideshow && block.type === "gallery" ? <Slides block={block}/> : render([block])}
     </section>;
     return <div key={block.id}>{decorate ? decorate(block, content) : content}</div>;
   })}</div>;

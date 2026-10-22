@@ -54,3 +54,11 @@ export async function getMyAcademyHeadquartersAccess(
   if (error) throw error;
   return ((data ?? [])[0] ?? null) as AcademyHeadquartersAccess | null;
 }
+
+/** Independent operating-fee onboarding; no trial or paid ledger is used. */
+export async function getNoOperatingFeeOnboardingAvailable(): Promise<boolean> {
+  if (isAcademyLocalReview()) return true;
+  const { data, error } = await supabase.rpc("academy_no_operating_fee_onboarding_available" as never);
+  if (error) throw error;
+  return data === true;
+}

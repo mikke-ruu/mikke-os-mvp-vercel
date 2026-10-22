@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthGate";
-import { getAcademyRouteContext, toAcademyContextHref, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
+import { getAcademyRouteContext, toCurrentAcademyContextHref } from "@/lib/academy/access-context";
 import { getOwnedHeadquarters } from "@/lib/academy/headquarters";
 import { supabase } from "@/lib/supabase/client";
 import { MyOfferingBookings, PaidApplicationAssignment } from "./AcademyClassBookings";
@@ -114,11 +114,11 @@ function Applications({ userId, academyId, audience }: { userId: string; academy
       <p className="mt-2 text-xs text-[var(--mikke-muted)]">申込日 {new Date(row.created_at).toLocaleDateString("ja-JP")} / 受付番号 {row.id}</p>
       {audience !== "learner" ? <p className="mt-2 break-all text-sm">{row.applicant_name} / {row.applicant_email}</p> : null}
       <p className="mt-3 font-bold">申込金額（税込） {Number.isFinite(Number(row.price)) ? `¥${Number(row.price).toLocaleString("ja-JP")}` : "確認が必要です"}</p>
-      <p className="text-sm">{row.payment_method === "bank" ? "銀行振込" : row.payment_method === "onsite" ? "現地払い" : "支払方法を確認してください"}</p>
+      <p className="text-sm">{row.payment_method === "bank" ? "銀行振込" : row.payment_method === "external" ? "外部決済サービス" : row.payment_method === "onsite" ? "現地払い" : "支払方法を確認してください"}</p>
       {audience === "learner" && row.status === "pending" && row.payment_method === "bank" && <p className="mt-2 text-sm">お振込みの名義は、お申込みのお名前と同じにしてください。</p>}
       <details className="mt-3 text-sm"><summary className="cursor-pointer py-2">申込時の講座内容</summary><ul className="list-disc space-y-1 pl-5">{Array.isArray(row.course_snapshot) ? row.course_snapshot.map(course => <li key={course.id}>{course.name}</li>) : null}</ul></details>
       {audience === "hq" && ["paid", "pending"].includes(row.status) ? <PaidApplicationAssignment applicationId={row.id} headquartersId={row.headquarters_id} applicantName={row.applicant_name} paid={row.status === "paid"} /> : null}
-      {audience === "learner" && row.status === "paid" ? <Link className="mt-3 inline-flex min-h-11 items-center font-bold text-[var(--mikke-primary)]" href={toAcademyContextHref("/academy/portal/study?view=learner", row.headquarters_id, "teach")}>教材を確認する →</Link> : null}
+      {audience === "learner" && row.status === "paid" ? <Link className="mt-3 inline-flex min-h-11 items-center font-bold text-[var(--mikke-primary)]" href={`/academy/portal/study?view=learner&application=${encodeURIComponent(row.id)}`}>教材を確認する →</Link> : null}
       {(row.stage_index > 0 || row.course_snapshot.some(course => course.learner_access_mode === "days_after_completion")) && <div className="mt-3 text-sm">
         <p>{row.stage_index > 0 ? `第${row.stage_index}講座` : "まとめて申し込んだ講座"} {row.completed_at ? "修了済み" : ""}</p>
         {row.status === "paid" && !row.completed_at && (audience === "hq" || (audience === "learner" && (row.purchase_snapshot?.completion_mode ?? "hq") === "learner")) ? <><p className="mt-2">{row.stage_index > 0 ? "受講が終わったら修了を記録してください。" : "対象の全講座を受講し終わってから修了を記録してください。まとめて修了扱いになります。"}修了後に閲覧期間が始まる教材は、この操作で期間が始まります。</p><button type="button" className="mt-2 min-h-11 rounded-lg border border-[var(--mikke-line)] px-4 font-bold" disabled={saving} onClick={() => void completeCourse(row)}>修了を記録する</button></> : null}

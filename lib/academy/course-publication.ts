@@ -32,7 +32,7 @@ export async function getCoursePublicationAccess(profile: Profile, headquartersI
     return { route: "blocked", message: "この利用状態ではここから公開できません。本部設定で利用状態と初回公開の手続きを確認してください。" };
   }
   const access = await getMyAcademyHeadquartersAccess(headquartersId);
-  if (access?.headquarters_id === headquartersId && access.access_kind === "paid" &&
+  if (access?.headquarters_id === headquartersId && ["paid", "no_operating_fee"].includes(access.access_kind) &&
       ["active", "internal_grant"].includes(access.status) && access.can_use_live_features === true &&
       (access.ends_at === null || Date.parse(access.ends_at) > Date.now())) {
     return { route: "legacy", message: "現在の利用権で講座を公開します。" };

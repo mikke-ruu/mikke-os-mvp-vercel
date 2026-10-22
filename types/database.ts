@@ -125,11 +125,11 @@ export type AcademyOnboardingEligibility = {
 };
 export type AcademyHeadquartersAccess = {
   headquarters_id: string;
-  access_kind: "trial" | "paid";
+  access_kind: "trial" | "paid" | "no_operating_fee";
   status: "trialing" | "active" | "internal_grant" | "past_due" | "ended" | "expired" | "cancelled" | "unavailable";
   starts_at: string;
   ends_at: string | null;
-  days_remaining: number;
+  days_remaining: number | null;
   can_manage_drafts: boolean;
   can_use_live_features: boolean;
 };

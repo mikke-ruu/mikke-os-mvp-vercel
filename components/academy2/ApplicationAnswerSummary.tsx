@@ -1,12 +1,25 @@
 "use client";
-import {useEffect,useState} from 'react';
+import {useEffect,useState,type ReactNode} from 'react';
 import {useAuth} from '@/components/AuthGate';
 import {supabase} from '@/lib/supabase/client';
+import styles from './applications-operation.module.css';
 import type {IntakeField} from '@/lib/academy2/application-conditions.mjs';
+
 type Snapshot={fields:IntakeField[];answers:Record<string,string>;savedAt?:string;legacy:boolean};
-/** Permission-checked immutable intake snapshot; never repurposed as an address consent. */
-export function ApplicationAnswerSummary({applicationId}:{applicationId:string}) {
- const {user}=useAuth();const [data,setData]=useState<Snapshot|null>(null);const [error,setError]=useState('');
- useEffect(()=>{let live=true;setData(null);setError('');void Promise.resolve(supabase.rpc('academy2_application_answers',{p_application:applicationId})).then(({data,error})=>{if(!live)return;if(error)setError('申込時の回答を確認できませんでした。');else setData(data as Snapshot);}).catch(()=>{if(live)setError('申込時の回答を確認できませんでした。');});return()=>{live=false;};},[applicationId,user.id]);
- return <section className="space-y-3 rounded-xl border border-[var(--mikke-line)] bg-white p-4"><h2 className="text-sm font-bold">申込時の回答</h2>{error?<p role="alert">{error}</p>:!data?<p role="status">回答を読み込んでいます…</p>:data.legacy?<p className="text-xs">この申込には追加質問の回答記録がありません。</p>:<dl className="space-y-3">{data.fields.filter(field=>Object.hasOwn(data.answers,field.id)).map(field=><div key={field.id}><dt className="text-xs font-bold">{field.label}</dt><dd className="mt-1 whitespace-pre-wrap break-words text-sm">{data.answers[field.id]||'未入力'}</dd></div>)}</dl>}<p className="text-xs text-[var(--mikke-muted)]">申込時の内容です。発送先や証書記載名の確定操作とは別に確認してください。</p></section>;
+type BasicRow={id:string;label:string;value?:ReactNode};
+/** Display the immutable question array in its saved order, never the current form. */
+export function ApplicationAnswerSummary({applicationId,className,basicRows,reservedAnswers={}}:{applicationId:string;className?:string;basicRows?:BasicRow[];reservedAnswers?:Record<string,string|undefined>}) {
+ const {user}=useAuth();const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ useEffect(()=>{let live=true;setData(null);setError('');void Promise.resolve(supabase.rpc('academy2_application_answers',{p_application:applicationId}).abortSignal(AbortSignal.timeout(30000))).then(({data,error})=>{if(!live)return;if(error)setError('申込時の回答を読み込めませんでした。');else setData(data as Snapshot);}).catch(()=>{if(live)setError('申込時の回答を読み込めませんでした。');});return()=>{live=false;};},[applicationId,user.id,retry]);
+ const fields=data?.fields??[],answers=data?.answers??{};
+ const basicById=new Map(basicRows?.map(row=>[row.id,row])??[]);
+ const ordered=!!data&&!data.legacy&&fields.length>0;
+ // Metadata is separate. Form answers, including name/email/phone, follow the immutable field array.
+ const metadata=ordered?basicRows?.filter(row=>!fields.some(field=>field.id===row.id)&&row.id!=='phone'):basicRows;
+ const answer=(field:IntakeField)=>Object.hasOwn(answers,field.id)?answers[field.id]:reservedAnswers[field.id];
+ const unknown=Object.keys(answers).filter(id=>!fields.some(field=>field.id===id));
+ return <section className={`${className??styles.detailCard} ${styles.answers}`}><h2>{basicRows?'お申し込み内容':'申込時の回答'}</h2>
+ {metadata&&<dl className={styles.basicAnswers}>{metadata.map(row=>{const field=fields.find(field=>field.id===row.id);if(row.id==='phone'&&!field&&!Object.hasOwn(answers,'phone'))return null;return <div className={styles.row} key={row.id}><dt className={styles.rowLabel}>{field?.label??row.label}</dt><dd className={styles.rowValue}>{row.id==='phone'?(answers.phone??''):row.value}</dd></div>;})}</dl>}
+ {error?<p role="alert">{error}<button type="button" className={styles.iconButton} aria-label="申込時の回答を再取得" onClick={()=>setRetry(v=>v+1)}>↻</button></p>:!data?<p role="status">回答を読み込んでいます…</p>:data.legacy?<p>この申込には追加質問の回答記録がありません。</p>:<dl className={styles.questionAnswers}>{fields.map(field=>{const value=basicById.get(field.id)?.value??answer(field),missing=field.required&&!value;return <div key={field.id}><dt className={styles.answerLabel}>{field.label}</dt><dd className={styles.answerValue}>{value||<span aria-label="回答なし">&nbsp;</span>}{missing&&<p className={styles.missingAnswer}>{field.id==='terms'?'同意記録の読み取りを確認できません。':'必須回答の記録を確認できません。'}</p>}</dd></div>;})}{unknown.map(id=><div key={id}><dt className={styles.answerLabel}>質問名の記録がない回答（{id}）</dt><dd className={styles.answerValue}>{answers[id]}</dd></div>)}</dl>}
+ </section>;
 }

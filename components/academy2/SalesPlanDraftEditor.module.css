@@ -168,4 +168,156 @@
 
 .sixStepReview .help,.sixStepReview .note,.sixStepReview .localReview p,.sixStepReview .pitem span,.sixStepReview .review-box p{line-height:var(--academy-line-note)}
 
+/* Keep workshop questions and all conditional inputs inside their own rows. */
+.sixStepReview .conditional{min-width:0}
+.sixStepReview .conditional>label{display:grid;gap:6px;min-width:0;margin:0 0 14px}
+.sixStepReview .conditional>label>input:not([type=checkbox]),.sixStepReview .conditional>label>textarea,.sixStepReview .conditional>label>select{display:block;box-sizing:border-box;width:100%;min-width:0;margin:0;border:1px solid #d9dce0;border-radius:8px;padding:10px 12px;background:#fff;color:var(--ink)}
+.sixStepReview .conditional>label>textarea{min-height:96px;resize:vertical}
+.sixStepReview .conditional>label:last-child{margin-bottom:0}
+.sixStepReview .conditional>label.radio-line{display:grid;grid-template-columns:22px minmax(0,1fr);align-items:start;gap:10px;min-height:54px;margin:8px 0;padding:8px 4px}
+.sixStepReview .conditional>label.radio-line>input[type=radio]{width:18px;min-width:18px;height:18px;margin:3px 0 0;padding:0}
+.sixStepReview .conditional>label.radio-line span{min-width:0}
+.sixStepReview .conditional>label.radio-line b{font-size:var(--academy-text-body)}
+.sixStepReview .form-row strong,.sixStepReview .customer-field label{font-size:var(--academy-text-body);line-height:var(--academy-line-body)}
+.sixStepReview .form-row p{font-size:var(--academy-text-note);line-height:var(--academy-line-note)}
+.sixStepReview .form-row strong,.sixStepReview .customer-field label{font-weight:600}
+.sixStepReview .form-badge{font-weight:650}
+.form-modal .customer-field label{font-weight:600}
+.sixStepReview .course-details button,.sixStepReview .note button{border:1px solid #a8c8b7;border-radius:8px;background:#fff;color:#346d53;padding:8px 11px;text-align:left}
+.sixStepReview .launch-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+.sixStepReview .launch-card{display:flex;flex-direction:column;min-width:0}
+.sixStepReview .launch-card p{flex:1}
+.sixStepReview .launch-card button{margin-top:auto;min-height:44px}
+.sixStepReview .field>input{display:block;width:100%;max-width:520px;min-height:44px;font-size:var(--academy-text-body)}
+.sixStepReview .courseChoice{display:block;min-width:0;padding:4px;text-align:left}
+.sixStepReview .courseChoice>span:last-child{display:block;margin-top:8px;color:#346d53;font-size:var(--academy-text-note);font-weight:700}
+.reviewIssueList{margin:10px 0 14px;padding-left:24px;list-style:disc outside}
+.reviewIssueList li{padding:5px 0;line-height:1.5}
+.reviewIssueList button{display:inline-block;margin-left:10px;border:1px solid #a8c8b7;border-radius:8px;background:#fff;color:#346d53;padding:6px 10px}
+@media(max-width:820px){.sixStepReview .launch-options{grid-template-columns:1fr}}
+@media(max-width:820px){.reviewIssueList button{display:block;margin:7px 0 0}}
+.sixStepReview .customer-field input,.sixStepReview .customer-field textarea,.sixStepReview .customer-field select{font-size:16px;line-height:1.5;min-height:44px}
+.form-modal-head strong{font-size:16px}
+.form-modal .customer-form h2{font-size:22px;line-height:1.4}
+.form-modal .customer-form .lead,.form-modal .consult-note{font-size:14px;line-height:1.6}
+.form-modal .customer-field label{font-size:16px;line-height:1.5}
+.form-modal .customer-field input,.form-modal .customer-field textarea,.form-modal .customer-field select{font-size:16px;line-height:1.5;min-height:44px}
+.form-modal .submit-demo{font-size:16px;min-height:48px}
+.sixStepReview .field label{font-size:16px;line-height:1.5}
+.sixStepReview .field label>input{display:block;width:100%;min-height:44px;margin-top:6px;padding:9px 12px;border:1px solid #d9dce0;border-radius:8px;background:#fff;color:var(--ink);font-size:16px}
+
 .sixStepReview .study-choice strong,.sixStepReview .method-choice strong,.sixStepReview .after-choice strong,.sixStepReview .billing-choice strong,.sixStepReview .pay-option strong,.sixStepReview .launch-card strong{font-size:var(--academy-text-body);font-weight:var(--academy-weight-label)}.sixStepReview .schedule-note,.sixStepReview .ready,.sixStepReview .price-total,.sixStepReview .pay-config,.sixStepReview .lp-note,.sixStepReview .auto-item{font-size:var(--academy-text-body);line-height:var(--academy-line-body)}.sixStepReview .back,.sixStepReview .course-details,.sixStepReview .thumb,.sixStepReview .pitem b,.sixStepReview .review-box b,.sixStepReview .price-head,.sixStepReview .price-warning,.sixStepReview .discount,.sixStepReview .form-badge,.sixStepReview .status{font-size:var(--academy-text-note);line-height:var(--academy-line-note)}
+/* STEP1 review only: preserve later STEP layouts and business behavior. */
+.stepOne{--muted:#555b63;font-size:14px;line-height:1.65;letter-spacing:.01em}
+.stepOne .titlebar{border-radius:13px}.stepOne .card>h2{font-size:14px;font-weight:400;line-height:1.65;margin:0 0 14px}
+.stepOne .step,.stepOne .back,.stepOne .jp,.stepOne .card h3,.stepOne .field label,.stepOne .conditional>label,.stepOne .course strong,.stepOne .form-row strong,.stepOne .preview-label,.stepOne .pitem strong{font-size:14px;font-weight:600;line-height:1.65}
+.stepOne .course small,.stepOne .course-price,.stepOne .form-row p,.stepOne .pitem span,.stepOne .pitem b,.stepOne .courseChoice>span:last-child,.stepOne .status{font-size:14px;font-weight:400;line-height:1.65;color:var(--muted)}
+.stepOne .courseChoice>span:last-child{color:#346d53}.stepOne .pitem b{color:#346d53;font-weight:600}
+.stepOne .conditional>label>input,.stepOne .conditional>label>textarea{font-size:14px;font-weight:400;line-height:1.65}
+.stepOne .course{grid-template-columns:30px 50px minmax(0,1fr) auto}.stepOne .courseChoice{overflow-wrap:anywhere}.stepOne .form-row{text-align:left}.stepOne .form-row p{margin-top:4px}
+.stepOne .add,.stepOne .actions button{font-size:14px;font-weight:600;line-height:1.65}
+.sequenceHelp{margin:12px 0;color:#555b63;font-size:14px;font-weight:400;line-height:1.65}
+.materialsSection{margin-top:20px}.materialsSection h3{margin:0 0 6px}.materialsSection>p{margin:0 0 12px;color:#555b63;font-size:14px;font-weight:400;line-height:1.65}
+.materialsList{display:grid;gap:8px}.materialCard{background:#fff;border:1px solid #e0e3e5;border-radius:10px;padding:12px 14px;min-width:0}.materialCard h4{margin:0 0 6px;font-size:14px;font-weight:600;line-height:1.65;overflow-wrap:anywhere}
+.materialStatus{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;font-size:14px;font-weight:400;line-height:1.65;color:#555b63;overflow-wrap:anywhere}.materialPending,.materialDone{padding:1px 7px;border-radius:5px;font-weight:600}.materialPending{background:#fff4cf;color:#70521c}.materialDone{background:#edf7f1;color:#346d53}.materialValue{color:#202126}
+.materialAction{display:inline-block;border:0;background:transparent;color:#346d53;font-size:14px;font-weight:600;line-height:1.65;padding:6px 0 0;margin-top:3px;text-align:left;cursor:pointer}
+.stepOne .materialsSection [role=alert]{color:#a52d25;margin-top:12px}
+@media(max-width:820px){.stepOne .course{grid-template-columns:25px 42px minmax(0,1fr) auto}.stepOne .actions{flex-wrap:wrap;gap:8px}.stepOne .actions .next{margin-left:auto}.materialCard{padding:12px}.stepOne .step{min-width:112px}}
+
+.durationInput{display:flex;align-items:center;gap:10px;min-width:0}.durationInput input{width:100%;min-width:0;border:1px solid #d9dce0;border-radius:8px;padding:10px 12px;background:#fff;color:var(--ink);font-size:14px;font-weight:400;line-height:1.65}.durationInput span{font-size:14px;font-weight:400;color:#555b63}
+/* STEP2–4: course editor typography; keep other steps unchanged. */
+.steps234 {font-size:14px;font-weight:400;line-height:1.65;letter-spacing:.01em;color:#252b33;}
+.steps234 .field label,.steps234 .conditional>label,.steps234 .wizard label {font-size:14px;font-weight:600;line-height:1.65;}
+.steps234 .card h3 {font-size:16px;font-weight:600;line-height:1.6;}
+.steps234 .help,.steps234 .price-summary,.steps234 .wizard p,.steps234 .pitem span {font-size:14px;font-weight:400;line-height:1.65;color:#555b63;}
+.steps234 .field input,.steps234 .field textarea,.steps234 .wizard input,.steps234 .wizard textarea {font-size:14px;line-height:1.65;font-weight:400;}
+.steps234 .wizardCards button {font-size:14px;font-weight:600;line-height:1.6;}
+.steps234 .paymentSupplement {font-size:13px;font-weight:400;line-height:1.65;color:#555b63;}
+.paymentChoices {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.paymentChoices button {min-height:56px;padding:12px 10px;border:1px solid #d7dce0;border-radius:10px;background:#fff;color:#252b33;font-size:14px;font-weight:600;line-height:1.6;letter-spacing:.01em;}
+.paymentChoices button[aria-pressed="true"] {background:#eaf6f1;border:2px solid #438b75;padding:11px 9px;}
+.paymentChoices button:disabled {color:#626b72;cursor:not-allowed;}
+.steps234 .wizardSummary {background:#fff;border:1px solid #d7dce0;padding:16px;display:grid;gap:16px;}
+.availableAfter {border-left:3px solid #8bc6ae;padding-left:12px;}
+.availableAfter p,.preparingAfter p {margin:0 0 6px;}
+.availableAfter h3 {margin:0;}
+.preparingAfter {border-top:1px solid #e3e6e8;padding-top:14px;}
+.preparingAfter>div {display:flex;flex-wrap:wrap;gap:8px;}
+.preparingAfter button {padding:8px 12px;border:1px solid #d7dce0;border-radius:8px;background:#f5f6f7;color:#626b72;font-size:14px;font-weight:400;line-height:1.6;cursor:not-allowed;}
+.steps234 .wizardSummary details {border-top:1px solid #e3e6e8;padding-top:12px;}
+.steps234 .wizardSummary summary {font-size:14px;font-weight:400;color:#39464f;}
+@media(max-width:640px){.paymentChoices {grid-template-columns:1fr;gap:8px;}.steps234 .wizardSummary {padding:14px;gap:14px;}}
+
+.steps234 .wizard>h3,.steps234 .field>label {font-size:14px;font-weight:600;line-height:1.65;}
+.steps234 .study-choice strong,.steps234 .method-choice strong,.steps234 .radio-line b,.steps234 .preview-label,.steps234 .pitem strong {font-size:14px;font-weight:600;line-height:1.65;}
+.steps234 .study-choice p,.steps234 .method-choice p,.steps234 .radio-line small,.steps234 .price-head,.steps234 .price-row,.steps234 .discount,.steps234 .schedule-note,.steps234 .pitem b {font-size:14px;font-weight:400;line-height:1.65;color:#555b63;}
+.steps234 .schedule-note b {font-weight:400;}
+.steps234 .wizard .paymentSupplement {font-size:13px;}
+.steps234 .actions {gap:8px;}
+.steps234 .actions button {font-size:14px;font-weight:600;line-height:1.65;}
+@media(max-width:640px){.steps234 .actions {flex-wrap:wrap;}.steps234 .actions .next {margin-left:auto;}}
+
+.steps234 .price-row b {font-size:14px;font-weight:600;line-height:1.65;}
+.steps234 .paymentChoices button:disabled,.steps234 .preparingAfter button:disabled {opacity:1;color:#626b72;}
+
+/* STEP1 bug fixes: local result beside the save button and in-place course confirmation. */
+.saveControl {display:flex;flex-direction:column;align-items:flex-start;gap:5px;}
+.saveResult,.saveFailure {font-size:14px;font-weight:400;line-height:1.65;max-width:230px;}
+.saveResult {color:#346d53;}.saveFailure {color:#a52d25;}
+.courseConfirmation {margin:auto;width:min(720px,calc(100vw - 32px));max-height:85vh;overflow:auto;border:1px solid #d7dce0;border-radius:14px;background:#fff;padding:20px;color:#252b33;font-size:14px;font-weight:400;line-height:1.65;letter-spacing:.01em;}
+.courseConfirmation::backdrop {background:rgba(0,0,0,.35);}
+.courseConfirmation h2 {font-size:18px;font-weight:600;line-height:1.6;margin:0 0 12px;}.courseConfirmation h3 {font-size:14px;font-weight:600;margin:16px 0 6px;}
+.courseConfirmation p {white-space:pre-wrap;}.courseConfirmation li {margin-bottom:6px;}.courseConfirmation button {min-height:44px;padding:8px 12px;border:1px solid #d7dce0;border-radius:8px;background:#fff;color:#252b33;font-size:14px;line-height:1.65;}
+
+/* STEP5 and administrator application preview use the course editor typography scale. */
+.stepFive,.form-modal {font-size:14px;font-weight:400;line-height:1.65;letter-spacing:.01em;color:#252b33;}
+.stepFive .card>h2,.form-modal .customer-form h2 {font-size:20px;font-weight:600;line-height:1.5;}
+.stepFive .card h3,.form-modal .previewConditions legend,.form-modal .previewTerms h3 {font-size:17px;font-weight:600;line-height:1.6;}
+.stepFive .help,.stepFive .form-row p,.stepFive .note,.stepFive .pitem span,.stepFive .pitem b,.form-modal .lead,.form-modal .consult-note,.form-modal p {font-size:14px;font-weight:400;line-height:1.65;color:#4b535e;}
+.stepFive .form-row strong,.stepFive .customer-field label,.stepFive .pitem strong,.stepFive .preview-label,.form-modal .customer-field label {font-size:14px;font-weight:600;line-height:1.65;}
+.stepFive .form-row {padding:12px 14px;margin-bottom:8px;}.stepFive .form-row p {margin:4px 0 0;}.stepFive .form-row p:empty {display:none;}
+.stepFive .form-badge {font-size:13px;font-weight:400;}.stepFive .radio-line {font-size:14px;font-weight:400;margin:6px 0;}
+.stepFive .customer-field {margin-top:16px;}.stepFive .customer-field label,.form-modal .customer-field label {margin-bottom:6px;}
+.stepFive .customer-field input,.stepFive .customer-field textarea,.stepFive .customer-field select,.form-modal .customer-field input,.form-modal .customer-field textarea,.form-modal .customer-field select {font-size:15px;font-weight:400;line-height:1.6;min-height:44px;}
+.stepFive .form-actions button,.stepFive .preview-form-btn,.stepFive .actions button,.stepFive .note summary {font-size:14px;font-weight:600;line-height:1.65;}
+.form-modal-head strong {font-size:17px;font-weight:600;line-height:1.6;}.form-modal-head .form-close {width:40px;height:40px;flex:none;font-size:20px;font-weight:400;}
+.form-modal .customer-form {padding:18px;}.form-modal .customer-field {margin-top:14px;}.form-modal .lead {margin:6px 0 14px;}
+.previewConditions {border:1px solid #d7dce0;border-radius:10px;padding:12px;margin:0 0 16px;background:#f7f9f8;}.previewConditions legend {padding:0 4px;}.previewConditions .customer-field:first-of-type {margin-top:0;}
+.previewTerms {margin-top:18px;}.previewTerms h3 {margin:0 0 8px;}.termsBody {white-space:pre-wrap;overflow-wrap:anywhere;max-height:280px;overflow:auto;border:1px solid #d7dce0;border-radius:8px;padding:12px;background:#fff;font-size:14px;font-weight:400;line-height:1.7;color:#4b535e;}
+.form-modal .customer-field .agreementLabel {display:flex;align-items:flex-start;gap:8px;font-size:14px;font-weight:400;line-height:1.65;}.form-modal .customer-field .agreementLabel input[type=checkbox] {width:18px;height:18px;min-height:0;flex:none;margin:3px 0 0;padding:0;}
+@media(max-width:640px){.stepFive .customer-field input,.stepFive .customer-field textarea,.stepFive .customer-field select,.form-modal .customer-field input,.form-modal .customer-field textarea,.form-modal .customer-field select {font-size:16px;}.form-overlay {padding:12px;}.form-modal {max-height:calc(100dvh - 24px);}.form-modal .customer-form {padding:16px;}.stepFive .form-row {padding:10px 12px;}}
+.stepFive .jp {font-size:20px;font-weight:600;line-height:1.5;}
+
+/* STEP6 keeps the existing review cards and page actions. */
+.stepSix {font-size:14px;font-weight:400;line-height:1.65;letter-spacing:.01em;color:#252b33;}
+.stepSix .jp,.stepSix .card>h2 {font-size:20px;font-weight:600;line-height:1.5;}
+.stepSix .review-panel h3 {font-size:17px;font-weight:600;line-height:1.6;margin-bottom:8px;}
+.stepSix .review-panel p,.stepSix .review-box p,.stepSix .help,.stepSix .pitem span,.stepSix .pitem b {font-size:14px;font-weight:400;line-height:1.65;color:#4b535e;}
+.stepSix .review-box b,.stepSix .review-box strong,.stepSix .launch-card strong,.stepSix .pitem strong,.stepSix .ready b,.stepSix .review-panel summary {font-size:14px;font-weight:600;line-height:1.65;}
+.stepSix .review-box {padding:12px 14px;}.stepSix .review-box p {margin:4px 0 0;}.stepSix .review-grid {gap:10px;}
+.stepSix .reviewIssueList {margin:8px 0 12px;}.stepSix .reviewIssueList li {line-height:1.65;}.stepSix .reviewIssueList button,.stepSix .actions button,.stepSix .launch-card button {font-size:14px;font-weight:600;line-height:1.65;}
+.stepSix .launch-card {padding:14px;}.stepSix .launch-card p {margin:4px 0 10px;}.stepSix .ready {margin-top:16px;}
+.stepSix .wizardSummary {margin:16px 0;}.stepSix .wizardSummary details {margin-top:10px;}.stepSix .wizardSummary .availableAfter,.stepSix .wizardSummary .preparingAfter {padding:12px 14px;}.stepSix .wizardSummary .preparingAfter button {font-size:14px;font-weight:400;line-height:1.65;}
+@media(max-width:640px){.stepSix .review-box {padding:10px 12px;}.stepSix .launch-card {padding:12px;}.stepSix .reviewIssueList li {align-items:flex-start;}}
+/* Course STEP3: display-only scale, preserving pricing and payment controls. */
+.steps234.coursePricing .billing-choice {background:#fff;}
+.steps234.coursePricing .billing-choice.on {background:#edf7f2;border-color:#72b79b;}
+.steps234.coursePricing .billing-choice strong {display:block;font-size:14px;font-weight:600;line-height:1.5;letter-spacing:.01em;}
+.steps234.coursePricing .billing-choice p {margin:6px 0 0;font-size:14px;font-weight:400;line-height:1.65;letter-spacing:.01em;color:#4b535e;}
+.steps234.coursePricing .price-head {font-weight:600;color:#202126;}
+.steps234.coursePricing .price-row label {font-size:14px;font-weight:600;line-height:1.65;}
+.steps234.coursePricing .price-row small {display:block;font-size:14px;font-weight:400;line-height:1.65;color:#4b535e;letter-spacing:.01em;}
+.steps234.coursePricing .courseStageAmount {display:flex;align-items:center;gap:8px;}
+.steps234.coursePricing .courseStageAmount input {width:110px;font-size:15px;font-weight:400;min-height:40px;}
+.steps234.coursePricing .courseStageAmount span {font-size:14px;font-weight:400;color:#4b535e;}
+.steps234.coursePricing .price-total {color:#4b535e;}
+.steps234.coursePricing .price-total strong {font-size:20px;font-weight:600;color:#202126;}
+.steps234.coursePricing .coursePaymentHelp {margin:10px 0 0;font-size:14px;font-weight:400;line-height:1.65;letter-spacing:.01em;color:#4b535e;}
+@media(max-width:820px){.steps234.coursePricing .courseStageAmount input {font-size:16px;width:100px;}}
+.nextAction{margin:16px 0;padding:18px;border:1px solid #bddace;border-radius:12px;background:#f4faf7;font-size:14px;line-height:1.65;letter-spacing:.01em;color:#4b535e}.nextAction h2,.nextAction h3{font-size:17px;font-weight:600;margin:0 0 8px;color:#26382f}.nextAction p{margin:0 0 12px}.nextAction a{display:inline-block;background:#f75a3b;color:#fff;border-radius:8px;padding:10px 16px;font-weight:600;text-decoration:none}.nextAction button{margin-left:12px;background:#fff;border:1px solid #cfd6d2;border-radius:8px;padding:10px 16px}
+
+/* Keep detailed management available without stacking cards before the editing steps. */
+.detailTools{margin:12px 0;font-size:14px;line-height:1.65;color:#4b535e}.detailTools>summary{cursor:pointer;min-height:44px;padding:10px 0;font-weight:600}.detailTools>summary:focus-visible{outline:2px solid #3f4eb5;outline-offset:3px}
+
+/* Approved management geometry and typography; no data or state changes. */
+.wrap{max-width:1220px;margin:auto;padding:28px 30px 80px;font-size:14px;line-height:1.65;letter-spacing:.01em;color:#4b535e}.titlebar{min-height:74px;padding:12px 16px;display:flex;flex-direction:column;justify-content:center}.en{font-size:15px;font-weight:600}.jp{font-size:14px;font-weight:600}.headbox p{font-size:14px;font-weight:400;color:#4b535e}.create{background:#f75a3b!important;color:#fff!important;font-size:14px;font-weight:600;min-height:44px}.compactHead{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:16px 0 4px}.compactHead h1{font-size:20px;font-weight:600;line-height:1.5;margin:0;overflow-wrap:anywhere}.compactHead p{font-size:14px;font-weight:400;color:#4b535e;margin:6px 0}.relatedActions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:start;margin:12px 0 16px}.relatedActions>details{margin:0}.relatedActions summary{font-weight:600}.addEvent{display:inline-flex;align-items:center;justify-content:center;background:#f75a3b;color:#fff!important;border-radius:8px;min-height:44px;padding:8px 14px;font-size:14px;font-weight:600;text-decoration:none}.addEvent[aria-disabled=true]{opacity:.6}@media(max-width:820px){.wrap{padding:16px 12px 80px}.relatedActions{grid-template-columns:1fr;gap:8px}.compactHead h1{font-size:18px}.addEvent{width:100%}}

@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase/client";
 import { assertAcademyWritable } from "@/lib/academy/preview";
+import type {AcademyCourseMarketing} from '@/types/database';
 
 export type Academy2Course = {
   id: string; headquarters_id: string; user_id: string; code: string; name: string;
@@ -7,6 +8,7 @@ export type Academy2Course = {
   duration_text: string | null; created_at: string; updated_at: string;
   reference_price: number | null; reference_revision: number; lesson_count: number | null; material_count?: number | null;
   target_audience?: string;
+  marketing?:AcademyCourseMarketing;
   show_introduction?: boolean;
 };
 export type Academy2CourseInput = {

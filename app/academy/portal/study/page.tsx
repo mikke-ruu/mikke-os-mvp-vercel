@@ -7,7 +7,8 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ExternalLink, FileText, Link2, Video } from "lucide-react";
 import { AuthGate, useAuth } from "@/components/AuthGate";
-import { ownedLearnerMaterialApplication } from "@/lib/academy2/learner-material-route.mjs";
+import { supabase } from "@/lib/supabase/client";
+import { ownedLearnerMaterialApplication, ownedLearnerStudySource } from "@/lib/academy2/learner-material-route.mjs";
 import { KoushiShell } from "@/components/academy/AcademyShell";
 import { getCoursesByIds, getMyInstructorRecords, listMaterialsForInstructor } from "@/lib/academy/instructor-portal";
 import { getInstructorPageForViewer } from "@/lib/academy/instructor-page";
@@ -39,7 +40,7 @@ function kindIcon(kind: AcademyMaterial["kind"]) {
   return <FileText size={14} className="shrink-0 text-[var(--mikke-accent-strong)]" />;
 }
 
-function StudyContent() {
+function StudyContent({allowedCourseIds}:{allowedCourseIds?:string[]} = {}) {
   const { profile } = useAuth();
   const searchParams = useSearchParams();
   const selectedCourseId = searchParams.get("course");
@@ -69,10 +70,12 @@ function StudyContent() {
       ]);
       if (cancelled) return;
       setRecords(myRecords);
-      setLearnerCourseIds(membership.courseIds);
-      if (!requestedView) setView(membership.courseIds.length > 0 ? "learner" : "instructor");
+      const scopedCourseIds=allowedCourseIds?membership.courseIds.filter(id=>allowedCourseIds.includes(id)):membership.courseIds;
+      setLearnerCourseIds(scopedCourseIds);
+      if (allowedCourseIds) setView("learner");
+      else if (!requestedView) setView(membership.courseIds.length > 0 ? "learner" : "instructor");
       const instructorCourseIds = myRecords.map((record) => record.course_id);
-      const learnerCourseIds = membership.courseIds;
+      const learnerCourseIds = scopedCourseIds;
       const courseIds = [...new Set([...instructorCourseIds, ...learnerCourseIds])];
       const [courses, mats, pages, learnerPages, grants] = await Promise.all([
         getCoursesByIds(courseIds),
@@ -92,13 +95,13 @@ function StudyContent() {
     }
     load();
     return () => { cancelled = true; };
-  }, [profile.user_id, searchParams]);
+  }, [profile.user_id, searchParams, allowedCourseIds]);
 
   if (loading) return <p className="py-16 text-center text-sm text-[var(--mikke-muted)]">読み込み中…</p>;
   if (loadError) return <p role="alert" className="py-8 text-sm text-[var(--mikke-danger)]">{loadError}</p>;
   if (view === "learner") {
     if (learnerCourseIds.length === 0) {
-      return <div className="rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-sm leading-7"><h2 className="font-bold">講座復習ページを表示できる受講履歴がありません</h2><p>講座復習ページは、受講の登録と教材の閲覧権限がある講座に表示されます。講師として登録されているだけでは表示されません。</p><p>受講済みなのに表示されない場合は、本部に受講登録のアカウントをご確認ください。本部で作成中のページは編集画面の「プレビュー」から確認できます。</p><Link className="mt-3 inline-block text-[var(--mikke-primary)]" href="?view=instructor">講師マニュアルページを確認する →</Link></div>;
+      return <div className="rounded-lg border border-[var(--mikke-line)] bg-white p-6 text-sm leading-7"><h2 className="font-bold">講座復習ページを表示できる受講履歴がありません</h2><p>講座復習ページは、受講の登録と教材の閲覧権限がある講座に表示されます。講師として登録されているだけでは表示されません。</p><p>受講済みなのに表示されない場合は、本部に受講登録のアカウントをご確認ください。本部で作成中のページは編集画面の「プレビュー」から確認できます。</p>{!allowedCourseIds&&<Link className="mt-3 inline-block text-[var(--mikke-primary)]" href="?view=instructor">講師マニュアルページを確認する →</Link>}</div>;
     }
     if (selectedCourseId && !learnerCourseIds.includes(selectedCourseId)) return <p role="status" className="py-8 text-sm text-[var(--mikke-muted)]">この講座の復習ページは表示できません。マイページから受講登録のある講座を選んでください。</p>;
     return (
@@ -222,7 +225,27 @@ function StudyPageContent() {
 
 function OwnedStudyMaterials({applicationId}:{applicationId:string}) {
   const {user}=useAuth();
-  return <main className="mx-auto max-w-3xl px-4 py-8"><Link href="/academy/learner-home" className="mb-4 inline-flex min-h-11 items-center underline">← 受講者ホームへ</Link><LearnerMaterials key={`${user.id}:${applicationId}`} applicationId={applicationId}/></main>;
+  const [source,setSource]=useState<'loading'|'v2'|'legacy'|'unavailable'>('loading');
+  const [legacyCourseIds,setLegacyCourseIds]=useState<string[]>([]);
+  useEffect(()=>{
+    let active=true;
+    setSource('loading');
+    setLegacyCourseIds([]);
+    void Promise.all([
+      supabase.rpc('academy2_my_materials',{p_application_id:applicationId}),
+      supabase.rpc('academy_my_application_material_source',{p_application_id:applicationId}),
+      supabase.from('academy_offering_applications').select('id,learner_user_id,status,course_ids').eq('id',applicationId).eq('learner_user_id',user.id).eq('status','paid').maybeSingle(),
+      supabase.from('academy_offering_application_grants').select('course_id').eq('application_id',applicationId),
+    ]).then(([materials,identifiedSource,application,legacyLinks])=>{
+      if(!active)return;
+      if(application.error||identifiedSource.error||legacyLinks.error){setSource('unavailable');return;}
+      const nextSource=ownedLearnerStudySource(materials.data,application.data,identifiedSource.data,legacyLinks.data,user.id,applicationId);
+      if(nextSource==='legacy')setLegacyCourseIds((legacyLinks.data??[]).map(link=>link.course_id).filter(id=>application.data?.course_ids.includes(id)));
+      setSource(nextSource);
+    }).catch(()=>{if(active)setSource('unavailable');});
+    return()=>{active=false;};
+  },[applicationId,user.id]);
+  return <main className="mx-auto max-w-3xl px-4 py-8"><Link href="/academy/offering-applications/mine" className="mb-4 inline-flex min-h-11 items-center underline">← 自分の申込へ</Link>{source==='loading'?<p role="status">教材を確認しています…</p>:source==='v2'?<LearnerMaterials key={`${user.id}:${applicationId}`} applicationId={applicationId}/>:source==='legacy'?<StudyContent allowedCourseIds={legacyCourseIds}/>:<p role="alert">この申込の教材は表示できません。申込時のアカウントとお支払い状況をご確認ください。</p>}</main>;
 }
 function StudyRoute() {
   const params = useSearchParams();
@@ -230,6 +253,7 @@ function StudyRoute() {
   // V2 purchases have their own immutable enrollment/material rights. Do not require
   // legacy instructor membership or widen that gate. This RPC checks the actual owner,
   // payment and material availability on every load, including direct URLs/reloads.
+  if (params.has('application') && !applicationId) return <AuthGate><main className="mx-auto max-w-3xl px-4 py-8"><p role="alert">申込のURLが正しくありません。</p><Link href="/academy/offering-applications/mine" className="mt-4 inline-flex min-h-11 items-center underline">自分の申込へ戻る</Link></main></AuthGate>;
   if (applicationId) return <AuthGate><OwnedStudyMaterials applicationId={applicationId}/></AuthGate>;
   return <KoushiShell title="講座復習ページ・講師マニュアルページ"><StudyPageContent /></KoushiShell>;
 }

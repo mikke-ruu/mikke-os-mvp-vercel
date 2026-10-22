@@ -1,8 +1,9 @@
 "use client";
+import {HeadquartersHomepagePresentation} from '@/components/academy2/HeadquartersHomepagePresentation';
 import { academyCourseCode } from "@/lib/academy/course-display";
 
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { CalendarCheck, ClipboardPen, GraduationCap, Search } from "lucide-react";
@@ -30,6 +31,9 @@ function SitePage() {
   const [courses, setCourses] = useState<PublicHomepage["courses"]>([]);
   const [instructors, setInstructors] = useState<PublicHomepage["instructors"]>([]);
   const [offerings, setOfferings] = useState<PublicHomepage["offerings"]>(null);
+  const [academy2, setAcademy2] = useState(false);
+  const [serviceAvailability, setServiceAvailability] = useState<{ headquartersId: string; available: boolean } | null>(null);
+  const onServicesAvailability = useCallback((headquartersId: string, available: boolean) => setServiceAvailability({ headquartersId, available }), []);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -43,6 +47,7 @@ function SitePage() {
         const result = handle ? await getPublicHomepage(handle) : null;
         if (cancelled) return;
         setHq(result?.headquarters ?? null);
+        setAcademy2(result?.mode === "academy2");
         setCourses(result?.courses ?? []);
         setInstructors(result?.instructors ?? []);
         setOfferings(result?.offerings ?? null);
@@ -60,7 +65,9 @@ function SitePage() {
   if (loadError) return <div role="alert" className="py-24 text-center"><p>ホームページを読み込めませんでした。</p><button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={() => setRetry(value => value + 1)}>もう一度読み込む</button></div>;
   if (!hq) return <p className="py-24 text-center text-sm text-[var(--mikke-muted)]">本部ホームページが見つかりません。</p>;
 
+  if(academy2)return <HeadquartersHomepagePresentation front={hq}/>;
   const document = readFrontDocument(hq.front_blocks ?? []);
+  const canApply = serviceAvailability?.headquartersId === hq.id && serviceAvailability.available;
   return (
     <div>
       {/* ヘッダー */}
@@ -70,16 +77,16 @@ function SitePage() {
             <p className="text-base font-bold leading-none text-[var(--mikke-accent)]">{hq.name}</p>
             <p className="mt-0.5 text-[9px] font-bold tracking-[0.3em] text-[var(--mikke-muted-light)]">Academy</p>
           </div>
-          <a
-            href={offerings?.length ? "#services" : "#courses"}
+          {canApply ? <a
+            href="#services"
             className="rounded-full bg-[var(--mikke-accent)] px-4 py-2 text-xs font-bold text-white transition hover:opacity-90"
           >
-            {offerings?.length ? "講座に申し込む" : "講座一覧を見る"}
-          </a>
+            講座に申し込む
+          </a> : null}
         </div>
       </header>
 
-      <AcademyFrontHero design={document.design} title={hq.tagline || "わたしらしい学びで、誰かの未来を照らす。"} message={hq.front_message || `${hq.name}の講座やワークショップをご紹介します。`} imageUrl={hq.hero_image_url || ""} canApply={Boolean(offerings?.length)} />
+      <AcademyFrontHero design={document.design} title={hq.tagline || "わたしらしい学びで、誰かの未来を照らす。"} message={hq.front_message || `${hq.name}の講座やワークショップをご紹介します。`} imageUrl={hq.hero_image_url || ""} applicationHref={canApply ? "#services" : null} coursesHref={!academy2 && courses.length ? "#courses" : null} />
 
       {/* Wave F (AC-F3): フロントの自由ブロック（ヒーローと講座一覧の間） */}
       {document.blocks.length ? (
@@ -90,10 +97,10 @@ function SitePage() {
         </section>
       ) : null}
 
-      {offerings === null || offerings.length > 0 ? <div style={{ maxWidth: frontMaxWidth(document.design, 1024) }} className="mx-auto px-5"><AcademyPublicServices key={hq.id} headquartersId={hq.id} /></div> : null}
+      <div style={{ maxWidth: frontMaxWidth(document.design, 1024) }} className="mx-auto px-5"><AcademyPublicServices key={hq.id} headquartersId={hq.id} hideWhenEmpty onAvailabilityChange={onServicesAvailability} /></div>
 
       {/* 講座一覧 */}
-      <section id="courses" className="bg-[var(--mikke-surface-soft)] px-5 py-12 md:py-16">
+      {!academy2 && <section id="courses" className="bg-[var(--mikke-surface-soft)] px-5 py-12 md:py-16">
         <div style={{ maxWidth: frontMaxWidth(document.design, 1024) }} className="mx-auto ">
           <h2 className="text-center text-lg font-bold tracking-[0.15em] text-[var(--mikke-text)] md:text-xl">講座・ワークショップ</h2>
           <p className="mt-1 text-center text-xs text-[var(--mikke-muted)]">自分らしい学びを見つけよう</p>
@@ -104,6 +111,7 @@ function SitePage() {
               {courses.map((c) => {
                 const matchingOfferings = offerings?.filter(offering => offering.course_ids.includes(c.id)) ?? [];
                 const offeringHref = matchingOfferings.length === 1 ? `/academy/o/${matchingOfferings[0].id}` : "#services";
+                const courseHref = `/academy/site/${encodeURIComponent(hq.handle)}/course/${encodeURIComponent(c.id)}`;
                 return (
                   <li key={c.id} className="overflow-hidden rounded-3xl border border-[var(--mikke-line)] bg-white">
                   {c.main_image_url ? (
@@ -115,12 +123,15 @@ function SitePage() {
                     {academyCourseCode(c.code) && <p className="text-[10px] font-bold tracking-[0.25em] text-[var(--mikke-accent-strong)]">{academyCourseCode(c.code)}</p>}
                     <h3 className="mt-1 text-base font-bold text-[var(--mikke-text)]">{c.name}</h3>
                     {c.subtitle ? <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--mikke-muted)]">{c.subtitle}</p> : null}
-                    <div className="mt-3 flex items-center justify-between">
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-bold text-[var(--mikke-text)]">
                         基本価格 {c.price.toLocaleString()}円
                         {c.duration_text ? <span className="ml-2 text-[11px] font-normal text-[var(--mikke-muted)]">{c.duration_text}</span> : null}
                       </p>
-                      {matchingOfferings.length ? <a href={offeringHref} className="text-xs underline">サービスの詳細・申込を見る</a> : <span className="text-xs text-[var(--mikke-muted)]">{offerings === null ? "申込状況を確認できません" : "申込受付前"}</span>}
+                      <div className="flex flex-wrap items-center gap-3 text-xs">
+                        <Link href={courseHref} className="font-bold text-[var(--mikke-accent)] underline">講座の内容を見る</Link>
+                        {matchingOfferings.length ? <a href={offeringHref} className="underline">サービスの詳細・申込を見る</a> : <span className="text-[var(--mikke-muted)]">{offerings === null ? "申込状況を確認できません" : "申込受付前"}</span>}
+                      </div>
                     </div>
                   </div>
                   </li>
@@ -129,7 +140,7 @@ function SitePage() {
             </ul>
           )}
         </div>
-      </section>
+      </section>}
 
       {/* 申込から受講後まで */}
       <section className="px-5 py-12 md:py-16">

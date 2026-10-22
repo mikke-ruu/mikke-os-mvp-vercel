@@ -7,10 +7,12 @@ import { createFirstPublicationRpc, type FirstPublicationStatus } from "@/lib/ac
 import { AcademyFirstPublicationEnrollment, shouldResumeAcademyRepreparation } from "./AcademyFirstPublicationEnrollment";
 import { AcademyFirstPublicationPanel } from "./AcademyFirstPublicationPanel";
 import { AcademyPlatformBillingLoader } from "@/app/academy/billing/AcademyPlatformBillingLoader";
+import { getMyAcademyHeadquartersAccess } from "@/lib/academy/trial";
+import { AcademyNoOperatingFeeNotice } from "./AcademyNoOperatingFeeNotice";
 import { useAcademyCancellation, AcademyCancellationNotice } from "./useAcademyCancellation";
 
 type Props = { userId: string; headquartersId: string; sample: boolean; isGuest: boolean; legacy: ReactNode };
-type ReadState = { kind: "loading" } | { kind: "error" } | { kind: "legacy" }
+type ReadState = { kind: "loading" } | { kind: "error" } | { kind: "legacy" } | { kind: "no_operating_fee" }
   | { kind: "new"; access: FirstPublicationAccess; status: FirstPublicationStatus | null };
 const policyVersion = "academy-first-publication-trial-2026-09-08-v1";
 const termsRevision = "academy-first-publication-trial-terms-2026-09-08-v1";
@@ -45,6 +47,10 @@ function BillingWorkspace({ userId, headquartersId, legacy, isGuest, token }: Pr
     if (alive.current) { setView({ kind: "loading" }); setRenewPrepared(false); }
     try {
       await assertActor();
+      const operatingAccess = await getMyAcademyHeadquartersAccess(headquartersId);
+      await assertActor();
+      if (request !== generation.current) return;
+      if (operatingAccess?.access_kind === "no_operating_fee" && operatingAccess.can_use_live_features) { setView({ kind: "no_operating_fee" }); return; }
       const access = await createFirstPublicationAccessRpc(supabase)(headquartersId);
       await assertActor();
       if (request !== generation.current) return;
@@ -70,6 +76,7 @@ function BillingWorkspace({ userId, headquartersId, legacy, isGuest, token }: Pr
   }, [load]);
   if (view.kind === "loading") return <>{cancellationNotice}<p role="status" className="rounded-lg border border-[var(--mikke-line)] p-4 text-sm">利用契約を確認しています…</p></>;
   if (view.kind === "error") return <>{cancellationNotice}<section className="space-y-3 rounded-lg border border-[var(--mikke-line)] bg-white p-4"><h2 className="font-bold">Academyの利用契約</h2><p role="alert" className="text-sm leading-7">契約状態を取得できませんでした。未契約という意味ではありません。確認できるまで申し込みや取消は行えません。</p><button type="button" className="min-h-11 rounded-lg border border-[var(--mikke-line)] px-4 text-sm" onClick={() => void load().catch(() => undefined)}>契約状態を再確認</button></section></>;
+  if (view.kind === "no_operating_fee") return <AcademyNoOperatingFeeNotice />;
   if (view.kind === "legacy") return legacy;
   if (view.status === null || renewPrepared) return <div className="space-y-3">
     {renewPrepared && <p className="text-sm leading-7">新しい見積もりで料金と支払方法を確認し直します。以前の見積もりと支払方法の確認結果は引き継ぎません。</p>}

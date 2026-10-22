@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.108.2";
+import { handleAcademy2BankIntake } from "../_shared/academy2-offering-bank-intake.ts";
 
 const allowedOrigins = new Set([
   "https://app.mikke-os.com",
@@ -8,6 +9,9 @@ const allowedOrigins = new Set([
 
 function isAllowedOrigin(origin: string) {
   if (allowedOrigins.has(origin)) return true;
+  if (origin === Deno.env.get("ACADEMY_LOCAL_TEST_ORIGIN")
+      && /^http:\/\/127\.0\.0\.1:\d{2,5}$/.test(origin)
+      && /^http:\/\/(?:127\.0\.0\.1|localhost):57982\/?$/.test(Deno.env.get("SUPABASE_URL") ?? "")) return true;
   try {
     const url = new URL(origin);
     return url.protocol === "https:" && url.hostname.endsWith(".vercel.app");
@@ -132,6 +136,9 @@ Deno.serve(async (request) => {
 
   try {
     const body = await request.json() as IntakeBody;
+    if (["academy2_offering_bank", "academy2_offering_external"].includes((body as IntakeBody & { kind?: string }).kind ?? "")) {
+      return await handleAcademy2BankIntake(request, body as IntakeBody & { kind: "academy2_offering_bank" | "academy2_offering_external" }, corsHeaders);
+    }
     if (body.instructor_id) return json(request, { error: "講師受付はこの送信窓口の対象外です。" }, 400);
 
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

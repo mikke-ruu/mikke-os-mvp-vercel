@@ -1,90 +1,96 @@
 'use client';
-
-import { useEffect, useRef, useState } from 'react';
-import { useAcademy2Headquarters } from './HeadquartersBoundary';
-import { toAcademyContextHref } from '@/lib/academy/access-context';
-import { commandHeadquartersApplication, getHeadquartersApplication, type HeadquartersApplicationDetail as Detail, type HeadquartersApplicationAction } from '@/lib/academy2/headquarters-applications';
-import { getAcademy2Event, updateAcademy2Event } from '@/lib/academy2/operations';
+import {useEffect,useRef,useState} from 'react';
+import {useSearchParams} from 'next/navigation';
+import {useAcademy2Headquarters} from './HeadquartersBoundary';
+import {toAcademyContextHref} from '@/lib/academy/access-context';
+import {commandHeadquartersApplication,getHeadquartersApplication,type HeadquartersApplicationDetail as Detail,type HeadquartersApplicationAction} from '@/lib/academy2/headquarters-applications';
+import {getAcademy2Event,type Academy2EventDetail} from '@/lib/academy2/operations';
 import {ApplicationAnswerSummary} from './ApplicationAnswerSummary';
-import { applicationDate, nextActionLabel } from './HeadquartersApplications';
-
-const card = 'space-y-3 rounded-2xl border border-[var(--mikke-line)] bg-white p-4';
-const inputClass = 'min-w-0 w-full rounded-xl border border-[var(--mikke-line)] bg-white px-3 py-2 text-base text-[var(--mikke-text)] outline-none focus:border-[var(--mikke-accent)] sm:text-sm';
-const button = 'rounded-xl border border-[var(--mikke-line)] px-3 py-2 text-sm font-bold disabled:opacity-50';
-function Row({ label, children }: { label: string; children: React.ReactNode }) { return <div className="flex justify-between gap-3 py-1 text-sm"><span className="shrink-0 text-[var(--mikke-text-soft)]">{label}</span><span className="min-w-0 break-words text-right [overflow-wrap:anywhere]">{children}</span></div>; }
-function localInput(iso: string | null | undefined) { if (!iso) return ''; const date = new Date(iso); return Number.isNaN(date.getTime()) ? '' : new Date(date.getTime() + 9 * 3600000).toISOString().slice(0, 16); }
-function status(value: string | undefined | null) { return ({ pending: '確認待ち', paid: '支払済み', unpaid: '未払い', shipped: '発送済み', not_required: '不要', submitted: '報告済み', certified: '認定済み', attended: '出席', confirmed: '確認済み', waiting: '確認待ち', unreported: '未報告', not_started: '未実施', not_certified: '未認定', preparing: '準備中', waiting_assignment: '担当講師の確定待ち', awaiting_destination: '講師の発送先指定待ち', blocked: '開催の設定を確認' }[value ?? ''] ?? '確認中'); }
-
-/** Provisional wiring of the existing HQ detail cards; this is not a replacement design for missing UI11. */
-export function HeadquartersApplicationDetail({ applicationId }: { applicationId: string }) {
-  const hq = useAcademy2Headquarters();
-  const [data, setData] = useState<Detail | null>(null);
-  const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [saved, setSaved] = useState('');
-  const [note, setNote] = useState(''); const [address, setAddress] = useState(''); const [tracking, setTracking] = useState(''); const [shipped, setShipped] = useState('');
-  const [starts, setStarts] = useState(''); const [ends, setEnds] = useState(''); const [dirty, setDirty] = useState(false);
-  const [retry, setRetry] = useState(0);
-  const request = useRef<{ signature: string; id: string } | null>(null);
-  const initialized = useRef('');
-  useEffect(() => { if (!hq) return; let live = true; setError('');
-    getHeadquartersApplication(hq.id, applicationId).then(result => { if (!live) return; setData(result);
-      if (initialized.current !== applicationId) { initialized.current = applicationId; setAddress(result.headquarters?.shipping.address ?? ''); setStarts(localInput(result.headquarters?.event?.startsAt)); setEnds(localInput(result.headquarters?.event?.endsAt)); }
-    }).catch(cause => { if (live) setError(cause instanceof Error ? cause.message : '申込を読み込めませんでした。'); });
-    return () => { live = false; };
-  }, [hq?.id, applicationId, retry]);
-  function edit(set: (value: string) => void, value: string) { set(value); setDirty(true); setSaved(''); }
-  async function execute(action: HeadquartersApplicationAction, input: Record<string, unknown> = {}) {
-    if (!hq || !data || busy) return;
-    setBusy(true); setError(''); setSaved('');
-    const signature = JSON.stringify([applicationId, data.summary.revision, action, input]);
-    if (request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
-    try { const result = await commandHeadquartersApplication(hq.id, applicationId, data.summary.revision, request.current.id, action, input); setData(result); request.current = null; setSaved('保存しました。'); setDirty(false); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : '保存できませんでした。入力内容は残っています。'); }
-    finally { setBusy(false); }
-  }
-  async function saveSchedule() {
-    if (!hq || !data?.headquarters?.event || busy) return;
-    if (!starts || !ends || ends <= starts) { setError('開催の開始日時と終了日時を確認してください。'); return; }
-    setBusy(true); setError(''); setSaved('');
-    try {
-      const event = data.headquarters.event; const original = await getAcademy2Event(hq.id, event.id);
-      const signature = JSON.stringify([event.id, event.revision, starts, ends]);
-      if (request.current?.signature !== signature) request.current = { signature, id: crypto.randomUUID() };
-      await updateAcademy2Event(hq.id, event.id, event.revision, request.current.id, { title: original.title, scheduleMode: original.schedule_mode, startsAt: new Date(`${starts}:00+09:00`).toISOString(), endsAt: new Date(`${ends}:00+09:00`).toISOString(), format: original.format, capacity: original.capacity, venueName: event.venueName ?? undefined, meetingUrl: event.meetingUrl ?? undefined });
-      setData(await getHeadquartersApplication(hq.id, applicationId)); request.current = null; setSaved('日程を保存しました。'); setDirty(false);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '日程を保存できませんでした。入力内容は残っています。'); } finally { setBusy(false); }
-  }
-  if (!hq) return null;
-  if (!data) return <div className="space-y-3"><p role={error ? 'alert' : 'status'}>{error || '読み込み中…'}</p>{error && <button className={button} onClick={() => setRetry(value => value + 1)}>再読み込み</button>}</div>;
-  const { summary, headquarters, instructor } = data;
-  const view = instructor?.view;
-  const allowed = headquarters?.allowedActions ?? instructor?.allowedActions ?? [];
-  const shipping = headquarters?.shipping ?? { required: view?.kit.required, status: view?.kit.status, address: instructor?.details.shippingAddress ?? instructor?.details.kitDestination?.selectedAddress, shippedAt: instructor?.details.shippedAt, trackingNumber: instructor?.details.trackingNumber };
-  const eventKit = headquarters?.shipping.recipient === 'instructor';
-  const shippingEventId = headquarters?.shipping.eventId ?? headquarters?.event?.id;
-  const eventLink = shippingEventId ? <a className="underline" href={toAcademyContextHref(`/academy/classes/${shippingEventId}`, hq.id, 'manage')} onClick={event => { if (busy || (dirty && !window.confirm('未保存の入力があります。開催詳細へ移動しますか？'))) event.preventDefault(); }}>開催のキット発送を確認 →</a> : null;
-  const email = headquarters?.contactEmail ?? view?.contact.email;
-  return <div className="space-y-4"><ApplicationAnswerSummary key={applicationId} applicationId={applicationId}/>
-    <section className={card}><h1 className="text-base font-bold">申込情報</h1><Row label="販売プラン">{summary.planTitle}</Row><Row label="申込者">{summary.applicantName}</Row><Row label="受付">{summary.saleChannel === 'instructor' ? '講師販売' : '本部販売'}</Row><Row label="申込日">{applicationDate(summary.appliedAt)}</Row><Row label="メール">{email ? <a href={`mailto:${email}`}>{email}</a> : '未登録'}</Row>{summary.tuition && <><Row label="受講料">{new Intl.NumberFormat('ja-JP', { style: 'currency', currency: summary.tuition.currency || 'JPY' }).format(summary.tuition.amount)}</Row><Row label="入金状態">{status(summary.tuition.status)}</Row></>}<Row label="状態">{summary.statusLabel}</Row><Row label="次の対応">{summary.nextAction === 'event_kit_shipping' && eventLink ? eventLink : nextActionLabel(summary.nextAction)}</Row></section>
-    <section className={card}><h2 className="text-sm font-bold">ステータス管理</h2><div className="grid gap-2 sm:grid-cols-3">
-      {allowed.includes('confirm_payment') && <button className={button} disabled={busy} onClick={() => void execute('confirm_payment')}>入金済みにする</button>}
-      {allowed.includes('confirm_completion') && <button className={button} disabled={busy || !note.trim()} onClick={() => void execute('confirm_completion', { review_note: note })}>受講完了にする</button>}
-      {allowed.includes('confirm_certification') && <button className={button} disabled={busy || (summary.saleChannel === 'headquarters' && !note.trim())} onClick={() => void execute('confirm_certification', summary.saleChannel === 'headquarters' ? { review_note: note } : {})}>認定済みにする</button>}
-    </div>{headquarters && (allowed.includes('confirm_completion') || allowed.includes('confirm_certification')) && <label className="block space-y-1 text-xs font-bold">確認内容<textarea className={inputClass} value={note} onChange={event => edit(setNote, event.target.value)} /></label>}
-      <Row label="修了">{summary.completedAt ? applicationDate(summary.completedAt) : view ? status(view.completion.report) : '未確認'}</Row><Row label="認定">{summary.certifiedAt ? applicationDate(summary.certifiedAt) : '未認定'}</Row>
-      {view && <><Row label="開講ライセンス">{status(view.openingLicense.status)}</Row>{view.progression.certify.state !== 'allow' && <p className="text-xs text-[var(--mikke-text-soft)]">{view.progression.certify.message || '受講者ごとの支払い・修了報告を確認後に認定できます。'}</p>}</>}
-    </section>
-    <section className={card}><h2 className="text-sm font-bold">開催・日程</h2><Row label="開始">{applicationDate(headquarters?.event?.startsAt ?? view?.schedule.startsAt)}</Row><Row label="終了">{applicationDate(headquarters?.event?.endsAt ?? view?.schedule.endsAt)}</Row>
-      {allowed.includes('confirm_schedule') && <><label className="block space-y-1 text-xs font-bold">開始日時<input type="datetime-local" className={inputClass} value={starts} onChange={event => edit(setStarts, event.target.value)} /></label><label className="block space-y-1 text-xs font-bold">終了日時<input type="datetime-local" className={inputClass} value={ends} onChange={event => edit(setEnds, event.target.value)} /></label><button className={button} disabled={busy} onClick={() => void saveSchedule()}>日程を保存する</button></>}
-      {!headquarters?.event && !view && <p className="text-xs">この申込に開催は登録されていません。</p>}
-    </section>
-    {shipping.required && <section className={card}><h2 className="text-sm font-bold">キット・発送</h2><Row label="発送状態">{status(shipping.status)}</Row><Row label="発送日">{applicationDate(shipping.shippedAt)}</Row>
-      {eventKit ? <><p className="text-xs">担当講師へまとめて発送するキットです。この申込者の分が発送対象に含まれているか、開催詳細で確認できます。</p>{eventLink}</> : <><Row label="発送先">{shipping.address || '未確定'}</Row><Row label="追跡番号">{shipping.trackingNumber || '未登録'}</Row>
-      {allowed.includes('set_shipping_destination') && <><label className="block space-y-1 text-xs font-bold">発送先<textarea className={inputClass} value={address} onChange={event => edit(setAddress, event.target.value)} /></label><button className={button} disabled={busy || !address.trim()} onClick={() => void execute('set_shipping_destination', { address })}>発送先を保存する</button></>}
-      {allowed.includes('record_shipping') && <><label className="block space-y-1 text-xs font-bold">発送日時<input type="datetime-local" className={inputClass} value={shipped} onChange={event => edit(setShipped, event.target.value)} /></label><label className="block space-y-1 text-xs font-bold">追跡番号（任意）<input className={inputClass} value={tracking} onChange={event => edit(setTracking, event.target.value)} /></label><button className={button} disabled={busy || !shipped || !shipping.address} onClick={() => void execute('record_shipping', { shippedAt: new Date(`${shipped}:00+09:00`).toISOString(), trackingNumber: tracking || undefined })}>発送済みにする</button></>}
-      </>}
-    </section>}
-    <div aria-live="polite" className="space-y-2 text-sm">{busy ? <p role="status">保存中…</p> : error ? <p role="alert" className="text-red-700">{error}</p> : saved ? <p role="status">{saved}</p> : dirty ? <p role="status">未保存の入力があります。</p> : null}<button className={button} disabled={busy} onClick={() => { setSaved(''); setRetry(value => value + 1); }}>最新の状態を読み込む</button>{dirty && <p className="text-xs">再読み込み後も入力中の内容は保持します。</p>}</div>
-    <a className="block w-full rounded-xl border border-[var(--mikke-line)] bg-white px-4 py-3 text-center text-sm font-bold" href={toAcademyContextHref('/academy/offering-applications', hq.id, 'manage')}>一覧に戻る</a>
-  </div>;
+import {applicationDate,applicationPaymentLabel,nextActionLabel} from './HeadquartersApplications';
+import {confirmApplicationSchedule,applicationScheduleLabel} from '@/lib/academy2/application-schedule';
+import styles from './applications-operation.module.css';
+const card=styles.detailCard,button=styles.button,primaryButton=styles.button+' '+styles.primary,inputClass=styles.operationInput;
+function Row({label,children}:{label:string;children:React.ReactNode}){return <div className={styles.row}><span className={styles.rowLabel}>{label}</span><span className={styles.rowValue}>{children}</span></div>;}
+function status(value:string|null|undefined){return ({pending:'入金確認待ち',paid:'入金済み',unpaid:'未払い',shipped:'発送済み',not_required:'不要',submitted:'報告済み',certified:'認定済み',attended:'出席',present:'出席',absent:'欠席',late:'遅刻',unconfirmed:'未確認',confirmed:'確認済み',waiting:'確認待ち',unreported:'未報告',not_started:'未実施',not_certified:'未認定',preparing:'発送準備中',waiting_assignment:'担当講師の確定待ち',awaiting_destination:'講師の発送先指定待ち',blocked:'開催の設定を確認'} as Record<string,string>)[value??'']??'確認中';}
+/** Return targets are constructed from this HQ and this application's canonical event, never an arbitrary URL. */
+export function applicationBackTarget(hqId:string,eventId:string|null|undefined,params:URLSearchParams){
+ if(eventId&&/^[0-9a-f-]{36}$/i.test(eventId)&&params.get('fromEvent')===eventId)return{href:toAcademyContextHref('/academy/classes/'+eventId,hqId,'manage'),label:'← 開催詳細へ戻る'};
+ const q=new URLSearchParams();const filter=params.get('listFilter'),channel=params.get('listChannel'),sort=params.get('listSort'),search=params.get('listSearch');
+ if(['all','attention','schedule','shipping','payment_pending','completion_pending','completed'].includes(filter??''))q.set('filter',filter!);
+ if(['all','headquarters','instructor'].includes(channel??''))q.set('channel',channel!);
+ if(['recent','oldest'].includes(sort??''))q.set('sort',sort!);if(search)q.set('q',search.slice(0,200));
+ return{href:toAcademyContextHref('/academy/offering-applications'+(q.size?'?'+q.toString():''),hqId,'manage'),label:'← 申込一覧へ戻る'};
 }
-
+export function HeadquartersApplicationDetail({applicationId}:{applicationId:string}){const hq=useAcademy2Headquarters();return hq?<ApplicationDetailBody key={hq.id+':'+applicationId} hq={hq} applicationId={applicationId}/>:null;}
+function ApplicationDetailBody({hq,applicationId}:{hq:NonNullable<ReturnType<typeof useAcademy2Headquarters>>;applicationId:string}){
+ const query=useSearchParams(),[data,setData]=useState<Detail|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[saved,setSaved]=useState('');
+ const [note,setNote]=useState(''),[address,setAddress]=useState(''),[tracking,setTracking]=useState(''),[shipped,setShipped]=useState(''),[dirty,setDirty]=useState(false),[retry,setRetry]=useState(0),[copyStatus,setCopyStatus]=useState('');
+ const [event,setEvent]=useState<Academy2EventDetail|null>(null),[eventError,setEventError]=useState('');
+ const [individualStarts,setIndividualStarts]=useState(''),[individualEnds,setIndividualEnds]=useState('');
+ const individualRequest=useRef<{signature:string;id:string}|null>(null);
+ const request=useRef<{signature:string;id:string}|null>(null),lock=useRef(false),dirtyFields=useRef(new Set<string>());
+ useEffect(()=>{let live=true;setLoading(true);setError('');getHeadquartersApplication(hq.id,applicationId).then(result=>{if(!live)return;setData(result);if(!dirtyFields.current.has('address'))setAddress(result.headquarters?.shipping.address??'');}).catch(cause=>{if(live)setError(cause instanceof Error?cause.message:'申込を読み込めませんでした。');}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;};},[hq.id,applicationId,retry]);
+ useEffect(()=>{let live=true;setEvent(null);setEventError('');const id=data?.headquarters?.event?.id;if(id)void getAcademy2Event(hq.id,id).then(v=>{if(live)setEvent(v);}).catch(()=>{if(live)setEventError('開催情報を読み込めませんでした。');});return()=>{live=false;};},[hq.id,data?.headquarters?.event?.id,data?.headquarters?.event?.revision]);
+ useEffect(()=>{if(!dirty)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard);},[dirty]);
+ useEffect(()=>{if(dirty||busy)return;const refresh=()=>{if(document.visibilityState==='visible')setRetry(v=>v+1);};window.addEventListener('focus',refresh);return()=>window.removeEventListener('focus',refresh);},[dirty,busy]);
+ useEffect(()=>{const row=data?.headquarters?.individualSchedule;const local=(v:string|null)=>v?new Date(Date.parse(v)+9*3600000).toISOString().slice(0,16):'';if(!dirtyFields.current.has('individualStarts'))setIndividualStarts(local(row?.startsAt??null));if(!dirtyFields.current.has('individualEnds'))setIndividualEnds(local(row?.endsAt??null));},[data?.headquarters?.individualSchedule]);
+ useEffect(()=>{if(!copyStatus)return;const timer=setTimeout(()=>setCopyStatus(''),3500);return()=>clearTimeout(timer);},[copyStatus]);
+ function edit(set:(value:string)=>void,value:string){set(value);dirtyFields.current.add(set===setNote?'note':set===setAddress?'address':set===setTracking?'tracking':set===setIndividualStarts?'individualStarts':set===setIndividualEnds?'individualEnds':'shipped');setDirty(true);setSaved('');}
+ function leave(){return !lock.current&&(!dirty||window.confirm('保存していない入力があります。画面を移動しますか？'));}
+ async function execute(action:HeadquartersApplicationAction,input:Record<string,unknown>={}){
+  if(!data||lock.current||loading||!(data.headquarters?.allowedActions??data.instructor?.allowedActions??[]).includes(action))return;
+  lock.current=true;setBusy(true);setError('');setSaved('');const signature=JSON.stringify([applicationId,data.summary.revision,action,input]);if(request.current?.signature!==signature)request.current={signature,id:crypto.randomUUID()};
+  try{const result=await commandHeadquartersApplication(hq.id,applicationId,data.summary.revision,request.current.id,action,input);setData(result);request.current=null;
+   if(action==='set_shipping_destination')dirtyFields.current.delete('address');if(action==='record_shipping'){dirtyFields.current.delete('tracking');dirtyFields.current.delete('shipped');}if(Object.hasOwn(input,'review_note'))dirtyFields.current.delete('note');setDirty(dirtyFields.current.size>0);setSaved('保存しました');
+  }catch(cause){setError(cause instanceof Error?cause.message:'保存できませんでした。入力内容は残っています。');}finally{lock.current=false;setBusy(false);}
+ }
+ async function saveIndividualSchedule(){
+  const row=data?.headquarters?.individualSchedule;if(!data||!row||!data.headquarters?.scheduleWritable||lock.current||loading)return;
+  const starts=individualStarts?new Date(individualStarts+':00+09:00'):null,ends=individualEnds?new Date(individualEnds+':00+09:00'):null;
+  if(!starts||!ends||!Number.isFinite(starts.getTime())||!Number.isFinite(ends.getTime())||ends<=starts){setError('開始日時と、その後の終了日時を入力してください。');return;}
+  const signature=JSON.stringify([applicationId,row.revision,starts.toISOString(),ends.toISOString()]);if(individualRequest.current?.signature!==signature)individualRequest.current={signature,id:crypto.randomUUID()};
+  lock.current=true;setBusy(true);setError('');setSaved('');try{const result=await confirmApplicationSchedule(hq.id,applicationId,row.revision,individualRequest.current.id,starts.toISOString(),ends.toISOString());setData(result);individualRequest.current=null;dirtyFields.current.delete('individualStarts');dirtyFields.current.delete('individualEnds');setDirty(dirtyFields.current.size>0);setSaved('保存しました');}catch(cause){setError(cause instanceof Error?cause.message:'日程を保存できませんでした。入力内容は残っています。');}finally{lock.current=false;setBusy(false);}
+ }
+ if(!data)return <div className={styles.wrap}><p role={error?'alert':'status'}>{error||'読み込み中…'}</p>{error&&<button className={button} onClick={()=>setRetry(v=>v+1)}>再読み込み</button>}</div>;
+ const {summary,headquarters,instructor}=data,individual=headquarters?.individualSchedule,view=instructor?.view,allowed=headquarters?.allowedActions??instructor?.allowedActions??[];
+ const shipping=headquarters?.shipping??{required:view?.kit?.required,status:view?.kit?.status,address:instructor?.details.shippingAddress??instructor?.details.kitDestination?.selectedAddress,shippedAt:instructor?.details.shippedAt,trackingNumber:instructor?.details.trackingNumber};
+ const eventId=headquarters?.event?.id,back=applicationBackTarget(hq.id,eventId,new URLSearchParams(query.toString())),email=headquarters?.contactEmail??view?.contact?.email;
+ const href=(path:string)=>toAcademyContextHref(path,hq.id,'manage');
+ const eventLink=eventId?<a className={styles.textLink} href={href('/academy/classes/'+eventId)} onClick={e=>{if(!leave())e.preventDefault();}}>開催詳細を確認</a>:null;
+ const shippingEventId=headquarters?.shipping.eventId??eventId,eventKit=headquarters?.shipping.recipient==='instructor';
+ const starts=headquarters?.event?.startsAt??view?.schedule?.startsAt,ends=headquarters?.event?.endsAt??view?.schedule?.endsAt;
+ const arranged=!!individual||event?.schedule_mode==='arranged_after_application'||view?.schedule?.mode==='arranged_after_application';
+ const paymentReviewRequired=summary.saleChannel==='headquarters'&&['onsite','external'].includes(summary.tuition?.method??'');
+ const needsNote=!!headquarters&&((paymentReviewRequired&&allowed.includes('confirm_payment'))||allowed.includes('confirm_completion'));
+ const next=['confirm_certification','review_outcome'].includes(summary.nextAction??'')?'認定機能は準備中です。':summary.nextAction===null&&summary.completedAt?'対応完了':nextActionLabel(summary.nextAction);
+ async function copyEmail(){if(!email)return;try{await navigator.clipboard.writeText(email);setCopyStatus('コピーしました');}catch{setCopyStatus('コピーできませんでした。メールアドレスを選択してコピーしてください。');}}
+ const emailView=email?<div className={styles.emailRow}><span>{email}</span><button type="button" className={styles.iconButton} aria-label="メールアドレスをコピー" onClick={()=>void copyEmail()}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/></svg></button><span role="status" className={styles.copyStatus}>{copyStatus}</span></div>:null;
+ return <div className={styles.wrap}>
+  <a className={styles.backLink} href={back.href} onClick={e=>{if(!leave())e.preventDefault();}}>{back.label}</a>
+  <div className={styles.heroTitle}><div className={styles.en}>APPLICATION</div><h1 className={styles.jp}>申込詳細</h1></div><div className={styles.detailIntro}><p>申込内容と対応状況を確認します。</p><button className={styles.iconButton} type="button" aria-label="申込情報を更新" disabled={busy||loading} onClick={()=>{setSaved('');setRetry(v=>v+1);}}>↻</button></div>
+  <div className={styles.finalDetail}>
+   <ApplicationAnswerSummary applicationId={applicationId} className={card} basicRows={[{id:'plan',label:'販売プラン',value:headquarters?.sales_plan_id&&/^[0-9a-f-]{36}$/i.test(headquarters.sales_plan_id)?<a className={styles.textLink} href={href('/academy/offerings/'+headquarters.sales_plan_id)} target="_blank" rel="noopener noreferrer" aria-label={'現在の販売プランを確認：'+summary.planTitle+'（別タブ）'}>{summary.planTitle} ↗</a>:summary.planTitle},{id:'appliedAt',label:'申込日時',value:applicationDate(summary.appliedAt)},{id:'name',label:'申込者名',value:summary.applicantName},{id:'email',label:'メールアドレス',value:emailView},{id:'phone',label:'電話番号'},{id:'price',label:'受講料',value:summary.tuition?new Intl.NumberFormat('ja-JP',{style:'currency',currency:summary.tuition.currency||'JPY'}).format(summary.tuition.amount):'閲覧権限を確認してください'}]} reservedAnswers={{terms:headquarters?.consented_at&&headquarters.consent_version?'同意済み（'+applicationDate(headquarters.consented_at)+'／'+headquarters.consent_version+'）':undefined}}/>
+   <section className={card}><h2>運営側の対応状況</h2>
+    {summary.tuition&&<Row label="入金状態">{applicationPaymentLabel(summary.tuition.status)}</Row>}
+    {!individual&&(eventId||view?.schedule)?<><Row label="開催日時">{starts?<>{applicationDate(starts)}{ends?' 〜 '+applicationDate(ends):''}</>:arranged?'日程相談中':'未確定'}</Row>{eventId&&<Row label="開催">{eventLink}</Row>}{arranged&&<Row label="日程調整">{starts?'日時確定':'相談中'}</Row>}{eventError&&<p role="alert">{eventError}</p>}</>:null}
+    {individual&&eventLink&&<Row label="募集">{eventLink}</Row>}
+    {view?.completion?.attendance&&<Row label="出欠">{status(view.completion.attendance)}</Row>}
+    <Row label="修了">{summary.completedAt?'修了済み（'+applicationDate(summary.completedAt)+'）':'未記録'}</Row>{view?.completion?.report&&<Row label="修了報告">{status(view.completion.report)}</Row>}{summary.certifiedAt&&<Row label="認定記録">{applicationDate(summary.certifiedAt)}</Row>}
+    {individual&&<div className={styles.operationSection}><h3>個別の日程</h3><p>{({consulting:'日程相談中',confirmed:'日程確定',changed:'日程変更あり'}[individual.state])}</p>{!headquarters?.scheduleWritable&&<p>{applicationScheduleLabel(summary.schedule)}</p>}{headquarters?.scheduleWritable&&<div className={styles.individualEditor}><div className={styles.individualDates}><label>開始日時<input type="datetime-local" className={inputClass} value={individualStarts} disabled={busy||loading} onChange={e=>edit(setIndividualStarts,e.target.value)}/></label><label>終了日時<input type="datetime-local" className={inputClass} value={individualEnds} disabled={busy||loading} onChange={e=>edit(setIndividualEnds,e.target.value)}/></label></div><p>この申込者の日程だけを保存します。お客様への連絡は普段のメールで行ってください。</p><button type="button" className={primaryButton} disabled={busy||loading||!individualStarts||!individualEnds} onClick={()=>void saveIndividualSchedule()}>{individual.startsAt?'日程の変更を保存する':'日程を確定する'}</button></div>}</div>}
+    <div className={styles.operationSection}><h3>次に対応すること</h3><p>{next}</p>
+     {!individual&&summary.nextAction==='confirm_schedule'&&eventId&&<p className={styles.scheduleNotice}>日程の変更は同じ開催の参加者全員に反映されます。{eventLink}</p>}
+     {allowed.includes('confirm_payment')&&<button className={primaryButton} disabled={busy||loading||(paymentReviewRequired&&!note.trim())} onClick={()=>void execute('confirm_payment',paymentReviewRequired?{review_note:note}:{})}>入金を確認する</button>}
+     {needsNote&&<label>確認内容<textarea className={inputClass} maxLength={2000} value={note} onChange={e=>edit(setNote,e.target.value)}/></label>}
+     {allowed.includes('confirm_completion')&&<button className={primaryButton} disabled={busy||loading||!note.trim()} onClick={()=>void execute('confirm_completion',{review_note:note})}>修了を記録する</button>}
+    </div>
+    {shipping.required&&<div className={styles.operationSection}><h3>物品の受け渡し</h3><Row label="発送状態">{status(shipping.status)}</Row>{shipping.shippedAt&&<Row label="発送日">{applicationDate(shipping.shippedAt)}</Row>}
+     {eventKit?<><p>担当講師へまとめて発送する物品です。</p>{shippingEventId&&<a className={styles.textLink} href={href('/academy/classes/'+shippingEventId)} onClick={e=>{if(!leave())e.preventDefault();}}>開催の発送状況を確認</a>}</>:<><Row label="発送先">{shipping.address??''}</Row>{shipping.trackingNumber&&<Row label="追跡番号">{shipping.trackingNumber}</Row>}
+      {allowed.includes('set_shipping_destination')&&<><label>発送先の確認・変更<textarea className={inputClass} value={address} onChange={e=>edit(setAddress,e.target.value)}/></label><button className={button} disabled={busy||loading||!address.trim()} onClick={()=>void execute('set_shipping_destination',{address})}>発送先を保存する</button></>}
+      {allowed.includes('record_shipping')&&<><label>発送日時<input type="datetime-local" className={inputClass} value={shipped} onChange={e=>edit(setShipped,e.target.value)}/></label><label>追跡番号（任意）<input className={inputClass} value={tracking} onChange={e=>edit(setTracking,e.target.value)}/></label><button className={primaryButton} disabled={busy||loading||!shipped||!shipping.address} onClick={()=>void execute('record_shipping',{shippedAt:new Date(shipped+':00+09:00').toISOString(),trackingNumber:tracking||undefined})}>発送済みにする</button></>}
+     </>}
+    </div>}
+    <div aria-live="polite" className={styles.inlineFeedback}>{busy?<p role="status">保存中…</p>:error?<p role="alert" className={styles.error}>{error}</p>:saved?<p role="status">{saved}</p>:dirty?<p role="status">未保存の入力があります。</p>:null}</div>
+   </section>
+  </div>
+ </div>;
+}

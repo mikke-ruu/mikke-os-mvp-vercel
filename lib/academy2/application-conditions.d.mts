@@ -1,5 +1,5 @@
 import type {SalesPlanApplicationField,SalesPlan} from './sales-plan.mjs';
-export type ApplicationContext={format:string|null;schedule_mode:string|null;kit_shipping:boolean;certificate:boolean;physical_certificate:boolean;instructor_registration?:boolean;course_ids:string[]};
+export type ApplicationContext={kit_contract_version?:2|null;format:string|null;schedule_mode:string|null;kit_shipping:boolean;certificate:boolean;physical_certificate:boolean;instructor_registration?:boolean;course_ids:string[]};
 export type ApplicationEvent={format:string;scheduleMode:string;kitMethod?:string|null};
 export type IntakeField=Omit<SalesPlanApplicationField,'type'> & {type:SalesPlanApplicationField['type']|'date'};
 export const defaultApplicationFields:SalesPlanApplicationField[];
@@ -11,3 +11,5 @@ export function intakeFields(form:{fields:SalesPlanApplicationField[];conditiona
 export function projectApplicationAnswers(fields:IntakeField[],answers?:Record<string,string>):Record<string,string>;
 export function applicationFormErrors(fields:SalesPlanApplicationField[]):string[];
 
+
+export function applicationFieldAnswerLimit(id:string,context:ApplicationContext):number;

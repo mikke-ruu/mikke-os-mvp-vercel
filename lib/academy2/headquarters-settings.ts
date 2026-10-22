@@ -4,6 +4,7 @@ import { assertAcademyWritable } from '@/lib/academy/preview';
 export type HeadquartersDocumentKind = 'application'|'cancellation'|'privacy'|'commerce'|'instructor_contract';
 export type HeadquartersBasic = {name:string;contact_email:string;tagline:string;default_payment_note:string;updated_at:string};
 export type HeadquartersSettings = {
+ operating_fee_state?:'no_operating_fee';
  basic:HeadquartersBasic;
  documents:{kind:HeadquartersDocumentKind;revision:number;version:string;body:string;saved_at:string}[];
  connect:null|{charges_enabled:boolean;payouts_enabled:boolean;verified_at:string;valid_until:string;ready:boolean};

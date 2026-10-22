@@ -59,7 +59,7 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
           );
 
         if (b.type === "gallery")
-          return b.images.length ? (
+          return Array.isArray(b.images) && b.images.length ? (
             <div key={i} className="grid grid-cols-2 gap-2 md:grid-cols-3">
               {b.images.filter((img) => img.url).map((img, j) => (
                 <figure key={j}>
@@ -103,6 +103,9 @@ export function PageBlocks({ blocks, materials = [] }: { blocks: AcademyPageBloc
             </div>
           ) : null;
 
+        // JSON snapshots can contain an unknown or incomplete block. Do not
+        // interpret it as links or crash the rest of the purchased material.
+        if (b.type !== "links" || !Array.isArray(b.items)) return <p key={i} role="alert" className="text-sm text-[var(--mikke-muted)]">この部分を表示できません。本部へお問い合わせください。</p>;
         // links（リンク集）
         return (
           <div key={i}>

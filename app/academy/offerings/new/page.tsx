@@ -67,8 +67,8 @@ function EditorIdentity() {
   const router = useRouter();
   if(context && searchParams.get("view")==="samples") return <SalesPlanSamples headquartersId={context.id}/>;
   if(context && !preset && !sample && !courseId) return <main className={styles.wrap}><div className={styles.titlebar}><div className={styles.en}>CHOOSE A SALES PLAN</div><div className={styles.jp}>どんな売り方をしますか？</div></div><div className={styles["modal-body"]}><SalesPlanNewChoices headquartersId={context.id}/></div></main>;
-  return context ? <SalesPlanDraftEditor key={`${user.id}:${context.id}:${preset??""}:${sample??""}`} headquartersId={context.id} initialCourseId={sample?undefined:courseId} initialPreset={preset} initialSample={sample}
-    onSaved={draft => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${draft.id}`))}
+  return context ? <SalesPlanDraftEditor key={`${user.id}:${context.id}:${courseId??""}:${preset??""}:${sample??""}`} headquartersId={context.id} initialCourseId={sample?undefined:courseId} initialPreset={preset} initialSample={sample}
+    onSaved={draft => router.replace(toCurrentAcademyContextHref(`/academy/offerings/${draft.id}?saved=1&step=6`))}
     onPageAction={(action, draft) => { if (action !== "template") router.replace(toCurrentAcademyContextHref(`/academy/offerings/${draft.id}?preview=${action}`)); }} /> : <Content />;
 }
 export default function Page() { return <HonbuShell title="販売プランをつくる"><Suspense fallback={<p>読み込み中…</p>}><EditorIdentity /></Suspense></HonbuShell>; }

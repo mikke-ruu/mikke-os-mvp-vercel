@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { Building2, Check, Link2, ReceiptJapaneseYen, ShieldCheck, UserPlus } from "lucide-react";
+import { getAcademyRouteContext } from "@/lib/academy/access-context";
+import { getMusubiLegacyPaidAdapter } from "@/lib/academy/musubi-legacy-adapter";
+import { MusubiBankNoteEditor } from "@/components/academy/MusubiBankNoteEditor";
 import { useAuth } from "@/components/AuthGate";
 import { HonbuShell } from "@/components/academy/AcademyShell";
 import { useAcademy2Headquarters } from "@/components/academy2/HeadquartersBoundary";
@@ -67,7 +70,7 @@ const roleDetails = [
   { role: "講座編集担当", permissions: "講座、公開講座ページ、教材の編集" }
 ];
 
-function SettingsContent() {
+function SettingsContent({ separateBankNote = false }: { separateBankNote?: boolean }) {
   const { user, profile, isGuest } = useAuth();
   const [headquarters, setHeadquarters] = useState<AcademyHeadquarters | null>(null);
   const [role, setRole] = useState<AcademyHeadquartersRole | null>(null);
@@ -232,7 +235,7 @@ function SettingsContent() {
         next_instructor_number: form.next_instructor_number
           ? Number(form.next_instructor_number)
           : null,
-        default_payment_note: form.default_payment_note.trim() || null
+        ...(separateBankNote ? {} : { default_payment_note: form.default_payment_note.trim() || null })
       });
       setHeadquarters(updated);
       setMessage("本部情報を保存しました。");
@@ -426,7 +429,7 @@ function SettingsContent() {
                 <label className="text-xs font-bold">問い合わせメール<input type="email" className={inputClass} value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} /></label>
                 <label className="text-xs font-bold">認定の更新周期（月）<input type="number" min="1" className={inputClass} value={form.renewal_period_months} onChange={(e) => setForm({ ...form, renewal_period_months: e.target.value })} /></label>
                 <label className="text-xs font-bold">次の講師番号<input type="number" min="1" className={inputClass} value={form.next_instructor_number} onChange={(e) => setForm({ ...form, next_instructor_number: e.target.value })} /></label>
-                <label className="text-xs font-bold md:col-span-2">支払い案内の既定文<textarea rows={3} className={inputClass} value={form.default_payment_note} onChange={(e) => setForm({ ...form, default_payment_note: e.target.value })} /></label>
+                {!separateBankNote && <label className="text-xs font-bold md:col-span-2">支払い案内の既定文<textarea rows={3} className={inputClass} value={form.default_payment_note} onChange={(e) => setForm({ ...form, default_payment_note: e.target.value })} /></label>}
                 <button type="button" disabled={busy === "profile"} onClick={() => void saveProfile()} className="rounded-xl bg-[var(--mikke-primary)] px-4 py-2.5 text-sm font-bold text-white md:col-span-2">
                   本部情報を保存
                 </button>
@@ -447,7 +450,7 @@ function SettingsContent() {
           {canManageRole ? <AcademyNotificationLogs key={`mail-log:${user.id}:${headquarters.id}`} headquartersId={headquarters.id} sampleOnly={isAcademyLocalReview()} /> : null}
 
           {role === "owner" ? (
-            <AcademySettingsBilling key={`${user.id}:${headquarters.id}`} userId={user.id} headquartersId={headquarters.id} isGuest={isGuest} sample={isAcademyLocalReview()} legacy={
+            <AcademySettingsBilling key={`billing:${user.id}:${headquarters.id}`} userId={user.id} headquartersId={headquarters.id} isGuest={isGuest} sample={isAcademyLocalReview()} legacy={
             <section className={cardClass}>
               <h2 className="flex items-center gap-2 text-base font-bold">
                 <ReceiptJapaneseYen size={18} /> Academy利用料金
@@ -539,7 +542,7 @@ function SettingsContent() {
             } />
           ) : null}
 
-          {canManageRole ? <AcademyCommunityOverview key={`${user.id}:${headquarters.id}`} headquartersId={headquarters.id} userId={user.id} instructors={communityInstructors} sample={isAcademyLocalReview()} links={communityLinks} unavailable={communityUnavailable} /> : null}
+          {canManageRole ? <AcademyCommunityOverview key={`community:${user.id}:${headquarters.id}`} headquartersId={headquarters.id} userId={user.id} instructors={communityInstructors} sample={isAcademyLocalReview()} links={communityLinks} unavailable={communityUnavailable} /> : null}
 
           {canManage ? (
             <section className={cardClass}>
@@ -706,9 +709,20 @@ export default function AcademySettingsPage() {
 }
 
 function SettingsIdentityBoundary() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const pathname = usePathname();
   const academy2Headquarters = useAcademy2Headquarters();
+  const scopedId = getAcademyRouteContext()?.academyId ?? null;
+  const adapter = getMusubiLegacyPaidAdapter(profile.user_id, scopedId);
+  const [tab, setTab] = useState<"basic" | "payment">("basic");
   if (academy2Headquarters) return <Academy2HeadquartersSettings key={`${user.id}:${academy2Headquarters.id}`} headquarters={academy2Headquarters} />;
+  if (adapter) return <div className="space-y-5">
+    <nav className="flex gap-2" aria-label="本部設定の項目">
+      <button type="button" aria-current={tab === "basic" ? "page" : undefined} className="rounded-xl border px-4 py-2 text-sm font-bold" onClick={() => setTab("basic")}>本部情報</button>
+      <button type="button" aria-current={tab === "payment" ? "page" : undefined} className="rounded-xl border px-4 py-2 text-sm font-bold" onClick={() => setTab("payment")}>支払</button>
+    </nav>
+    <div hidden={tab !== "basic"}><SettingsContent key={`${user.id}:${pathname}`} separateBankNote /></div>
+    <div hidden={tab !== "payment"}><MusubiBankNoteEditor key={`${user.id}:${scopedId}`} userId={profile.user_id} headquartersId={scopedId} /></div>
+  </div>;
   return <SettingsContent key={`${user.id}:${pathname}`} />;
 }

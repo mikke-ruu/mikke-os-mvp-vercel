@@ -83,3 +83,26 @@
 
 
 .wrap button:disabled,.wrap input:disabled,.wrap select:disabled,.wrap textarea:disabled{cursor:not-allowed;opacity:.6}.layout{align-items:start}.wrap fieldset{border:0;padding:0;margin:0;min-width:0}.field{min-width:0}.error{color:#b42318}.wrap a{text-decoration:none}
+
+/* Form scale shared with the course editor; existing card geometry is retained. */
+.wrap{--muted:#4b535e;font-size:14px;line-height:1.65;letter-spacing:.01em}
+.back{font-size:14px;font-weight:400;line-height:1.65}.head{min-height:74px;padding:12px 16px 10px}.head .en{font-size:15px;font-weight:600;line-height:1.65;letter-spacing:.08em}.head .jp{font-size:14px;font-weight:600;line-height:1.65;margin-top:4px}
+.intro p,.help{font-size:14px;font-weight:400;line-height:1.65;color:var(--muted)}.intro p{margin:0}.intro{padding:16px 18px}
+.layout{grid-template-columns:minmax(0,1fr) 300px;gap:18px}.card{padding:20px;border-radius:14px;min-width:0}.card h2,.section h3,.summary h3{font-size:17px;font-weight:600;line-height:1.6;margin:0 0 10px}
+.planbox{padding:14px;background:#fff}.planbox b,.planbox strong{font-size:14px;font-weight:600;line-height:1.65}.planbox span{font-size:14px;font-weight:400;color:var(--muted)}
+.choice,.method,.assignee-choice,.visibility{padding:12px 14px;text-align:left;min-width:0}.choice strong,.method strong,.assignee-choice strong,.visibility strong,.instructor-card strong,.kit strong{font-size:14px;font-weight:600;line-height:1.65}
+.choice p,.method p,.assignee-choice p,.visibility p,.instructor-card p,.kit p{font-size:14px;font-weight:400;color:var(--muted);line-height:1.65;margin-top:6px}.choice.on,.method.on,.assignee-choice.on,.instructor-card.selected{background:#eaf6f0;border-color:#6aaf92;box-shadow:inset 0 0 0 1px #6aaf92}
+.section{margin-top:22px;padding-top:18px}.grid2{gap:14px}.field{margin-top:12px}.field label{font-size:14px;font-weight:600;line-height:1.65;margin:0}.field input,.field select,.field textarea{display:block;min-height:44px;font-size:15px;font-weight:400;line-height:1.6;margin-top:6px;padding:9px 11px;border-radius:9px;color:var(--ink)}.field textarea{min-height:88px}
+.kit{padding:14px;background:#fff;border:1px solid var(--line)}.kit-pill,.instructor-card button{font-size:14px;font-weight:600;line-height:1.65;min-height:40px}.kit-destination,.request-box{font-size:14px;line-height:1.65;color:var(--muted)}
+.assignee-type{grid-template-columns:repeat(2,minmax(0,1fr))}.assignee-choice:disabled,.visibility:disabled{background:#f7f8f9;color:#4b535e;opacity:1}
+.actions{align-items:flex-start;gap:12px;flex-wrap:wrap;margin-top:24px}.btn{display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;line-height:1.65;min-height:44px}.btn.primary{background:#f75a3b;color:#fff}.saveArea{display:grid;justify-items:end;gap:6px;max-width:100%}.saveArea .help{margin:0;text-align:right}
+.sumrow{font-size:14px;font-weight:400;line-height:1.65;padding:10px 0;align-items:flex-start}.sumrow span{min-width:0;overflow-wrap:anywhere}.sumrow span:first-child{flex:0 0 9em;color:var(--muted)}.sumrow span:last-child{flex:1;font-weight:600}.status{font-size:14px;font-weight:400;line-height:1.65;background:#f7f8f9;color:var(--muted);padding:12px}
+.error{margin-top:12px;padding:12px;border:1px solid #e7b6ac;border-radius:10px;background:#fff3ee;line-height:1.65}.error .btn{margin-left:8px}.wrap :is(input,select,textarea,button,a):focus-visible{outline:2px solid #4051a6;outline-offset:2px}
+@media(max-width:1000px){.layout{grid-template-columns:minmax(0,1fr) 260px}.card{padding:16px}}
+@media(max-width:820px){.layout{grid-template-columns:1fr}.choices,.methods,.grid2,.assignee-type,.visibility-options{grid-template-columns:1fr}.field input,.field select,.field textarea{font-size:16px;max-width:100%}.summary{position:static}.actions{align-items:stretch}.saveArea{flex:1;min-width:140px}.saveArea .btn{width:100%}.card{padding:16px}.choice,.method{padding:12px}.sumrow{gap:12px}}
+
+.embedded{max-width:none;width:100%;padding:0;margin:0}.overview>summary{font-size:17px;font-weight:600;cursor:pointer;line-height:1.6}.overview .sumrow{display:grid;grid-template-columns:1fr;gap:4px}.overview .sumrow span:first-child{flex:none}
+@media(min-width:821px){.overview:not([open])>.sumrow{display:grid}.overview>summary{list-style:none}.overview>summary::-webkit-details-marker{display:none}}
+
+/* Event input uses the same available width as the detail screen. */
+.wrap{max-width:1220px;margin:auto}.unavailable{margin-top:16px;border-top:1px solid var(--line);padding-top:10px}.unavailable summary{cursor:pointer;font-size:14px;min-height:44px;display:flex;align-items:center}.unavailable .help{margin:0}.choices{margin-top:18px}.overview .help{margin-bottom:0}

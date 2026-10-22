@@ -12,8 +12,10 @@ export type LpBlock = MikkeContentBlock & { lp?: {
   media?: { width?: number; height?: number; fit?: "contain" | "cover"; align?: "left" | "center" | "right" };
   reference?: { kind: string; id: string; imageSide?: "left" | "right" };
   desktop?: LpStyle; mobile?: LpStyle; children?: LpBlock[]; template?: "faq";
+  hidden?: boolean;
   motion?: "none" | "fade" | "rise";
   slideshow?: boolean; autoplay?: boolean; backgroundImage?: string;
+  salesDisplay?: import("@/lib/academy2/sales-page-display").SalesPageDisplay;
 } };
 
 export function newLpSection(): LpBlock {

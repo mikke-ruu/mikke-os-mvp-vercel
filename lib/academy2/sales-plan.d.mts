@@ -23,7 +23,7 @@ export type SalesPlan = {
     certificate?: { kind: 'completion' | 'certification' | 'other'; delivery: 'digital' | 'physical' | 'both'; name_rule: string } };
   dues?: { enabled: boolean; interval: 'month' | 'year'; amount: number | null; payment_method?:'academy_card'; billing_anchor?:'application'|'first'|'specified';billing_day?:number|null;cancellation?:'before_next'|'end_of_period';unpaid_grace_days?:number|null };
   opening_license?: { enabled: boolean; amount: number | null; kit: 'none' | 'included' | 'separate_order';timing?:'initial'|'per_event'|'renewal';payment_method?:'academy_card' };
-  kit?: { name?: string; enabled: boolean; methods: ('shipping' | 'venue_handover')[]; recipient?: 'instructor' | 'learner' };
+  kit?: { contract_version?:2; name?: string; enabled: boolean; methods: ('shipping' | 'venue_handover')[]; recipient?: 'instructor' | 'learner' };
   community?: 'none' | 'optional' | 'required';
   monthly?: Partial<MonthlyPolicies> & { months: { month: string; course_ids: string[]; materials: boolean; kit: boolean }[];
     period: { kind: 'unlimited' } | { kind: 'months'; count: number } | { kind: 'calendar'; start: string; end: string };

@@ -48,6 +48,9 @@
 .box .box[data-selected=true]{padding-top:24px}
 .root .previewReturn{position:fixed;bottom:calc(76px + env(safe-area-inset-bottom,0px));right:16px;display:flex;align-items:center;gap:8px;background:var(--mikke-surface);border:1px solid var(--mikke-line);box-shadow:0 2px 12px #0002;z-index:31;padding:8px 12px}.root .inspector>header>.inspectorToggle{margin-right:auto}
 
+/* Optional Academy outline and visibility controls; existing callers do not render these. */
+.sectionOutline,.sectionLibrary{min-width:0}.sectionOutline summary,.sectionLibrary summary{cursor:pointer;font-weight:600}.sectionOutline button,.sectionLibrary button{display:flex;width:100%;text-align:left;gap:8px}.sectionOutline small{display:block}.visibility{display:flex;align-items:center;gap:8px;padding:12px 0}.visibility input{width:auto}.hiddenNotice{font-size:14px;padding:8px 12px;background:#f4f5f6;color:#4b535e;margin:0}
+
 /* Keep mobile overrides after the desktop defaults. Reserve enough scroll
    space to bring the last BOX above the bottom sheet and app navigation. */
 @media(max-width:700px){
@@ -59,3 +62,9 @@
   .root .inspectorToggle{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .root .inspectorClose{flex-shrink:0}
 }
+
+/* Optional composed renderers keep insertion controls outside document flow. */
+.renderedSection{position:relative;min-width:0}
+.root .renderedInsert{position:absolute;right:0;bottom:0;z-index:6;width:28px;min-height:28px;border:1px solid var(--mikke-line);border-radius:50%;background:var(--mikke-surface);color:var(--mikke-primary);opacity:0}
+.renderedSection:hover>.renderedInsert,.renderedSection:focus-within>.renderedInsert{opacity:1}
+@media(hover:none){.root .renderedInsert{opacity:1}}

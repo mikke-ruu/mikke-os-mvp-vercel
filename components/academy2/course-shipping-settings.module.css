@@ -1,0 +1,8 @@
+.shipping{margin-top:20px;padding:16px;border:1px solid #d8e6de;border-radius:12px;font-size:14px;line-height:1.65;letter-spacing:.01em;color:#4b535e;min-width:0}
+.shipping h3{font-size:15px;margin:0 0 12px}
+.shipping label:has(input:not([type=checkbox])),.shipping label:has(textarea){display:grid;gap:6px;min-width:0;font-weight:600}
+.shipping input:not([type=checkbox]),.shipping textarea{display:block;box-sizing:border-box;width:100%;min-width:0;border:1px solid #d4ddd8;border-radius:8px;padding:10px 12px;background:#fff;color:#202126;font:inherit;font-weight:400}
+.shipping textarea{min-height:100px;resize:vertical}
+.shipping label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px;min-height:32px}
+.shipping input[type=checkbox]{width:18px;height:18px;margin:0;flex:none}
+.shipping button{font:inherit}
