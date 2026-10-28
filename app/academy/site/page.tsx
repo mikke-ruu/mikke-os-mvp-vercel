@@ -65,7 +65,7 @@ function SitePage() {
   if (loadError) return <div role="alert" className="py-24 text-center"><p>ホームページを読み込めませんでした。</p><button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={() => setRetry(value => value + 1)}>もう一度読み込む</button></div>;
   if (!hq) return <p className="py-24 text-center text-sm text-[var(--mikke-muted)]">本部ホームページが見つかりません。</p>;
 
-  if(academy2)return <HeadquartersHomepagePresentation front={hq}/>;
+  if(academy2)return <HeadquartersHomepagePresentation front={hq} courses={courses} instructors={instructors}/>;
   const document = readFrontDocument(hq.front_blocks ?? []);
   const canApply = serviceAvailability?.headquartersId === hq.id && serviceAvailability.available;
   return (

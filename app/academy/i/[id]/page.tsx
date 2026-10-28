@@ -21,7 +21,7 @@ function InstructorPublicInner({ instructorId }: { instructorId: string }) {
     async function load() {
       const ins = await getListedInstructor(instructorId).catch(() => null);
       setInstructor(ins);
-      if (ins) setCourse(await getPublicCourse(ins.course_id).catch(() => null));
+      if (ins) setCourse(await getPublicCourse(ins.course_id,ins.headquarters_id).catch(() => null));
       setLoading(false);
     }
     load();

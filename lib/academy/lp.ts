@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import {academyPublicClient} from './public-client';
 import {
   academyPreviewCourses,
   academyPreviewClasses,
@@ -78,8 +79,13 @@ export async function listListedInstructors(headquartersId?: string) {
 }
 
 // 公開LP: 講座を取得（RLSで公開中のみ匿名でも読める）
-export async function getPublicCourse(courseId: string) {
+export async function getPublicCourse(courseId: string, headquartersId?: string) {
   if (isAcademyLocalReview()) return academyPreviewCourses.find((item) => item.id === courseId && item.is_published) ?? null;
+  if(headquartersId){
+    const compatible=await academyPublicClient.rpc('academy2_existing_public_course',{p_hq:headquartersId,p_course:courseId}).abortSignal(AbortSignal.timeout(30000));
+    if(compatible.error&&compatible.error.code!=='PGRST202')throw compatible.error;
+    if(!compatible.error&&compatible.data)return compatible.data as AcademyCourse;
+  }
   const { data, error } = await supabase.from("academy_courses").select("*").eq("id", courseId).maybeSingle();
   if (error) throw error;
   return (data ?? null) as AcademyCourse | null;
@@ -122,6 +128,9 @@ export async function listPublicClasses(courseId: string, instructorId: string |
 // 公開LP: 担当講師（掲載中のみ匿名でも読める）
 export async function getListedInstructor(instructorId: string) {
   if (isAcademyLocalReview()) return academyPreviewInstructors.find((item) => item.id === instructorId && item.is_listed) ?? null;
+  const compatible=await academyPublicClient.rpc('academy2_existing_public_instructor',{p_id:instructorId}).abortSignal(AbortSignal.timeout(30000));
+  if(compatible.error&&compatible.error.code!=='PGRST202')throw compatible.error;
+  if(!compatible.error&&compatible.data)return compatible.data as AcademyInstructor;
   const { data, error } = await supabase
     .from("academy_instructors")
     .select("*")

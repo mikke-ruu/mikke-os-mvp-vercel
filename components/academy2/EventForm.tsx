@@ -13,6 +13,8 @@ import {EventKitDestinationsForEvent} from './EventKitDestination';
 import styles from './event-form.module.css';
 import {useEventAssignee,EventAssigneeControl} from './EventAssigneeControl';
 import type {SalesPlanDraft} from '@/lib/academy2/sales-plan-drafts';
+import {getExistingEventReview,type ExistingEventReview} from '@/lib/academy2/existing-event-review';
+import {eventCapacityError,preservesExistingUnboundedCapacity} from '@/lib/academy2/event-capacity';
 
 const cx=(...names:string[])=>names.map(name=>styles[name]).filter(Boolean).join(' ');
 const localDate=(value:string|null)=>value ? new Date(Date.parse(value)+9*3600000).toISOString().slice(0,16) : '';
@@ -27,6 +29,7 @@ export function Academy2EventForm({eventId,onBack,onSaved,initialPlanId,embedded
  const [planId,setPlanId]=useState(initialPlanId??search.get('plan')??'');
  const [courseId,setCourseId]=useState('');
  const [detail,setDetail]=useState<Academy2EventDetail|null>(null);
+ const [reviewCandidate,setReviewCandidate]=useState<ExistingEventReview|null>(null),[reviewApplied,setReviewApplied]=useState<ExistingEventReview|null>(null),[reviewError,setReviewError]=useState(''),[reviewLoading,setReviewLoading]=useState(false);
  const [fulfillment,setFulfillment]=useState<MaterialFulfillment>({method:'none',destination:{recipient_name:'',postal_code:'',address:''}});
  const [form,setForm]=useState<Academy2EventInput>({title:'',scheduleMode:'fixed',startsAt:null,endsAt:null,format:'in_person',capacity:1,venueName:'',meetingUrl:'',location:{address:'',address_visibility:'private',area:'',participant_note:''}});
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(''),[dirty,setDirty]=useState(false),[saved,setSaved]=useState(false),[retry,setRetry]=useState(0);
@@ -69,6 +72,11 @@ export function Academy2EventForm({eventId,onBack,onSaved,initialPlanId,embedded
    if(active){if(!preserveInput){setDirty(false);restoreWorkingInput(loadedRevision);}setSaved(false);}
   }catch(cause){if(active)setError(cause instanceof Error?cause.message:'開催を読み込めませんでした。');}finally{if(active)setLoading(false);}};void run();return()=>{active=false;};
  },[hq,eventId,retry]);
+ useEffect(()=>{let active=true;setReviewCandidate(null);setReviewError('');if(!hq||!eventId||!detail||!allowed)return;setReviewLoading(true);
+  getExistingEventReview(hq.id,eventId).then(candidate=>{if(!active)return;if(candidate&&(candidate.event_revision!==detail.revision||candidate.plan_id!==detail.sales_plan_id||candidate.course_id!==detail.course_id))throw new Error('開催が更新されています。最新の開催内容を読み直してください。');setReviewCandidate(candidate);}).catch(cause=>{if(active)setReviewError(cause instanceof Error?cause.message:'販売プランの見直しを確認できませんでした。');}).finally(()=>{if(active)setReviewLoading(false);});
+  return()=>{active=false;};
+ },[hq?.id,eventId,detail?.revision,allowed,retry]);
+ useEffect(()=>{setReviewApplied(null);},[hq?.id,eventId]);
  useEffect(()=>{if(eventId)return;const plan=plans.find(row=>row.id===planId);if(!plan)return;setForm(current=>({...current,title:current.title||plan.configuration.title,format:plan.configuration.allowed_methods.includes(current.format)?current.format:plan.configuration.allowed_methods[0]??current.format}));},[eventId,plans,planId]);
  useEffect(()=>{if(assignee.dirty)savedNavigation.current=false;},[assignee.dirty]);
  useEffect(()=>{if(!storageKey||loading)return;try{if(dirty)sessionStorage.setItem(storageKey,JSON.stringify({dirty:true,eventId:eventId??null,planId,sourceRevision:sourceRevision.current,form,fulfillment,dateParts,request:request.current,pendingCreated:pendingCreated.current,uncertainCreate:uncertainCreate.current}));else sessionStorage.removeItem(storageKey);}catch{setError('入力中の開催内容をブラウザに保持できません。画面を閉じる前に保存してください。');}},[storageKey,loading,dirty,planId,eventId,form,fulfillment,dateParts,saving]);
@@ -79,30 +87,34 @@ export function Academy2EventForm({eventId,onBack,onSaved,initialPlanId,embedded
  const href=(path:string)=>toAcademyContextHref(path,hq.id,'manage');
  const selected=plans.find(plan=>plan.id===planId);
  const config=selected?.configuration;
- const summaryMismatch=!!summaryPlan&&!loading&&(summaryPlan.id!==planId||summaryPlan.revision!==(eventId?detail?.plan_revision:selected?.revision));
+ const summaryMismatch=!!summaryPlan&&!loading&&(summaryPlan.id!==planId||summaryPlan.revision!==(eventId?reviewApplied?.review_plan_revision??detail?.plan_revision:selected?.revision));
  // The event represents the plan; the first saved course is only the legacy scheduling anchor.
  const selectedCourseId=courseId||selected?.course_snapshot[0]?.course_id||'';
- const kit=detail?.kit_settings??config?.kit;
+ const kit=reviewApplied?.configuration.kit??detail?.kit_settings??config?.kit;
+ const allowedMethods=reviewApplied?.configuration.allowed_methods??detail?.allowed_methods??config?.allowed_methods??['in_person','online'];
  const materialV2=kit?.contract_version===2;
  const effectiveFulfillment:MaterialFulfillment={...fulfillment,method:!kit?.enabled?'none':form.format==='online'?'learner_shipping':fulfillment.method};
  const kitMethods=(kit?.methods??[]).filter(method=>form.format!=='online'||method==='shipping');
  const kitMethod=!kit?.enabled?null:kitMethods.length===1?kitMethods[0]:kitMethods.find(method=>method===form.kitMethod)??null;
  const kitLabel=materialV2?materialMethodLabels[effectiveFulfillment.method]:kitMethod==='shipping'?'事前に発送':kitMethod==='venue_handover'?'会場で手渡し':kit?.enabled?'選択してください':'キットなし';
- const planTitle=detail?.sales_plan_name??config?.title??'販売プランを選択';
+ const planTitle=reviewApplied?.configuration.title??detail?.sales_plan_name??config?.title??'販売プランを選択';
  const date=dateParts.day+(dateParts.time?'T'+dateParts.time:''),end=localDate(form.endsAt);
  const change=<K extends keyof Academy2EventInput>(key:K,value:Academy2EventInput[K])=>{savedNavigation.current=false;setForm(current=>({...current,[key]:value}));setDirty(true);setSaved(false);};
  const setDate=(day:string,time:string)=>{setDateParts({day,time});change('startsAt',day&&time?new Date(`${day}T${time}:00+09:00`).toISOString():null);};
  const individualRequested=form.scheduleMode==='arranged_after_application'&&(!eventId||detail?.individual_consultation===true);
  const scheduleChanged=!!detail&&detail.application_count>0&&(form.scheduleMode!==detail.schedule_mode||(form.startsAt?Date.parse(form.startsAt):null)!==(detail.starts_at?Date.parse(detail.starts_at):null)||(form.endsAt?Date.parse(form.endsAt):null)!==(detail.ends_at?Date.parse(detail.ends_at):null));
  useEffect(()=>{setScheduleContactConfirmed(false);},[form.scheduleMode,form.startsAt,form.endsAt]);
+ async function applyReviewedPlan(){if(!reviewCandidate||!eventId||reviewLoading||saving)return;setReviewLoading(true);setReviewError('');try{const latest=await getExistingEventReview(hq!.id,eventId);if(!latest||latest.event_revision!==detail?.revision||latest.plan_id!==reviewCandidate.plan_id||latest.review_plan_revision!==reviewCandidate.review_plan_revision)throw new Error('販売プランまたは開催が更新されています。最新の内容を読み直してください。');setReviewApplied(latest);setDirty(true);setSaved(false);request.current=null;savedNavigation.current=false;}catch(cause){setReviewError(cause instanceof Error?cause.message:'販売プランの見直しを反映できませんでした。');}finally{setReviewLoading(false);}}
  async function save(event:React.FormEvent){event.preventDefault();if(inFlight.current||!hq||!allowed)return;savedNavigation.current=false;setError('');
+  if(reviewLoading)return setError('販売プランの確認が終わるまでお待ちください。');
+  if(reviewApplied&&!allowedMethods.includes(form.format))return setError('見直した販売プランで利用できる開催方法を選択してください。');
   if(summaryMismatch)return setError('販売プランが更新されています。保存済みの内容を読み直してください。');
   if(draftConflict)return setError('保存済みの版が更新されています。入力を控えてから最新の内容を読み直してください。');
   if(scheduleChanged&&!scheduleContactConfirmed)return setError('この日程変更は参加者全員に反映されます。申込者への連絡を確認してください。');
   if(!form.title.trim())return setError('開催名を入力してください。');
   if(form.title.length>300)return setError('開催名は300文字以内で入力してください。');
-  if(form.scheduleMode==='fixed'&&form.capacity===null)return setError('定員は1人以上で入力してください。');
-  if(!individualRequested&&form.capacity!==null&&(!Number.isInteger(form.capacity)||form.capacity<1))return setError('定員は1人以上の整数で入力してください。');
+  const capacityError=eventCapacityError({eventId,existing:detail,scheduleMode:form.scheduleMode,capacity:form.capacity,individualRequested});
+  if(capacityError)return setError(capacityError);
   if(form.startsAt&&!Number.isFinite(Date.parse(form.startsAt))||form.endsAt&&!Number.isFinite(Date.parse(form.endsAt)))return setError('開催日時を確認してください。');
   const meetingUrl=form.format==='online'?(form.meetingUrl??'').trim():'';
   if(meetingUrl&&(meetingUrl.length>2048||!/^https:\/\//.test(meetingUrl)||/[\s\u0000-\u001f]/.test(meetingUrl)))return setError('オンライン参加URLは空白を含まない https:// で始まるURLを入力してください。');
@@ -117,16 +129,16 @@ export function Academy2EventForm({eventId,onBack,onSaved,initialPlanId,embedded
   if(materialV2&&effectiveFulfillment.method==='designated_shipping'&&effectiveFulfillment.destination&&[effectiveFulfillment.destination.recipient_name.trim().length>200,effectiveFulfillment.destination.postal_code.trim().length>30,effectiveFulfillment.destination.address.trim().length>2000].some(Boolean))return setError('指定先は宛名200文字・郵便番号30文字・住所2000文字以内で入力してください。');
   const input={...form,meetingUrl,kitMethod,...(individualRequested?{capacity:null}:{}),...(form.scheduleMode==='arranged_after_application'?{startsAt:null,endsAt:null}:{})};
   const courseId=selectedCourseId;
-  const body=JSON.stringify({eventId,revision:detail?.revision,planId,courseId,input,fulfillment:materialV2?effectiveFulfillment:null});
+  const body=JSON.stringify({eventId,revision:detail?.revision,planId,courseId,input,fulfillment:materialV2?effectiveFulfillment:null,reviewPlanRevision:reviewApplied?.review_plan_revision});
   if(!eventId&&(pendingCreated.current||uncertainCreate.current)&&request.current?.body!==body)return setError('前回の保存結果を確認できていません。重複作成を防ぐため、前回と同じ入力で保存結果を確認してください。入力内容は残っています。');
   if(request.current?.body!==body)request.current={id:crypto.randomUUID(),body};
   inFlight.current=true;setSaving(true);if(!eventId)uncertainCreate.current=true;
-  try{const result=await writeAcademy2EventWithLocation(hq.id,eventId??null,detail?.revision??0,request.current!.id,{...input,...(!eventId?{planId,planRevision:selected!.revision,courseId}:{})},materialV2||individualRequested?{method:effectiveFulfillment.method,...(effectiveFulfillment.method==='designated_shipping'?{destination:effectiveFulfillment.destination}:{})}:null,individualRequested);
+  try{const result=await writeAcademy2EventWithLocation(hq.id,eventId??null,detail?.revision??0,request.current!.id,{...input,...(!eventId?{planId,planRevision:selected!.revision,courseId}:reviewApplied?{legacyReviewPlanRevision:reviewApplied.review_plan_revision}:{})},materialV2||individualRequested?{method:effectiveFulfillment.method,...(effectiveFulfillment.method==='designated_shipping'?{destination:effectiveFulfillment.destination}:{})}:null,individualRequested);
    if(!eventId)pendingCreated.current=result.id;
    if(materialV2){const verified=await readEventMaterials(hq.id,result.id);if(!matchesMaterialFulfillment(verified,effectiveFulfillment))throw new Error('開催は保存されましたが、受け渡し設定の再取得を確認できませんでした。入力内容は残っています。');}
    if(!eventId){const persisted=await getAcademy2Event(hq.id,result.id);pendingCreated.current=null;uncertainCreate.current=false;if(storageKey){try{sessionStorage.removeItem(storageKey);}catch{/* Server save remains authoritative. */}}savedNavigation.current=true;setDirty(false);setSaved(true);if(embedded&&onSaved){onSaved(persisted);return;}window.location.assign(href(`/academy/classes/${result.id}${search.get('plan')?`?returnPlan=${encodeURIComponent(search.get('plan')!)}`:''}`));return;}
-   const persisted=await getAcademy2Event(hq.id,result.id);setDetail(persisted);setForm(current=>({...current,kitMethod:persisted.kit_method}));setDirty(false);request.current=null;await assignee.save();setSaved(true);onSaved?.(persisted);
-  }catch(cause){const code=(cause as {code?:string}).code;if(['22023','42501','PT409','PGRST202','42883'].includes(code??''))uncertainCreate.current=false;setError(cause instanceof Error?cause.message:'保存できませんでした。入力内容は残っています。');}finally{inFlight.current=false;setSaving(false);}
+   const persisted=await getAcademy2Event(hq.id,result.id);setDetail(persisted);setReviewApplied(null);setForm(current=>({...current,kitMethod:persisted.kit_method}));setDirty(false);request.current=null;await assignee.save();setSaved(true);onSaved?.(persisted);
+  }catch(cause){const code=(cause as {code?:string}).code;if(['22023','42501','PT409','PGRST202','42883'].includes(code??''))uncertainCreate.current=false;setError(cause instanceof Error?cause.message:'保存できませんでした。入力内容は残っています。');if(reviewApplied&&code==='PT409')setReviewError('販売プランまたは開催が更新されています。再確認してから見直した内容を反映してください。');}finally{inFlight.current=false;setSaving(false);}
  }
  const location=form.location??{address:'',address_visibility:'private' as const,area:'',participant_note:''};
  const locationLocked=!!detail&&(detail.registration_status==='open'||detail.application_count>0);
@@ -138,20 +150,22 @@ export function Academy2EventForm({eventId,onBack,onSaved,initialPlanId,embedded
   {!eventId&&search.get('copyEvent')?<p className={styles.help}>開催内容を新しい下書きへ複製します。日時を確認して保存してください。申込・入金・発送・出欠・修了・担当者の履歴は引き継ぎません。</p>:null}
   {loading?<p role="status">読み込み中…</p>:<div className={styles.layout}><form className={styles.card} onSubmit={save}>
    <h2>開催内容</h2>{summaryMismatch&&<div role="alert" className={styles.error}>販売プランが更新されています。保存済みの内容を読み直してください。<button type="button" className={styles.btn} onClick={()=>{if(leave())window.location.reload();}}>読み直す</button></div>}
-   <fieldset disabled={!allowed||saving||summaryMismatch||!!eventId&&!detail}>
+   {reviewCandidate&&<div className={styles.help}><p>{reviewApplied&&reviewApplied.review_plan_revision===reviewCandidate.review_plan_revision?'見直した販売プランを入力画面に反映しました。受け渡し方法を確認し、開催を保存してください。':'販売プランの受講方法・物品の設定が見直されています。開催に反映して、受け渡し方法を確認してください。'}</p>{(!reviewApplied||reviewApplied.review_plan_revision!==reviewCandidate.review_plan_revision)&&<button type="button" className={styles.btn} disabled={reviewLoading||saving} onClick={()=>void applyReviewedPlan()}>見直した販売プランを反映</button>}</div>}
+   {reviewError&&<p role="alert" className={styles.error}>{reviewError}<button type="button" className={styles.btn} disabled={saving||reviewLoading} onClick={()=>setRetry(value=>value+1)}>再確認</button></p>}
+   <fieldset disabled={!allowed||saving||reviewLoading||summaryMismatch||!!eventId&&!detail}>
     <div className={styles.planbox}><b>販売プラン</b>{eventId?<strong>{planTitle}</strong>:<div className={styles.field}><select aria-label="販売プラン" disabled={embedded} value={planId} onChange={e=>{setPlanId(e.target.value);setCourseId('');change('kitMethod',null);}}><option value="">選択してください</option>{plans.map(plan=><option key={plan.id} value={plan.id}>{plan.configuration.title}</option>)}</select></div>}
      <span>講師から受講</span>{!eventId&&selected?<p className={styles.help}>含まれる講座：{(summaryPlan?summaryPlan.configuration.course_ids.map(id=>summaryPlan.course_snapshot.find(c=>c.course_id===id)?.title).filter(Boolean):selected.course_snapshot.map(c=>c.title)).join('、')}</p>:null}
     </div>
     <div className={styles.field}><label>開催名<input value={form.title} onChange={e=>change('title',e.target.value)} maxLength={300}/></label></div>
     <div className={styles.choices}>{(['fixed','arranged_after_application'] as const).map(mode=><button type="button" disabled={!!eventId&&detail?.schedule_mode!==mode} aria-pressed={form.scheduleMode===mode} key={mode} className={cx('choice',form.scheduleMode===mode?'on':'')} onClick={()=>change('scheduleMode',mode)}><strong>{mode==='fixed'?'日時を決めて募集する':'個別に日程を相談する'}</strong><p>{mode==='fixed'?'開催日・時間・会場などを決めて、その日程で参加者を募集します。':'申込者ごとに日時を決め、受付は継続します。'}</p></button>)}</div>
-    <div className={styles.section}><h3>開催方法</h3><div className={styles.methods}>{(['in_person','online'] as const).map(method=><button type="button" key={method} disabled={!(detail?.allowed_methods??config?.allowed_methods??['in_person','online']).includes(method)} aria-pressed={form.format===method} className={cx('method',form.format===method?'on':'')} onClick={()=>change('format',method)}><strong>{method==='in_person'?'対面':'オンライン'}</strong><p>{method==='in_person'?'会場で開催します。':'Zoomなどで開催します。'}</p></button>)}</div></div>
+    <div className={styles.section}><h3>開催方法</h3><div className={styles.methods}>{(['in_person','online'] as const).map(method=><button type="button" key={method} disabled={!allowedMethods.includes(method)} aria-pressed={form.format===method} className={cx('method',form.format===method?'on':'')} onClick={()=>change('format',method)}><strong>{method==='in_person'?'対面':'オンライン'}</strong><p>{method==='in_person'?'会場で開催します。':'Zoomなどで開催します。'}</p></button>)}</div></div>
     {detail?.schedule_mode==='arranged_after_application'&&!detail.individual_consultation&&<p className={styles.help}>この既存募集は参加者共通の日程です。個別の日程相談は新しい募集を作成してください。</p>}<div className={styles.section}>{form.scheduleMode==='fixed'?<h3>日時</h3>:null}<div className={styles.grid2}>
      {form.scheduleMode==='fixed'?<>
      <div className={styles.field}><label>開催日<input type="date" value={date.slice(0,10)} onChange={e=>setDate(e.target.value,date.slice(11)||'09:00')}/></label></div>
      <div className={styles.field}><label>開始時間<input type="time" value={date.slice(11)} onChange={e=>setDate(date.slice(0,10),e.target.value)}/></label></div>
      <div className={styles.field}><label>終了時間<input type="time" value={end.slice(11)} onChange={e=>change('endsAt',e.target.value&&date?new Date(`${date.slice(0,10)}T${e.target.value}:00+09:00`).toISOString():null)}/></label></div>
      </>:null}
-     {individualRequested?<div className={styles.field}><strong>1回の受講人数：1名</strong><p className={styles.help}>受付停止するまで継続して募集します。</p></div>:<div className={styles.field}><label>定員<input type="number" min={1} value={form.capacity??''} onChange={e=>change('capacity',e.target.value?Number(e.target.value):null)}/></label></div>}
+     {individualRequested?<div className={styles.field}><strong>1回の受講人数：1名</strong><p className={styles.help}>受付停止するまで継続して募集します。</p></div>:<div className={styles.field}><label>定員<input type="number" min={1} value={form.capacity??''} onChange={e=>change('capacity',e.target.value?Number(e.target.value):null)}/></label>{preservesExistingUnboundedCapacity({eventId,existing:detail,scheduleMode:form.scheduleMode,capacity:form.capacity})&&<p className={styles.help}>定員なし（現在の設定）</p>}</div>}
     </div></div>
     <div className={styles.section}><h3>{form.format==='in_person'?'会場':'オンライン参加'}</h3><div className={styles.field}>{form.format==='in_person'?<label>会場名<input value={form.venueName??''} onChange={e=>change('venueName',e.target.value)}/></label>:<label>参加URL<input type="url" placeholder="https://zoom.us/..." value={form.meetingUrl??''} onChange={e=>change('meetingUrl',e.target.value)}/></label>}</div>
      {unsupported}

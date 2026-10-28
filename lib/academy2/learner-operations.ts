@@ -3,10 +3,14 @@ import { supabase } from "@/lib/supabase/client";
 /** Read-only, server-scoped to the signed-in learner. No caller-supplied user ID.
  * This does not grant materials, issue certificates or expose teacher invoices. */
 export type Academy2LearnerApplication = {
+  source?: 'legacy_course' | 'legacy_plan';
+  course_id?: string;
+  /** Historical course records have a completion state but no timestamp. */
+  legacy_completed?: boolean;
   id: string;
   headquarters_id: string;
   headquarters_name: string;
-  sales_plan_id: string;
+  sales_plan_id: string | null;
   sales_plan_name: string;
   application_status: string;
   materials_available?: boolean;

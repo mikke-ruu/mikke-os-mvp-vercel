@@ -14,6 +14,7 @@ export function applicationDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? '未設定' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
 }
 export const nextActionLabel = (key: string | null) => ({ confirm_payment: '支払い確認', confirm_tuition: '支払い確認', confirm_schedule: '日程調整', set_shipping_destination: '発送先確認', record_shipping: 'キット発送', event_kit_shipping: '開催のキット発送', ship_kit: 'キット発送', confirm_completion: '受講終了を確認する', submit_completion: '修了報告', confirm_certification: '認定', review_outcome: '認定確認', pay_opening_license: '開講ライセンス支払い', done: '対応完了', wait: '確認待ち' }[key ?? ''] ?? '申込詳細を確認');
+export const applicationCompleted = (row: HeadquartersApplicationSummary) => row.completed === true || !!row.completedAt;
 
 export function applicationPaymentLabel(value: string | null | undefined) {
   return ({ paid: '入金済み', unpaid: '未払い', pending: '入金確認待ち', confirmed: '入金確認済み', refunded: '返金済み', not_required: '支払い不要' } as Record<string, string>)[value ?? ''] ?? '確認中';
@@ -47,7 +48,7 @@ export function HeadquartersApplications({ mode = 'applications' }: { mode?: 'ap
     if (filter === 'schedule' && !(row.schedule?.individual&&!row.schedule.startsAt) && row.nextAction !== 'confirm_schedule') return false;
     if (![row.applicantName, row.planTitle].join(' ').toLocaleLowerCase('ja-JP').includes(search.trim().toLocaleLowerCase('ja-JP'))) return false;
     if (filter === 'payment_pending') return ['confirm_payment', 'confirm_tuition'].includes(row.nextAction ?? '');
-    if (filter === 'completed') return row.nextAction==='done'||!!row.completedAt&&!row.nextAction;
+    if (filter === 'completed') return row.nextAction==='done'||applicationCompleted(row)&&!row.nextAction;
     if (filter === 'all' || filter === 'schedule') return true;
     if (filter === 'certified') return !!row.certifiedAt;
     if (filter === 'certification_pending') return !row.certifiedAt && ['confirm_certification', 'review_outcome'].includes(row.nextAction ?? '');
@@ -63,7 +64,7 @@ export function HeadquartersApplications({ mode = 'applications' }: { mode?: 'ap
   const detailHref=(id:string)=>{const p=new URLSearchParams({listFilter:filter,listChannel:saleChannel,listSort:sort});if(search)p.set('listSearch',search);if(mode==='certifications')p.set('from','certifications');return toAcademyContextHref('/academy/applications/'+id+'?'+p.toString(),hq.id,'manage');};
   return <div className={styles.wrap}>
     <div className={styles.heroTitle}><div className={styles.en}>{mode === 'applications' ? 'APPLICATIONS' : 'MY ACADEMY'}</div><h1 className={styles.jp}>{title}</h1></div>
-    <div className={styles.heroBody}><p>申込内容と対応状況を確認します。</p><div className={styles.listTools}><a href={toAcademyContextHref('/academy/offering-applications/legacy',hq.id,'manage')}>旧申込を確認</a><button type="button" className={styles.iconButton} aria-label="申込情報を更新" onClick={()=>setRetry(v=>v+1)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button></div></div>
+    <div className={styles.heroBody}><p>申込内容と対応状況を確認します。</p><div className={styles.listTools}><button type="button" className={styles.iconButton} aria-label="申込情報を更新" onClick={()=>setRetry(v=>v+1)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></svg></button></div></div>
     <div className={styles.toolbar}><input className={styles.input} aria-label="申込者・販売プランで検索" placeholder="申込者・販売プランで検索" value={search} onChange={e=>setSearch(e.target.value)}/><select className={styles.input} aria-label="並び替え" value={sort} onChange={e=>setSort(e.target.value)}><option value="recent">申込日が新しい順</option><option value="oldest">申込日が古い順</option></select></div>
     <button className={styles.mobileFilters} type="button" aria-expanded={filtersOpen} aria-controls={'application-filters-'+mode} onClick={()=>setFiltersOpen(v=>!v)}>絞り込み{saleChannel!=='all'||filter!=='all'?'（選択中）':''} <span aria-hidden="true">{filtersOpen?'−':'＋'}</span></button>
     <div id={'application-filters-'+mode} className={styles.filterPanels+' '+(filtersOpen?styles.filtersOpen:'')}>
@@ -77,7 +78,7 @@ export function HeadquartersApplications({ mode = 'applications' }: { mode?: 'ap
       <p className={styles.planLine}>{row.planTitle}</p>
       <p className={styles.scheduleLine}>{applicationScheduleLabel(row.schedule)}</p>
       <div className={styles.applicantLine}>{row.tuition&&<span className={styles.cardPrice}>受講料 {new Intl.NumberFormat('ja-JP',{style:'currency',currency:row.tuition.currency||'JPY'}).format(row.tuition.amount)}</span>}</div>
-      <div className={styles.responseLine}>{payment&&<span className={styles.stateBadge}>{payment}</span>}{<span className={styles.nextLine}>{row.nextAction==='done'||!row.nextAction&&row.completedAt?'対応完了':row.nextAction==='wait'?'確認待ち':row.nextAction==='confirm_completion'?nextActionLabel(row.nextAction):'次の対応：'+nextActionLabel(row.nextAction)}</span>}</div>
+      <div className={styles.responseLine}>{payment&&<span className={styles.stateBadge}>{payment}</span>}{<span className={styles.nextLine}>{row.nextAction==='done'||!row.nextAction&&applicationCompleted(row)?'対応完了':row.source?.startsWith('legacy_')&&!row.nextAction?'過去の申込記録':row.nextAction==='wait'?'確認待ち':row.nextAction==='confirm_completion'?nextActionLabel(row.nextAction):'次の対応：'+nextActionLabel(row.nextAction)}</span>}</div>
       <div className={styles.cardMeta}><span>申込 {applicationDate(row.appliedAt)}</span><span>{row.saleChannel==='instructor'?'講師販売':'本部販売'}</span></div>
       {mode==='certifications'&&<p>修了：{row.completedAt?applicationDate(row.completedAt):'未完了'} ／ 認定：{row.certifiedAt?applicationDate(row.certifiedAt):'未確定'}</p>}
     </a>;})}</div>

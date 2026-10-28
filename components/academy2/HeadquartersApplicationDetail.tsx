@@ -6,12 +6,48 @@ import {toAcademyContextHref} from '@/lib/academy/access-context';
 import {commandHeadquartersApplication,getHeadquartersApplication,type HeadquartersApplicationDetail as Detail,type HeadquartersApplicationAction} from '@/lib/academy2/headquarters-applications';
 import {getAcademy2Event,type Academy2EventDetail} from '@/lib/academy2/operations';
 import {ApplicationAnswerSummary} from './ApplicationAnswerSummary';
-import {applicationDate,applicationPaymentLabel,nextActionLabel} from './HeadquartersApplications';
+import {applicationCompleted,applicationDate,applicationPaymentLabel,nextActionLabel} from './HeadquartersApplications';
 import {confirmApplicationSchedule,applicationScheduleLabel} from '@/lib/academy2/application-schedule';
 import styles from './applications-operation.module.css';
 const card=styles.detailCard,button=styles.button,primaryButton=styles.button+' '+styles.primary,inputClass=styles.operationInput;
 function Row({label,children}:{label:string;children:React.ReactNode}){return <div className={styles.row}><span className={styles.rowLabel}>{label}</span><span className={styles.rowValue}>{children}</span></div>;}
 function status(value:string|null|undefined){return ({pending:'入金確認待ち',paid:'入金済み',unpaid:'未払い',shipped:'発送済み',not_required:'不要',submitted:'報告済み',certified:'認定済み',attended:'出席',present:'出席',absent:'欠席',late:'遅刻',unconfirmed:'未確認',confirmed:'確認済み',waiting:'確認待ち',unreported:'未報告',not_started:'未実施',not_certified:'未認定',preparing:'発送準備中',waiting_assignment:'担当講師の確定待ち',awaiting_destination:'講師の発送先指定待ち',blocked:'開催の設定を確認'} as Record<string,string>)[value??'']??'確認中';}
+/** The original submission stays in its original table. Only the server authorizes historical updates. */
+function HistoricalApplicationDetail({data,headquartersId,params,busy,error,saved,note,setNote,leave,refresh,execute}:{data:Detail;headquartersId:string;params:URLSearchParams;busy:boolean;error:string;saved:string;note:string;setNote:(value:string)=>void;leave:()=>boolean;refresh:()=>void;execute:(action:HeadquartersApplicationAction,input?:Record<string,unknown>)=>Promise<void>}){
+ const legacy=data.legacy!,summary=data.summary,back=applicationBackTarget(headquartersId,legacy.reference.eventId,params);
+ const [copyStatus,setCopyStatus]=useState('');
+ const allowed=legacy.allowedActions;
+ const act=(action:'confirm_payment'|'confirm_completion')=>{const label=action==='confirm_payment'?'この申込の入金を確認しますか？':'この申込の修了を記録しますか？';if(window.confirm(label))void execute(action,{review_note:note.trim()});};
+ return <div className={styles.wrap}>
+  <a className={styles.backLink} href={back.href} onClick={event=>{if(!leave())event.preventDefault();}}>{back.label}</a>
+  <div className={styles.heroTitle}><div className={styles.en}>APPLICATION</div><h1 className={styles.jp}>申込詳細</h1></div>
+  <div className={styles.detailIntro}><p>申込内容と対応状況を確認します。</p><button className={styles.iconButton} type="button" aria-label="申込情報を更新" disabled={busy} onClick={refresh}>↻</button></div>
+  <div className={styles.finalDetail}>
+   <section className={`${card} ${styles.answers}`}><h2>お申し込み内容</h2>
+    <div className={styles.basicAnswers}>
+     <Row label={legacy.source==='legacy_course'?'講座':'販売プラン'}>{summary.planTitle}</Row>
+     <Row label="申込日時">{applicationDate(summary.appliedAt)}</Row><Row label="申込者名">{summary.applicantName}</Row>
+     <Row label="メールアドレス">{legacy.contactEmail&&<div className={styles.emailRow}><span>{legacy.contactEmail}</span><button type="button" className={styles.iconButton} aria-label="メールアドレスをコピー" onClick={()=>{void navigator.clipboard.writeText(legacy.contactEmail!).then(()=>setCopyStatus('コピーしました')).catch(()=>setCopyStatus('コピーできませんでした。メールアドレスを選択してコピーしてください。'));}}>コピー</button><span role="status" className={styles.copyStatus}>{copyStatus}</span></div>}</Row>
+     {legacy.phone&&<Row label="電話番号">{legacy.phone}</Row>}
+     <Row label="受講料">{summary.tuition?new Intl.NumberFormat('ja-JP',{style:'currency',currency:summary.tuition.currency||'JPY'}).format(summary.tuition.amount):'金額の記録なし'}</Row>
+    </div>
+    <dl className={styles.questionAnswers}>{legacy.answers.map((answer,index)=><div key={index}><dt className={styles.answerLabel}>{answer.label}</dt><dd className={styles.answerValue}>{answer.value??<span aria-label="回答なし">&nbsp;</span>}</dd></div>)}</dl>
+    {legacy.consent&&<Row label="規約への同意">{legacy.consent.consentedAt?applicationDate(legacy.consent.consentedAt):'日時の記録なし'}{legacy.consent.version?' ／ '+legacy.consent.version:''}</Row>}
+   </section>
+   <section className={card}><h2>運営側の対応状況</h2>
+    {summary.tuition&&<Row label="入金状態">{applicationPaymentLabel(summary.tuition.status)}</Row>}
+    {summary.schedule&&<Row label="開催日時">{applicationScheduleLabel(summary.schedule)}</Row>}
+    <Row label="修了">{summary.completedAt?'修了済み（'+applicationDate(summary.completedAt)+'）':legacy.completed===true||applicationCompleted(summary)?'修了済み（日時の記録なし）':'未記録'}</Row>
+    {summary.kitStatus&&summary.kitStatus!=='not_required'&&<Row label="物品の受け渡し">{status(summary.kitStatus)}</Row>}
+    {allowed.length>0?<div className={styles.operationSection}><h3>次に対応すること</h3><p>{nextActionLabel(summary.nextAction)}</p><label>確認内容<textarea className={inputClass} maxLength={2000} value={note} disabled={busy} onChange={event=>setNote(event.target.value)}/></label>
+     {allowed.includes('confirm_payment')&&<button type="button" className={primaryButton} disabled={busy||!note.trim()} onClick={()=>act('confirm_payment')}>入金を確認する</button>}
+     {allowed.includes('confirm_completion')&&<button type="button" className={primaryButton} disabled={busy||!note.trim()} onClick={()=>act('confirm_completion')}>修了を記録する</button>}
+    </div>:<p>過去の申込記録です。</p>}
+    <div aria-live="polite" className={styles.inlineFeedback}>{busy?<p role="status">確認中…</p>:error?<p role="alert" className={styles.error}>{error}</p>:saved?<p role="status">{saved}</p>:null}</div>
+   </section>
+  </div>
+ </div>;
+}
 /** Return targets are constructed from this HQ and this application's canonical event, never an arbitrary URL. */
 export function applicationBackTarget(hqId:string,eventId:string|null|undefined,params:URLSearchParams){
  if(eventId&&/^[0-9a-f-]{36}$/i.test(eventId)&&params.get('fromEvent')===eventId)return{href:toAcademyContextHref('/academy/classes/'+eventId,hqId,'manage'),label:'← 開催詳細へ戻る'};
@@ -38,9 +74,10 @@ function ApplicationDetailBody({hq,applicationId}:{hq:NonNullable<ReturnType<typ
  function edit(set:(value:string)=>void,value:string){set(value);dirtyFields.current.add(set===setNote?'note':set===setAddress?'address':set===setTracking?'tracking':set===setIndividualStarts?'individualStarts':set===setIndividualEnds?'individualEnds':'shipped');setDirty(true);setSaved('');}
  function leave(){return !lock.current&&(!dirty||window.confirm('保存していない入力があります。画面を移動しますか？'));}
  async function execute(action:HeadquartersApplicationAction,input:Record<string,unknown>={}){
-  if(!data||lock.current||loading||!(data.headquarters?.allowedActions??data.instructor?.allowedActions??[]).includes(action))return;
+  if(!data||lock.current||loading||!(data.legacy?.allowedActions??data.headquarters?.allowedActions??data.instructor?.allowedActions??[]).includes(action))return;
   lock.current=true;setBusy(true);setError('');setSaved('');const signature=JSON.stringify([applicationId,data.summary.revision,action,input]);if(request.current?.signature!==signature)request.current={signature,id:crypto.randomUUID()};
   try{const result=await commandHeadquartersApplication(hq.id,applicationId,data.summary.revision,request.current.id,action,input);setData(result);request.current=null;
+   if(result.legacy)setData(await getHeadquartersApplication(hq.id,applicationId));
    if(action==='set_shipping_destination')dirtyFields.current.delete('address');if(action==='record_shipping'){dirtyFields.current.delete('tracking');dirtyFields.current.delete('shipped');}if(Object.hasOwn(input,'review_note'))dirtyFields.current.delete('note');setDirty(dirtyFields.current.size>0);setSaved('保存しました');
   }catch(cause){setError(cause instanceof Error?cause.message:'保存できませんでした。入力内容は残っています。');}finally{lock.current=false;setBusy(false);}
  }
@@ -52,6 +89,8 @@ function ApplicationDetailBody({hq,applicationId}:{hq:NonNullable<ReturnType<typ
   lock.current=true;setBusy(true);setError('');setSaved('');try{const result=await confirmApplicationSchedule(hq.id,applicationId,row.revision,individualRequest.current.id,starts.toISOString(),ends.toISOString());setData(result);individualRequest.current=null;dirtyFields.current.delete('individualStarts');dirtyFields.current.delete('individualEnds');setDirty(dirtyFields.current.size>0);setSaved('保存しました');}catch(cause){setError(cause instanceof Error?cause.message:'日程を保存できませんでした。入力内容は残っています。');}finally{lock.current=false;setBusy(false);}
  }
  if(!data)return <div className={styles.wrap}><p role={error?'alert':'status'}>{error||'読み込み中…'}</p>{error&&<button className={button} onClick={()=>setRetry(v=>v+1)}>再読み込み</button>}</div>;
+ if(data.legacy)return <HistoricalApplicationDetail data={data} headquartersId={hq.id} params={new URLSearchParams(query.toString())} busy={busy||loading} error={error} saved={saved} note={note} setNote={value=>edit(setNote,value)} leave={leave} refresh={()=>setRetry(v=>v+1)} execute={execute}/>;
+ if(data.summary.source==='legacy_course'||data.summary.source==='legacy_plan')return <div className={styles.wrap}><p role="alert">過去の申込内容を確認できませんでした。再読み込みしてください。</p><button className={button} onClick={()=>setRetry(v=>v+1)}>再読み込み</button></div>;
  const {summary,headquarters,instructor}=data,individual=headquarters?.individualSchedule,view=instructor?.view,allowed=headquarters?.allowedActions??instructor?.allowedActions??[];
  const shipping=headquarters?.shipping??{required:view?.kit?.required,status:view?.kit?.status,address:instructor?.details.shippingAddress??instructor?.details.kitDestination?.selectedAddress,shippedAt:instructor?.details.shippedAt,trackingNumber:instructor?.details.trackingNumber};
  const eventId=headquarters?.event?.id,back=applicationBackTarget(hq.id,eventId,new URLSearchParams(query.toString())),email=headquarters?.contactEmail??view?.contact?.email;

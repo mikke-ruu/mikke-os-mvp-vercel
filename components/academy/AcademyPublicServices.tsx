@@ -6,7 +6,7 @@ import { listPublicOfferings, type PublicOfferingScope, type PublicOfferingSumma
 
 export function AcademyPublicServices({ headquartersId, instructorId, courseId, hideWhenEmpty = false, onAvailabilityChange, heading = '申込できるサービス', description, emptyMessage = '現在、申込できるサービスはありません。' }: PublicOfferingScope & { hideWhenEmpty?: boolean; onAvailabilityChange?: (headquartersId: string, available: boolean) => void; heading?:string; description?:string; emptyMessage?:string }) {
   const scopeKey = `${headquartersId}:${instructorId ?? ""}:${courseId ?? ""}`;
-  const [result, setResult] = useState<{ key: string; items: PublicOfferingSummary[]; error: boolean } | null>(null);
+  const [result, setResult] = useState<{ key: string; items: PublicOfferingSummary[]; error: boolean; unavailable?: boolean } | null>(null);
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let cancelled = false;
@@ -17,9 +17,9 @@ export function AcademyPublicServices({ headquartersId, instructorId, courseId, 
         setResult({ key: scopeKey, items, error: false });
         onAvailabilityChange?.(headquartersId, items.length > 0);
       }
-    }).catch(() => {
+    }).catch((cause: unknown) => {
       if (!cancelled) {
-        setResult({ key: scopeKey, items: [], error: true });
+        setResult({ key: scopeKey, items: [], error: true, unavailable: !!instructorId && (cause as {code?: string} | null)?.code === "PGRST202" });
         onAvailabilityChange?.(headquartersId, false);
       }
     });
@@ -35,6 +35,7 @@ export function AcademyPublicServices({ headquartersId, instructorId, courseId, 
     <h2 className="text-xl font-bold">{heading}</h2>
     {description&&<p className="text-sm leading-relaxed text-[#4b535e]">{description}</p>}
     {!result || result.key !== scopeKey ? <p role="status">サービスを読み込んでいます…</p>
+      : result.unavailable ? <p role="status">講師からの申込受付は現在利用できません。本部へご確認ください。</p>
       : result.error ? <div role="alert"><p>サービスを読み込めませんでした。</p><button type="button" className="min-h-11 underline" onClick={() => setRefresh(value => value + 1)}>再読み込み</button></div>
       : !result.items.length ? <p>{emptyMessage}</p>
       : <ul className="grid min-w-0 gap-4 md:grid-cols-2">

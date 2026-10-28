@@ -7,6 +7,7 @@ import { AcademyPersonalHome } from "@/components/academy/AcademyPersonalHome";
 import { getCoursesByIds, getMyInstructorRecords } from "@/lib/academy/instructor-portal";
 import { listMyLearnerCourseMemberships } from "@/lib/academy/learner-portal";
 import { getAcademyRouteContext } from "@/lib/academy/access-context";
+import { listMyAcademy2Applications } from "@/lib/academy2/learner-operations";
 import type { AcademyApplication, AcademyCourse, AcademyInstructor } from "@/types/database";
 
 function PortalDashboard() {
@@ -23,6 +24,17 @@ function PortalDashboard() {
     async function load() {
       try {
         const academyId = getAcademyRouteContext()?.academyId;
+        // A migrated HQ keeps its existing learner URL. The self-scoped RPC
+        // decides membership; never infer learner access from HQ operator roles.
+        if (academyId && requested !== "instructor") {
+          try {
+            const own = await listMyAcademy2Applications({ headquartersId: academyId, limit: 1 });
+            if (own.length) { if (active) router.replace("/academy/learner-home"); return; }
+          } catch (cause) {
+            const code = (cause as { code?: string }).code;
+            if (code !== "PGRST202" && code !== "42883") throw cause;
+          }
+        }
         const [records, membership] = await Promise.all([getMyInstructorRecords(profile.user_id, academyId), listMyLearnerCourseMemberships(profile.user_id, academyId)]);
         const ids = [...new Set([...records.map(record => record.course_id), ...membership.courseIds])];
         const courses = await getCoursesByIds(ids);
@@ -31,7 +43,7 @@ function PortalDashboard() {
     }
     void load();
     return () => { active = false; };
-  }, [profile.user_id, pathname]);
+  }, [profile.user_id, pathname, requested, router]);
   if (error) return <div role="alert"><p>マイページを読み込めませんでした。</p><button type="button" className="my-3 min-h-11 rounded-lg border px-4" onClick={() => window.location.reload()}>再読み込み</button></div>;
   if (!data) return <p className="py-12 text-center text-sm">読み込み中…</p>;
   const canSwitch = data.records.length > 0 && data.learnerCourseIds.length > 0;

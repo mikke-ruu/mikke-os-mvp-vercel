@@ -5,14 +5,25 @@ import type { Academy2Operation } from './operations';
 import type { InstructorApplicationDetailData } from './instructor-operations';
 
 export type HeadquartersApplicationSummary = {
+  source?: 'academy2' | 'legacy_course' | 'legacy_plan';
   applicationId: string; headquartersId: string; saleChannel: 'headquarters' | 'instructor';
   applicantName: string; planTitle: string; appliedAt: string; statusLabel: string;
-  nextAction: string | null; revision: number;
+  nextAction: string | null; revision: number; completed?: boolean;
   tuition?: { amount: number; currency: string; status: string; method: string };
   schedule?:ApplicationSchedule|null; kitStatus: string | null; completedAt: string | null; certifiedAt: string | null;
 };
 export type HeadquartersApplicationDetail = {
   summary: HeadquartersApplicationSummary;
+  /** Historical originals are projected by the HQ-scoped RPC, never reconstructed from the current form. */
+  legacy?: {
+    source: 'legacy_course' | 'legacy_plan';
+    completed?: boolean;
+    contactEmail: string | null; phone: string | null;
+    answers: { label: string; value: string | null }[];
+    consent: { version: string | null; consentedAt: string | null } | null;
+    allowedActions: ('confirm_payment' | 'confirm_completion')[];
+    reference: { courseId?: string | null; salesPlanId?: string | null; eventId?: string | null };
+  } | null;
   headquarters: (Academy2Operation & {
     location?: import('./operations').EventLocation|null;
     contactEmail: string | null; allowedActions: string[]; individualSchedule?:IndividualSchedule|null;scheduleWritable?:boolean;

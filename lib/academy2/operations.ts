@@ -89,10 +89,10 @@ function eventInput(input: Academy2EventInput) {
   return {title: input.title,schedule_mode: input.scheduleMode,starts_at: input.startsAt,ends_at: input.endsAt,format: input.format,capacity: input.capacity,venue_name: input.venueName ?? null,meeting_url: input.meetingUrl ?? null,...(input.kitMethod === undefined ? {} : {kit_method:input.kitMethod})};
 }
 /** One transaction reuses the existing event/kit guards and records the private location. */
-export async function writeAcademy2EventWithLocation(headquartersId:string,eventId:string|null,expected:number,requestId:string,input:Academy2EventInput&{planId?:string;planRevision?:number;courseId?:string},fulfillment:{method:string;destination?:unknown}|null,individual:boolean):Promise<Academy2EventDetail> {
+export async function writeAcademy2EventWithLocation(headquartersId:string,eventId:string|null,expected:number,requestId:string,input:Academy2EventInput&{planId?:string;planRevision?:number;courseId?:string;legacyReviewPlanRevision?:number},fulfillment:{method:string;destination?:unknown}|null,individual:boolean):Promise<Academy2EventDetail> {
  assertAcademyWritable();
  const core=eventInput(input);if(fulfillment!==null)delete core.kit_method;
- return call('academy2_write_event_with_location',{p_hq:headquartersId,p_event:eventId,p_expected:expected,p_request:requestId,p_input:{...core,...(!eventId?{plan_id:input.planId,plan_revision:input.planRevision,course_id:input.courseId}:{})},p_fulfillment:fulfillment,p_individual:individual,p_location:input.location??{address:'',address_visibility:'private',area:'',participant_note:''}});
+ return call('academy2_write_event_with_location',{p_hq:headquartersId,p_event:eventId,p_expected:expected,p_request:requestId,p_input:{...core,...(!eventId?{plan_id:input.planId,plan_revision:input.planRevision,course_id:input.courseId}:input.legacyReviewPlanRevision!==undefined?{legacy_review_plan_revision:input.legacyReviewPlanRevision}:{})},p_fulfillment:fulfillment,p_individual:individual,p_location:input.location??{address:'',address_visibility:'private',area:'',participant_note:''}});
 }
 export async function createAcademy2Event(headquartersId: string, requestId: string, input: Academy2EventInput & {planId: string; planRevision: number; courseId: string}): Promise<Academy2EventSummary> {
   assertAcademyWritable();
