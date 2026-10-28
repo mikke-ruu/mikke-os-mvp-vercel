@@ -1,0 +1,33 @@
+const fs = require('fs');
+const assert = require('node:assert/strict');
+const ts = require('typescript');
+const React = require('react');
+const { renderToStaticMarkup } = require('react-dom/server');
+function load(file, mocks = {}) {
+  const mod = { exports: {} };
+  const js = ts.transpileModule(fs.readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
+  new Function('require', 'module', 'exports', js)(name => mocks[name] ?? require(name), mod, mod.exports);
+  return mod.exports;
+}
+const { portalNavigationReducer: reduce } = load('components/team-works/useTeamWorksPortalNavigation.tsx');
+let state = { current: { view: 'home', tab: 'calendar', date: '2026-11-12', scroll: 0 }, history: [], restore: null };
+state = reduce(state, { type: 'view', value: 'school-a', scroll: 480 });
+state = reduce(state, { type: 'tab', value: 'roster' });
+state = reduce(state, { type: 'date', value: '2026-11-19' });
+state = reduce(state, { type: 'view', value: 'school-b', scroll: 160 });
+state = reduce(state, { type: 'tab', value: 'calendar' });
+state = reduce(state, { type: 'back' });
+assert.deepEqual(state.current, { view: 'school-a', tab: 'roster', date: '2026-11-19', scroll: 160 });
+assert.equal(state.restore, 160);
+state = reduce(state, { type: 'back' });
+assert.deepEqual(state.current, { view: 'home', tab: 'calendar', date: '2026-11-12', scroll: 480 });
+assert.equal(state.history.length, 0);
+assert.equal(reduce(state, { type: 'back' }), state);
+assert.equal(reduce(state, { type: 'view', value: 'home', scroll: 0 }), state);
+const { teamWorksNavigationDate: date } = load('lib/team-works-navigation.ts');
+assert.equal(date('2028-02-29'), '2028-02-29');
+for (const value of [null, '', '2026-02-29', '2026-13-01', '../other', '2026-1-1']) assert.equal(date(value), null);
+const { TeamWorksDayPanel } = load('components/team-works/operations/TeamWorksDayPanel.tsx', { 'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children), __esModule: true } });
+const html = renderToStaticMarkup(React.createElement(TeamWorksDayPanel, { dateKey: '2026-11-12', holidays: [], onClose() {}, events: [{ id: 'session', projectId: 'school-a', projectTitle: '確認用', startTime: '13:00', durationMin: 60, participantCount: 0 }] }));
+assert.ok(html.includes('/apps/team-works/projects/school-a?tab=overview&amp;date=2026-11-12'));
+console.log('PASS portal return restores project, tab, date and scroll; empty history safe; calendar detail preserves valid date');

@@ -1,5 +1,7 @@
 "use client";
 
+import { useTeamWorksPortalNavigation } from "@/components/team-works/useTeamWorksPortalNavigation";
+
 import {
   AlertCircle,
   BookOpen,
@@ -245,9 +247,7 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
   // 担当プロジェクトが1件もshifts=trueで無ければ「希望シフトを提出」自体を隠す。
   // プロジェクトがまだ無い(新規パートナー等)場合は従来どおり表示する。
   const shiftsEnabled = projects.length === 0 || projects.some((project) => project.featureSettings.shifts);
-  const [activeView, setActiveView] = useState("home");
-  const [projectTab, setProjectTab] = useState<"calendar" | "schedule" | "manuals">("calendar");
-  const [selectedDate, setSelectedDate] = useState(dateKey(new Date()));
+  const { activeView, setActiveView, projectTab, setProjectTab, selectedDate, setSelectedDate, backButton } = useTeamWorksPortalNavigation<"calendar" | "schedule" | "manuals">("calendar", dateKey(new Date()));
   const [responding, setResponding] = useState<string | null>(null);
   const [responseNotice, setResponseNotice] = useState<SaveNotice>(null);
 
@@ -277,6 +277,7 @@ function PartnerPortalBody({ data, onRefresh }: { data: OperationsPartnerPortalD
 
   return (
     <div className="space-y-6">
+      {backButton}
       <PartnerOfferCards offers={data.offers} responding={responding} notice={responseNotice} onRespond={respond} />
 
       <nav aria-label={`${labels.workers}ポータル内のページ`} className="flex gap-1 overflow-x-auto border-b border-[var(--mikke-line)]">

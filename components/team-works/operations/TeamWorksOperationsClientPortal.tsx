@@ -1,5 +1,7 @@
 "use client";
 
+import { useTeamWorksPortalNavigation } from "@/components/team-works/useTeamWorksPortalNavigation";
+
 import { AlertCircle, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, GripVertical, MessageSquare, Plus, UsersRound } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { MikkeEmptyState } from "@/components/mikkeos/MikkeEmptyState";
@@ -60,9 +62,7 @@ export function TeamWorksOperationsClientPortal() {
   const viewAsMemberId = viewAs && !viewAs.sampleProjectId ? viewAs.organizationMemberId : undefined;
   const [data, setData] = useState<OperationsClientPortalData | null>(null);
   const [pending, setPending] = useState<OperationsClientPendingProject[]>([]);
-  const [activeView, setActiveView] = useState<string>("home");
-  const [projectTab, setProjectTab] = useState<ProjectTab>("calendar");
-  const [selectedDate, setSelectedDate] = useState<string>(() => todayKey());
+  const { activeView, setActiveView, projectTab, setProjectTab, selectedDate, setSelectedDate, backButton } = useTeamWorksPortalNavigation<ProjectTab>("calendar", todayKey());
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -139,6 +139,7 @@ export function TeamWorksOperationsClientPortal() {
   return (
     <TeamWorksClientProjectsShell title={`${labels.clientNoun}ポータル`} subtitle={`総合ホームと各プロジェクトのカレンダー・${labels.rosterNoun}・メッセージを確認・更新できます。`} displayName={data?.memberName}>
       <TeamWorksViewAsBanner />
+      {backButton}
       {notice ? <p className="mb-4 rounded-xl bg-[var(--mikke-primary-soft)] px-4 py-3 text-sm font-bold text-[var(--mikke-primary)]">{notice}</p> : null}
       {error ? <div className="mb-4"><MikkeEmptyState title="操作できませんでした" helper={error} /></div> : null}
       {pending.length > 0 ? <PendingApprovals pending={pending} approvingId={approvingId} onApprove={approve} /> : null}
