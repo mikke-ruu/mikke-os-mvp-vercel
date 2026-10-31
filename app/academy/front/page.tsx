@@ -177,9 +177,7 @@ function LegacyFrontContent() {
             URLをコピー
           </button>
           <Link
-            href={homepagePath}
-            target="_blank"
-            rel="noopener noreferrer"
+            href={homepagePath+"?from=academy"}
             className="flex min-h-10 items-center justify-center gap-1 rounded-xl border border-[var(--mikke-line)] bg-white px-4 text-sm font-bold text-[var(--mikke-accent)]"
           >
             <ExternalLink size={16} /> 保存済みのページを見る

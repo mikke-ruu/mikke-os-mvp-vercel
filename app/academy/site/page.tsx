@@ -1,5 +1,6 @@
 "use client";
 import {HeadquartersHomepagePresentation} from '@/components/academy2/HeadquartersHomepagePresentation';
+import {AcademyPublicReturnLink,useAcademyPublicReturn} from '@/components/academy2/AcademyPublicReturnLink';
 import { academyCourseCode } from "@/lib/academy/course-display";
 
 
@@ -27,6 +28,7 @@ const steps = [
 function SitePage() {
   const params = useParams<{ handle?: string | string[] }>();
   const handle = Array.isArray(params.handle) ? params.handle[0] : params.handle;
+  const returnToAcademy=useAcademyPublicReturn(handle);
   const [hq, setHq] = useState<PublicHomepage["headquarters"] | null>(null);
   const [courses, setCourses] = useState<PublicHomepage["courses"]>([]);
   const [instructors, setInstructors] = useState<PublicHomepage["instructors"]>([]);
@@ -65,11 +67,12 @@ function SitePage() {
   if (loadError) return <div role="alert" className="py-24 text-center"><p>ホームページを読み込めませんでした。</p><button type="button" className="mt-4 rounded-lg border px-4 py-2" onClick={() => setRetry(value => value + 1)}>もう一度読み込む</button></div>;
   if (!hq) return <p className="py-24 text-center text-sm text-[var(--mikke-muted)]">本部ホームページが見つかりません。</p>;
 
-  if(academy2)return <HeadquartersHomepagePresentation front={hq} courses={courses} instructors={instructors}/>;
+  if(academy2)return <><AcademyPublicReturnLink enabled={returnToAcademy} headquartersId={hq.id}/><HeadquartersHomepagePresentation front={hq} courses={courses} instructors={instructors} returnToAcademy={returnToAcademy}/></>;
   const document = readFrontDocument(hq.front_blocks ?? []);
   const canApply = serviceAvailability?.headquartersId === hq.id && serviceAvailability.available;
   return (
     <div>
+      <AcademyPublicReturnLink enabled={returnToAcademy} headquartersId={hq.id}/>
       {/* ヘッダー */}
       <header className="sticky top-0 z-20 border-b border-[var(--mikke-line)] bg-white/95 backdrop-blur">
         <div style={{ maxWidth: frontMaxWidth(document.design, 1024) }} className="mx-auto flex  items-center justify-between px-5 py-3.5">
@@ -111,7 +114,7 @@ function SitePage() {
               {courses.map((c) => {
                 const matchingOfferings = offerings?.filter(offering => offering.course_ids.includes(c.id)) ?? [];
                 const offeringHref = matchingOfferings.length === 1 ? `/academy/o/${matchingOfferings[0].id}` : "#services";
-                const courseHref = `/academy/site/${encodeURIComponent(hq.handle)}/course/${encodeURIComponent(c.id)}`;
+                const courseHref = `/academy/site/${encodeURIComponent(hq.handle)}/course/${encodeURIComponent(c.id)}${returnToAcademy?'?from=academy':''}`;
                 return (
                   <li key={c.id} className="overflow-hidden rounded-3xl border border-[var(--mikke-line)] bg-white">
                   {c.main_image_url ? (

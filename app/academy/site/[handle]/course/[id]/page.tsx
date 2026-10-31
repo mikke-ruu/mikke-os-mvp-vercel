@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { getPublicHomepage } from "@/lib/academy/public-homepage";
 import { getPublicCourseOverview, type PublicCourseOverview } from "@/lib/academy/public-course-overview";
+import {AcademyPublicReturnLink,useAcademyPublicReturn} from '@/components/academy2/AcademyPublicReturnLink';
 
 function Detail({ title, body }: { title: string; body: string | null }) {
   if (!body?.trim()) return null;
@@ -16,12 +17,13 @@ function Detail({ title, body }: { title: string; body: string | null }) {
 
 export default function PublicCourseOverviewPage() {
   const { handle, id } = useParams<{ handle: string; id: string }>();
+  const returnToAcademy=useAcademyPublicReturn(id);
   const [course, setCourse] = useState<PublicCourseOverview | null>(null);
   const [headquartersName, setHeadquartersName] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [retry, setRetry] = useState(0);
-  const homepageHref = `/academy/site/${encodeURIComponent(handle)}`;
+  const homepageHref = `/academy/site/${encodeURIComponent(handle)}${returnToAcademy?'?from=academy':''}`;
 
   useEffect(() => {
     let active = true;
@@ -52,11 +54,11 @@ export default function PublicCourseOverviewPage() {
   if (!course) return <main className="px-5 py-20 text-center text-sm">この講座の公開情報は見つかりませんでした。</main>;
 
   return <main className="min-h-screen bg-[var(--mikke-surface-soft)] px-5 py-8 md:py-12">
+    <AcademyPublicReturnLink enabled={returnToAcademy} headquartersId={course.headquarters_id}/>
     <article className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-[var(--mikke-line)] bg-white">
       {course.main_image_url ? <img src={course.main_image_url} alt="" className="h-52 w-full object-cover md:h-80" /> : null}
       <div className="px-5 py-7 md:px-10 md:py-9">
         <Link href={homepageHref} className="text-sm font-bold text-[var(--mikke-accent)] underline">← {headquartersName}のホームページへ</Link>
-        {course.code ? <p className="mt-6 text-xs font-bold tracking-widest text-[var(--mikke-accent-strong)]">{course.code}</p> : null}
         <h1 className="mt-2 text-2xl font-bold leading-9 text-[var(--mikke-text)]">{course.name}</h1>
         {course.subtitle ? <p className="mt-2 text-sm leading-6 text-[var(--mikke-muted)]">{course.subtitle}</p> : null}
         {course.duration_text ? <p className="mt-5 text-sm text-[var(--mikke-text)]">目安の学習時間：{course.duration_text}</p> : null}
