@@ -1,5 +1,6 @@
 "use client";
 import {CreationReturnLink} from './CreationReturnLink';
+import {PlanPublicationNotice} from './PlanPublicationNotice';
 import {CreationRelations} from './CreationRelations';
 
 import { AcademyManagementActions } from './AcademyManagementActions';
@@ -165,7 +166,8 @@ export function SalesPlanDraftEditor({ headquartersId, draftId, initialCourseId,
     <div className={styles.titlebar}><div className={styles.en}>SALES PLAN</div><div className={styles.jp}>販売プランの編集</div></div>
     {!loadedDraftId&&initialSample&&<p className={styles.note}>見本の名前と金額を入力しています。講座と条件を確認して、ご自身の販売プランとして保存してください。</p>}
     <div className={styles.compactHead}><div><h1>{configuration.title||'新しい販売プラン'}</h1>{saved&&<p>更新 {new Date(saved.updated_at).toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric'})}</p>}</div>{saved&&<AcademyManagementActions compact key={saved.id+':'+saved.revision} headquartersId={headquartersId} kind="plan" id={saved.id} title={configuration.title} disabled={dirty||saving} onChanged={()=>setRetry(value=>value+1)}/>}</div>
-    {saved?.hold_reasons.includes('legacy_settings_review_required')&&<p className={styles.note} role="status">以前の販売プランを引き継いでいます。募集を更新する前に、受講方法・教材・支払い方法・申込規約を確認してください。下書きの保存だけでは公開中のページは変わりません。</p>}
+    {saved&&<PlanPublicationNotice headquartersId={headquartersId} planId={saved.id} revision={saved.revision} disabled={dirty||saving}/>}
+    {saved?.hold_reasons.includes('legacy_settings_review_required')&&<p className={styles.note} role="status">以前の販売プランの内容は保存されています。受講方法・教材・支払い方法・申込規約を確認し、販売ページで公開条件を確認してください。保存だけでは募集は始まりません。</p>}
     {saved&&<div className={styles.relatedActions}><CreationRelations compact key={saved.id+':'+saved.revision} headquartersId={headquartersId} planId={saved.id} showEvents/><a className={styles.addEvent} aria-disabled={dirty||saving} href={href('/academy/create?plan='+encodeURIComponent(saved.id)+'&tab=event')} onClick={event=>{if(dirty||saving){event.preventDefault();setError(saving?'保存中です。完了するまでお待ちください。':'変更を保存してから開催日を追加してください。');}}}>＋ 開催日を追加</a></div>}
     <LocalReviewControls headquartersId={headquartersId}/>
     <div className={styles.steps} aria-label="作成STEP">{names.map((name, i) => <button key={name} type="button" className={cx("step", navigation[i] === step && "on", navigation[i] < step && "done")} aria-current={navigation[i] === step ? "step" : undefined} disabled={step===0&&saving||step===4&&!afterReady&&navigation[i]>step} onClick={() => setStep(navigation[i])}>{i + 1} {name}</button>)}</div>

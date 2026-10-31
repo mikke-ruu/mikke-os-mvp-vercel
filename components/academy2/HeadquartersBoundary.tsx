@@ -85,7 +85,7 @@ export function HeadquartersBoundary({ children, legacy }: { title: string; chil
     {path:'/academy/create?entry=existing&tab=plan',label:'販売をつくる',action:'public_price.edit'},
     {path:'/academy/create?tab=event',label:'開催日追加',action:'applications.operate'},
   ].filter(item=>canAcademy2(hq.role,item.action as Academy2Action,{sameHeadquarters:true})).map(item=>({href:href(item.path),label:item.label}));
-  return <HeadquartersContext.Provider value={hq}><HeadquartersShell name={hq.name} role={hq.role} mikkeId={profile.handle} nav={nav} activeHref={section?href(section.href):href('/academy')} createLinks={createLinks} hideCreate={canonical==='/academy'||canonical==='/academy/'} onSignOut={()=>void signOut()}>
+  return <HeadquartersContext.Provider value={hq}><HeadquartersShell name={hq.name} role={hq.role} mikkeId={profile.handle} nav={nav} activeHref={section?href(section.href):href('/academy')} createLinks={createLinks} onSignOut={()=>void signOut()}>
     {deferred ? <div role="status" className="p-5"><p>認定・講師の機能は次の更新で公開します。</p><a href={href('/academy/offerings')}>販売プランに戻る</a></div> : denied ? <p role="alert" className="p-5">この画面を操作する権限がありません。</p> : connected ? children : <p role="status" className="p-5">この画面は準備中です。</p>}
   </HeadquartersShell></HeadquartersContext.Provider>;
 }
