@@ -8,11 +8,15 @@ import {toAcademyContextHref} from '@/lib/academy/access-context';
 import type {SalesPlanDraft} from '@/lib/academy2/sales-plan-drafts';
 import {getSalesPage,saveSalesPage,type SalesPageDraft} from '@/lib/academy2/sales-pages';
 import {prepareSalesPageForPublication} from '@/lib/academy2/prepare-sales-page-publication';
-import styles from './headquarters-settings.module.css';
+import styles from './publication-flow.module.css';
+import {PublicationChecklist} from './PublicationChecklist';
+import {publicationFix,publicationSummary} from '@/lib/academy2/publication-navigation';
+import {listSalesPlanCatalog,type SalesPlanPublicationState} from '@/lib/academy2/sales-plan-catalog';
 
-export function SalesPlanPublicationPanel({draft,page,onPagePrepared,onPublished}:{draft:SalesPlanDraft;page:SalesPageDraft;onPagePrepared?:(page:SalesPageDraft)=>void;onPublished?:()=>void}){
+export function SalesPlanPublicationPanel({draft,page,onPagePrepared,onPublished,disabled=false}:{draft:SalesPlanDraft;page:SalesPageDraft;onPagePrepared?:(page:SalesPageDraft)=>void;onPublished?:()=>void;disabled?:boolean}){
  const hq=useAcademy2Headquarters();
  const [events,setEvents]=useState<Academy2EventSummary[]|null>(null),[eventId,setEventId]=useState('');
+ const [checkKey,setCheckKey]=useState('');
  const [check,setCheck]=useState<PublicationReadiness|null>(null),[result,setResult]=useState<PlanPublication|null>(null);
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
  const attempt=useRef<{key:string;id:string}|null>(null);
@@ -20,6 +24,9 @@ export function SalesPlanPublicationPanel({draft,page,onPagePrepared,onPublished
  const publishing=useRef(false);
  const [phase,setPhase]=useState<'saving'|'publishing'|null>(null);
  const [first,setFirst]=useState<FirstPublicationState|null>(null);
+ const [publication,setPublication]=useState<SalesPlanPublicationState|null>(null);
+ const [publicationError,setPublicationError]=useState('');
+ useEffect(()=>{let live=true;setPublication(null);setPublicationError('');listSalesPlanCatalog(draft.headquarters_id).then(rows=>{const value=rows.find(row=>row.id===draft.id)?.publication;if(!value)throw new Error('公開状態を確認できませんでした。');if(live)setPublication(value);}).catch(()=>{if(live)setPublicationError('公開状態を確認できませんでした。');});return()=>{live=false;};},[draft.headquarters_id,draft.id,draft.revision,refresh]);
  const materialsOnly=draft.configuration.study_style==='materials_only';
  const deferredFeatures=!['ワークショップ','単品講座','コース'].includes(draft.configuration.kind)||Boolean(draft.configuration.after?.skill_certification||draft.configuration.after?.instructor_license||draft.configuration.after?.certificate?.kind==='certification');
  const canPublish=hq?.role==='administrator';
@@ -28,12 +35,11 @@ export function SalesPlanPublicationPanel({draft,page,onPagePrepared,onPublished
  const selected=materialsOnly?undefined:events?.find(row=>row.id===eventId);
  const input:PublicationInput={headquartersId:draft.headquarters_id,planId:draft.id,planRevision:draft.revision,pageRevision:page.revision,eventId:selected?.id??null,eventRevision:selected?.revision??null};
  const key=JSON.stringify(input);
- useEffect(()=>{if(!canPublish||!events)return;let current=true;setCheck(null);setError('');getPlanPublicationReadiness(JSON.parse(key) as PublicationInput).then(value=>{if(current)setCheck(value);}).catch(cause=>{if(current)setError(cause.message);});return()=>{current=false;};},[canPublish,events,key,refresh]);
- const ready=!deferredFeatures&&!!check&&(check.ready||(first?.consented===true&&first.phase==='prepared'&&check.reasons.every(reason=>reason==='existing_public_contract_required')));
- const planStep=(reason:string)=>reason==='application_terms_required'?5:reason==='title_or_price_required'||reason==='bank_only_bridge'?3:reason==='teaching_method_required'?2:reason==='six_step_review_settings_pending'?1:null;
- const planHref=(step:number)=>toAcademyContextHref(`/academy/offerings/${draft.id}`,draft.headquarters_id,'manage')+`?step=${step}`;
+ useEffect(()=>{if(!canPublish||!events)return;let current=true;setCheck(null);setError('');getPlanPublicationReadiness(JSON.parse(key) as PublicationInput).then(value=>{if(current){setCheck(value);setCheckKey(key);}}).catch(cause=>{if(current)setError(cause.message);});return()=>{current=false;};},[canPublish,events,key,refresh]);
+ const publicationKnown=!!publication&&['published','not_published','archived'].includes(publication.state);
+ const ready=!deferredFeatures&&checkKey===key&&!!check&&(check.ready||(first?.consented===true&&first.phase==='prepared'&&check.reasons.every(reason=>reason==='existing_public_contract_required')));
  async function publish(){
-  if(publishing.current||busy||!ready)return;
+  if(publishing.current||busy||uncertain||disabled||!ready||!publicationKnown||publicationError)return;
   publishing.current=true;setBusy(true);setError('');let publicationStarted=false;
   try{
    setPhase('saving');
@@ -48,25 +54,28 @@ export function SalesPlanPublicationPanel({draft,page,onPagePrepared,onPublished
    const preparedKey=JSON.stringify(preparedInput);
    if(!attempt.current||attempt.current.key!==preparedKey)attempt.current={key:preparedKey,id:crypto.randomUUID()};
    setPhase('publishing');publicationStarted=true;
-   const value=await publishExistingHeadquartersPlan(preparedInput,attempt.current.id);setResult(value);setUncertain(false);onPublished?.();
+   const value=await publishExistingHeadquartersPlan(preparedInput,attempt.current.id);const savedPublication=(await listSalesPlanCatalog(draft.headquarters_id)).find(row=>row.id===draft.id)?.publication;
+   if(!savedPublication||savedPublication.state!=='published'||savedPublication.plan_revision!==preparedInput.planRevision||savedPublication.page_revision!==preparedInput.pageRevision)throw new Error('公開結果を再確認できませんでした。再送せず、最新の状態を確認してください。');
+   setPublication(savedPublication);setResult(value);setUncertain(false);onPublished?.();
   }catch(cause){setError(cause instanceof Error?cause.message:'募集公開の結果を確認できませんでした。');if(publicationStarted)setUncertain(true);}
   finally{publishing.current=false;setBusy(false);setPhase(null);}
  }
- if(!canPublish)return <p className={styles.note}>募集公開は本部運営担当が行います。</p>;
- return <section className={`${styles.card} ${styles.publication}`} aria-label="募集公開">
-  <h2>募集公開</h2>
-  {deferredFeatures&&<p role="alert" className={styles.note}>この販売プランには、今回の公開範囲に含まれない販売タイプまたは認定・講師の設定が保存されています。設定値は保持していますが、新たに募集を公開できません。</p>}
-  {!materialsOnly&&<div className={styles.field}><label>募集する開催<select value={eventId} disabled={busy||uncertain||!!result} onChange={event=>{setEventId(event.target.value);setResult(null);attempt.current=null;}}><option value="">開催を選んでください</option>{events?.map(event=><option value={event.id} key={event.id}>{event.title}（{event.schedule_mode==='arranged_after_application'?'申込後に日程相談':event.starts_at?new Date(event.starts_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}):'日時未設定'}）</option>)}</select></label></div>}
-  {!result&&!materialsOnly&&<a className={styles.linkRow} href={toAcademyContextHref('/academy/classes/new',draft.headquarters_id,'manage')+`?plan=${encodeURIComponent(draft.id)}`}>この販売プランの開催を作る →</a>}
-  {materialsOnly&&<p className={styles.help}>レッスン教材のみのため、開催の登録は不要です。</p>}
-  {!check&&!error&&!result&&<p role="status" className={styles.help}>公開条件を確認しています…</p>}
-  {check&&!result&&<>
-   <div className={styles.actions}><button className={styles.btn} disabled={busy||uncertain} onClick={()=>setRefresh(value=>value+1)}>条件を再確認</button><button className={`${styles.btn} ${styles.orange}`} disabled={busy||!ready} onClick={()=>void publish()}>{busy?(phase==='saving'?'販売ページを保存・確認中…':'公開処理中…'):uncertain?'公開結果を確認中':'募集を公開する'}</button></div>
-   {!ready&&check.reasons.length>0&&<div className={styles.note}><strong>公開前に確認すること</strong><ul>{check.reasons.map(reason=><li key={reason}>{publicationReason(reason)} {planStep(reason)&&<a href={planHref(planStep(reason)!)}>設定へ →</a>}{reason==='event_required'&&<a href={toAcademyContextHref('/academy/classes/new',draft.headquarters_id,'manage')+`?plan=${encodeURIComponent(draft.id)}`}>開催を作る →</a>}</li>)}</ul></div>}
-   <p className={styles.help}>{first?.phase==='no_operating_fee'?'Academy運営利用料は当面かかりません。':first?.consented&&first.phase==='prepared'?'この契約では初回公開から7日間の無料期間が始まります。':'現在の利用契約は変更されません。'}</p>
-   {check.reasons.includes('existing_public_contract_required')&&first?.phase!=='no_operating_fee'&&!first?.consented&&<a className={styles.linkRow} href={toAcademyContextHref('/academy/settings',draft.headquarters_id,'manage')}>利用契約を確認する →</a>}
-  </>}
-  {result&&<><p className={styles.note} role="status">募集を公開しました。</p><a className={styles.linkRow} href={result.public_path}>公開ページと申込フォームを確認する</a></>}
+ if(!canPublish)return <p className={styles.card}>公開は本部運営担当が行います。</p>;
+ const tasks=check?.reasons.filter(reason=>!(reason==='existing_public_contract_required'&&first?.consented&&first.phase==='prepared')).map(reason=>{const fix=publicationFix(reason,draft.headquarters_id,draft.id,selected?.id);return reason==='event_required'&&!!events?.length&&!eventId?{key:reason,label:'上の一覧から募集する日程を選んでください。'}:{key:reason,label:publicationReason(reason),href:fix?.href,actionLabel:fix?.label};})??[];
+ return <section id="publication-controls" className={styles.card} aria-label="販売ページを公開する">
+  <h2>{result?'公開しました':'内容を確認したら公開しましょう'}</h2>
+  <p className={styles.status}>{publicationSummary(publication).label}</p>
+  {publicationError&&<p role="alert" className={styles.error}>{publicationError}</p>}
+  {deferredFeatures&&<p role="alert">このプランには、現在公開できない種類や認定・講師の設定が含まれています。入力内容は保存されています。</p>}
+  {!materialsOnly&&!result&&<><label>募集する日程<select value={eventId} disabled={busy||uncertain} onChange={event=>{setEventId(event.target.value);attempt.current=null;}}><option value="">登録済みの日程から選んでください</option>{events?.map(event=><option value={event.id} key={event.id}>{event.title}（{event.schedule_mode==='arranged_after_application'?'申込後に日程相談':event.starts_at?new Date(event.starts_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}):'日時未設定'}）</option>)}</select></label><div className={styles.actions}><a className={styles.button} href={toAcademyContextHref('/academy/classes/new',draft.headquarters_id,'manage')+'?plan='+encodeURIComponent(draft.id)}>{events?.length?'別の日程を追加する':'開催日程を登録する'}</a></div></>}
+  {materialsOnly&&<p>教材のみの講座なので、開催日程の登録は不要です。</p>}
+  {!check&&!error&&!result&&<p role="status">必要な設定を確認中…</p>}
+  {check&&!result&&<><PublicationChecklist tasks={tasks}/>
+   <p className={styles.small}>{first?.phase==='no_operating_fee'?'Academy運営利用料は当面かかりません。':first?.consented&&first.phase==='prepared'?'この契約では初回公開から7日間の無料期間が始まります。':'現在の利用契約は変更されません。'}</p>
+   {disabled&&<p>ページの保存が終わるまでお待ちください。</p>}
+   <div className={styles.actions}><button type="button" className={styles.primary} disabled={busy||uncertain||disabled||!ready||!publicationKnown||!!publicationError} onClick={()=>void publish()}>{busy?(phase==='saving'?'ページを保存・確認中…':'公開中…'):uncertain?'公開結果を確認してください':publication?.state==='published'?'この内容を公開ページに反映する':'この内容で公開する'}</button><button type="button" className={styles.button} disabled={busy||uncertain} onClick={()=>setRefresh(value=>value+1)}>設定状況を再確認する</button></div></>}
+  {uncertain&&<p role="alert" className={styles.error}>結果を確認できないため、再実行を止めています。ページを開き直して公開状態を確認してください。</p>}
+  {result&&<><p>申込ボタンや受付状況を、お客様に見えるページで確認してください。</p><a className={styles.primary} href={result.public_path}>公開ページ・申込入口を確認する</a><p className={styles.small}>本部ホームページへの掲載状況は、ホームページ編集から確認できます。</p></>}
   {error&&<p role="alert" className={styles.error}>{error}</p>}
  </section>;
 }
