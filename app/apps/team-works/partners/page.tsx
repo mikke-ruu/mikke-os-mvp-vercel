@@ -1,5 +1,6 @@
 "use client";
 
+import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Archive, LoaderCircle, Mail, PauseCircle, PlayCircle, UserPlus, Users } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
@@ -158,7 +159,7 @@ function TeamWorksPartnersContent() {
                       <Users size={18} />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold">{partner.displayName}</p>
+                      <Link href={`/apps/team-works/partners/${partner.id}/history`} className="block truncate text-sm font-bold underline">{partner.displayName}</Link><Link href={`/apps/team-works/partners/${partner.id}/history`} className="mt-2 inline-block rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs font-bold">実施履歴・時給</Link>
                       <p className="mt-1 flex items-center gap-1.5 truncate text-xs font-semibold text-[var(--mikke-muted)]">
                         <Mail size={13} /> {partner.email}
                       </p>

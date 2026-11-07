@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import {
   AlertCircle,
@@ -127,6 +128,7 @@ export function TeamWorksOperationsPartnerPortal({
       </div>
 
       <TeamWorksViewAsBanner />
+      {!viewAsMemberId && !sampleProjectId ? <Link href="/apps/team-works/portal/worker/history" className="inline-block rounded-lg border border-[var(--mikke-line)] px-4 py-3 text-sm font-bold">自分の実施履歴・報酬</Link> : null}
       {!data && !error ? <p className="text-sm font-semibold text-[var(--mikke-muted)]">読み込み中…</p> : null}
       {error ? <MikkeEmptyState title="読み込みに失敗しました" helper={error} /> : null}
       {data ? <PartnerPortalBody data={data} onRefresh={load} /> : null}

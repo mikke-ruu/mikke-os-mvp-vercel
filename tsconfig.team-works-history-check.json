@@ -1,0 +1,1 @@
+{"extends":"./tsconfig.team-works-role-check.json","include":["next-env.d.ts","app/apps/team-works/partners/page.tsx","app/apps/team-works/partners/[partnerId]/history/page.tsx","app/apps/team-works/portal/worker/history/page.tsx","components/team-works/operations/TeamWorksOperationsPartnerPortal.tsx"]}

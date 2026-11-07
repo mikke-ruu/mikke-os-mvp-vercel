@@ -1996,13 +1996,20 @@ export async function loadOperationsProjectPartnerSettings(
 
 export async function updateOperationsProjectPartnerSetting(
   client: SupabaseClient,
-  input: { projectId: string; organizationMemberId: string; hourlyWage: number | null; status?: "active" | "removed" }
+  input: { projectId: string; organizationMemberId: string; hourlyWage: number | null; calculationBasis?: "scheduled" | "actual"; status?: "active" | "removed" }
 ) {
+  let calculationBasis = input.calculationBasis;
+  if (!calculationBasis) {
+    const { data, error } = await client.from('team_works_project_partner_settings').select('calculation_basis').eq('project_id',input.projectId).eq('organization_member_id',input.organizationMemberId).maybeSingle();
+    if (error) throw error;
+    calculationBasis = data?.calculation_basis === 'actual' ? 'actual' : 'scheduled';
+  }
   const { error } = await client.from("team_works_project_partner_settings").upsert(
     {
       project_id: input.projectId,
       organization_member_id: input.organizationMemberId,
       hourly_wage: input.hourlyWage,
+      calculation_basis: calculationBasis,
       status: input.status ?? "active",
       updated_at: new Date().toISOString()
     },
