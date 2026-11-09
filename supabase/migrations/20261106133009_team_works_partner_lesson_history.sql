@@ -24,11 +24,39 @@ grant select on public.team_works_partner_lesson_history to authenticated;
 grant update(hourly_wage,actual_minutes) on public.team_works_partner_lesson_history to authenticated;
 grant all on public.team_works_partner_lesson_history to service_role;
 create policy history_read on public.team_works_partner_lesson_history for select to authenticated using (
- private.team_works_is_project_staff(project_id) or exists (
+ exists(select 1 from public.team_works_projects p where p.id=project_id and private.team_works_is_org_staff(p.organization_id)) or exists (
  select 1 from public.team_works_organization_members m where m.id=organization_member_id and m.user_id=(select auth.uid()) and m.status='active' and m.role='worker'));
 create policy history_rate_update on public.team_works_partner_lesson_history for update to authenticated
- using(private.team_works_is_project_staff(project_id)) with check(private.team_works_is_project_staff(project_id));
+ using(exists(select 1 from public.team_works_projects p where p.id=project_id and private.team_works_is_org_staff(p.organization_id)))
+ with check(exists(select 1 from public.team_works_projects p where p.id=project_id and private.team_works_is_org_staff(p.organization_id)));
 create index team_works_partner_history_month on public.team_works_partner_lesson_history(organization_member_id,session_date);
+
+-- actual-clock-fields: also used to upgrade the isolated local review database.
+alter table public.team_works_partner_lesson_history
+ add column actual_start_time time,
+ add column actual_end_time time,
+ add column actual_end_next_day boolean not null default false,
+ add column actual_break_minutes integer not null default 0 check(actual_break_minutes between 0 and 1440);
+grant update(actual_start_time,actual_end_time,actual_end_next_day,actual_break_minutes) on public.team_works_partner_lesson_history to authenticated;
+create function private.team_works_calculate_actual_time() returns trigger
+language plpgsql security invoker set search_path='' as $$
+declare elapsed numeric;
+begin
+ if new.actual_start_time is null and new.actual_end_time is null then
+  if new.actual_end_next_day or new.actual_break_minutes<>0 then raise exception 'actual times required'; end if;
+  -- Previously saved minutes have no trustworthy start/end. Retain, never infer.
+  return new;
+ end if;
+ if new.actual_start_time is null or new.actual_end_time is null or new.calculation_basis<>'actual' then raise exception 'invalid actual times'; end if;
+ if extract(second from new.actual_start_time)<>0 or extract(second from new.actual_end_time)<>0 or new.actual_start_time=time '24:00' or new.actual_end_time=time '24:00' then raise exception 'minute precision required'; end if;
+ elapsed:=extract(epoch from (new.actual_end_time-new.actual_start_time))/60 + case when new.actual_end_next_day then 1440 else 0 end;
+ if elapsed<=0 or elapsed>1440 or new.actual_break_minutes<0 or new.actual_break_minutes>elapsed then raise exception 'invalid actual duration or break'; end if;
+ new.actual_minutes:=elapsed-new.actual_break_minutes;
+ return new;
+end; $$;
+revoke all on function private.team_works_calculate_actual_time() from public,anon,authenticated;
+create trigger calculate_actual_time before insert or update on public.team_works_partner_lesson_history for each row execute function private.team_works_calculate_actual_time();
+-- end-actual-clock-fields
 
 create function private.team_works_capture_partner_lesson() returns trigger
 language plpgsql security definer set search_path='' as $$
@@ -77,7 +105,7 @@ begin
   left join public.team_works_project_partner_settings ps on ps.project_id=p.id and ps.organization_member_id=m.id
   where m.id=any(member_ids) and pm.project_role='worker'), '[]'::jsonb),
  'lessons',coalesce((select jsonb_agg(x.data order by x.lesson_day desc,x.start_at desc) from (
- select h.session_date as lesson_day,h.start_time start_at,jsonb_build_object('id',h.id,'sessionId',h.session_id,'projectId',h.project_id,'projectTitle',p.title,'memberId',h.organization_member_id,'date',h.session_date,'startTime',h.start_time,'minutes',h.duration_min,'role',h.participation_role,'status',case when s.id is null or s.status='cancelled' then 'cancelled' when s.id is not null and s.status<>'completed' and s.partner_presence_status<>'ended' then 'unconfirmed' else 'completed' end,'hourlyWage',h.hourly_wage,'calculationBasis',h.calculation_basis,'actualMinutes',h.actual_minutes,'amount',h.amount_yen) data
+ select h.session_date as lesson_day,h.start_time start_at,jsonb_build_object('id',h.id,'sessionId',h.session_id,'projectId',h.project_id,'projectTitle',p.title,'memberId',h.organization_member_id,'date',h.session_date,'startTime',h.start_time,'minutes',h.duration_min,'role',h.participation_role,'status',case when s.id is null or s.status='cancelled' then 'cancelled' when s.id is not null and s.status<>'completed' and s.partner_presence_status<>'ended' then 'unconfirmed' else 'completed' end,'hourlyWage',h.hourly_wage,'calculationBasis',h.calculation_basis,'actualMinutes',h.actual_minutes,'actualStartTime',h.actual_start_time,'actualEndTime',h.actual_end_time,'actualEndNextDay',h.actual_end_next_day,'actualBreakMinutes',h.actual_break_minutes,'amount',h.amount_yen) data
  from public.team_works_partner_lesson_history h join public.team_works_projects p on p.id=h.project_id left join public.team_works_op_sessions s on s.id=h.session_id
  where h.organization_member_id=any(member_ids) and h.session_date>=month_start and h.session_date<(month_start+interval '1 month')
  union all
