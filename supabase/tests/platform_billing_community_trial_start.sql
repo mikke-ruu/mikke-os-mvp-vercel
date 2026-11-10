@@ -34,8 +34,8 @@ select jsonb_build_object(
   'policies', jsonb_build_object('approved', true, 'approvalId', 'fixture', 'revision', 1)
     || (select jsonb_object_agg(key, jsonb_build_object('version', 'fixture-v1', 'url', 'https://example.invalid/policy'))
         from unnest(array['terms','privacy','refund','cancellation','proration','renewal','commercialDisclosure']) key),
-  'issuedAt', to_char((transaction_timestamp() - interval '1 minute') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
-  'expiresAt', to_char((transaction_timestamp() + interval '1 hour') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+  'issuedAt', to_char(date_trunc('milliseconds', transaction_timestamp() - interval '1 minute') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+  'expiresAt', to_char(date_trunc('milliseconds', transaction_timestamp() + interval '1 hour') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
 )
 $$;
 
@@ -128,7 +128,8 @@ insert into platform_billing_private.quotes(
   'trial-paid-fixture','df040000-0000-4000-8000-000000000001','af040000-0000-4000-8000-000000000004',
   'community_platform',null,'starter','df040000-0000-4000-8000-000000000002',1,
   pg_temp.trial_quote('af040000-0000-4000-8000-000000000004','df040000-0000-4000-8000-000000000002'),
-  transaction_timestamp()-interval '1 minute',transaction_timestamp()+interval '1 hour'
+  date_trunc('milliseconds', transaction_timestamp()-interval '1 minute'),
+  date_trunc('milliseconds', transaction_timestamp()+interval '1 hour')
 );
 insert into platform_billing_private.attempts(
   id,scope_id,owner_user_id,product_key,resource_id,plan_key,request_id,quote_id,quote_revision,consent,
@@ -165,15 +166,18 @@ insert into platform_billing_private.creation_entitlements(
 set local role service_role;
 select pg_temp.trial_assert(
   public.platform_billing_status_get('af040000-0000-4000-8000-000000000006','community_platform',null)
-    @> '{"subscription":{"state":"ended","planKey":"trial","automaticBilling":false},"creation":{"state":"none"},"allowedActions":["checkout"]}'::jsonb
-  and not exists (
-    select 1 from platform_billing_private.subscriptions
-    where actor_user_id = 'af040000-0000-4000-8000-000000000006'
-  ),
+    @> '{"subscription":{"state":"ended","planKey":"trial","automaticBilling":false},"creation":{"state":"none"},"allowedActions":["checkout"]}'::jsonb,
   'expired trial never becomes paid automatically'
 );
 
 reset role;
+select pg_temp.trial_assert(
+  not exists (
+    select 1 from platform_billing_private.subscriptions
+    where actor_user_id = 'af040000-0000-4000-8000-000000000006'
+  ),
+  'expired trial creates no subscription'
+);
 select pg_temp.trial_assert(
   (select count(*) = 2 from platform_billing_private.creation_entitlements where source_kind = 'verified_trial'),
   'only requested trial ledger rows exist'
