@@ -20,7 +20,7 @@ export function Academy2HeadquartersSettings({headquarters}:{headquarters:Academ
   <div className={styles.titlebar}><div className={styles.en}>SETTINGS</div><h1 className={styles.jp}>本部設定</h1></div>
   <div className={styles.headbox}><p>本部の情報やお支払い方法などを設定します。</p></div>
   <div className={styles.tabs} aria-label="本部設定の項目">{tabs.map(item=><button key={item.id} type="button" className={`${styles.tab} ${tab===item.id?styles.on:''}`} aria-current={tab===item.id?'page':undefined} onClick={()=>{setTab(item.id);const url=new URL(window.location.href);url.searchParams.set('tab',item.query);window.history.replaceState(null,'',url.toString());}}>{item.label}</button>)}</div>
-  {safeReturn&&<a className={styles.linkRow} href={safeReturn}>← 保存した販売プランへ戻る</a>}
+  {safeReturn&&<a className={styles.linkRow} href={safeReturn}>← 販売ページの確認へ戻る</a>}
   <div hidden={tab==='通知メール'}><HeadquartersSettingsPanels key={headquarters.id} headquarters={headquarters} tab={tab}/></div>
   <div hidden={tab!=='通知メール'}>{canEdit?<ReceiptEditor key={headquarters.id} headquartersId={headquarters.id}/>:<p className={styles.note} role="status">通知メールの本文は本部運営担当が編集します。</p>}</div>
  </main>;
