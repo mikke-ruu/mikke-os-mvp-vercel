@@ -8,7 +8,7 @@ import {readLessons} from '@/lib/academy/lesson-content';
 import styles from './SalesPlanDraftEditor.module.css';
 
 /** Read-only confirmation; the sales plan stays mounted and is never saved by opening this dialog. */
-export function SalesPlanCourseConfirmation({headquartersId,courseId,course,onClose,returnHref,editInSameTab=false,backLabel='販売プランSTEP1へ戻る'}:{headquartersId:string;courseId:string;course?:Academy2Course;onClose:()=>void;returnHref?:string;editInSameTab?:boolean;backLabel?:string}) {
+export function SalesPlanCourseConfirmation({headquartersId,courseId,course,onClose,returnHref,editInSameTab=false,onEdit,backLabel='販売プランSTEP1へ戻る'}:{headquartersId:string;courseId:string;course?:Academy2Course;onClose:()=>void;returnHref?:string;editInSameTab?:boolean;onEdit?:()=>void;backLabel?:string}) {
  const dialog=useRef<HTMLDialogElement>(null);
  const [document,setDocument]=useState<CourseEditorDocument|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[retry,setRetry]=useState(0);
  const [details,setDetails]=useState<CommonCourseState|null>(null);
@@ -26,6 +26,6 @@ export function SalesPlanCourseConfirmation({headquartersId,courseId,course,onCl
   {loading&&<p role="status">レッスン一覧を確認中…</p>}
   {document&&<><h3>レッスン・教材</h3>{lessons.length?<ol>{lessons.map(lesson=><li key={lesson.id}>{lesson.title}（{lesson.blocks.length}教材）</li>)}</ol>:<p>レッスンはまだ登録されていません。</p>}</>}
   {error&&<div role="alert"><p>{error}</p><button type="button" onClick={()=>setRetry(x=>x+1)}>もう一度確認する</button></div>}
-  {returnHref&&<a href={returnHref} target={editInSameTab?undefined:"_blank"} rel={editInSameTab?undefined:"noopener"}>講座情報を編集する</a>}<button type="button" onClick={onClose}>{backLabel}</button>
+  {onEdit?<button type="button" onClick={onEdit}>講座を編集する</button>:returnHref&&<a href={returnHref} target={editInSameTab?undefined:"_blank"} rel={editInSameTab?undefined:"noopener"}>講座情報を編集する</a>}<button type="button" onClick={onClose}>{backLabel}</button>
  </dialog>;
 }

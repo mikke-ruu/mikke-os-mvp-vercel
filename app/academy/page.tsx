@@ -140,7 +140,7 @@ function DashboardContent() {
       if (!activeIdentity.current || currentSessionError || currentSession.session?.user.id !== user.id) throw new Error("preparation_identity_changed");
       if (!created || (created as { scheme?: string }).scheme !== "no_operating_fee" || typeof (created as { headquarters_id: string }).headquarters_id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test((created as { headquarters_id: string }).headquarters_id)) throw new Error("invalid_preparation");
       setCanStartNoFee(false);
-      router.replace(toAcademyContextHref((created as {academy2_enabled?:boolean}).academy2_enabled ? "/academy/settings?onboarding=1" : "/academy", (created as { headquarters_id: string }).headquarters_id, "manage"));
+      router.replace(toAcademyContextHref((created as {academy2_enabled?:boolean}).academy2_enabled ? "/academy/settings?onboarding=1&intro=1" : "/academy", (created as { headquarters_id: string }).headquarters_id, "manage"));
     } catch {
       setCreationError("本部の準備状態を確認できませんでした。画面を再読み込みしてご確認ください。この操作では運営利用料の契約や請求は発生しません。");
     } finally {

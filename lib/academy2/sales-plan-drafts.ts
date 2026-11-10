@@ -32,6 +32,7 @@ export type SalesPlanDraft = {
 function draftError(error: { code?: string;message?:string }): Error {
   if(error.message==='読み取り専用の確認画面です。保存・アップロード・公開はできません。')return new Error('このローカル確認環境は読み取り専用のため、保存できません。入力内容は残っています。');
   if(error.message==='academy2_shipping_unconfigured')return new Error('選択した講座の発送物設定を保存してください。');
+  if(error.message==='academy2_invalid_cover')return new Error('代表画像を選び直してください。画像なしでも保存できます。');
   if(error.message==='academy2_card_contract_required')return new Error('講師向け料金の回収にはAcademyカード決済の契約が必要です。決済設定を確認してください。');
   if(error.message==='academy2_invalid_instructor_fee')return new Error('講師向け料金は税込の整数で入力してください。金額未設定の下書きも保存できます。');
   if (error.code === "42501") return new Error("この本部の販売プランまたは選択した講座を扱う権限がありません。");

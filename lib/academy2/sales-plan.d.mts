@@ -9,10 +9,11 @@ export type PlanExpiry = { kind: 'none'|'months'|'years'|'date'; count?: number|
 export type PlanRenewal = { enabled: boolean; conditions: string[]; other?: string; minimum_events?: number|null };
 export type InstructorRegistrationFee = { enabled: boolean; amount: number|null; payment_method: 'academy_card' };
 export type SalesPlan = {
+  cover_image?: import("./plan-cover-image").PlanCoverImage;
   id: string; headquarters_id: string; title: string; kind: SalesPlanType; course_ids: string[]; catalog_course_ids?:string[];
   price: number | null; purchase_mode: 'all' | 'staged'; stage_prices: Record<string, number>;
   study_style: 'instructor' | 'materials_only'; allowed_methods: ('in_person' | 'online')[];
-  materials: { enabled: boolean; starts?: 'from_start' | 'specified_date' | 'after_attendance'; starts_at?: string; usage?: ('learning' | 'preparation' | 'during_class' | 'review')[] };
+  materials: { enabled: boolean; access_months?:number|null; starts?: 'from_start' | 'specified_date' | 'after_attendance'; starts_at?: string; usage?: ('learning' | 'preparation' | 'during_class' | 'review')[] };
   payment_methods: ('bank' | 'external' | 'card' | 'onsite')[]; external_payment_urls?: Record<string, string>;
   external_payment_details?: {service_name:string;instructions:string};
   after: { record_completion?: boolean; skill_certification: boolean; commercial_license: boolean; instructor_license: boolean; required_certification_id?: string; required_skill_condition_id?:string; completion_condition_id?:string; skill_definition_id?:string; commercial_condition_id?:string; instructor_condition_id?:string; instructor_manual_id?:string; instructor_registration_required?:boolean; instructor_sales_page_required?:boolean;

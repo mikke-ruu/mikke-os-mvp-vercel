@@ -6,7 +6,7 @@ import type { AcademyPageBlock } from '@/types/database';
 
 export type CourseEditorSettings = { targetAudience: string; showIntroduction: boolean; sampleName: string };
 export type CourseEditorDocument = { course: Academy2Course; materials: Academy2CourseMaterials; settings: CourseEditorSettings };
-export type CourseEditorInput = { name: string; subtitle: string; main_image_url: string; description: string; duration_text: string; code?: string };
+export type CourseEditorInput = { name: string; subtitle: string; main_image_url: string; description: string; duration_text: string; images?:string[]; code?: string };
 export type CourseEditorSave = { requestId: string; courseId: string | null; expectedUpdatedAt: string | null; materialRevision: number; legacyUpdatedAt: string | null; basic: CourseEditorInput; settings: CourseEditorSettings; blocks: AcademyPageBlock[] };
 function editorError(error: { code?: string }): Error {
   if (error.code === '42501') return new Error('この講座を確認・変更する権限がありません。');

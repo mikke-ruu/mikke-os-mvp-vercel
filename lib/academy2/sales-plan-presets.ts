@@ -14,7 +14,7 @@ export type SalesPlanPreset = typeof salesPlanChoices[number]['id'];
 export const salesPlanSamples = [
  {id:'workshop',title:'キャンドル体験ワークショップ',price:5000,summary:'キャンドル基礎'},
  {id:'course',title:'キャンドル基礎3回コース',price:18000,summary:'01 基礎 → 02 実技 → 03 応用'},
- {id:'certification',title:'キャンドル認定講座',price:55000,summary:'3講座・ライセンスあり・キットあり'},
+ {id:'certification',title:'キャンドル認定講座',price:55000,summary:'3講座・ライセンスあり・教材・材料あり'},
  {id:'monthly',title:'季節のキャンドル 月額レッスン',price:5500,summary:'月額レッスン'},
 ] as const;
 export type SalesPlanSample = typeof salesPlanSamples[number]['id'];

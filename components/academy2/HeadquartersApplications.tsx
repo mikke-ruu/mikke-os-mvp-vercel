@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {applicationScheduleLabel} from '@/lib/academy2/application-schedule';
 import styles from './applications-operation.module.css';
+import {ApplicationThumbnail} from './ApplicationThumbnail';
 import { useAcademy2Headquarters } from './HeadquartersBoundary';
 import { toAcademyContextHref } from '@/lib/academy/access-context';
 import { listHeadquartersApplications, type HeadquartersApplicationSummary } from '@/lib/academy2/headquarters-applications';
@@ -13,7 +14,7 @@ export function applicationDate(value: string | null | undefined) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? '未設定' : new Intl.DateTimeFormat('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(date);
 }
-export const nextActionLabel = (key: string | null) => ({ confirm_payment: '支払い確認', confirm_tuition: '支払い確認', confirm_schedule: '日程調整', set_shipping_destination: '発送先確認', record_shipping: 'キット発送', event_kit_shipping: '開催のキット発送', ship_kit: 'キット発送', confirm_completion: '受講終了を確認する', submit_completion: '修了報告', confirm_certification: '認定', review_outcome: '認定確認', pay_opening_license: '開講ライセンス支払い', done: '対応完了', wait: '確認待ち' }[key ?? ''] ?? '申込詳細を確認');
+export const nextActionLabel = (key: string | null) => ({ confirm_payment: '支払い確認', confirm_tuition: '支払い確認', confirm_schedule: '日程調整', set_shipping_destination: '発送先確認', record_shipping: '教材発送', event_kit_shipping: '開催の教材発送', ship_kit: '教材発送', confirm_completion: '受講の完了を確認する', submit_completion: '受講完了の報告', confirm_certification: '認定', review_outcome: '認定確認', pay_opening_license: '開講ライセンス支払い', done: '対応完了', wait: '確認待ち' }[key ?? ''] ?? '申込詳細を確認');
 export const applicationCompleted = (row: HeadquartersApplicationSummary) => row.completed === true || !!row.completedAt;
 
 export function applicationPaymentLabel(value: string | null | undefined) {
@@ -40,9 +41,9 @@ export function HeadquartersApplications({ mode = 'applications' }: { mode?: 'ap
   }, [hq?.id, retry]);
   if (!hq) return null;
   const title = mode === 'attention' ? 'ホーム' : mode === 'certifications' ? '認定' : '申込';
-  const tabs = mode === 'certifications' ? [['all', 'すべて'], ['certification_pending', '認定待ち'], ['certified', '認定済み'], ['completion_pending', '修了確認待ち'], ['attention', '要対応']]
+  const tabs = mode === 'certifications' ? [['all', 'すべて'], ['certification_pending', '認定待ち'], ['certified', '認定済み'], ['completion_pending', '受講完了の確認待ち'], ['attention', '要対応']]
     : mode === 'attention' ? [['attention', '要対応'], ['all', 'すべて']]
-    : [['all', 'すべて'], ['attention', '要対応'], ['schedule', '日程調整待ち'], ['shipping', '発送待ち'], ['payment_pending', '入金確認待ち'], ['completion_pending', '修了確認待ち'], ['completed', '完了済み']];
+    : [['all', 'すべて'], ['attention', '要対応'], ['schedule', '日程調整待ち'], ['shipping', '発送待ち'], ['payment_pending', '入金確認待ち'], ['completion_pending', '受講完了の確認待ち'], ['completed', '完了済み']];
   const shown = rows?.filter(row => {
     if (mode === 'applications' && saleChannel !== 'all' && row.saleChannel !== saleChannel) return false;
     if (filter === 'schedule' && !(row.schedule?.individual&&!row.schedule.startsAt) && row.nextAction !== 'confirm_schedule') return false;
@@ -73,7 +74,8 @@ export function HeadquartersApplications({ mode = 'applications' }: { mode?: 'ap
     {error&&<div role="alert" className={styles.error}><p>申込情報を読み込めませんでした。</p><p>{error}</p></div>}
     {!rows&&!error&&<p role="status">読み込み中…</p>}
     {shown?.length===0&&<p className={styles.empty}>該当する申込はありません。</p>}
-    <div className={styles.list}>{shown?.map(row=>{const payment=row.tuition?applicationPaymentLabel(row.tuition.status):null;return <a key={row.applicationId} className={styles.linkCard} href={detailHref(row.applicationId)}>
+    <div className={styles.list}>{shown?.map(row=>{const payment=row.tuition?applicationPaymentLabel(row.tuition.status):null;return <a key={row.applicationId} className={styles.linkCard+' '+styles.applicationCard} href={detailHref(row.applicationId)}>
+      <ApplicationThumbnail src={row.thumbnailUrl}/><div className={styles.applicationCardBody}>
       <div className={styles.cardTitle}><h2>{row.applicantName}</h2></div>
       <p className={styles.planLine}>{row.planTitle}</p>
       <p className={styles.scheduleLine}>{applicationScheduleLabel(row.schedule)}</p>
@@ -81,6 +83,7 @@ export function HeadquartersApplications({ mode = 'applications' }: { mode?: 'ap
       <div className={styles.responseLine}>{payment&&<span className={styles.stateBadge}>{payment}</span>}{<span className={styles.nextLine}>{row.nextAction==='done'||!row.nextAction&&applicationCompleted(row)?'対応完了':row.source?.startsWith('legacy_')&&!row.nextAction?'過去の申込記録':row.nextAction==='wait'?'確認待ち':row.nextAction==='confirm_completion'?nextActionLabel(row.nextAction):'次の対応：'+nextActionLabel(row.nextAction)}</span>}</div>
       <div className={styles.cardMeta}><span>申込 {applicationDate(row.appliedAt)}</span><span>{row.saleChannel==='instructor'?'講師販売':'本部販売'}</span></div>
       {mode==='certifications'&&<p>修了：{row.completedAt?applicationDate(row.completedAt):'未完了'} ／ 認定：{row.certifiedAt?applicationDate(row.certifiedAt):'未確定'}</p>}
+      </div><span className={styles.cardDetail}>詳細を見る →</span>
     </a>;})}</div>
   </div>;
 }
