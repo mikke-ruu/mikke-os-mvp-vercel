@@ -2,6 +2,14 @@
 
 2026-11-09。専用worktree: mikke-os-mvp-team-works-partner-history-20261106。
 
+## 2026-11-10 反映状況
+
+ユーザーが既存public GitHubへの今回ソース送信を明示承認。PR117作成。全体webpack buildは型チェック・静的生成を含めexit 0、Vercel/Netlify previewともsuccess。
+
+本番DBへ適用成功。実version `20261110063929`、name `team_works_partner_lesson_history`、SQL SHA256 `9d88ab6945909fbfb14e15f036053b8b9b75d6d8f801cbfac0150d9dabdbab55`。履歴8件、時給設定済み0件、RLS有効、anonのRPC実行不可・authenticated可を確認。security advisorは適用前と件数同じ。CLIの今後の比較で二重適用されないよう、Git内のmigration名を実versionへ合わせた（本文は変更なし）。当初draft名20261106133009からのrename。
+
+本番画面はこれから配備。実行直前のProductionは `dpl_2UrrZvKkSje9fU51ZVaqoh95LJLJ` / `de033632b777d20e8ed666e5cf492549d7d20626` / READY、production branch master。Team Works先行、Academy後続で調整済み。以下は準備時点の記録。
+
 ## 承認内容と導線
 
 ユーザーがローカル画面を確認し、配置・表示・計算を承認。「ローカルでOKなら本番」も依頼済み。本部はパートナー管理から対象の方の「実施履歴・時給」を開く。本人はパートナーポータルの「自分の実施履歴・報酬」。クライアントには追加しない。

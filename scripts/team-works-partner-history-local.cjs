@@ -18,7 +18,7 @@ async function init(){
   await db.query("insert into team_works_projects values($1,$2,'サンプルプロジェクト','operations')",[id(20),id(10)]);
   await db.query("insert into team_works_project_members values($1,$2,'worker')",[id(20),id(1)]);
   await db.query("insert into team_works_project_partner_settings values($1,$2,1200,'active')",[id(20),id(1)]);
-  await db.exec(fs.readFileSync('supabase/migrations/20261106133009_team_works_partner_lesson_history.sql','utf8'));
+  await db.exec(fs.readFileSync('supabase/migrations/20261110063929_team_works_partner_lesson_history.sql','utf8'));
   await db.exec(`alter table team_works_project_partner_settings enable row level security;
    create policy local_staff_settings on team_works_project_partner_settings for update to authenticated using(private.team_works_is_project_staff(project_id)) with check(private.team_works_is_project_staff(project_id));
    create policy local_read_settings on team_works_project_partner_settings for select to authenticated using(private.team_works_is_project_staff(project_id) or organization_member_id=auth.uid());
@@ -31,7 +31,7 @@ async function init(){
    await db.query("insert into team_works_op_sessions values($1,$2,$3,null,(now() at time zone 'Asia/Tokyo')::date,'00:00',45,$4,'not_started')",[id(n),id(20),id(1),n===32?'scheduled':'completed']);
   }
  }
- const draft=fs.readFileSync('supabase/migrations/20261106133009_team_works_partner_lesson_history.sql','utf8');
+ const draft=fs.readFileSync('supabase/migrations/20261110063929_team_works_partner_lesson_history.sql','utf8');
  if(!(await db.query("select 1 from information_schema.columns where table_name='team_works_partner_lesson_history' and column_name='actual_start_time'")).rows.length){
   await db.exec(draft.split('-- actual-clock-fields: also used to upgrade the isolated local review database.')[1].split('-- end-actual-clock-fields')[0]);
  }

@@ -25,7 +25,7 @@ await db.query(`insert into team_works_projects values($1,$2,'授業','operation
 await db.query(`insert into team_works_project_members values($1,$2,'worker');`,[id(20),id(1)]);
 await db.query(`insert into team_works_project_partner_settings values($1,$2,1200,'active')`,[id(20),id(1)]);
 await db.query(`insert into team_works_op_sessions values($1,$2,$3,null,date_trunc('month',now())::date,'10:00',45,'completed','ended')`,[id(30),id(20),id(1)]);
-await db.exec(fs.readFileSync('supabase/migrations/20261106133009_team_works_partner_lesson_history.sql','utf8'));
+await db.exec(fs.readFileSync('supabase/migrations/20261110063929_team_works_partner_lesson_history.sql','utf8'));
 await as(3,async()=>{assert.equal((await db.query('select private.team_works_is_project_staff($1) as allowed',[id(20)])).rows[0].allowed,false);});
 await as(4,async()=>assert.equal((await db.query('select count(*)::int as count from team_works_partner_lesson_history')).rows[0].count,1));
 await db.query("insert into team_works_organization_members values($1,$2,$1,'クライアント','client','active'),($3,$4,$3,'別本部','manager','active')",[id(5),id(10),id(6),id(60)]);
