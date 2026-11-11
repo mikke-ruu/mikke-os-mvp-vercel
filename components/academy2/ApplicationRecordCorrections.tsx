@@ -1,0 +1,38 @@
+'use client';
+import {useEffect,useRef,useState} from 'react';
+import {correctApplicationRecord,undoHeadquartersPayment,type ApplicationCorrection,type HeadquartersApplicationDetail as Detail} from '@/lib/academy2/headquarters-applications';
+import {japanDate,shipmentCarrierLabel,shipmentCarriers} from '@/lib/academy2/shipment-display';
+import styles from './applications-operation.module.css';
+
+export function ShipmentCopyActions({data}:{data:Detail}){
+ const s=data.headquarters?.shipping,[feedback,setFeedback]=useState('');
+ if(!s?.shippedAt)return null;
+ async function copy(notice:boolean){if(!s)return;const text=notice?[`${data.summary.planTitle}の教材・材料を発送しました。`,`配送方法：${shipmentCarrierLabel(s.carrier)}`,`発送日：${(s.shippedDate??japanDate(s.shippedAt!)).replaceAll('-','/')}`,s.trackingNumber?`追跡番号：${s.trackingNumber}`:''].filter(Boolean).join('\n'):s.trackingNumber??'';try{await navigator.clipboard.writeText(text);setFeedback(notice?'発送案内をコピーしました':'追跡番号をコピーしました');}catch{setFeedback('コピーできませんでした。表示されている内容を選択してコピーしてください。');}}
+ return <div className={styles.shipmentCopy}><div>{s.trackingNumber&&<button type="button" className={styles.button} onClick={()=>void copy(false)}>追跡番号をコピー</button>}<button type="button" className={styles.button} onClick={()=>void copy(true)}>発送案内をコピー</button></div><p>メールやメッセージに貼り付けて送れます。</p><p role="status" className={styles.inlineFeedback}>{feedback}</p></div>;
+}
+
+export function ApplicationRecordCorrections({data,hq,disabled,onChange,onBusyChange}:{data:Detail;hq:string;disabled:boolean;onChange:(value:Detail)=>void;onBusyChange:(value:boolean)=>void}){
+ const s=data.headquarters?.shipping,w=data.workspace,summary=data.summary;
+ const[editing,setEditing]=useState(false),[carrier,setCarrier]=useState(''),[other,setOther]=useState(''),[tracking,setTracking]=useState(''),[day,setDay]=useState(''),[busy,setBusy]=useState(false),[feedback,setFeedback]=useState(''),[error,setError]=useState('');
+ const lock=useRef(false),request=useRef<{signature:string;id:string}|null>(null),feedbackRevision=useRef<number|null>(null);
+ const dirty=editing&&(carrier!==(s?.carrier?.startsWith('other:')?'other':s?.carrier??'')||other!==(s?.carrier?.startsWith('other:')?s.carrier.slice(6):'')||tracking!==(s?.trackingNumber??'')||day!==(s?.shippedDate??(s?.shippedAt?japanDate(s.shippedAt):japanDate())));
+ useEffect(()=>{if(!dirty)return;const unload=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};const click=(e:MouseEvent)=>{const a=(e.target as Element)?.closest?.('a[href]');if(a&&!a.getAttribute('href')?.startsWith('#')&&!window.confirm('保存していない発送情報があります。画面を移動しますか？')){e.preventDefault();e.stopImmediatePropagation();}};window.addEventListener('beforeunload',unload);document.addEventListener('click',click,true);return()=>{window.removeEventListener('beforeunload',unload);document.removeEventListener('click',click,true);};},[dirty]);
+ const shownFeedback=feedbackRevision.current===summary.revision?feedback:'';
+ if(!data.headquarters||!w||(!s?.shippedAt&&!summary.completedAt&&summary.tuition?.status!=='paid'&&!shownFeedback&&!busy&&!error))return null;
+ const button=styles.button,primary=button+' '+styles.primary;
+ function edit(){if(editing&&dirty&&!window.confirm('訂正中の発送情報を破棄しますか？'))return;setCarrier(s?.carrier?.startsWith('other:')?'other':s?.carrier??'');setOther(s?.carrier?.startsWith('other:')?s.carrier.slice(6):'');setTracking(s?.trackingNumber??'');setDay(s?.shippedDate??(s?.shippedAt?japanDate(s.shippedAt):japanDate()));setEditing(v=>!v);setError('');setFeedback('');}
+ async function run(action:ApplicationCorrection|'undo_payment',input:Record<string,string>={}){
+  if(lock.current||disabled)return;
+  const message=action==='undo_completion'?'受講完了の記録を取り消し、受講中に戻します。受講後に公開する教材は、再び受講完了にするまで閲覧できなくなります。取り消しますか？':action==='undo_shipping'?'発送済みの記録を取り消し、発送準備中に戻します。配送会社への発送取消や、お客様への連絡は行いません。戻しますか？':action==='undo_payment'?'入金確認待ちに戻します。返金は行いません。入金後に公開する教材は、再び入金確認するまで閲覧できなくなります。戻しますか？':null;
+  if(message&&!window.confirm((dirty?'入力中の訂正は保存されません。 ':'')+message))return;
+  const signature=JSON.stringify([summary.applicationId,summary.revision,action,input]);if(request.current?.signature!==signature)request.current={signature,id:crypto.randomUUID()};lock.current=true;setBusy(true);onBusyChange(true);setError('');setFeedback('');
+  try{const result=action==='undo_payment'?await undoHeadquartersPayment(hq,summary.applicationId,summary.revision,request.current.id):await correctApplicationRecord(hq,summary.applicationId,summary.revision,request.current.id,action,input);feedbackRevision.current=result.summary.revision;onChange(result);request.current=null;setEditing(false);setFeedback(action==='edit_shipping'?'発送情報を訂正しました':action==='undo_shipping'?'発送準備中に戻しました':action==='undo_completion'?'受講完了を取り消しました':'入金確認待ちに戻しました');}catch(e){setError(e instanceof Error?e.message:'保存できませんでした。入力内容は残っています。');}finally{lock.current=false;setBusy(false);onBusyChange(false);}
+ }
+ return <section className={styles.detailCard}><h2>記録を訂正する</h2>
+ {summary.completedAt&&<div className={styles.recordCorrection}><button type="button" className={button} disabled={disabled||busy||!w.canUndoCompletion} onClick={()=>void run('undo_completion')}>受講完了を取り消す</button>{!w.canUndoCompletion&&<p>この申込の受講完了は、この画面から取り消せません。認定などの記録を確認してください。</p>}</div>}
+ {s?.shippedAt&&<div className={styles.recordCorrection}><div><button type="button" className={button} disabled={disabled||busy||!w.canEditShipping} aria-expanded={editing} onClick={edit}>{editing?'訂正をやめる':'発送情報を訂正する'}</button><button type="button" className={button} disabled={disabled||busy||!w.canUndoShipping} onClick={()=>void run('undo_shipping')}>発送準備中に戻す</button></div>{!w.canUndoShipping&&<p>{summary.completedAt?'先に受講完了を取り消すと、発送の記録を戻せます。':'この発送記録は、この画面から取り消せません。'}</p>}
+ {editing&&<div className={styles.shippingEditor} role="group" aria-label="発送情報の訂正"><div className={styles.shippingFields}><label>配送会社・配送方法<select className={styles.operationInput} value={carrier} disabled={busy} onChange={e=>setCarrier(e.target.value)}><option value="">選んでください</option>{shipmentCarriers.map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></label>{carrier==='other'&&<label>配送方法の名前<input className={styles.operationInput} value={other} maxLength={94} disabled={busy} onChange={e=>setOther(e.target.value)}/></label>}{carrier!=='untracked'&&<label>追跡番号<input className={styles.operationInput} value={tracking} maxLength={200} disabled={busy} onChange={e=>setTracking(e.target.value)}/></label>}<label>発送日<input className={styles.operationInput} type="date" max={japanDate()} value={day} disabled={busy} onChange={e=>setDay(e.target.value)}/></label></div><button type="button" className={primary} disabled={disabled||busy||!day||!carrier||carrier==='other'&&!other.trim()||carrier!=='untracked'&&!tracking.trim()} onClick={()=>void run('edit_shipping',{date:day,carrier:carrier==='other'?'other:'+other.trim():carrier,trackingNumber:carrier==='untracked'?'':tracking.trim()})}>訂正を保存する</button><p>発送済みのまま、情報だけを訂正します。送信済みの案内は変わりません。</p></div>}</div>}
+ {summary.tuition?.status==='paid'&&<div className={styles.recordCorrection}><button type="button" className={button} disabled={disabled||busy||!w.canUndoPayment} onClick={()=>void run('undo_payment')}>入金確認待ちに戻す</button>{!w.canUndoPayment&&<p>{summary.completedAt?'先に受講完了を取り消し、発送の記録がある場合は発送準備中に戻してください。':s?.shippedAt?'先に発送準備中に戻すと、入金確認を取り消せます。':'この申込の入金確認は、この画面から取り消せません。'}</p>}</div>}
+ <p className={styles.meta}>訂正前の記録も履歴に残ります。</p>{error?<p role="alert">{error}</p>:<p role="status" className={styles.inlineFeedback}>{shownFeedback}</p>}
+ </section>;
+}

@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { AcademyFrontDesign } from "@/lib/academy/front-design";
 import { frontMaxWidth } from "@/lib/academy/front-design";
 
-export function AcademyFrontHero({ design, title, message, imageUrl, applicationHref = "#services", coursesHref = "#courses", hideEmptyImage = false }: { design: AcademyFrontDesign; title: string; message: string; imageUrl: string; applicationHref?: string | null; coursesHref?: string | null; hideEmptyImage?: boolean }) {
+export function AcademyFrontHero({ design, title, message, imageUrl, applicationHref = "#services", coursesHref = "#courses", hideEmptyImage = false, showTitle = true }: { design: AcademyFrontDesign; title: string; message: string; imageUrl: string; applicationHref?: string | null; coursesHref?: string | null; hideEmptyImage?: boolean; showTitle?: boolean }) {
   const [selected, setSelected] = useState(0);
   if (design.hero === "hidden") return null;
   const slides = design.slides.filter(slide => slide.url);
@@ -12,7 +12,7 @@ export function AcademyFrontHero({ design, title, message, imageUrl, application
   const showImage = !!active.url || !hideEmptyImage;
   return <section style={{ maxWidth: frontMaxWidth(design) }} className={`mx-auto grid min-w-0 items-center gap-8 px-5 py-12 md:py-20 ${design.hero === "split" && showImage ? "md:grid-cols-2" : ""}`} aria-label="ホームページのメイン紹介">
     <div className={design.hero === "split" ? "" : "order-2"}>
-      <h1 className="text-2xl font-bold leading-relaxed tracking-wide md:text-4xl">{title}</h1>
+      {showTitle && <h1 className="text-2xl font-bold leading-relaxed tracking-wide md:text-4xl">{title}</h1>}
       <p className="mt-4 whitespace-pre-wrap text-sm leading-7 md:text-[15px]">{message}</p>
       {applicationHref || coursesHref ? <div className="mt-6 flex flex-wrap items-center gap-4">{applicationHref ? <a href={applicationHref} className="rounded-full bg-[var(--mikke-accent)] px-6 py-3 text-sm font-bold text-white">講座に申し込む</a> : null}{coursesHref ? <a href={coursesHref} className="text-sm font-bold text-[var(--mikke-accent-strong)]">講座一覧を見る →</a> : null}</div> : null}
     </div>

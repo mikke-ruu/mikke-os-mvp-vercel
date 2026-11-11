@@ -6,12 +6,14 @@ import {getAcademy2Event,getAcademy2EventRegistrationSource,setAcademy2EventRegi
 import {toAcademyContextHref} from '@/lib/academy/access-context';
 import styles from './event-detail.module.css';
 
+import flowStyles from './publication-flow.module.css';
+import {EventFirstIntake} from './EventFirstIntake';
 const reasonLabels:Record<string,string>={
- plan_not_published:'販売プランはまだ公開されていません。販売ページと初回の公開条件を確認してください。',
+ plan_not_published:'この開催の申込受付はまだ開始していません。',
  publication_revision_mismatch:'開催と公開済み販売プランの保存版が一致しません。販売条件を確認してください。',
  public_source_unavailable:'本部または販売プランの公開条件を確認してください。',
  event_not_ready:'開催の状態・日時・受講方法を確認してください。',
- kit_not_ready:'物品の受け渡し方法と配送先の設定を確認してください。',
+ kit_not_ready:'教材・材料の受け渡し方法と配送先の設定を確認してください。',
 };
 /** Separate an event save from explicit registration; server checks remain authoritative. */
 export function EventRegistrationControl({headquartersId,event,participantCount=0,relatedPlanHref,onRelatedNavigate,enabled,locked,onReload,onBusyChange}:{headquartersId:string;event:Academy2EventDetail;participantCount?:number;relatedPlanHref?:string;onRelatedNavigate?:()=>boolean;enabled:boolean;locked:boolean;onReload:()=>void;onBusyChange:(value:boolean)=>void}) {
@@ -35,17 +37,17 @@ export function EventRegistrationControl({headquartersId,event,participantCount=
  }
  return <div className={styles.registration} aria-label="募集の確認と受付">
   <div className={styles.actions} aria-label="関連ページ">{relatedPlanHref?<Link className={styles.textLink} href={relatedPlanHref} onClick={event=>{if(onRelatedNavigate&&!onRelatedNavigate())event.preventDefault();}}>販売プランを確認</Link>:null}{source?.public_path?<Link className={styles.textLink} href={source.public_path} target="_blank" rel="noopener noreferrer">販売ページを確認</Link>:null}</div>
-  <p className={styles.help}>現在：{event.registration_status==='open'?'受付中':event.registration_status==='draft'?'下書き':'受付停止中'}</p>
+  <p className={flowStyles.status}>申込受付：{!enabled?'確認する権限がありません':loading?'確認中…':error||!source?'確認できません':event.status==='cancelled'?'開催中止':event.status==='completed'?'開催終了':source.reasons.includes('plan_not_published')?'受付前':source.reasons.length||!source.ready?'受付できません（設定の確認が必要）':event.registration_status==='open'?'受付中':event.registration_status==='draft'?'募集前':'受付停止中'}</p>
   {!enabled?<p className={styles.help}>受付の開始・停止は本部責任者が行います。</p>:<>
    {loading?<p role="status" className={styles.help}>募集条件を確認中…</p>:null}
 
 
    {source?.reasons.map(reason=><p key={reason} className={styles.help}>{reasonLabels[reason]??'公開条件を確認してください。'}</p>)}
-   {source?.reasons.includes('plan_not_published')&&event.sales_plan_id?<Link className={styles.btn} href={href(`/academy/offerings/${event.sales_plan_id}?step=6`)}>販売プランの公開前確認へ</Link>:null}
-   {['planned','active'].includes(event.status)&&event.revision!==null?<div className={styles.actions}>
+   {source&&!source.offering_id&&event.sales_plan_id&&['planned','active'].includes(event.status)&&<EventFirstIntake headquartersId={headquartersId} event={event} locked={locked||busy} onReload={onReload} onBusyChange={onBusyChange}/>}
+   {source?.offering_id&&['planned','active'].includes(event.status)&&event.revision!==null?<div className={styles.actions}>
     {event.registration_status!=='open'?<button className={`${styles.btn} ${styles.primary}`} disabled={locked||busy||loading||!source?.ready} onClick={()=>setConfirm('open')}>受付を開始する</button>:<button className={styles.btn} disabled={locked||busy||loading} onClick={()=>setConfirm('closed')}>受付を停止する</button>}
    </div>:null}
-   {confirm?<div className={styles.section}><p className={styles.help}>{confirm==='open'?'この開催の日時・受講方法・定員・物品の受け渡しと販売ページを確認しましたか？ 受付開始後、お客様が申し込めるようになります。':participantCount>0?'新規申込の受付だけを停止します。既存の申込・入金・受講履歴は維持します。開催内容も変更する場合は、申込者への連絡を確認してください。':'新しい申込の受付を停止します。'}</p><div className={styles.actions}><button className={`${styles.btn} ${styles.primary}`} disabled={busy||locked} onClick={()=>void apply()}>{busy?'処理中…':confirm==='open'?'確認して受付を開始する':'確認して受付を停止する'}</button><button className={styles.btn} disabled={busy} onClick={()=>setConfirm(null)}>戻る</button></div></div>:null}
+   {confirm?<div className={styles.section}><p className={styles.help}>{confirm==='open'?'この開催の日時・受講方法・定員・教材・材料の受け渡しと販売ページを確認しましたか？ 受付開始後、お客様が申し込めるようになります。':participantCount>0?'新規申込の受付だけを停止します。既存の申込・入金・受講履歴は維持します。開催内容も変更する場合は、申込者への連絡を確認してください。':'新しい申込の受付を停止します。'}</p><div className={styles.actions}><button className={`${styles.btn} ${styles.primary}`} disabled={busy||locked} onClick={()=>void apply()}>{busy?'処理中…':confirm==='open'?'確認して受付を開始する':'確認して受付を停止する'}</button><button className={styles.btn} disabled={busy} onClick={()=>setConfirm(null)}>戻る</button></div></div>:null}
    {error?<div role="alert" className={styles.error}>{error}<button type="button" className={styles.btn} disabled={busy||locked} onClick={()=>{onReload();setRetry(value=>value+1);}}>最新の募集条件を確認</button></div>:null}
    {saved?<p role="status" className={styles.saved}>{saved}</p>:null}
   </>}

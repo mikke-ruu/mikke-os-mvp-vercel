@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2.108.2";
+import {dispatchParticipationJobs,participationTransport} from '../_shared/academy2-participation-dispatch.mjs';
 import { deliverStoredAcademy2BankMail } from "../_shared/academy2-offering-bank-intake.ts";
 
 const reply = (status: number, value: Record<string, unknown>) => new Response(JSON.stringify(value), {
@@ -35,6 +36,9 @@ Deno.serve(async request => {
         if (!finishError && finished && outcome === "sent") sent++; else deferred++;
       } catch { deferred++; /* An expired lease can safely be reclaimed. */ }
     }
-    return reply(200, { processed: jobs.length, sent, deferred });
+    const transport=participationTransport(Object.fromEntries(['SUPABASE_URL','ACADEMY_LOCAL_CAPTURE','ACADEMY_LOCAL_CAPTURE_KEY','ACADEMY_LOCAL_TEST_ORIGIN','ACADEMY_PARTICIPATION_MAIL_ENABLED','RESEND_API_KEY','ACADEMY_PARTICIPATION_FROM'].map(key=>[key,Deno.env.get(key)])));
+    let participation:Record<string,unknown>={disabled:true};
+    try{participation=await dispatchParticipationJobs({client:admin,...transport});}catch{participation={needsReview:true};}
+    return reply(200, { processed: jobs.length, sent, deferred, participation });
   } catch { return reply(503, { error: "worker_unavailable" }); }
 });

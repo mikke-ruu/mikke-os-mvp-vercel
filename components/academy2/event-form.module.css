@@ -63,6 +63,7 @@
 .assignee-type{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
 .assignee-choice{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;cursor:pointer}
 .assignee-choice.on{border-color:var(--green);background:#f7fcf9}
+.wrap .assignee-type .assignee-choice{display:block;text-align:left;min-width:0}
 .assignee-choice strong{display:block;font-size:10px}
 .assignee-choice p{font-size:8px;color:#777;line-height:1.45;margin:3px 0 0}
 .instructor-list{display:grid;gap:8px;margin-top:10px}

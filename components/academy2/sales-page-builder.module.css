@@ -52,3 +52,5 @@
 .v5Builder.v5Builder [data-lp=rendered-section]{display:flex;flex-direction:column}
 .v5Builder.v5Builder [data-lp=rendered-section]>[data-box-id]{display:flex;flex-direction:column;flex:1}
 .v5Builder.v5Builder [data-lp=rendered-section]>[data-box-id]>article{flex:1}
+
+.guidedFooter{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;align-items:start;padding:18px 0;border-top:1px solid #dce5df}.guidedFooter>div{text-align:center}.guidedFooter p{font-size:13px;margin:6px 0}.guidedFooter button{min-height:44px}@media(max-width:700px){.guidedFooter{grid-template-columns:1fr 1fr}.guidedFooter>p{grid-column:1/-1}}

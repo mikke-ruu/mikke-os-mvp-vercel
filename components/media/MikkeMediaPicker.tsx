@@ -8,24 +8,36 @@ import {
   deleteMikkeMediaAsset,
   getMikkeMediaUsage,
   listMikkeMediaAssets,
+  listPendingMikkeMediaImages,
+  listDeletingMikkeMediaImages,
+  recoverMikkeMediaImage,
   uploadMikkeMediaImage
 } from "@/lib/media/client";
 import type { MikkeMediaAsset, MikkeMediaUsage } from "@/lib/media/types";
 
-export function MikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = false, helperText }: {
+type MediaPickerProps={
   helperText?: string;
   currentUrl?: string;
   onSelect: (asset: MikkeMediaAsset) => void;
   sourceApp: string;
   compact?: boolean;
-}) {
+};
+export function MikkeMediaPicker(props:MediaPickerProps){
+  const {user}=useAuth();
+  return <OwnedMikkeMediaPicker key={user.id} {...props}/>;
+}
+function OwnedMikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = false, helperText }:MediaPickerProps) {
   const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
+  const mounted=useRef(true);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;};},[]);
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [assets, setAssets] = useState<MikkeMediaAsset[]>([]);
+  const [pending, setPending] = useState<MikkeMediaAsset[]>([]);
+  const [deleting, setDeleting] = useState<MikkeMediaAsset[]>([]);
   const [usage, setUsage] = useState<MikkeMediaUsage | null>(null);
   const [message, setMessage] = useState("");
 
@@ -33,13 +45,17 @@ export function MikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = fa
     setLoading(true);
     setMessage("");
     try {
-      const [nextAssets, nextUsage] = await Promise.all([listMikkeMediaAssets(), getMikkeMediaUsage()]);
+      const [nextAssets, nextUsage, nextPending, nextDeleting] = await Promise.all([listMikkeMediaAssets(), getMikkeMediaUsage(), listPendingMikkeMediaImages(),listDeletingMikkeMediaImages()]);
+      if(!mounted.current)return;
       setAssets(nextAssets);
       setUsage(nextUsage);
+      setPending(nextPending);
+      setDeleting(nextDeleting);
     } catch (error) {
+      if(!mounted.current)return;
       setMessage(error instanceof Error ? error.message : "画像ライブラリを読み込めませんでした。");
     } finally {
-      setLoading(false);
+      if(mounted.current)setLoading(false);
     }
   }
 
@@ -53,15 +69,18 @@ export function MikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = fa
     setMessage("");
     try {
       const asset = await uploadMikkeMediaImage({ userId: user.id, file, sourceApp });
+      if(!mounted.current)return;
       onSelect(asset);
       setAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)]);
       const nextUsage = await getMikkeMediaUsage();
       setUsage(nextUsage);
       setMessage("Mikke Mediaへ保存しました。別のアプリでも再利用できます。");
     } catch (error) {
+      if(!mounted.current)return;
+      void listPendingMikkeMediaImages().then(items=>{if(mounted.current)setPending(items);}).catch(()=>{});
       setMessage(error instanceof Error ? error.message : "画像を保存できませんでした。");
     } finally {
-      setUploading(false);
+      if(mounted.current)setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
     }
   }
@@ -72,14 +91,26 @@ export function MikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = fa
     setMessage("");
     try {
       await deleteMikkeMediaAsset(asset);
+      if(!mounted.current)return;
       setAssets((current) => current.filter((item) => item.id !== asset.id));
+      setDeleting((current)=>current.filter(item=>item.id!==asset.id));
       setUsage(await getMikkeMediaUsage());
       setMessage("画像を削除しました。");
     } catch (error) {
+      if(!mounted.current)return;
+      void Promise.all([listMikkeMediaAssets(),listDeletingMikkeMediaImages()]).then(([nextAssets,nextDeleting])=>{if(mounted.current){setAssets(nextAssets);setDeleting(nextDeleting);}}).catch(()=>{});
       setMessage(error instanceof Error ? error.message : "画像を削除できませんでした。");
     } finally {
-      setDeletingId(null);
+      if(mounted.current)setDeletingId(null);
     }
+  }
+
+  async function recoverAsset(asset:MikkeMediaAsset){
+    if(uploading)return;
+    setUploading(true);setMessage('');
+    try{const recovered=await recoverMikkeMediaImage(asset.id);if(!mounted.current)return;setPending(items=>items.filter(item=>item.id!==asset.id));setAssets(items=>[recovered,...items.filter(item=>item.id!==asset.id)]);setMessage('画像の保存を確認しました。画像を選んでご利用ください。');}
+    catch(error){if(mounted.current)setMessage(error instanceof Error?error.message:'保存状況を確認できませんでした。');}
+    finally{if(mounted.current)setUploading(false);}
   }
 
   const percent = usage ? Math.min(100, Math.round((usage.usedBytes / usage.maxBytes) * 100)) : 0;
@@ -118,6 +149,8 @@ export function MikkeMediaPicker({ currentUrl, onSelect, sourceApp, compact = fa
           </div>
           <div className="max-h-[52vh] overflow-y-auto p-5">
             {loading ? <div className="grid min-h-44 place-items-center text-sm font-bold text-[var(--mikke-muted)]"><LoaderCircle className="animate-spin" /></div> : assets.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">{assets.map((asset) => <article key={asset.id} className="relative overflow-hidden rounded-xl border border-[var(--mikke-line)] bg-white transition hover:border-[var(--mikke-primary)] hover:shadow-md"><button type="button" onClick={() => { onSelect(asset); setOpen(false); }} className="block w-full text-left"><img src={asset.publicUrl} alt={asset.originalName} loading="lazy" className="aspect-square w-full object-cover" /><span className="block truncate px-3 pt-2 text-xs font-bold text-[var(--mikke-ink)]">{asset.originalName}</span><span className="block px-3 pb-3 pt-1 text-[10px] text-[var(--mikke-muted)]">{formatMediaBytes(asset.byteSize)}・{asset.sourceApp}</span></button><button type="button" onClick={() => void removeAsset(asset)} disabled={deletingId === asset.id || currentUrl === asset.publicUrl} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/95 text-[var(--mikke-danger)] shadow disabled:opacity-35" aria-label={`${asset.originalName}を削除`}>{deletingId === asset.id ? <LoaderCircle size={14} className="animate-spin" /> : <Trash2 size={14} />}</button></article>)}</div> : <div className="grid min-h-44 place-items-center rounded-xl bg-[var(--mikke-surface-soft)] p-6 text-center"><div><Images className="mx-auto text-[var(--mikke-muted)]" /><p className="mt-3 text-sm font-bold">保存済み画像はまだありません</p><p className="mt-1 text-xs text-[var(--mikke-muted)]">最初の画像を追加すると、ここから再利用できます。</p></div></div>}
+            {pending.length>0&&<section className="mt-5 rounded-lg border border-[var(--mikke-line)] p-3" aria-label="保存待ちの画像"><h3 className="text-sm font-semibold">保存待ちの画像</h3><p className="mt-1 text-xs">保存の完了を確認できていない画像です。同じ画像を追加する前に、保存状況をご確認ください。</p><ul>{pending.map(asset=><li key={asset.id} className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="min-w-0 break-all text-xs">{asset.originalName}</span><button type="button" disabled={uploading} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs" onClick={()=>void recoverAsset(asset)}>保存状況を確認</button></li>)}</ul></section>}
+            {deleting.length>0&&<section className="mt-5 rounded-lg border border-[var(--mikke-line)] p-3" aria-label="削除待ちの画像"><h3 className="text-sm font-semibold">削除待ちの画像</h3><p className="mt-1 text-xs">削除の完了を確認できていない画像です。ページには追加できません。</p><ul>{deleting.map(asset=><li key={asset.id} className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="min-w-0 break-all text-xs">{asset.originalName}</span><button type="button" disabled={deletingId===asset.id} className="rounded-lg border border-[var(--mikke-line)] px-3 py-2 text-xs" onClick={()=>void removeAsset(asset)}>もう一度削除する</button></li>)}</ul></section>}
             {message ? <p role="status" className="mt-4 text-xs font-bold text-[var(--mikke-accent)]">{message}</p> : null}
           </div>
         </section>

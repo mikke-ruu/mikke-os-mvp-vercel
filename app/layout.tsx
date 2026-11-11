@@ -28,7 +28,7 @@ export const metadata: Metadata = {
 // lib/page/fonts.ts の既存カタログ・ヘルパーを流用。
 // The isolated Academy runtime works without remote stylesheets. A failed
 // stylesheet can leave React's initial commit waiting during offline review.
-const appFontsCssUrl = process.env.NEXT_PUBLIC_SUPABASE_URL === "http://127.0.0.1:57680"
+const appFontsCssUrl = ["http://127.0.0.1:57680", "http://127.0.0.1:57982"].includes(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "")
   ? "" : buildPageFontsCssUrl(["noto-sans"], ["poppins"]);
 
 export default function RootLayout({

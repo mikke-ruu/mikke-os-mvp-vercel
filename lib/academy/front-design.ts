@@ -5,6 +5,7 @@ export type AcademyFrontDesign = {
   width: "standard" | "wide" | "full";
   hero: "split" | "stack" | "slides" | "hidden";
   slides: { url: string; alt: string }[];
+  visibility?: { name: boolean; logo: boolean; tagline: boolean };
 };
 export const defaultFrontDesign: AcademyFrontDesign = { version: 1, width: "standard", hero: "split", slides: [] };
 // Presentation metadata lives in the existing JSON document. Its empty text
@@ -15,6 +16,7 @@ export function readFrontDocument(blocks: AcademyLpBlock[] = []) {
   const raw = metadata?.academyFrontDesign;
   const design: AcademyFrontDesign = {
     version: 1,
+    visibility: { name: raw?.visibility?.name !== false, logo: raw?.visibility?.logo !== false, tagline: raw?.visibility?.tagline !== false },
     width: raw && ["standard", "wide", "full"].includes(raw.width) ? raw.width : "standard",
     hero: raw && ["split", "stack", "slides", "hidden"].includes(raw.hero) ? raw.hero : "split",
     slides: Array.isArray(raw?.slides) ? raw.slides.filter(slide => typeof slide?.url === "string").map(slide => ({ url: slide.url, alt: typeof slide.alt === "string" ? slide.alt : "" })) : [],

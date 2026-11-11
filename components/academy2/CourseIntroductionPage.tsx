@@ -14,9 +14,9 @@ export function CourseIntroductionPage({id}:{id:string}){
  const [course,setCourse]=useState<CourseIntroduction|null>(null);const [loading,setLoading]=useState(true);const [error,setError]=useState('');const [retry,setRetry]=useState(0);
  useEffect(()=>{let live=true;setLoading(true);setError('');void(async()=>{try{let result:CourseIntroduction|null;
   if(previewHq)result=await getCourseIntroductionPreview(previewHq,id);
-  else result=await getPublicCourseIntroduction(id);
+  else result=await getPublicCourseIntroduction(id,back);
   if(live)setCourse(result);
- }catch(cause){if(live)setError(cause instanceof Error?cause.message:'講座を読み込めませんでした。');}finally{if(live)setLoading(false);}})();return()=>{live=false;};},[id,previewHq,retry]);
+ }catch(cause){if(live)setError(cause instanceof Error?cause.message:'講座を読み込めませんでした。');}finally{if(live)setLoading(false);}})();return()=>{live=false;};},[id,previewHq,back,retry]);
  if(loading)return <main className={styles.message} role="status">講座を読み込み中…</main>;
  if(error)return <main className={styles.message} role="alert"><p>{error}</p><button type="button" onClick={()=>setRetry(value=>value+1)}>もう一度読み込む</button>{back&&<p><Link href={back}>{backLabel}</Link></p>}</main>;
  if(!course)return <main className={styles.message}>この講座の公開情報は見つかりませんでした。{back&&<p><Link href={back}>{backLabel}</Link></p>}</main>;

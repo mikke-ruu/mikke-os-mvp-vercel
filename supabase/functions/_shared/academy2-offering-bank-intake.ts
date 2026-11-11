@@ -40,6 +40,11 @@ async function send(mail: { to: string; subject: string; html: string; idempoten
       && /^http:\/\/(?:127\.0\.0\.1|localhost):57982\/?$/.test(Deno.env.get("SUPABASE_URL") ?? "")) {
     return `local-fake-${mail.idempotencyKey}`;
   }
+  if(Deno.env.get('ACADEMY_LOCAL_CAPTURE')==='true' && ['http://127.0.0.1:57982','http://localhost:57982'].includes((Deno.env.get('SUPABASE_URL')??'').replace(/\/$/,''))){
+    if(!mail.to.endsWith('.invalid'))throw new Error('local_test_recipient_required');
+    const response=await fetch('http://host.docker.internal:57887/capture',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+Deno.env.get('ACADEMY_LOCAL_CAPTURE_KEY')},body:JSON.stringify(mail),signal:AbortSignal.timeout(10000)});
+    const result=await response.json();if(!response.ok||!result.id)throw new Error('local_capture_failed');return result.id;
+  }
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) throw new Error("mail_provider_unavailable");
   const response = await fetch("https://api.resend.com/emails", {
@@ -71,9 +76,12 @@ export async function deliverStoredAcademy2BankMail(
       p_application: application.id, p_user: user.id, p_request: requestId
     });
     if (contentError) throw new Error("stored_receipt_content_unavailable");
+    const {data:v2,error:v2Error}=await admin.rpc('academy2_receipt_v2_content',{p_application:application.id,p_user:user.id,p_request:requestId});
+    if(v2Error&&v2Error.code!=='PGRST202')throw new Error('stored_receipt_v2_unavailable');
     const prepare = application.payment_method === "bank" ? prepareAcademy2BankApplicantMail : prepareAcademy2ExternalApplicantMail;
     const mail = prepare({
-      user, request: { requestToken: requestId, offeringId }, application, offering, headquarters, contentSnapshot
+      user, request: { requestToken: requestId, offeringId }, application, offering, headquarters, contentSnapshot,
+      receiptV2Snapshot:v2, appOrigin:Deno.env.get('ACADEMY_LOCAL_TEST_ORIGIN')||'https://app.mikke-os.com'
     });
     const digest = await sha256(JSON.stringify({ to: mail.to, subject: mail.subject, html: mail.html }));
     const { data: claim, error: claimError } = await admin.rpc("academy2_claim_offering_applicant_mail", {
