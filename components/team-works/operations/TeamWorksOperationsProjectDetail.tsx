@@ -1,5 +1,7 @@
 "use client";
 
+import { teamWorksNavigationDate } from "@/lib/team-works-navigation";
+
 import {
   AlertTriangle,
   ArrowLeft,
@@ -228,7 +230,7 @@ function OperationsProjectDetail({
       <div className="space-y-5">
         <div className="flex flex-wrap items-center gap-3">
           <Link
-            href="/apps/team-works"
+            href={teamWorksNavigationDate(searchParams.get("date")) ? `/apps/team-works?date=${searchParams.get("date")}` : "/apps/team-works"}
             aria-label="本部ダッシュボードへ戻る"
             className="grid h-9 w-9 place-items-center rounded-xl border border-[var(--mikke-line)] bg-white text-[var(--mikke-text)]"
           >
@@ -486,8 +488,9 @@ function ProjectCalendarPanel({
   mutate: (action: () => Promise<void>, successMessage: string) => Promise<void>;
 }) {
   const labels = useTeamWorksLabels();
-  const [monthDate, setMonthDate] = useState(() => new Date());
-  const [selectedDate, setSelectedDate] = useState(() => toDateKey(new Date()));
+  const requestedDate = teamWorksNavigationDate(useSearchParams().get("date"));
+  const [monthDate, setMonthDate] = useState(() => requestedDate ? new Date(`${requestedDate}T00:00:00`) : new Date());
+  const [selectedDate, setSelectedDate] = useState(() => requestedDate ?? toDateKey(new Date()));
   const [adding, setAdding] = useState(false);
   const [startTime, setStartTime] = useState("13:00");
   const [finishTime, setFinishTime] = useState("14:00");

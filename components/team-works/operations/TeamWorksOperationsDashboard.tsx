@@ -1,5 +1,7 @@
 "use client";
 
+import { teamWorksNavigationDate } from "@/lib/team-works-navigation";
+
 import { Clock, Plus } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -37,13 +39,14 @@ export function TeamWorksOperationsDashboard() {
   const searchParams = useSearchParams();
   const labels = useTeamWorksLabels();
 
-  const [monthDate, setMonthDate] = useState<Date>(startOfCurrentMonth);
+  const requestedDate = teamWorksNavigationDate(searchParams.get("date"));
+  const [monthDate, setMonthDate] = useState<Date>(() => requestedDate ? new Date(`${requestedDate.slice(0, 7)}-01T00:00:00`) : startOfCurrentMonth());
   const [data, setData] = useState<OperationsDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(requestedDate);
   const [shiftSubmissions, setShiftSubmissions] = useState<PartnerShiftSubmission[]>([]);
-  const [calendarAutoPositioned, setCalendarAutoPositioned] = useState(false);
+  const [calendarAutoPositioned, setCalendarAutoPositioned] = useState(Boolean(requestedDate));
   // 納品型が1件でもあるかどうかだけの軽い判定。重いloadDeliveryHomeSummary
   // (プロジェクト数×4-5クエリ)はTeamWorksDeliveryDashboard側が自分で読む。
   const [hasDeliveryProjects, setHasDeliveryProjects] = useState(false);

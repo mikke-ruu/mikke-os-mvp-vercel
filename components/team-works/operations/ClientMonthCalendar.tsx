@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getJapanDayOff } from "@/lib/japanese-calendar";
 import { useTeamWorksLabels } from "@/components/team-works/useTeamWorksLabels";
 
@@ -59,6 +59,7 @@ export function ClientMonthCalendar({
   const [monthDate, setMonthDate] = useState(() => {
     const now = new Date();
     const todayKey = toDateKey(now);
+    if (selectedDate && selectedDate !== todayKey) return new Date(`${selectedDate.slice(0, 7)}-01T00:00:00`);
     const currentMonthKey = todayKey.slice(0, 7);
     const upcoming = sessions
       .filter((session) => session.status !== "cancelled" && session.sessionDate >= todayKey)
@@ -70,6 +71,12 @@ export function ClientMonthCalendar({
     }
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  const previousSelectedDate = useRef(selectedDate);
+  useEffect(() => {
+    if (previousSelectedDate.current === selectedDate) return;
+    previousSelectedDate.current = selectedDate;
+    if (selectedDate) setMonthDate(new Date(`${selectedDate.slice(0, 7)}-01T00:00:00`));
+  }, [selectedDate]);
   const calendarDates = useMemo(() => monthCalendarDates(monthDate), [monthDate]);
 
   const projectIds = useMemo(() => [...new Set(sessions.map((session) => session.projectId))], [sessions]);
