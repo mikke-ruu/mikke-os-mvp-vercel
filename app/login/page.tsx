@@ -11,6 +11,7 @@ import { sendWelcomeEmail } from "@/lib/email-delivery";
 import { supabase } from "@/lib/supabase/client";
 
 type AuthMode = "login" | "signup";
+type PendingCodePurpose = "login" | "signup";
 
 type PasswordStrength = {
   level: 0 | 1 | 2;
@@ -93,6 +94,7 @@ function LoginPageContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailUpdatesOptIn, setEmailUpdatesOptIn] = useState(false);
   const [pendingSignupEmail, setPendingSignupEmail] = useState("");
+  const [pendingCodePurpose, setPendingCodePurpose] = useState<PendingCodePurpose>("signup");
   const [confirmationCode, setConfirmationCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [message, setMessage] = useState("");
@@ -119,6 +121,7 @@ function LoginPageContent() {
   function selectMode(nextMode: AuthMode) {
     setMode(nextMode);
     setPendingSignupEmail("");
+    setPendingCodePurpose("signup");
     setConfirmationCode("");
     setMessage("");
   }
@@ -133,14 +136,14 @@ function LoginPageContent() {
     const { data, error } = await supabase.auth.verifyOtp({
       email: pendingSignupEmail,
       token,
-      type: "signup"
+      type: pendingCodePurpose === "login" ? "email" : "signup"
     });
     setLoading(false);
     if (error) {
       setMessage(getJapaneseAuthError(error.message));
       return;
     }
-    if (data.user) {
+    if (pendingCodePurpose === "signup" && data.user) {
       try {
         await saveEmailPreferences(data.user.id, {
           newsletter_enabled: emailUpdatesOptIn,
@@ -162,18 +165,49 @@ function LoginPageContent() {
     if (resendCooldown > 0 || loading) return;
     setLoading(true);
     setMessage("");
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: pendingSignupEmail,
-      options: { emailRedirectTo: `${window.location.origin}${nextPath}` }
-    });
+    const { error } = pendingCodePurpose === "login"
+      ? await supabase.auth.signInWithOtp({
+          email: pendingSignupEmail,
+          options: { shouldCreateUser: false }
+        })
+      : await supabase.auth.resend({
+          type: "signup",
+          email: pendingSignupEmail,
+          options: { emailRedirectTo: `${window.location.origin}${nextPath}` }
+        });
     setLoading(false);
     if (error) {
       setMessage(getJapaneseAuthError(error.message));
       return;
     }
     setResendCooldown(60);
-    setMessage("確認メールをもう一度送りました。迷惑メールフォルダもご確認ください。");
+    setMessage(
+      pendingCodePurpose === "login"
+        ? "ログイン確認番号をもう一度送りました。迷惑メールフォルダもご確認ください。"
+        : "確認メールをもう一度送りました。迷惑メールフォルダもご確認ください。"
+    );
+  }
+
+  async function sendLoginCode() {
+    const address = email.trim().toLowerCase();
+    if (!address || loading) return;
+
+    setLoading(true);
+    setMessage("");
+    const { error } = await supabase.auth.signInWithOtp({
+      email: address,
+      options: { shouldCreateUser: false }
+    });
+    setLoading(false);
+    if (error) {
+      setMessage("確認番号を送れませんでした。メールアドレスをご確認ください。");
+      return;
+    }
+    setPendingCodePurpose("login");
+    setPendingSignupEmail(address);
+    setConfirmationCode("");
+    setPassword("");
+    setResendCooldown(60);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -187,6 +221,7 @@ function LoginPageContent() {
       if (error) {
         if (error.message.toLowerCase().includes("email not confirmed")) {
           setPendingSignupEmail(email);
+          setPendingCodePurpose("signup");
           setResendCooldown(0);
         }
         setMessage(getJapaneseAuthError(error.message));
@@ -226,6 +261,7 @@ function LoginPageContent() {
       return;
     }
     setPendingSignupEmail(email);
+    setPendingCodePurpose("signup");
     setConfirmationCode("");
     setPassword("");
     setResendCooldown(60);
@@ -243,20 +279,26 @@ function LoginPageContent() {
         <section className="self-start rounded-lg border border-[var(--mikke-line)] bg-[var(--mikke-surface)] p-5 shadow-sm sm:p-6 md:self-auto">
           {pendingSignupEmail ? (
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--mikke-accent)]">メールアドレスの確認</p>
-              <h2 className="mt-2 text-xl font-bold text-[var(--mikke-primary)]">確認メールを送りました</h2>
+              <p className="text-xs font-bold uppercase tracking-[0.15em] text-[var(--mikke-accent)]">
+                {pendingCodePurpose === "login" ? "確認番号でログイン" : "メールアドレスの確認"}
+              </p>
+              <h2 className="mt-2 text-xl font-bold text-[var(--mikke-primary)]">
+                {pendingCodePurpose === "login" ? "ログイン確認番号を送りました" : "確認メールを送りました"}
+              </h2>
               <p className="mt-3 text-sm leading-6 text-[var(--mikke-muted)]">
                 <span className="break-all font-bold text-[var(--mikke-text)]">{pendingSignupEmail}</span>
                 <br />
                 迷惑メールフォルダに入ることもあります。
               </p>
-              <p className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-muted)]">
-                ご自分の端末の場合は、次回のログインに備えてパスワードを保存しておくと便利です。
-              </p>
+              {pendingCodePurpose === "signup" ? (
+                <p className="mt-3 rounded-lg bg-[var(--mikke-surface-soft)] px-4 py-3 text-xs leading-5 text-[var(--mikke-muted)]">
+                  ご自分の端末の場合は、次回のログインに備えてパスワードを保存しておくと便利です。
+                </p>
+              ) : null}
 
               <form onSubmit={verifyConfirmationCode} className="mt-5 space-y-4">
                 <label className="block">
-                  <span className="text-sm font-bold text-[var(--mikke-text)]">メールに届いた確認コードを入力してください</span>
+                  <span className="text-sm font-bold text-[var(--mikke-text)]">メールに届いた確認番号を入力してください</span>
                   <input
                     value={confirmationCode}
                     onChange={(event) => setConfirmationCode(event.target.value.replace(/\s/g, ""))}
@@ -276,7 +318,7 @@ function LoginPageContent() {
                 ) : null}
 
                 <button type="submit" disabled={loading || !confirmationCode.trim()} className="w-full rounded-lg bg-[var(--mikke-primary)] px-4 py-3 font-bold text-white disabled:opacity-60">
-                  {loading ? "確認中..." : "確認して続ける"}
+                  {loading ? "確認中..." : pendingCodePurpose === "login" ? "mikkeOSに入る" : "確認して続ける"}
                 </button>
               </form>
 
@@ -286,12 +328,17 @@ function LoginPageContent() {
                 disabled={loading || resendCooldown > 0}
                 className="mt-3 w-full rounded-lg border border-[var(--mikke-line)] bg-white px-4 py-3 text-sm font-bold text-[var(--mikke-primary)] disabled:text-[var(--mikke-muted-light)]"
               >
-                {resendCooldown > 0 ? `もう一度送る（あと${resendCooldown}秒）` : "確認メールをもう一度送る"}
+                {resendCooldown > 0
+                  ? `もう一度送る（あと${resendCooldown}秒）`
+                  : pendingCodePurpose === "login"
+                    ? "確認番号をもう一度送る"
+                    : "確認メールをもう一度送る"}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   setPendingSignupEmail("");
+                  setPendingCodePurpose("signup");
                   setConfirmationCode("");
                   setMessage("");
                 }}
@@ -421,6 +468,27 @@ function LoginPageContent() {
             >
               {loading ? "確認中..." : mode === "login" ? "ログイン" : "新規登録"}
             </button>
+
+            {mode === "login" ? (
+              <>
+                <div className="flex items-center gap-3 text-xs font-semibold text-[var(--mikke-muted-light)]" aria-hidden="true">
+                  <span className="h-px flex-1 bg-[var(--mikke-line)]" />
+                  または
+                  <span className="h-px flex-1 bg-[var(--mikke-line)]" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void sendLoginCode()}
+                  disabled={loading || !email.trim()}
+                  className="w-full rounded-lg border border-[var(--mikke-primary)] bg-white px-4 py-3 font-bold text-[var(--mikke-primary)] disabled:opacity-50"
+                >
+                  確認番号でログイン
+                </button>
+                <p className="text-center text-xs leading-5 text-[var(--mikke-muted)]">
+                  パスワードを入力せず、メールに届く番号でログインできます。
+                </p>
+              </>
+            ) : null}
           </form>
 
           {showMarketNoteGuestEntry ? (
