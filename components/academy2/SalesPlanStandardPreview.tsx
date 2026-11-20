@@ -57,8 +57,8 @@ export function SalesPlanStandardPreview({ draft, courses, onBack, onMode, child
   const priceLabel = amount === null ? '未設定' : `¥${amount.toLocaleString('ja-JP')}`;
   return <section className={styles.workspace}>
     <button type="button" className={styles.back} onClick={onBack}>← 販売プラン「{configuration.title}」へ</button>
-    <div className={styles.headrow}><header className={styles.title}><h1>販売ページの確認</h1><p>お客様に見えるページ全体を確認できます。</p></header><div className={styles.actions}><button type="button" className={styles.button} aria-pressed={mobile} onClick={()=>setMobile(value=>!value)}>{mobile?'PCで確認':'スマホで確認'}</button><button type="button" className={styles.button} onClick={()=>onMode?.('builder')}>← 編集に戻る</button><button type="button" className={`${styles.button} ${styles.save}`} disabled={saving} onClick={()=>void save()}>{saving?'保存中…':'保存'}</button></div></div>
-    <SalesPlanPublicationPanel draft={draft} page={page} onPagePrepared={setPage} onPublished={()=>setEventsRefresh(value=>value+1)}/>
+    <div className={styles.headrow}><header className={styles.title}><h1>販売ページの確認・公開</h1><p>ページを確認したら、下の「この内容で公開する」へ進みます。</p></header><div className={styles.actions}><button type="button" className={styles.button} aria-pressed={mobile} onClick={()=>setMobile(value=>!value)}>{mobile?'PCで確認':'スマホで確認'}</button><button type="button" className={styles.button} onClick={()=>onMode?.('builder')}>← 編集に戻る</button><button type="button" className={`${styles.button} ${styles.save}`} disabled={saving} onClick={()=>void save()}>{saving?'保存中…':'保存'}</button></div></div>
+    <p><a className={styles.button} href="#publication-controls">公開の操作へ進む ↓</a></p>
     {saveError && <p role="alert">{saveError}</p>}
     {page.needs_rebase && <p role="status" className={styles.help}>販売プランが更新されています。内容を確認して保存してください。</p>}
     <div className={styles.two}><div className={styles.previewShell}><div className={styles.browser}><div className={styles.browserbar}><span className={styles.dot}/><span className={styles.dot}/><span className={styles.dot}/><span>販売ページのプレビュー</span></div><div className={isStandardSalesPageV5(page.blocks)?v5Styles.page:`${styles.public} ${presentationStyles.page}`} data-mobile={mobile}>
@@ -67,6 +67,7 @@ export function SalesPlanStandardPreview({ draft, courses, onBack, onMode, child
       <SalesPlanPageContent blocks={page.blocks} courses={courses.filter(course => ids.includes(course.id))} previewHq={draft.headquarters_id} returnHref={`/academy/h/${draft.headquarters_id}/manage/offerings/${draft.id}?preview=standard`}/>
       <SalesPageBottom draft={draft} events={events} eventsError={eventsError} display={readSalesPageDisplay(page.blocks)} standard={isStandardSalesPageV2(page.blocks)} v5={isStandardSalesPageV5(page.blocks)} onFormPreview={()=>setFormPreview(true)}/>
     </div></div></div><aside><section className={styles.summary}><h2>販売プラン</h2><dl><div><dt>名前</dt><dd>{configuration.title}</dd></div><div><dt>講座</dt><dd>{ids.length}講座</dd></div><div><dt>料金</dt><dd>{priceLabel}</dd></div><div><dt>保存</dt><dd>{page.revision===0?'未保存':page.needs_rebase?'更新を確認':'保存済み'}</dd></div></dl></section><section className={styles.summary}><h2>ページを直す</h2><button type="button" className={styles.button} onClick={()=>onMode?.('builder')}>販売ページを編集</button></section></aside></div>
+    <SalesPlanPublicationPanel draft={draft} page={page} disabled={saving} onPagePrepared={setPage} onPublished={()=>setEventsRefresh(value=>value+1)}/>
     {children}<LocalMonthlyReviewEntry draft={draft}/>
     {formPreview && <SalesPlanApplicationPreview headquartersId={draft.headquarters_id} planId={draft.id} configuration={configuration} fields={configuration.application_form?.fields??[]} onClose={()=>setFormPreview(false)}/>}
   </section>;

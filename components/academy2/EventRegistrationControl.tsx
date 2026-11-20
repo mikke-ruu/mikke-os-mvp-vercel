@@ -6,8 +6,9 @@ import {getAcademy2Event,getAcademy2EventRegistrationSource,setAcademy2EventRegi
 import {toAcademyContextHref} from '@/lib/academy/access-context';
 import styles from './event-detail.module.css';
 
+import flowStyles from './publication-flow.module.css';
 const reasonLabels:Record<string,string>={
- plan_not_published:'販売プランはまだ公開されていません。販売ページと初回の公開条件を確認してください。',
+ plan_not_published:'販売ページが未公開です。内容を確認して公開してください。',
  publication_revision_mismatch:'開催と公開済み販売プランの保存版が一致しません。販売条件を確認してください。',
  public_source_unavailable:'本部または販売プランの公開条件を確認してください。',
  event_not_ready:'開催の状態・日時・受講方法を確認してください。',
@@ -35,13 +36,13 @@ export function EventRegistrationControl({headquartersId,event,participantCount=
  }
  return <div className={styles.registration} aria-label="募集の確認と受付">
   <div className={styles.actions} aria-label="関連ページ">{relatedPlanHref?<Link className={styles.textLink} href={relatedPlanHref} onClick={event=>{if(onRelatedNavigate&&!onRelatedNavigate())event.preventDefault();}}>販売プランを確認</Link>:null}{source?.public_path?<Link className={styles.textLink} href={source.public_path} target="_blank" rel="noopener noreferrer">販売ページを確認</Link>:null}</div>
-  <p className={styles.help}>現在：{event.registration_status==='open'?'受付中':event.registration_status==='draft'?'下書き':'受付停止中'}</p>
+  <p className={flowStyles.status}>申込受付：{!enabled?'確認する権限がありません':loading?'確認中…':error||!source?'確認できません':event.status==='cancelled'?'開催中止':event.status==='completed'?'開催終了':source.reasons.includes('plan_not_published')?'募集前（販売ページが未公開）':source.reasons.length||!source.ready?'受付できません（設定の確認が必要）':event.registration_status==='open'?'受付中':event.registration_status==='draft'?'募集前':'受付停止中'}</p>
   {!enabled?<p className={styles.help}>受付の開始・停止は本部責任者が行います。</p>:<>
    {loading?<p role="status" className={styles.help}>募集条件を確認中…</p>:null}
 
 
    {source?.reasons.map(reason=><p key={reason} className={styles.help}>{reasonLabels[reason]??'公開条件を確認してください。'}</p>)}
-   {source?.reasons.includes('plan_not_published')&&event.sales_plan_id?<Link className={styles.btn} href={href(`/academy/offerings/${event.sales_plan_id}?step=6`)}>販売プランの公開前確認へ</Link>:null}
+   {source?.reasons.includes('plan_not_published')&&event.sales_plan_id?<Link className={styles.btn} href={href(`/academy/offerings/${event.sales_plan_id}?preview=standard`)}>販売ページを確認・公開する</Link>:null}
    {['planned','active'].includes(event.status)&&event.revision!==null?<div className={styles.actions}>
     {event.registration_status!=='open'?<button className={`${styles.btn} ${styles.primary}`} disabled={locked||busy||loading||!source?.ready} onClick={()=>setConfirm('open')}>受付を開始する</button>:<button className={styles.btn} disabled={locked||busy||loading} onClick={()=>setConfirm('closed')}>受付を停止する</button>}
    </div>:null}

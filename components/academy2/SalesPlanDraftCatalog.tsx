@@ -44,7 +44,7 @@ export function salesPlanDraftSummary(draft: SalesPlanDraft): string {
 
 export function salesPlanPublicationLabel(publication:SalesPlanPublicationState|undefined){
  if(!publication)return '公開状態は未確認';
- switch(publication.state){case 'published':return publication.has_unpublished_changes?'公開中・未反映の変更あり':'公開中';case 'not_published':return '下書き';case 'archived':return '非公開';case 'unavailable':return '公開状態の確認が必要';default:return '公開状態は未確認';}
+ switch(publication.state){case 'published':return publication.has_unpublished_changes?'公開中・変更は未反映':'公開中';case 'not_published':return '未公開';case 'archived':return '非公開';case 'unavailable':return '公開状態の確認が必要';default:return '公開状態は未確認';}
 }
 function kindLabel(draft:SalesPlanDraft){return draft.configuration.kind==='コース'&&draft.configuration.after?.skill_certification?'認定講座':draft.configuration.kind;}
 function salePrice(draft:SalesPlanDraft){const p=draft.sale_price_snapshot;return yen(p.purchase_mode==='staged'?total(draft.course_snapshot.map(c=>p.stage_prices[c.course_id])):money(p.price)?p.price:null)+(draft.configuration.kind==='月額レッスン'?' / 月':'');}
