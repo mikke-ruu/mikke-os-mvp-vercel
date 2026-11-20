@@ -1,0 +1,17 @@
+'use client';
+import {useEffect,useRef,useState} from 'react';
+import {getHomepageUrlSettings,saveHomepageUrlSettings,homepageUrlHandleValid,homepageUrlPath,type HomepageUrlSettings as Settings} from '@/lib/academy2/homepage-url';
+import styles from './homepage-url-settings.module.css';
+export type HomepageUrlApi={get:typeof getHomepageUrlSettings;save:typeof saveHomepageUrlSettings};
+const defaultApi:HomepageUrlApi={get:getHomepageUrlSettings,save:saveHomepageUrlSettings};
+export function HomepageUrlSettings({oneTime=false,headquartersId,disabled=false,api=defaultApi,onChanged}:{oneTime?:boolean;headquartersId:string;disabled?:boolean;api?:HomepageUrlApi;onChanged?:(value:Settings)=>void}){
+ const [current,setCurrent]=useState<Settings|null>(null),[handle,setHandle]=useState(''),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState(''),[retry,setRetry]=useState(0),[uncertain,setUncertain]=useState(false);
+ const lock=useRef(false),scope=useRef(headquartersId);scope.current=headquartersId;
+ useEffect(()=>{let active=true;setCurrent(null);setHandle('');setBusy(false);setLoading(true);setError('');setMessage('');api.get(headquartersId).then(value=>{if(active){setCurrent(value);setHandle(value.preferredHandle);setUncertain(false);}}).catch(cause=>{if(active)setError(cause instanceof Error?cause.message:'URLの設定を確認できませんでした。');}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[headquartersId,api,retry]);
+ async function save(){if(lock.current||!current||!current.canEdit||disabled||uncertain||!homepageUrlHandleValid(handle.trim().toLowerCase()))return;if(oneTime&&!window.confirm('このURL名で確定しますか？保存後は変更できません。'))return;const hq=headquartersId;lock.current=true;setBusy(true);setError('');setMessage('');
+  try{const saved=await api.save(hq,current,handle);if(scope.current!==hq)return;setCurrent(saved);setHandle(saved.preferredHandle);setMessage('URL名を保存しました。以前のURLも引き続き使えます。');onChanged?.(saved);}
+  catch(cause){if(scope.current===hq){setUncertain(true);setError(cause instanceof Error?cause.message:'保存結果を確認できませんでした。');}}
+  finally{lock.current=false;if(scope.current===hq)setBusy(false);}
+ }
+ return <section className={styles.box} aria-label="ホームページのURL"><h2>ホームページのURL</h2>{loading?<p role="status">URLを確認中…</p>:current&&<><p className={styles.url}>{typeof window==='undefined'?'':window.location.origin}{homepageUrlPath(current.preferredHandle)}</p><label htmlFor="academy-homepage-url-name">URL名{oneTime?'（一度だけ設定できます）':''}</label><div className={styles.inputRow}><span aria-hidden="true">/academy/site/</span><input id="academy-homepage-url-name" autoCapitalize="none" autoComplete="off" spellCheck={false} value={handle} disabled={disabled||busy||!current.canEdit||uncertain} onChange={e=>{setHandle(e.target.value);setMessage('');}} maxLength={40}/></div><p>半角英数字・ハイフン・アンダーバーで3〜40文字。以前のURLも引き続き使えます。</p><div className={styles.actions}><button type="button" disabled={disabled||busy||uncertain||!current.canEdit||handle.trim().toLowerCase()===current.preferredHandle||!homepageUrlHandleValid(handle.trim().toLowerCase())} onClick={()=>void save()}>{busy?'保存中…':'URL名を保存'}</button></div>{!current.canEdit&&<p>{oneTime?'URL名は設定済みです。':'本部の基本情報を変更できる担当者が設定します。'}</p>}</>}{message&&<p role="status">{message}</p>}{error&&<div role="alert"><p>{error}</p><button type="button" disabled={busy} onClick={()=>setRetry(n=>n+1)}>保存状態を再確認</button></div>}</section>;
+}

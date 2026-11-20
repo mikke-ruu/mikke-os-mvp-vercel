@@ -1,3 +1,4 @@
+import {receiptV2} from './academy2-receipt-v2.mjs';
 import { renderHtmlBody, MAIL_SUBJECTS } from './offering-mail-content.mjs';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -7,7 +8,7 @@ const escape = value => String(value).replace(/[&<>"']/g, char => ({ '&':'&amp;'
 
 // Version 1 is immutable. A retry uses the accepted application's URL and body,
 // never today's plan/settings. Following a payment link does not confirm payment.
-export function prepareAcademy2ExternalApplicantMail({ user, request, application, offering, headquarters, contentSnapshot }) {
+export function prepareAcademy2ExternalApplicantMail({ user, request, application, offering, headquarters, contentSnapshot, receiptV2Snapshot = null, appOrigin = 'https://app.mikke-os.com' }) {
   if (!user || !uuid.test(user.id) || !user.email_confirmed_at || !email.test(normalize(user.email))) throw Error('verified_applicant_required');
   if (!request || !uuid.test(request.requestToken) || !uuid.test(request.offeringId)) throw Error('invalid_intake_request');
   if (!application || !uuid.test(application.id) || !uuid.test(application.headquarters_id)) throw Error('stored_application_required');
@@ -16,6 +17,12 @@ export function prepareAcademy2ExternalApplicantMail({ user, request, applicatio
   if (!headquarters || headquarters.id !== application.headquarters_id) throw Error('headquarters_mismatch');
   const recipient = normalize(application.applicant_email);
   if (!email.test(recipient) || recipient !== normalize(user.email)) throw Error('applicant_email_mismatch');
+  if(receiptV2Snapshot){
+    if(application.currency!=='JPY'||!Number.isSafeInteger(application.price)||application.price<0||typeof application.applicant_name!=='string'||!application.applicant_name.trim()||typeof application.offering_title!=='string'||!application.offering_title.trim())throw Error('stored_application_invalid');
+    if(receiptV2Snapshot.rendering_version!==2 || receiptV2Snapshot.method!==application.payment_method || receiptV2Snapshot.price!==application.price || receiptV2Snapshot.name!==application.applicant_name || receiptV2Snapshot.title!==application.offering_title)throw Error('receipt_snapshot_mismatch');
+    const mail=receiptV2(receiptV2Snapshot,appOrigin);
+    return {to:recipient,subject:mail.subject,html:mail.html,idempotencyKey:`academy-offering-application-${application.id}-applicant`};
+  }
   if (!contentSnapshot || contentSnapshot.rendering_version !== 1) throw Error('unsupported_receipt_version');
   const sourceUrl = contentSnapshot.external_payment_url;
   if (typeof sourceUrl !== 'string' || /[\s\u0000-\u001f\u007f]/u.test(sourceUrl)) throw Error('external_instruction_unavailable');

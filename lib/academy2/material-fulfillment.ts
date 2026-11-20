@@ -4,16 +4,16 @@ import type {Academy2EventDetail,Academy2EventInput} from './operations';
 export type MaterialMethod='none'|'venue_handover'|'learner_shipping'|'designated_shipping';
 export type MaterialDestination={recipient_name:string;postal_code:string;address:string};
 export type MaterialFulfillment={method:MaterialMethod;revision?:number;destination?:MaterialDestination|null;status?:'not_required'|'preparing'|'shipped';shipped_at?:string|null;tracking_number?:string|null};
-export const materialMethodLabels:Record<MaterialMethod,string>={none:'物品なし',venue_handover:'当日、会場で手渡し',learner_shipping:'受講者本人へ事前発送',designated_shipping:'会場・担当者など指定先へ発送'};
+export const materialMethodLabels:Record<MaterialMethod,string>={none:'教材・材料なし',venue_handover:'当日、会場で手渡し',learner_shipping:'受講者本人へ事前発送',designated_shipping:'会場・担当者など指定先へ発送'};
 async function call<T>(name:string,args:Record<string,unknown>):Promise<T>{
  const {data,error}=await supabase.rpc(name,args).abortSignal(AbortSignal.timeout(15000));
  if(error){
   const messages:Record<string,string>={
    academy2_invalid_destination:'指定先の宛名・郵便番号・住所を確認してください。',
    academy2_unused_destination:'この受け渡し方法では指定先住所を保存しません。受け渡し方法を確認してください。',
-   academy2_invalid_fulfillment:'講座の物品設定と、開催方法・受け渡し方法の組み合わせを確認してください。',
-   academy2_fulfillment_locked:'受付中または申込済みの開催では、物品の受け渡し条件を変更できません。',
-   academy2_materials_version_required:'販売プランの物品設定を確認してください。旧設定は講座・販売プランの詳細画面で確認できます。',
+   academy2_invalid_fulfillment:'講座の教材・材料の設定と、開催方法・受け渡し方法の組み合わせを確認してください。',
+   academy2_fulfillment_locked:'受付中または申込済みの開催では、教材・材料の受け渡し条件を変更できません。',
+   academy2_materials_version_required:'販売プランの教材・材料の設定を確認してください。旧設定は講座・販売プランの詳細画面で確認できます。',
    academy2_invalid_event:'開催名・日時・定員・受講方法・オンライン参加URLを確認してください。',
    academy2_invalid_event_field:'現在の保存契約に対応していない開催項目が含まれています。',
    academy2_invalid_event_field_type:'開催日時と定員などの入力形式を確認してください。',

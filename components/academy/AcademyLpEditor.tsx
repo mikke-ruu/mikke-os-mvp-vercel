@@ -1,7 +1,7 @@
 "use client";
 import type { ComponentType, ReactNode } from "react";
 
-import { LpCanvas } from "@/components/mikkeos/page-builder/LpCanvas";
+import { LpCanvas, type LpCanvasPresentation } from "@/components/mikkeos/page-builder/LpCanvas";
 import { LpDesignFields } from "@/components/mikkeos/page-builder/LpDesign";
 import { LpGalleryFields } from "@/components/mikkeos/page-builder/LpGalleryFields";
 import { LpRichWriting } from "@/components/mikkeos/page-builder/LpRichWriting";
@@ -28,8 +28,8 @@ function LinkEditor({ block, onChange }: { block: LpBlock; onChange: (block: LpB
 
 // Keep the existing HQ JSON field and its versioned, legacy-compatible payload.
 // This editor never owns publication, tenant identity, or payment configuration.
-export function AcademyLpEditor({ blocks, onChange, title, previewMaxWidth, pageHeader, ImagePicker = AcademyLpImagePicker }: { blocks: AcademyLpBlock[]; onChange: (blocks: AcademyLpBlock[]) => void; title: string; previewMaxWidth?: number | string; pageHeader?: ReactNode; ImagePicker?: ComponentType<ContentImagePickerProps> }) {
-  return <LpCanvas allowMediaParts presentation={{ className: builderStyles.builder, minimumFontSize: 14, stackBreakpoint: 900, inlineInspector: true, selectFirst: true }} hidePageTitle pageHeader={pageHeader} extraTemplates={[{ label: "動画", description: "YouTubeの動画を表示", create: () => ({id: crypto.randomUUID(), type: "video", url: ""}) }, {label: "区切り線", description: "内容の間に線を入れる", create: () => ({id: crypto.randomUUID(), type: "divider"})}, {label: "画像スライド", description: "複数の画像を切り替えて表示", create: () => ({id: crypto.randomUUID(), type: "gallery", images: [], lp: {slideshow: true}})}]} previewMaxWidth={previewMaxWidth} title={title} pageLabel="ホームページの本文" blocks={academyContent(blocks)} onChange={next => onChange(saveAcademyLpContent(blocks, next))}
+export function AcademyLpEditor({ blocks, onChange, title, previewMaxWidth, pageHeader, ImagePicker = AcademyLpImagePicker, onPreview, desktopViewportWidth, renderPage }: { renderPage?: LpCanvasPresentation['renderPage']; blocks: AcademyLpBlock[]; onChange: (blocks: AcademyLpBlock[]) => void; title: string; previewMaxWidth?: number | string; onPreview?: () => void; desktopViewportWidth?: number; pageHeader?: ReactNode; ImagePicker?: ComponentType<ContentImagePickerProps> }) {
+  return <LpCanvas allowMediaParts presentation={{ sectionLabel:"内容",inlineTextEditing:false,renderPage, onPreview, desktopViewportWidth, className: builderStyles.builder, minimumFontSize: 14, stackBreakpoint: 900, inlineInspector: true, selectFirst: true }} hidePageTitle pageHeader={pageHeader} extraTemplates={[{ label: "動画", description: "YouTubeの動画を表示", create: () => ({id: crypto.randomUUID(), type: "video", url: ""}) }, {label: "区切り線", description: "内容の間に線を入れる", create: () => ({id: crypto.randomUUID(), type: "divider"})}, {label: "画像スライド", description: "複数の画像を切り替えて表示", create: () => ({id: crypto.randomUUID(), type: "gallery", images: [], lp: {slideshow: true}})}]} previewMaxWidth={previewMaxWidth} title={title} pageLabel="ホームページの本文" blocks={academyContent(blocks)} onChange={next => onChange(saveAcademyLpContent(blocks, next))}
     renderContent={items => <AcademyLpRenderer blocks={items}/>}
     renderFields={(block, change, tab) => {
       if (block.type === "cta") return <LpButtonFields block={block} onChange={change} tab={tab}/>;

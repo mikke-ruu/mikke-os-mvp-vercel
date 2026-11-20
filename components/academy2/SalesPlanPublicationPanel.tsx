@@ -1,72 +1,44 @@
 'use client';
-
 import {useEffect,useRef,useState} from 'react';
 import {useAcademy2Headquarters} from './HeadquartersBoundary';
-import {listAcademy2Events,type Academy2EventSummary} from '@/lib/academy2/operations';
-import {getPlanPublicationReadiness,getFirstPublicationState,publishExistingHeadquartersPlan,publicationReason,type FirstPublicationState,type PublicationReadiness,type PlanPublication,type PublicationInput} from '@/lib/academy2/plan-publication';
-import {toAcademyContextHref} from '@/lib/academy/access-context';
-import type {SalesPlanDraft} from '@/lib/academy2/sales-plan-drafts';
 import {getSalesPage,saveSalesPage,type SalesPageDraft} from '@/lib/academy2/sales-pages';
+import {getSalesPagePublicationReadiness,publishSalesPage,unpublishSalesPage,getSalesPagePublicationStatus,publicationReason,type SalesPagePublicationReadiness,type SalesPagePublicationStatus} from '@/lib/academy2/plan-publication';
+import type {SalesPlanDraft} from '@/lib/academy2/sales-plan-drafts';
 import {prepareSalesPageForPublication} from '@/lib/academy2/prepare-sales-page-publication';
-import styles from './headquarters-settings.module.css';
-
-export function SalesPlanPublicationPanel({draft,page,onPagePrepared,onPublished}:{draft:SalesPlanDraft;page:SalesPageDraft;onPagePrepared?:(page:SalesPageDraft)=>void;onPublished?:()=>void}){
- const hq=useAcademy2Headquarters();
- const [events,setEvents]=useState<Academy2EventSummary[]|null>(null),[eventId,setEventId]=useState('');
- const [check,setCheck]=useState<PublicationReadiness|null>(null),[result,setResult]=useState<PlanPublication|null>(null);
- const [error,setError]=useState(''),[busy,setBusy]=useState(false),[refresh,setRefresh]=useState(0);
- const attempt=useRef<{key:string;id:string}|null>(null);
- const [uncertain,setUncertain]=useState(false);
- const publishing=useRef(false);
- const [phase,setPhase]=useState<'saving'|'publishing'|null>(null);
- const [first,setFirst]=useState<FirstPublicationState|null>(null);
- const materialsOnly=draft.configuration.study_style==='materials_only';
- const deferredFeatures=!['ワークショップ','単品講座','コース'].includes(draft.configuration.kind)||Boolean(draft.configuration.after?.skill_certification||draft.configuration.after?.instructor_license||draft.configuration.after?.certificate?.kind==='certification');
- const canPublish=hq?.role==='administrator';
- useEffect(()=>{if(!canPublish)return;let live=true;getFirstPublicationState(draft.headquarters_id).then(value=>{if(live)setFirst(value);}).catch(()=>{if(live)setFirst(null);});return()=>{live=false;};},[canPublish,draft.headquarters_id,refresh]);
- useEffect(()=>{if(!canPublish)return;let current=true;setEvents(null);setError('');listAcademy2Events(draft.headquarters_id).then(rows=>{if(current)setEvents(rows.filter(row=>row.sales_plan_id===draft.id));}).catch(cause=>{if(current)setError(cause.message);});return()=>{current=false;};},[canPublish,draft.headquarters_id,draft.id,refresh]);
- const selected=materialsOnly?undefined:events?.find(row=>row.id===eventId);
- const input:PublicationInput={headquartersId:draft.headquarters_id,planId:draft.id,planRevision:draft.revision,pageRevision:page.revision,eventId:selected?.id??null,eventRevision:selected?.revision??null};
- const key=JSON.stringify(input);
- useEffect(()=>{if(!canPublish||!events)return;let current=true;setCheck(null);setError('');getPlanPublicationReadiness(JSON.parse(key) as PublicationInput).then(value=>{if(current)setCheck(value);}).catch(cause=>{if(current)setError(cause.message);});return()=>{current=false;};},[canPublish,events,key,refresh]);
- const ready=!deferredFeatures&&!!check&&(check.ready||(first?.consented===true&&first.phase==='prepared'&&check.reasons.every(reason=>reason==='existing_public_contract_required')));
- const planStep=(reason:string)=>reason==='application_terms_required'?5:reason==='title_or_price_required'||reason==='bank_only_bridge'?3:reason==='teaching_method_required'?2:reason==='six_step_review_settings_pending'?1:null;
- const planHref=(step:number)=>toAcademyContextHref(`/academy/offerings/${draft.id}`,draft.headquarters_id,'manage')+`?step=${step}`;
- async function publish(){
-  if(publishing.current||busy||!ready)return;
-  publishing.current=true;setBusy(true);setError('');let publicationStarted=false;
-  try{
-   setPhase('saving');
-   const prepared=await prepareSalesPageForPublication({page,planRevision:draft.revision,
-    read:()=>getSalesPage(draft.headquarters_id,draft.id),
-    save:blocks=>saveSalesPage(draft.headquarters_id,draft.id,0,draft.revision,blocks)});
-   onPagePrepared?.(prepared);
-   const preparedInput={...input,pageRevision:prepared.revision};
-   const verifiedCheck=await getPlanPublicationReadiness(preparedInput);
-   const verifiedReady=verifiedCheck.ready||(first?.consented===true&&first.phase==='prepared'&&verifiedCheck.reasons.every(reason=>reason==='existing_public_contract_required'));
-   if(!verifiedReady){setCheck(verifiedCheck);throw new Error(verifiedCheck.reasons.map(publicationReason).join(' '));}
-   const preparedKey=JSON.stringify(preparedInput);
-   if(!attempt.current||attempt.current.key!==preparedKey)attempt.current={key:preparedKey,id:crypto.randomUUID()};
-   setPhase('publishing');publicationStarted=true;
-   const value=await publishExistingHeadquartersPlan(preparedInput,attempt.current.id);setResult(value);setUncertain(false);onPublished?.();
-  }catch(cause){setError(cause instanceof Error?cause.message:'募集公開の結果を確認できませんでした。');if(publicationStarted)setUncertain(true);}
-  finally{publishing.current=false;setBusy(false);setPhase(null);}
+import {toAcademyContextHref} from '@/lib/academy/access-context';
+import {publicationFix} from '@/lib/academy2/publication-navigation';
+import {PublicationChecklist} from './PublicationChecklist';
+import styles from './publication-flow.module.css';
+import {EventFirstIntake} from './EventFirstIntake';
+export const informationPageApi={readiness:getSalesPagePublicationReadiness,publish:publishSalesPage,hide:unpublishSalesPage,status:getSalesPagePublicationStatus,readPage:getSalesPage,savePage:saveSalesPage};
+export type InformationPageApi=typeof informationPageApi;
+type Props={draft:SalesPlanDraft;page:SalesPageDraft;disabled?:boolean;onPagePrepared?:(page:SalesPageDraft)=>void;onPublished?:()=>void;onPreview?:()=>void;onAddEvent?:()=>void};
+export function SalesPlanPublicationPanel(props:Props){const hq=useAcademy2Headquarters();return <SalesPagePublicationControls {...props} canPublish={hq?.role==='administrator'}/>;}
+/** Publication changes the information page only. This control never starts intake. */
+export function SalesPagePublicationControls({draft,page,disabled=false,onPagePrepared,onPublished,onPreview,onAddEvent,canPublish,api=informationPageApi}:Props&{canPublish:boolean;api?:InformationPageApi}){
+ const [check,setCheck]=useState<SalesPagePublicationReadiness|null>(null),[status,setStatus]=useState<SalesPagePublicationStatus|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[uncertain,setUncertain]=useState(false),[refresh,setRefresh]=useState(0),[message,setMessage]=useState('');
+ const flight=useRef(false),attempt=useRef<{id:string;signature:string}|null>(null);
+ const input={headquartersId:draft.headquarters_id,planId:draft.id,planRevision:draft.revision,pageRevision:page.revision};const key=JSON.stringify(input);
+ useEffect(()=>{let live=true;setCheck(null);setStatus(null);setError('');Promise.all([api.readiness(JSON.parse(key)),api.status(draft.headquarters_id,draft.id)]).then(([ready,current])=>{if(live){setCheck(ready);setStatus(current);}}).catch(cause=>{if(live)setError(cause instanceof Error?cause.message:'公開状態を確認できませんでした。');});return()=>{live=false;};},[key,api,refresh,draft.headquarters_id,draft.id]);
+ async function act(visible:boolean){if(flight.current||busy||uncertain||disabled||!canPublish||!status||(visible&&!check?.ready))return;
+  if(!visible&&!window.confirm('ページを非公開にします。既存の申込・受講記録は残ります。よろしいですか？'))return;
+  flight.current=true;setBusy(true);setError('');setMessage('');let sent=false;
+  try{const prepared=visible?await prepareSalesPageForPublication({page,planRevision:draft.revision,read:()=>api.readPage(draft.headquarters_id,draft.id),save:blocks=>api.savePage(draft.headquarters_id,draft.id,0,draft.revision,blocks)}):page;
+   onPagePrepared?.(prepared);const preparedInput={...input,pageRevision:prepared.revision};if(visible){const ready=await api.readiness(preparedInput);if(!ready.ready){setCheck(ready);throw new Error('公開前の設定を確認してください。');}}
+   const signature=JSON.stringify({preparedInput,visible});if(attempt.current?.signature!==signature)attempt.current={id:crypto.randomUUID(),signature};sent=true;
+   const result=await (visible?api.publish:api.hide)(preparedInput,attempt.current.id);
+   const verified=await api.status(draft.headquarters_id,draft.id);
+   if(verified.state!==(visible?'published':'unpublished')||verified.plan_revision!==result.plan_revision||verified.page_revision!==result.page_revision)throw new Error('公開結果を照合できませんでした。再送せず状態を確認してください。');
+   setStatus(verified);setMessage(visible?'販売ページを公開しました。申込受付の状態は変更していません。':'ページを非公開にしました。');attempt.current=null;onPublished?.();
+  }catch(cause){setError(cause instanceof Error?cause.message:'結果を確認できませんでした。');if(sent)setUncertain(true);}finally{setBusy(false);flight.current=false;}
  }
- if(!canPublish)return <p className={styles.note}>募集公開は本部運営担当が行います。</p>;
- return <section className={`${styles.card} ${styles.publication}`} aria-label="募集公開">
-  <h2>募集公開</h2>
-  {deferredFeatures&&<p role="alert" className={styles.note}>この販売プランには、今回の公開範囲に含まれない販売タイプまたは認定・講師の設定が保存されています。設定値は保持していますが、新たに募集を公開できません。</p>}
-  {!materialsOnly&&<div className={styles.field}><label>募集する開催<select value={eventId} disabled={busy||uncertain||!!result} onChange={event=>{setEventId(event.target.value);setResult(null);attempt.current=null;}}><option value="">開催を選んでください</option>{events?.map(event=><option value={event.id} key={event.id}>{event.title}（{event.schedule_mode==='arranged_after_application'?'申込後に日程相談':event.starts_at?new Date(event.starts_at).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo'}):'日時未設定'}）</option>)}</select></label></div>}
-  {!result&&!materialsOnly&&<a className={styles.linkRow} href={toAcademyContextHref('/academy/classes/new',draft.headquarters_id,'manage')+`?plan=${encodeURIComponent(draft.id)}`}>この販売プランの開催を作る →</a>}
-  {materialsOnly&&<p className={styles.help}>レッスン教材のみのため、開催の登録は不要です。</p>}
-  {!check&&!error&&!result&&<p role="status" className={styles.help}>公開条件を確認しています…</p>}
-  {check&&!result&&<>
-   <div className={styles.actions}><button className={styles.btn} disabled={busy||uncertain} onClick={()=>setRefresh(value=>value+1)}>条件を再確認</button><button className={`${styles.btn} ${styles.orange}`} disabled={busy||!ready} onClick={()=>void publish()}>{busy?(phase==='saving'?'販売ページを保存・確認中…':'公開処理中…'):uncertain?'公開結果を確認中':'募集を公開する'}</button></div>
-   {!ready&&check.reasons.length>0&&<div className={styles.note}><strong>公開前に確認すること</strong><ul>{check.reasons.map(reason=><li key={reason}>{publicationReason(reason)} {planStep(reason)&&<a href={planHref(planStep(reason)!)}>設定へ →</a>}{reason==='event_required'&&<a href={toAcademyContextHref('/academy/classes/new',draft.headquarters_id,'manage')+`?plan=${encodeURIComponent(draft.id)}`}>開催を作る →</a>}</li>)}</ul></div>}
-   <p className={styles.help}>{first?.phase==='no_operating_fee'?'Academy運営利用料は当面かかりません。':first?.consented&&first.phase==='prepared'?'この契約では初回公開から7日間の無料期間が始まります。':'現在の利用契約は変更されません。'}</p>
-   {check.reasons.includes('existing_public_contract_required')&&first?.phase!=='no_operating_fee'&&!first?.consented&&<a className={styles.linkRow} href={toAcademyContextHref('/academy/settings',draft.headquarters_id,'manage')}>利用契約を確認する →</a>}
-  </>}
-  {result&&<><p className={styles.note} role="status">募集を公開しました。</p><a className={styles.linkRow} href={result.public_path}>公開ページと申込フォームを確認する</a></>}
-  {error&&<p role="alert" className={styles.error}>{error}</p>}
+ const href=(path:string)=>toAcademyContextHref(path,draft.headquarters_id,'manage');
+ const tasks=check?.reasons.map(reason=>{const fix=publicationFix(reason,draft.headquarters_id,draft.id);return {key:reason,label:publicationReason(reason),href:fix?.href,actionLabel:fix?.label};})??[];
+ return <section id="publication-controls" className={[styles.card,styles.preparation].join(" ")} aria-label="販売ページの公開操作"><h2>販売ページを確認して公開</h2><p className={styles.status}>ページ：{!status?'確認中':status.state==='published'?'公開中'+(status.has_unpublished_changes?'・変更未反映':''):status.state==='unpublished'?'非公開':'未公開'}</p>
+ {!canPublish&&<p>公開操作は本部運営担当が行います。</p>}{disabled&&<p>変更を保存してから公開してください。</p>}{check&&tasks.length>0&&<PublicationChecklist tasks={tasks}/>}
+ <div className={styles.actions}>{onPreview&&<button className={styles.button} type="button" disabled={busy} onClick={onPreview}>お客様に見えるページを開く</button>}<button className={styles.primary} type="button" disabled={!canPublish||busy||uncertain||disabled||!check?.ready||!status} onClick={()=>void act(true)}>{busy?'反映を確認中…':status?.state==='published'?'変更を反映':'販売ページを公開する'}</button>{status?.state==='published'&&<button type="button" className={styles.button} disabled={!canPublish||busy||uncertain||disabled} onClick={()=>void act(false)}>非公開にする</button>}{error&&<button type="button" className={styles.button} disabled={busy} onClick={()=>setRefresh(v=>v+1)}>状態を再確認</button>}</div>
+ {status?.state==='published'&&status.public_path&&<><p className="text-sm">公開中の内容です。保存しただけでは、このページは変わりません。</p><div className={styles.actions}><a target="_blank" rel="noopener noreferrer" className="min-h-11 inline-flex items-center text-sm underline" href={status.public_path}>現在公開中のページを開く ↗</a>{draft.configuration.study_style!=='materials_only'&&(onAddEvent?<button type="button" className={styles.primary} disabled={disabled||busy||uncertain} onClick={onAddEvent}>このプランの開催日程を追加する</button>:<a className={styles.primary} href={href('/academy/create?plan='+draft.id+'&tab=event')}>このプランの開催日程を追加する</a>)}</div></>}
+ {canPublish&&status?.state==='published'&&draft.configuration.study_style==='materials_only'&&api===informationPageApi&&<EventFirstIntake headquartersId={draft.headquarters_id} planId={draft.id} locked={busy||disabled||uncertain} onReload={()=>setRefresh(v=>v+1)} onBusyChange={setBusy}/>}
+ {message&&<p role="status">{message}</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}{uncertain&&<p role="alert">結果が不明なため、再実行を停止しています。公開状態と保存履歴の照合が必要です。</p>}
  </section>;
 }

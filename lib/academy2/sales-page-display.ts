@@ -37,3 +37,9 @@ export function withSalesPageDisplay(blocks: LpBlock[], display: SalesPageDispla
     lp: { salesDisplay: display },
   }];
 }
+
+/** Customer course pages use the current heading until a custom label is saved. */
+export function readCoursePageDisplay(blocks:LpBlock[]):SalesPageDisplay {
+ const display=readSalesPageDisplay(blocks);
+ return blocks.some(block=>block.id===salesPageDisplayId)?display:{...display,priceHeading:'受講のご案内'};
+}

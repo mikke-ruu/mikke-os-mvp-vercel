@@ -1,0 +1,12 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {getHeadquartersTeaching,type HeadquartersTeachingEvent} from '@/lib/academy2/headquarters-teaching';
+import styles from './headquarters-settings.module.css';
+import teaching from './headquarters-teaching.module.css';
+const when=(v:string|null)=>v?new Date(v).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'日程は個別にご案内します';
+export function HeadquartersTeaching({headquartersId}:{headquartersId:string}){
+ const [events,setEvents]=useState<HeadquartersTeachingEvent[]|null>(null),[error,setError]=useState(''),[retry,setRetry]=useState(0);
+ useEffect(()=>{let live=true;setEvents(null);setError('');getHeadquartersTeaching(headquartersId).then(v=>{if(live)setEvents(v);}).catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[headquartersId,retry]);
+ useEffect(()=>{const refresh=()=>setRetry(v=>v+1);window.addEventListener('focus',refresh);return()=>window.removeEventListener('focus',refresh);},[]);
+ return <main className={styles.wrap} style={{maxWidth:1000,margin:'0 auto',padding:'24px 16px'}}><h1 style={{fontSize:22,marginBottom:12}}>担当する開催</h1><p className={styles.help}>本部で担当者に設定された開催を確認できます。</p>{error?<p role="alert">{error} <button className={styles.btn} onClick={()=>setRetry(v=>v+1)}>再読み込み</button></p>:!events?<p role="status">読み込んでいます…</p>:events.length===0?<section className={styles.card}>担当する開催はまだありません。本部の運営担当者が開催の担当者を設定すると、ここに表示されます。</section>:events.map(event=><section key={event.id} className={styles.card} style={{marginTop:16}}><h2>{event.title}</h2><dl className={teaching.facts}><div><dt>開催日時</dt><dd>{when(event.startsAt)}{event.endsAt?' 〜 '+when(event.endsAt):''}</dd></div><div><dt>受講方法</dt><dd>{event.format==='online'?'オンライン':event.venueName||'対面'}</dd></div><div><dt>開催状況</dt><dd>{({planned:'開催予定',active:'開催中',completed:'開催終了',cancelled:'中止'} as Record<string,string>)[event.status]??'本部にご確認ください'}</dd></div></dl>{event.meetingUrl&&/^https?:\/\//i.test(event.meetingUrl)&&<div className={teaching.meeting}><a className={styles.btn} href={event.meetingUrl} target="_blank" rel="noopener noreferrer">オンライン会場を開く ↗</a></div>}<details><summary>参加者 {event.participants.length}名</summary>{event.participants.length?<ul>{event.participants.map((person,index)=><li key={index}>{person.name}</li>)}</ul>:<p>参加者はまだいません。</p>}</details></section>)}</main>;
+}

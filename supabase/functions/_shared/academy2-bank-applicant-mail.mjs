@@ -1,3 +1,4 @@
+import {receiptV2} from './academy2-receipt-v2.mjs';
 // Offline candidate only. The existing offering intake RPC remains the application creator.
 // This module has no database, Auth, network, or mail-provider side effects.
 import {renderHtmlBody, MAIL_SUBJECTS} from './offering-mail-content.mjs';
@@ -11,7 +12,7 @@ const safeParagraph = value => safeHtml(value).replaceAll(/\r\n|\r|\n/g, '<br />
  * Accept only a persisted bank application belonging to the verified caller.
  * The Edge handler must obtain all three rows server-side after the authenticated RPC succeeds.
  */
-export function prepareAcademy2BankApplicantMail({ user, request, application, offering, headquarters, contentSnapshot = null }) {
+export function prepareAcademy2BankApplicantMail({ user, request, application, offering, headquarters, contentSnapshot = null, receiptV2Snapshot = null, appOrigin = 'https://app.mikke-os.com' }) {
   if (!user || !uuid.test(user.id) || !user.email_confirmed_at || !email.test(normalizedEmail(user.email))) throw new Error('verified_applicant_required');
   if (!request || !uuid.test(request.requestToken) || !uuid.test(request.offeringId)) throw new Error('invalid_intake_request');
   if (!application || !uuid.test(application.id) || !uuid.test(application.headquarters_id)) throw new Error('stored_application_required');
@@ -20,6 +21,12 @@ export function prepareAcademy2BankApplicantMail({ user, request, application, o
   if (!headquarters || headquarters.id !== application.headquarters_id) throw new Error('headquarters_mismatch');
   const recipient = normalizedEmail(application.applicant_email);
   if (!email.test(recipient) || recipient !== normalizedEmail(user.email)) throw new Error('applicant_email_mismatch');
+  if(receiptV2Snapshot){
+    if(application.currency!=='JPY'||!Number.isSafeInteger(application.price)||application.price<0||typeof application.applicant_name!=='string'||!application.applicant_name.trim()||typeof application.offering_title!=='string'||!application.offering_title.trim())throw Error('stored_application_invalid');
+    if(receiptV2Snapshot.rendering_version!==2 || receiptV2Snapshot.method!==application.payment_method || receiptV2Snapshot.price!==application.price || receiptV2Snapshot.name!==application.applicant_name || receiptV2Snapshot.title!==application.offering_title)throw Error('receipt_snapshot_mismatch');
+    const mail=receiptV2(receiptV2Snapshot,appOrigin);
+    return {to:recipient,subject:mail.subject,html:mail.html,idempotencyKey:`academy-offering-application-${application.id}-applicant`};
+  }
   if (contentSnapshot && contentSnapshot.rendering_version !== 1) throw new Error('unsupported_receipt_version');
   const sourceNote = contentSnapshot ? contentSnapshot.bank_note : headquarters.default_payment_note;
   const note = typeof sourceNote === 'string' ? sourceNote.trim() : '';

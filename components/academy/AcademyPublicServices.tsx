@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { listPublicOfferings, type PublicOfferingScope, type PublicOfferingSummary } from "@/lib/academy/public-offerings";
 
-export function AcademyPublicServices({ headquartersId, instructorId, courseId, hideWhenEmpty = false, onAvailabilityChange, heading = '申込できるサービス', description, emptyMessage = '現在、申込できるサービスはありません。' }: PublicOfferingScope & { hideWhenEmpty?: boolean; onAvailabilityChange?: (headquartersId: string, available: boolean) => void; heading?:string; description?:string; emptyMessage?:string }) {
+export function AcademyPublicServices({ headquartersId, instructorId, courseId, hideWhenEmpty = false, suppliedItems, onAvailabilityChange, heading = '申込できるサービス', description, emptyMessage = '現在、申込できるサービスはありません。' }: PublicOfferingScope & { hideWhenEmpty?: boolean; suppliedItems?: PublicOfferingSummary[]; onAvailabilityChange?: (headquartersId: string, available: boolean) => void; heading?:string; description?:string; emptyMessage?:string }) {
   const scopeKey = `${headquartersId}:${instructorId ?? ""}:${courseId ?? ""}`;
-  const [result, setResult] = useState<{ key: string; items: PublicOfferingSummary[]; error: boolean; unavailable?: boolean } | null>(null);
+  const [loadedResult, setResult] = useState<{ key: string; items: PublicOfferingSummary[]; error: boolean; unavailable?: boolean } | null>(null);
+  const result:typeof loadedResult = suppliedItems===undefined?loadedResult:{key:scopeKey,items:suppliedItems,error:false};
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
+    if(suppliedItems!==undefined){onAvailabilityChange?.(headquartersId,suppliedItems.length>0);return;}
     let cancelled = false;
     setResult(null);
     onAvailabilityChange?.(headquartersId, false);
@@ -24,7 +26,7 @@ export function AcademyPublicServices({ headquartersId, instructorId, courseId, 
       }
     });
     return () => { cancelled = true; };
-  }, [headquartersId, instructorId, courseId, scopeKey, refresh, onAvailabilityChange]);
+  }, [headquartersId, instructorId, courseId, scopeKey, refresh, onAvailabilityChange, suppliedItems]);
   useEffect(() => {
     const reload = () => setRefresh(value => value + 1);
     window.addEventListener("focus", reload);
@@ -32,7 +34,7 @@ export function AcademyPublicServices({ headquartersId, instructorId, courseId, 
   }, []);
   if (hideWhenEmpty && result?.key === scopeKey && !result.error && !result.items.length) return null;
   return <section id="services" className="my-8 min-w-0 space-y-4" aria-label={heading}>
-    <h2 className="text-xl font-bold">{heading}</h2>
+    {heading&&<h2 className="text-xl font-bold">{heading}</h2>}
     {description&&<p className="text-sm leading-relaxed text-[#4b535e]">{description}</p>}
     {!result || result.key !== scopeKey ? <p role="status">サービスを読み込んでいます…</p>
       : result.unavailable ? <p role="status">講師からの申込受付は現在利用できません。本部へご確認ください。</p>
@@ -43,7 +45,7 @@ export function AcademyPublicServices({ headquartersId, instructorId, courseId, 
           <p className="text-sm text-[var(--mikke-muted)]">{item.kind}</p>
           <h3 className="break-words text-lg font-bold">{item.title}</h3>
           <p className="my-3">{item.purchase_mode === "staged" ? "講座ごとにお支払い（価格は詳細で確認）" : `${item.price.toLocaleString("ja-JP")}円`}</p>
-          <Link className="inline-flex min-h-11 items-center font-bold text-[var(--mikke-primary)] underline" href={`/academy/${instructorId ? "oi" : "o"}/${item.id}`}>{item.title}の詳細・申込 →</Link>
+          <Link className="inline-flex min-h-11 items-center font-bold text-[var(--mikke-primary)] underline" href={`/academy/${instructorId ? "oi" : "o"}/${item.id}`}>{heading ? `${item.title}の詳細・申込 →` : '内容・申込方法を見る →'}</Link>
         </li>)}
       </ul>}
   </section>;

@@ -32,12 +32,12 @@ async function call<T>(name: string, args: Record<string, unknown>): Promise<T> 
       academy2_publication_or_terms_changed: "公開状態、価格または規約が更新されています。販売プランの最新情報を確認してください。",
       academy2_public_source_unavailable: "募集を開始できる状態ではありません。本部と販売プランの公開条件を確認してください。",
       academy2_operational_scope_on_hold: "この販売プランには、まだ申込処理へ接続していない設定が含まれています。対応範囲を確認してください。",
-      academy2_invalid_kit_method: "販売プランで許可されたキットの受け渡し方法を選択してください。",
-      academy2_kit_method_locked: "申込のある開催や受付中の開催では、キットの受け渡し方法を変更できません。",
+      academy2_invalid_kit_method: "販売プランで許可された教材・材料の受け渡し方法を選択してください。",
+      academy2_kit_method_locked: "申込のある開催や受付中の開催では、教材・材料の受け渡し方法を変更できません。",
       academy2_event_full: "この開催は定員に達しています。別の開催を選んでください。",
       academy2_review_required: "入金状態と確認内容を確認してください。修了・認定には確認した内容の記録が必要です。",
       academy2_event_not_ready: "開催の受講方法と日程の設定を確認してください。",
-      academy2_kit_contract_not_ready: "物品の受け渡し方法と配送先の設定を確認してください。この開催の受付は開始されていません。",
+      academy2_kit_contract_not_ready: "教材・材料の受け渡し方法と配送先の設定を確認してください。この開催の受付は開始されていません。",
       academy2_event_source_mismatch: "この開催と公開済み販売プランの保存版が一致しません。販売プランと開催を確認してください。",
       academy2_invalid_location: "住所・公開範囲・開催エリア・参加者への案内を確認してください。",
       academy2_location_locked: "受付中または申込のある開催では、住所と参加者への案内を変更できません。入力内容は残っています。",
@@ -93,6 +93,12 @@ export async function writeAcademy2EventWithLocation(headquartersId:string,event
  assertAcademyWritable();
  const core=eventInput(input);if(fulfillment!==null)delete core.kit_method;
  return call('academy2_write_event_with_location',{p_hq:headquartersId,p_event:eventId,p_expected:expected,p_request:requestId,p_input:{...core,...(!eventId?{plan_id:input.planId,plan_revision:input.planRevision,course_id:input.courseId}:input.legacyReviewPlanRevision!==undefined?{legacy_review_plan_revision:input.legacyReviewPlanRevision}:{})},p_fulfillment:fulfillment,p_individual:individual,p_location:input.location??{address:'',address_visibility:'private',area:'',participant_note:''}});
+}
+/** New-date creation only: server rechecks page preparation before canonical location write. */
+export async function writeAcademy2ReadyEventWithLocation(headquartersId:string,eventId:string|null,expected:number,requestId:string,input:Academy2EventInput&{planId?:string;planRevision?:number;courseId?:string;legacyReviewPlanRevision?:number},fulfillment:{method:string;destination?:unknown}|null,individual:boolean,assignment:import('./event-assignees').EventAssigneeSelection=null):Promise<Academy2EventDetail>{
+ assertAcademyWritable();if(eventId!==null||expected!==0)throw new Error('既存開催の編集は従来の経路で行ってください。');
+ const core=eventInput(input);if(fulfillment!==null)delete core.kit_method;
+ return call('academy2_create_event_assigned',{p_hq:headquartersId,p_assignment:assignment,p_request:requestId,p_input:{...core,plan_id:input.planId,plan_revision:input.planRevision,course_id:input.courseId},p_fulfillment:fulfillment,p_individual:individual,p_location:input.location??{address:'',address_visibility:'private',area:'',participant_note:''}});
 }
 export async function createAcademy2Event(headquartersId: string, requestId: string, input: Academy2EventInput & {planId: string; planRevision: number; courseId: string}): Promise<Academy2EventSummary> {
   assertAcademyWritable();

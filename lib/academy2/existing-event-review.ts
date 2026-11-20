@@ -8,7 +8,12 @@ export type ExistingEventReview = {
   configuration:{title:string;study_style:'instructor';allowed_methods:('online'|'in_person')[];kit:EventKitSettings};
 };
 export async function getExistingEventReview(headquartersId:string,eventId:string):Promise<ExistingEventReview|null>{
+  const state=await supabase.rpc('academy2_event_plan_review_status',{p_hq:headquartersId,p_event:eventId});
+  if(state.error)throw new Error('開催と販売プランの保存内容を確認できませんでした。再確認してください。');
+  if(state.data?.needsReview===false)return null;
+  if(state.data?.needsReview!==true)throw new Error('販売プランの確認結果を読み取れませんでした。');
   const {data,error}=await supabase.rpc('academy2_existing_event_review',{p_hq:headquartersId,p_event:eventId}).abortSignal(AbortSignal.timeout(30000));
+  if(error?.code==='PGRST202'||error?.code==='42883')throw new Error('販売プランに変更があります。この開催へ反映する機能は準備中です。保存済みの開催条件は変更していません。');
   if(error)throw Object.assign(new Error(error.code==='42501'?'この開催の見直しを確認する権限がありません。':'見直した販売プランの設定を確認できませんでした。入力内容は残っています。'),{code:error.code});
   if(data===null)return null;
   const value=data as ExistingEventReview;

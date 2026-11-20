@@ -1,3 +1,4 @@
+import {academyPublicClient} from '@/lib/academy/public-client';
 import {supabase} from '@/lib/supabase/client';
 import {assertAcademyWritable} from '@/lib/academy/preview';
 
@@ -19,4 +20,4 @@ function profile(value:SellerProfile){
 export async function getSellerProfile(hq:string){return profile(await call<SellerProfile>('academy2_seller_profile',{p_hq:hq}));}
 export async function saveSellerProfile(hq:string,expected:number,request:string,document:SellerDocument){assertAcademyWritable();return profile(await call<SellerProfile>('academy2_save_seller_profile',{p_hq:hq,p_expected:expected,p_request:request,p_document:document}));}
 export type PublicSellerDisclosure=SellerDocument&{offering_id:string;offering_title:string;price:number;currency:string;payment_methods:string[];published_at:string;policies:Partial<Record<'commerce'|'cancellation'|'privacy',{body:string;version:string;revision:number}>>};
-export function getPublicSellerDisclosure(offeringId:string){return call<PublicSellerDisclosure|null>('academy2_public_seller_disclosure',{p_offering:offeringId});}
+export async function getPublicSellerDisclosure(offeringId:string):Promise<PublicSellerDisclosure|null>{const {data,error}=await academyPublicClient.rpc('academy2_public_seller_disclosure',{p_offering:offeringId}).abortSignal(AbortSignal.timeout(20000));if(error)throw new Error('販売者情報を読み込めませんでした。');if(data&&data.offering_id!==offeringId)throw new Error('販売者情報を確認できませんでした。');return data as PublicSellerDisclosure|null;}

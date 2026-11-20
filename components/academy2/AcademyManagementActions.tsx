@@ -4,11 +4,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { toAcademyContextHref } from '@/lib/academy/access-context';
 import { getAcademy2Management, actAcademy2Management } from '@/lib/academy2/management';
+import {getSalesPagePublicationStatus} from '@/lib/academy2/plan-publication';
 import styles from './academy-management-actions.module.css';
 
 type Kind = 'course' | 'plan' | 'event';
 type Snapshot = Awaited<ReturnType<typeof getAcademy2Management>>;
-type Props = { headquartersId: string; kind: Kind; id: string; title: string; disabled?: boolean; children?: ReactNode; showArchived?: boolean; onChanged?: () => void; compact?: boolean; hideState?: boolean };
+type Props = { headquartersId: string; kind: Kind; id: string; title: string; disabled?: boolean; children?: ReactNode; showArchived?: boolean; archiveView?:'active'|'archived'; onChanged?: () => void; compact?: boolean; hideState?: boolean };
 const labels: Record<string, string> = { duplicate: '複製する', archive: 'アーカイブする', restore: '一覧に戻す', delete: '削除する', unpublish: '非公開にする', republish: '公開条件を確認して再公開', cancel: '開催を中止する' };
 const states: Record<string, string> = { saved: '保存済み', draft: '下書き', published: '公開版あり', unpublished: '非公開', not_published: '未公開', unavailable: '非公開', planned: '開催予定', active: '開催中', completed: '開催終了', cancelled: '中止', open: '受付中', closed: '受付停止', ended: '受付終了', archived: 'アーカイブ済み' };
 const routes = { course: 'courses', plan: 'offerings', event: 'classes' };
@@ -24,7 +25,7 @@ function impact(kind: Kind, action: string) {
 }
 
 /** Actions and delete eligibility are exclusively supplied and rechecked by the server. */
-export function AcademyManagementActions({ headquartersId, kind, id, title, disabled = false, children, showArchived = true, onChanged, compact = false, hideState = false }: Props) {
+export function AcademyManagementActions({ headquartersId, kind, id, title, disabled = false, children, showArchived = true, archiveView, onChanged, compact = false, hideState = false }: Props) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState('');
@@ -37,14 +38,17 @@ export function AcademyManagementActions({ headquartersId, kind, id, title, disa
   const [menuOpen, setMenuOpen] = useState(false);
   const confirmation = useRef<HTMLDialogElement>(null);
   const [pendingAction, setPendingAction] = useState('');
+  const [informationState,setInformationState]=useState<string|null>(null);
   useEffect(() => {
-    let live = true; setLoading(true); setSnapshot(null); setError('');
+    let live = true; setLoading(true); setSnapshot(null); setInformationState(null); setError('');
     getAcademy2Management(headquartersId, kind, id).then(value => { if (live) setSnapshot(value); }).catch(cause => { if (live) setError(cause instanceof Error ? cause.message : '管理状態を確認できませんでした。'); }).finally(() => { if (live) setLoading(false); });
+    if(kind==='plan')getSalesPagePublicationStatus(headquartersId,id).then(value=>{if(live)setInformationState(value.state);}).catch(()=>{/* Unknown information-page state must keep plan archival blocked. */});
     return () => { live = false; };
   }, [headquartersId, kind, id, retry]);
 
   async function act(action: string, confirmed = false) {
     if (!snapshot || disabled || inFlight.current || !snapshot.allowed_actions.includes(action)) return;
+    if(action==='archive'&&kind==='plan'&&(!['draft','not_published','unpublished'].includes(snapshot.state)||!['not_published','unpublished'].includes(informationState??''))){setError('先に販売ページを非公開にして、公開・受付の停止を確認してください。');return;}
     if (!confirmed) { setPendingAction(action); confirmation.current?.showModal(); return; }
     confirmation.current?.close();
     const signature = `${headquartersId}:${kind}:${id}:${action}:${snapshot.revision}:${snapshot.source_version}`;
@@ -62,12 +66,14 @@ export function AcademyManagementActions({ headquartersId, kind, id, title, disa
     finally { inFlight.current = false; setBusy(false); }
   }
   const actions = snapshot?.allowed_actions.filter(action => Object.hasOwn(labels, action) && (action !== 'delete' || snapshot.can_delete)) ?? [];
-  return <div className={`${children ? styles.item : styles.editor} ${compact ? styles.compact : ''}`} hidden={!!snapshot?.archived && !showArchived}>
+  const archiveBlocked=kind==='plan'&&!!snapshot&&(!['draft','not_published','unpublished'].includes(snapshot.state)||!['not_published','unpublished'].includes(informationState??''));
+  const filteredOut=!!snapshot&&(archiveView?archiveView==='archived'?!snapshot.archived:snapshot.archived:!!snapshot.archived&&!showArchived);
+  return <div data-management-item="true" className={`${children ? styles.item : styles.editor} ${compact ? styles.compact : ''}`} hidden={filteredOut}>
     <dialog ref={confirmation} className={styles.confirmation} aria-label="操作の確認"><h3>{labels[pendingAction] ?? '操作の確認'}</h3><p>「{title}」</p><p>{impact(kind,pendingAction)}</p><div><button type="button" onClick={()=>confirmation.current?.close()}>キャンセル</button><button type="button" disabled={busy||disabled} onClick={()=>void act(pendingAction,true)}>実行する</button></div></dialog>
-    {children}
+    {(!archiveView||!!snapshot)&&children}
     <div className={styles.controls}>
       {loading ? <span role="status">状態を確認中…</span> : snapshot && ((!hideState && (!compact || snapshot.state !== 'saved')) || snapshot.archived) ? <><span className={styles.badge}>{states[snapshot.state] ?? '状態を確認してください'}</span>{snapshot.archived && snapshot.state !== 'archived' && <span className={styles.badge}>アーカイブ済み</span>}</> : null}
-      {!!actions.length && <div className={styles.menu}><button type="button" aria-expanded={menuOpen} aria-label={`${title}の操作`} onClick={()=>setMenuOpen(value=>!value)}>{compact ? '…' : '操作'}</button>{menuOpen&&<div className={styles.panel}>{actions.map(action => <button key={action} type="button" className={action === 'delete' || action === 'cancel' ? styles.danger : ''} disabled={disabled || busy || loading} onClick={() => void act(action)}>{labels[action]}</button>)}{!compact && !snapshot?.can_delete && snapshot?.delete_reason && <p>{snapshot.delete_reason}</p>}{disabled && <p>入力中の内容を保存してから操作してください。</p>}</div>}</div>}
+      {!!actions.length && <div className={styles.menu}><button type="button" aria-expanded={menuOpen} aria-label={`${title}の操作`} onClick={()=>setMenuOpen(value=>!value)}>{compact ? '…' : '操作'}</button>{menuOpen&&<div className={styles.panel}>{actions.map(action => <button key={action} type="button" className={action === 'delete' || action === 'cancel' ? styles.danger : ''} disabled={disabled || busy || loading || action==='archive'&&archiveBlocked} onClick={() => void act(action)}>{labels[action]}</button>)}{archiveBlocked&&actions.includes('archive')&&<p>{informationState===null?'販売ページの公開状態を確認できるまで、アーカイブできません。':'先に販売ページを非公開にして、公開・受付の停止を確認してください。'}</p>}{!compact && !snapshot?.can_delete && snapshot?.delete_reason && <p>{snapshot.delete_reason}</p>}{disabled && <p>入力中の内容を保存してから操作してください。</p>}</div>}</div>}
       {message && <span role="status">{message}</span>}
       {error && <div className={styles.error} role="alert">{error}<button type="button" disabled={busy} onClick={() => setRetry(value => value + 1)}>管理状態を再確認</button></div>}
     </div>
