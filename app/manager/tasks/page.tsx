@@ -1,11 +1,6 @@
-import { AuthGate } from "@/components/AuthGate";
-import { ManagerTaskList } from "@/components/manager/ManagerTaskList";
+import { redirect } from "next/navigation";
 
 export default function ManagerTasksPage() {
-  return (
-    <AuthGate>
-      <ManagerTaskList />
-    </AuthGate>
-  );
+  redirect("/manager/notifications");
 }
 
